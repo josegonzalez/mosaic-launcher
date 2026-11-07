@@ -1,0 +1,9 @@
+id=battery-logger
+name=Battery logger (unsupported on desktop)
+api=1
+# sessions shorter than this aren't logged
+setting.min_minutes=choice|Shortest session to log (minutes)|1|0,1,5,10
+# past this the log is renamed to battery-logger.old.csv and a new one started
+setting.max_kb=choice|Largest log size (KB)|256|64,256,1024
+# off skips sessions where the device charged; on logs them with charged=yes
+setting.charged=toggle|Log sessions that charged|off
