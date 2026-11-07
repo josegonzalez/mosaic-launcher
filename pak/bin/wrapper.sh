@@ -23,7 +23,9 @@ run_stock() {
 	exec "$stock" "$@"
 }
 
-[ -n "$pak_dir" ] && [ -x "$ours" ] || run_stock "$@"
+if [ -z "$pak_dir" ] || [ ! -x "$ours" ]; then
+	run_stock "$@"
+fi
 [ -f "$STATE_DIR/enabled" ] || run_stock "$@"
 [ -f "$STATE_DIR/fallback" ] && run_stock "$@"
 
