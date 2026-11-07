@@ -1,0 +1,7 @@
+id=clear-recents
+name=Clear recents
+api=1
+# the game list button in Recently Played that removes the selected game or clears them all
+setting.button=choice|Recently Played button|Y|Y,L2,R2
+# a Clear recents tile on the quick menu, shown while there are recents
+setting.tile=toggle|Clear recents tile on the quick menu|on
