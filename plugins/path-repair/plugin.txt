@@ -1,0 +1,7 @@
+id=path-repair
+name=Path repair
+api=1
+# points a recent at its game again after a rename, as the launcher loads recents
+setting.recents=toggle|Repair recents|on
+# points entries in every collection, favorites too, at their games again after a rename, at start
+setting.collections=toggle|Repair collections|on
