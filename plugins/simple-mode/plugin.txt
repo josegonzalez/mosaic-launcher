@@ -1,0 +1,7 @@
+id=simple-mode
+name=Simple mode
+api=1
+# hides Tools and its tiles, and with settings on, Settings, Wifi, Bluetooth and Reboot; the Simple mode tile on the quick menu turns it off, after the PIN when one is set
+setting.on=toggle|Simple mode on|on
+setting.settings=toggle|Hide settings tiles|on
+setting.pin=text|PIN to leave|
