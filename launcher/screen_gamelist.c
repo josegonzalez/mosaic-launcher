@@ -1,0 +1,358 @@
+#include "launcher.h"
+
+void GameList_handleInput(void) {
+	if (PAD_tappedMenu(now)) {
+		currentScreen = SCREEN_QUICKMENU;
+		qm_col = 0;
+		qm_row = 0;
+		qm_shift = 0;
+		qm_slot = 0;
+		dirty = 1;
+		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
+		if (!HAS_POWER_BUTTON && !simple_mode) PWR_enableSleep();
+	}
+	else if (PAD_tappedSelect(now)) {
+		currentScreen = SCREEN_GAMESWITCHER;
+		switcher_selected = 0;
+		dirty = 1;
+	}
+	else if (total>0) {
+		if (PAD_justRepeated(BTN_UP)) {
+			if (selected==0 && !PAD_justPressed(BTN_UP)) {
+				// stop at top
+			}
+			else {
+				selected -= 1;
+				if (selected<0) {
+					selected = total-1;
+					int start = total - MAIN_ROW_COUNT;
+					top->start = (start<0) ? 0 : start;
+					top->end = total;
+				}
+				else if (selected<top->start) {
+					top->start -= 1;
+					top->end -= 1;
+				}
+			}
+		}
+		else if (PAD_justRepeated(BTN_DOWN)) {
+			if (selected==total-1 && !PAD_justPressed(BTN_DOWN)) {
+				// stop at bottom
+			}
+			else {
+				selected += 1;
+				if (selected>=total) {
+					selected = 0;
+					top->start = 0;
+					top->end = (total<MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
+				}
+				else if (selected>=top->end) {
+					top->start += 1;
+					top->end += 1;
+				}
+			}
+		}
+		if (PAD_justRepeated(BTN_LEFT)) {
+			selected -= MAIN_ROW_COUNT;
+			if (selected<0) {
+				selected = 0;
+				top->start = 0;
+				top->end = (total<MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
+			}
+			else if (selected<top->start) {
+				top->start -= MAIN_ROW_COUNT;
+				if (top->start<0) top->start = 0;
+				top->end = top->start + MAIN_ROW_COUNT;
+			}
+		}
+		else if (PAD_justRepeated(BTN_RIGHT)) {
+			selected += MAIN_ROW_COUNT;
+			if (selected>=total) {
+				selected = total-1;
+				int start = total - MAIN_ROW_COUNT;
+				top->start = (start<0) ? 0 : start;
+				top->end = total;
+			}
+			else if (selected>=top->end) {
+				top->end += MAIN_ROW_COUNT;
+				if (top->end>total) top->end = total;
+				top->start = top->end - MAIN_ROW_COUNT;
+			}
+		}
+	}
+
+	if (PAD_justRepeated(BTN_L1) && !PAD_isPressed(BTN_R1) && !PWR_ignoreSettingInput(BTN_L1, show_setting)) { // previous alpha
+		Entry* entry = top->entries->items[selected];
+		int i = entry->alpha-1;
+		if (i>=0) {
+			selected = top->alphas->items[i];
+			if (total>MAIN_ROW_COUNT) {
+				top->start = selected;
+				top->end = top->start + MAIN_ROW_COUNT;
+				if (top->end>total) top->end = total;
+				top->start = top->end - MAIN_ROW_COUNT;
+			}
+		}
+	}
+	else if (PAD_justRepeated(BTN_R1) && !PAD_isPressed(BTN_L1) && !PWR_ignoreSettingInput(BTN_R1, show_setting)) { // next alpha
+		Entry* entry = top->entries->items[selected];
+		int i = entry->alpha+1;
+		if (i<top->alphas->count) {
+			selected = top->alphas->items[i];
+			if (total>MAIN_ROW_COUNT) {
+				top->start = selected;
+				top->end = top->start + MAIN_ROW_COUNT;
+				if (top->end>total) top->end = total;
+				top->start = top->end - MAIN_ROW_COUNT;
+			}
+		}
+	}
+
+	if (selected!=top->selected) {
+		top->selected = selected;
+		dirty = 1;
+	}
+
+	Entry* entry = top->entries->items[top->selected];
+
+	if (dirty && total>0)
+		readyResume(entry);
+
+	if (total>0 && can_resume && PAD_justReleased(BTN_RESUME)) {
+		should_resume = 1;
+		Entry_open(entry);
+
+		dirty = 1;
+	}
+	else if (total>0 && PAD_justPressed(BTN_A)) {
+		Entry_open(entry);
+		if(entry->type == ENTRY_DIR) {
+			animationdirection = SLIDE_LEFT;
+			total = top->entries->count;
+		}
+		dirty = 1;
+
+		if (total>0) readyResume(top->entries->items[top->selected]);
+	}
+	else if (PAD_justPressed(BTN_B) && stack->count>1) {
+		closeDirectory();
+		animationdirection = SLIDE_RIGHT;
+		total = top->entries->count;
+		dirty = 1;
+
+		if (total>0) readyResume(top->entries->items[top->selected]);
+	}
+}
+
+void GameList_render(void) {
+	// background and game art file path stuff
+	Entry* entry = top->entries->items[top->selected];
+	assert(entry);
+	char tmp_path[MAX_PATH];
+	strncpy(tmp_path, entry->path, sizeof(tmp_path) - 1);
+	tmp_path[sizeof(tmp_path) - 1] = '\0';
+
+	char* res_name = strrchr(tmp_path, '/');
+	if (res_name) res_name++;
+
+	char path_copy[1024];
+	strncpy(path_copy, entry->path, sizeof(path_copy) - 1);
+	path_copy[sizeof(path_copy) - 1] = '\0';
+
+	char* rompath = dirname(path_copy);
+
+	char res_copy[1024];
+	strncpy(res_copy, res_name, sizeof(res_copy) - 1);
+	res_copy[sizeof(res_copy) - 1] = '\0';
+
+	char* dot = strrchr(res_copy, '.');
+	if (dot) *dot = '\0';
+
+	static int lastType = -1;
+
+	// this is only a choice on the root folder
+	list_show_entry_names = stack->count > 1 || CFG_getShowFolderNamesAtRoot();
+
+	// load folder background
+	char defaultBgPath[512];
+	snprintf(defaultBgPath, sizeof(defaultBgPath), SDCARD_PATH "/bg.png");
+
+	if(((entry->type == ENTRY_DIR || entry->type == ENTRY_ROM) && CFG_getRomsUseFolderBackground())) {
+		char *newBg = entry->type == ENTRY_DIR ? entry->path:rompath;
+		if((strcmp(newBg, folderBgPath) != 0 || lastType != entry->type) && sizeof(folderBgPath) != 1) {
+			lastType = entry->type;
+			char tmppath[512];
+			strncpy(folderBgPath, newBg, sizeof(folderBgPath) - 1);
+			if (entry->type == ENTRY_DIR)
+				snprintf(tmppath, sizeof(tmppath), "%s/.media/bg.png", folderBgPath);
+			else if (entry->type == ENTRY_ROM)
+				snprintf(tmppath, sizeof(tmppath), "%s/.media/bglist.png", folderBgPath);
+			if(!exists(tmppath)) {
+				// Safeguard: If no background is available, still render the text to leave the user a way out
+				list_show_entry_names = true;
+				snprintf(tmppath, sizeof(tmppath), defaultBgPath, folderBgPath);
+			}
+			startLoadFolderBackground(tmppath, onBackgroundLoaded, NULL);
+		}
+	}
+	else if(strcmp(defaultBgPath, folderBgPath) != 0 && exists(defaultBgPath)) {
+		strncpy(folderBgPath, defaultBgPath, sizeof(folderBgPath) - 1);
+		startLoadFolderBackground(defaultBgPath, onBackgroundLoaded, NULL);
+	}
+	else {
+		// Safeguard: If no background is available, still render the text to leave the user a way out
+		list_show_entry_names = true;
+	}
+	// load game thumbnails
+	if (total > 0) {
+		if(CFG_getShowGameArt()) {
+			char thumbpath[1024];
+			snprintf(thumbpath, sizeof(thumbpath), "%s/.media/%s.png", rompath, res_copy);
+			had_thumb = 0;
+			startLoadThumb(thumbpath, onThumbLoaded, NULL);
+			int max_w = (int)(screen->w - (screen->w * CFG_getGameArtWidth()));
+			int max_h = (int)(screen->h * 0.6);
+			int new_w = max_w;
+			int new_h = max_h;
+			if(exists(thumbpath)) {
+				ox = (int)(max_w) - SCALE1(BUTTON_MARGIN*5);
+				had_thumb = 1;
+			}
+			else
+				ox = screen->w;
+		}
+	}
+
+	// buttons
+	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
+	else if (can_resume) GFX_blitButtonGroup((char*[]){ "X","RESUME",  NULL }, 0, screen, 0);
+	else GFX_blitButtonGroup((char*[]){
+		BTN_SLEEP==BTN_POWER?"POWER":"MENU",
+		BTN_SLEEP==BTN_POWER||simple_mode?"SLEEP":"INFO",
+		NULL }, 0, screen, 0);
+
+	if (total==0) {
+		if (stack->count>1) {
+			GFX_blitButtonGroup((char*[]){ "B","BACK",  NULL }, 0, screen, 1);
+		}
+	}
+	else {
+		if (stack->count>1) {
+			GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OPEN", NULL }, 1, screen, 1);
+		}
+		else {
+			GFX_blitButtonGroup((char*[]){ "A","OPEN", NULL }, 0, screen, 1);
+		}
+	}
+
+	// list
+	if (total > 0) {
+		selected_row = top->selected - top->start;
+		previousY = previous_row * PILL_SIZE;
+		targetY = selected_row * PILL_SIZE;
+		SDL_Color text_color = uintToColour(THEME_COLOR4_255); // list text color
+		for (int i = top->start, j = 0; i < top->end; i++, j++) {
+			Entry* entry = top->entries->items[i];
+			char* entry_name = entry->name;
+			char* entry_unique = entry->unique;
+			int available_width = MAX(0,(had_thumb ? ox + SCALE1(BUTTON_MARGIN) : screen->w - SCALE1(BUTTON_MARGIN)) - SCALE1(PADDING * 2));
+			bool row_is_selected = (j == selected_row);
+			bool row_is_top = (i == top->start);
+			bool row_has_moved = (previous_row != selected_row || previous_depth != stack->count);
+			if (row_is_top && !(had_thumb))
+				available_width -= ow;
+
+			trimSortingMeta(&entry_name);
+			if (entry_unique) // Only render if a unique name exists
+				trimSortingMeta(&entry_unique);
+
+			char display_name[256];
+			int text_width = GFX_getTextWidth(font.large, entry_unique ? entry_unique : entry_name, display_name, available_width, SCALE1(BUTTON_PADDING * 2));
+			int max_width = MIN(available_width, text_width);
+
+			// This spaghetti is preventing white text on white pill when volume/color temp is shown,
+			// dont ask me why. This all needs to get tossed out and redone properly later.
+			SDL_Color text_color = uintToColour(THEME_COLOR4_255);
+			int notext = 0;
+			if(!row_has_moved && row_is_selected) {
+				text_color = uintToColour(THEME_COLOR5_255);
+				notext = 1;
+			}
+
+			SDL_LockMutex(fontMutex);
+			SDL_Surface* text = TTF_RenderUTF8_Blended(font.large, entry_name, text_color);
+			SDL_Surface* text_unique = TTF_RenderUTF8_Blended(font.large, display_name, COLOR_DARK_TEXT);
+			SDL_UnlockMutex(fontMutex);
+			// TODO: Use actual font metrics to center, this only works in simple cases
+			const int text_offset_y = (SCALE1(PILL_SIZE) - text->h + 1) >> 1;
+			if (row_is_selected) {
+				is_scrolling = list_show_entry_names && GFX_textShouldScroll(font.large,display_name, max_width - SCALE1(BUTTON_PADDING*2), fontMutex);
+				GFX_resetScrollText();
+				bool should_animate = previous_depth == stack->count;
+				SDL_LockMutex(animMutex);
+				if(globalpill) {
+					SDL_FreeSurface(globalpill);
+					globalpill=NULL;
+				}
+				globalpill = SDL_CreateRGBSurfaceWithFormat(SDL_SWSURFACE, max_width, SCALE1(PILL_SIZE), FIXED_DEPTH, screen->format->format);
+				GFX_blitPillDark(ASSET_WHITE_PILL, globalpill, &(SDL_Rect){0,0, max_width, SCALE1(PILL_SIZE)});
+				globallpillW =  max_width;
+				SDL_UnlockMutex(animMutex);
+				updatePillTextSurface(entry_name, max_width, uintToColour(THEME_COLOR5_255));
+				AnimTask* task = malloc(sizeof(AnimTask));
+				task->startX = SCALE1(BUTTON_MARGIN);
+				task->startY = SCALE1(previousY+PADDING);
+				task->targetX = SCALE1(BUTTON_MARGIN);
+				task->targetY = SCALE1(targetY+PADDING);
+				task->targetTextY = SCALE1(PADDING + targetY) + text_offset_y;
+				pilltargetTextY = task->targetTextY;
+				task->move_w = max_width;
+				task->move_h = SCALE1(PILL_SIZE);
+				task->frames = should_animate && CFG_getMenuAnimations() ? 3:1;
+				task->entry_name = strdup(notext ? " " : entry_name);
+				animPill(task);
+			}
+			SDL_Rect text_rect = { 0, 0, max_width - SCALE1(BUTTON_PADDING*2), text->h };
+			SDL_Rect dest_rect = { SCALE1(BUTTON_MARGIN + BUTTON_PADDING), SCALE1(PADDING + (j * PILL_SIZE)) + text_offset_y };
+
+			if(list_show_entry_names) {
+				SDL_BlitSurface(text_unique, &text_rect, screen, &dest_rect);
+				SDL_BlitSurface(text, &text_rect, screen, &dest_rect);
+			}
+			SDL_FreeSurface(text_unique); // Free after use
+			SDL_FreeSurface(text); // Free after use
+		}
+		if(lastScreen==SCREEN_GAMESWITCHER) {
+			if(switcherSur) {
+				// update cpu surface here first
+				GFX_clearLayers(LAYER_ALL);
+				folderbgchanged=1;
+
+				GFX_flipHidden();
+				GFX_animateSurface(switcherSur,0,0,0,0-screen->h,screen->w,screen->h,CFG_getMenuTransitions() ? 100:20,255,255,LAYER_BACKGROUND);
+				animationdirection = ANIM_NONE;
+			}
+		}
+		if(lastScreen==SCREEN_OFF) {
+			GFX_animateSurfaceOpacity(blackBG,0,0,screen->w,screen->h,255,0,CFG_getMenuTransitions() ? 200:20,LAYER_THUMBNAIL);
+		}
+
+		previous_row = selected_row;
+		previous_depth = stack->count;
+	}
+	else {
+		// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...
+		GFX_blitMessage(font.large, "Empty folder", screen, &(SDL_Rect){0,0,screen->w,screen->h}); //, NULL);
+	}
+
+	lastScreen = SCREEN_GAMELIST;
+}
+
+void LaunchFade_render(void) {
+	//pilltargetY = +screen->w;
+	//animationdirection = ANIM_NONE;
+	GFX_clearLayers(LAYER_ALL);
+	GFX_clear(screen);
+	GFX_flipHidden();
+	GFX_animateSurfaceOpacity(tmpOldScreen,0,0,screen->w,screen->h,255,0,CFG_getMenuTransitions() ? 150:20,LAYER_BACKGROUND);
+}

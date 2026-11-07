@@ -28,5 +28,6 @@
 #include "launch.h"
 #include "nav.h"
 #include "imgloader.h"
+#include "screens.h"
 
 #endif

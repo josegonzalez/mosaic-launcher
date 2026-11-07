@@ -73,6 +73,10 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `launch.c` | handing off to games and paks, resume state, FN buttons |
 | `nav.c` | the directory stack, restoring the last position, opening entries |
 | `imgloader.c` | background image, thumbnail and selection pill worker threads |
+| `screens.c` | the screen registry `main()` dispatches through, and state shared with it |
+| `screen_gamelist.c` | game list input and rendering, plus the fade shown when launching |
+| `screen_switcher.c` | game switcher input and rendering |
+| `screen_quickmenu.c` | quick menu input and rendering |
 
 Upstream changes have to be ported forward by hand. To see what changed upstream since the pinned tag:
 
