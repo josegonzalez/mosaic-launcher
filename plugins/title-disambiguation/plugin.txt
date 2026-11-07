@@ -1,0 +1,5 @@
+id=title-disambiguation
+name=Title disambiguation
+api=1
+# also tell apart same-named games from one system (by tags or extension), not only games from different systems
+setting.same_system=toggle|Same system too|on
