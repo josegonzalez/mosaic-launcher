@@ -5,8 +5,8 @@
 # version, one that replaces the root and opens entries, one that sorts
 # and renames a folder and moves the selection, one that adds quick menu
 # tiles and shares a button, one that declines after registering things,
-# one that powers off, one that sets stock toggles, and one that crashes
-# during startup.
+# one that powers off, one that sets stock toggles, one that reads theme
+# colours and sets an LED colour, and one that crashes during startup.
 #
 #   tests/plugins/run.sh
 
@@ -306,6 +306,20 @@ grep -q "plugins: refused to set stock toggle wifi to 1" "$log" || fail "the ref
 grep -q "^showclock=1$" "$SETTINGS" || fail "Show clock wasn't saved: $(grep showclock "$SETTINGS")"
 grep -q "^haptics=1$" "$SETTINGS" || fail "another toggle changed: $(grep haptics "$SETTINGS")"
 rm -rf "$WORK/plugins/toggler.plugin" "$STATE/plugins.txt"
+
+# lighter reads the theme colours stock loaded as 0xRRGGBB, and has its LED
+# colour refused, since desktop has no LEDs
+printf 'color1=0xFFFFFFFF\ncolor2=0x9B2257FF\ncolor7=0x10203080\n' >"$SETTINGS"
+printf 'lighter=on\n' >"$STATE/plugins.txt"
+build_plugin lighter 'id=lighter\nname=Lighter\napi=1\n'
+SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/lighter.log" || fail "the launcher exited early with lighter loaded"
+log="$WORK/lighter.log"
+plugin=lighter
+expect "main FFFFFF, accent 9B2257, background 102030, 0 -1, 8 -1"
+expect "leds 0, set -1, clear -1"
+grep -q "plugins: refused LED colour FF0000 for lighter" "$log" || fail "the refused LED colour wasn't logged"
+grep -q "LED colour" "$WORK/hello.log" && fail "the LED colour changed without a plugin asking"
+rm -rf "$WORK/plugins/lighter.plugin" "$STATE/plugins.txt"
 if [ -f "$WORK/minuisettings.txt.saved" ]; then cp "$WORK/minuisettings.txt.saved" "$SETTINGS"; else rm -f "$SETTINGS"; fi
 
 # the bundled plugins load and start cleanly

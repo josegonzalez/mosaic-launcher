@@ -105,6 +105,18 @@ enum MosaicLaunchResult {
 #define MOSAIC_TOGGLE_SHOW_BATTERY_PERCENT "show_battery_percent" // Show battery percentage
 #define MOSAIC_TOGGLE_HAPTICS "haptics"                           // Haptic feedback
 
+// Stock NextUI's theme colours theme_color takes, numbered and named as in
+// stock's Settings app.
+enum MosaicThemeColor {
+	MOSAIC_COLOR_MAIN = 1,               // Main Color
+	MOSAIC_COLOR_ACCENT = 2,             // Primary Accent Color
+	MOSAIC_COLOR_ACCENT2 = 3,            // Secondary Accent Color
+	MOSAIC_COLOR_LIST_TEXT = 4,          // List Text
+	MOSAIC_COLOR_LIST_TEXT_SELECTED = 5, // List Text Selected
+	MOSAIC_COLOR_HINT = 6,               // Hint info Color
+	MOSAIC_COLOR_BACKGROUND = 7,         // Background Color
+};
+
 typedef struct MosaicLaunch {
 	const char* path; // the rom or pak being launched
 	int type;         // MOSAIC_ENTRY_ROM or MOSAIC_ENTRY_PAK
@@ -293,10 +305,7 @@ typedef struct MosaicHost {
 	int (*is_charging)(void);
 
 	// How many LEDs the device's LED settings control: 0 on devices without
-	// controllable LEDs, and on desktop. Setting them is up to the plugin,
-	// through the platform's own files in /sys, and the launcher's LED rules
-	// set them again when the device starts or stops charging, gets low on
-	// battery, or sleeps.
+	// controllable LEDs, and on desktop. Set them with led_set_color.
 	int (*led_count)(void);
 
 	// Powers the device off, or reboots it when reboot is 1, the way the
@@ -324,6 +333,27 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, override_repeat), and use
 	// MOSAIC_TRIGGER_PRESS without it.
 	int override_repeat;
+
+	// Lights every LED in one static colour, rgb as 0xRRGGBB, at the
+	// brightness the user's LED settings give each one, or changes the
+	// colour the same plugin set. Stock's charging, critical and low
+	// battery, mute and sleep lights still come first, and the colour
+	// comes back after them. led_clear puts the user's own LED settings
+	// back; the launcher also does that after the plugin's quit (such as
+	// for a launch, or when it's turned off) and before a power-off, and
+	// games set the LEDs their own way. Nothing is saved: the user's LED
+	// settings files are never written. One plugin's colour is on at a
+	// time: until it clears it, another plugin's led_set_color returns -1.
+	// led_set_color returns 0, or -1 with no LEDs (led_count is 0, as on
+	// desktop), while another plugin's colour is on, or for rgb past
+	// 0xFFFFFF. led_clear returns 0, or -1 when the plugin's colour isn't
+	// on.
+	int (*led_set_color)(const char* plugin_id, unsigned int rgb);
+	int (*led_clear)(const char* plugin_id);
+
+	// A stock theme colour, by an enum MosaicThemeColor, as 0xRRGGBB, or
+	// -1 for any other index.
+	int (*theme_color)(int index);
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use

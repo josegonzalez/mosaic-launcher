@@ -4,6 +4,7 @@
 #include "pluginset.h"
 #include "plugins.h"
 #include "stocktoggles.h"
+#include "leds.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -412,6 +413,30 @@ static int hostStockToggleSet(const char* name, int on) {
 	return 0;
 }
 
+static int hostLedSetColor(const char* plugin_id, unsigned int rgb) {
+	const char* holder = Leds_holder();
+	if (hostLedCount() == 0 || Leds_set(plugin_id, rgb) != 0) {
+		if (holder && plugin_id && strcmp(holder, plugin_id) != 0) {
+			LOG_warn("plugins: refused %s's LED colour, %s's is on\n", plugin_id, holder);
+		}
+		else {
+			LOG_warn("plugins: refused LED colour %06X for %s\n", rgb, plugin_id ? plugin_id : "(null)");
+		}
+		return -1;
+	}
+	// once, not on every change of colour
+	if (!holder) LOG_info("plugins: %s set the LED colour\n", plugin_id);
+	return 0;
+}
+static int hostLedClear(const char* plugin_id) {
+	if (Leds_clear(plugin_id) != 0) return -1;
+	LOG_info("plugins: %s cleared the LED colour\n", plugin_id);
+	return 0;
+}
+static int hostThemeColor(int index) {
+	return Leds_themeColor(index);
+}
+
 static const MosaicHost host = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -463,6 +488,9 @@ static const MosaicHost host = {
 	.stock_toggle_get = hostStockToggleGet,
 	.stock_toggle_set = hostStockToggleSet,
 	.override_repeat = 1,
+	.led_set_color = hostLedSetColor,
+	.led_clear = hostLedClear,
+	.theme_color = hostThemeColor,
 };
 
 ///////////////////////////////////////
@@ -539,6 +567,7 @@ static void load(const PluginManifest* m) {
 		state.rebuild_quick = rebuild_quick;
 		state.power_off = power_off;
 		hostInhibitSleep(m->id, 0);
+		hostLedClear(m->id);
 		if (p->cfg) Hash_free(p->cfg);
 		dlclose(handle);
 		loaded_count--;
@@ -600,6 +629,8 @@ void Plugins_quit(void) {
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) p->plugin->quit();
+		// turning a plugin off, or a launch, gives the user's colour back
+		hostLedClear(p->id);
 		if (p->cfg) Hash_free(p->cfg);
 		dlclose(p->handle);
 	}
@@ -966,6 +997,13 @@ void Plugins_afterResume(void) {
 
 void Plugins_beforePoweroff(void) {
 	EACH_PLUGIN_WITH(before_poweroff) p->before_poweroff();
+	// so the device doesn't power off in a plugin's colour
+	const char* holder = Leds_holder();
+	if (holder) {
+		char id[64];
+		snprintf(id, sizeof(id), "%s", holder);
+		hostLedClear(id);
+	}
 }
 
 const MosaicPlugin* Plugins_at(int i) {
