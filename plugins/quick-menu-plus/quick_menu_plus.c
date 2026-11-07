@@ -1,9 +1,14 @@
-// Quick menu plus: relabels and hides quick menu tiles, and adds a Stay
-// awake toggle and a Reboot to stock tile.
+// Quick menu plus: relabels and hides quick menu tiles, and adds toggle
+// tiles for stock settings, a Stay awake toggle and a Reboot to stock tile.
 //
 // The labels setting renames the top row's built-in tiles, eg.
 // "Recents=Played, Games=Library", and the hide setting hides tiles by
 // name, built-in or a plugin tile's action id, eg. "Pak Store, Bluetooth".
+//
+// The toggles setting picks which of stock's on/off settings get a tile,
+// eg. "save, load, clock": the in-game notifications, the clock, the
+// battery percentage and haptics. A tile flips the setting the way stock's
+// Settings app does.
 //
 // Stay awake holds off auto-sleep while it's on, until the device reboots
 // or powers off; a file in /tmp remembers it across games.
@@ -22,6 +27,8 @@
 
 #define ID "quick-menu-plus"
 #define MAX_PATH_LEN 1024
+// as in plugin.txt: the in-game notifications
+#define QMP_TOGGLES_DEFAULT "save, load, screenshot, adjustments"
 
 #ifndef QMP_AWAKE_FILE
 #define QMP_AWAKE_FILE "/tmp/quick-menu-plus.awake"
@@ -86,6 +93,28 @@ static void applyHidden(void) {
 			say(message);
 		}
 	}
+}
+
+///////////////////////////////////////
+// stock toggles
+
+static int stockOn(void* data) {
+	const QmpToggle* toggle = data;
+	return host->stock_toggle_get(toggle->name) == 1;
+}
+
+static void flipStock(void* data) {
+	const QmpToggle* toggle = data;
+	int on = !stockOn(data);
+	char message[200];
+	if (host->stock_toggle_set(toggle->name, on) != 0) {
+		snprintf(message, sizeof(message), "Couldn't change %s", toggle->label);
+		toast(message);
+		return;
+	}
+	snprintf(message, sizeof(message), "%s %s", toggle->label, on ? "on" : "off");
+	toast(message);
+	host->request_redraw();
 }
 
 ///////////////////////////////////////
@@ -190,12 +219,40 @@ static void askRebootToStock(void* data) {
 ///////////////////////////////////////
 // hooks
 
-static void addTile(const char* id, const char* label, int (*available)(void*), void (*run)(void*), int (*is_on)(void*)) {
-	if (host->register_action(id, label, available, run, NULL) != 0
+static void addTile(const char* id, const char* label, int (*available)(void*), void (*run)(void*), int (*is_on)(void*), void* data) {
+	if (host->register_action(id, label, available, run, data) != 0
 			|| host->quick_tile(id, MOSAIC_QUICK_TOP, NULL, NULL, is_on) != 0) {
 		char message[200];
 		snprintf(message, sizeof(message), "couldn't add the %s tile", label);
 		say(message);
+	}
+}
+
+// A tile per toggle the toggles setting names that the launcher knows.
+static void addStockToggles(void) {
+	const char* setting = host->cfg_get(ID, "toggles", QMP_TOGGLES_DEFAULT);
+	if (!setting[0]) return;
+	if (!MOSAIC_HOST_HAS(host, stock_toggle_get) || !MOSAIC_HOST_HAS(host, stock_toggle_set)) {
+		say("this launcher can't change stock settings; no toggle tiles");
+		return;
+	}
+	const QmpToggle* toggles[QMP_MAX];
+	int skipped = 0;
+	int count = Qmp_parseToggles(setting, toggles, QMP_MAX, &skipped);
+	char message[200];
+	if (skipped) {
+		snprintf(message, sizeof(message), "left out %d unknown toggle(s)", skipped);
+		say(message);
+	}
+	for (int i = 0; i < count; i++) {
+		if (host->stock_toggle_get(toggles[i]->name) < 0) {
+			snprintf(message, sizeof(message), "this launcher doesn't know %s; no tile", toggles[i]->name);
+			say(message);
+			continue;
+		}
+		char id[QMP_NAME_LEN + 32];
+		snprintf(id, sizeof(id), ID ".toggle.%s", toggles[i]->word);
+		addTile(id, toggles[i]->label, always, flipStock, stockOn, (void*)toggles[i]);
 	}
 }
 
@@ -210,10 +267,12 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 
+	addStockToggles();
+
 	if (isOn("awake_tile", "on")) {
 		if (!MOSAIC_HOST_HAS(host, inhibit_sleep)) say("this launcher can't hold off sleep; no Stay awake tile");
 		else {
-			addTile(ID ".awake", "Stay awake", always, toggleAwake, awakeOn);
+			addTile(ID ".awake", "Stay awake", always, toggleAwake, awakeOn, NULL);
 			if (access(QMP_AWAKE_FILE, F_OK) == 0) setAwake(1);
 		}
 	}
@@ -225,7 +284,7 @@ static int init(const MosaicHost* h) {
 		else {
 			findPak();
 			if (!pak[0]) say("manage.sh not found; no Reboot to stock tile");
-			addTile(ID ".stock", "Reboot to stock", canRebootToStock, askRebootToStock, NULL);
+			addTile(ID ".stock", "Reboot to stock", canRebootToStock, askRebootToStock, NULL, NULL);
 		}
 	}
 	return 0;

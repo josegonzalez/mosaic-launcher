@@ -13,13 +13,15 @@ static const char* labels_setting = NULL;
 static const char* hide_setting = NULL;
 static const char* awake_setting = NULL;
 static const char* stock_setting = NULL;
+static const char* toggles_setting = "";
 
-#define MAX_ACTIONS 4
+#define MAX_ACTIONS 12
 static int action_count = 0;
 static char action_id[MAX_ACTIONS][64];
 static char action_label[MAX_ACTIONS][64];
 static int (*action_available[MAX_ACTIONS])(void*);
 static void (*action_run[MAX_ACTIONS])(void*);
+static void* action_data[MAX_ACTIONS];
 static int tile_count = 0;
 static char tile_action[MAX_ACTIONS][64];
 static int tile_row[MAX_ACTIONS];
@@ -44,11 +46,12 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	if (hide_setting && !strcmp(key, "hide")) return hide_setting;
 	if (awake_setting && !strcmp(key, "awake_tile")) return awake_setting;
 	if (stock_setting && !strcmp(key, "stock_tile")) return stock_setting;
+	if (toggles_setting && !strcmp(key, "toggles")) return toggles_setting;
 	return fallback;
 }
 static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
-	(void)data;
 	if (action_count >= MAX_ACTIONS) return -1;
+	action_data[action_count] = data;
 	snprintf(action_id[action_count], sizeof(action_id[0]), "%s", id);
 	snprintf(action_label[action_count], sizeof(action_label[0]), "%s", label);
 	action_available[action_count] = available;
@@ -86,6 +89,28 @@ static void fakeConfirm(const char* message, const char* yes, void (*on_yes)(voi
 }
 static void fakePowerOff(int reboot) { power_offs++; last_reboot = reboot; }
 
+// the fake's stock settings; haptics is one this launcher doesn't know
+static const char* stock_names[] = { "notify_manual_save", "notify_load", "notify_screenshot", "notify_adjustments", "show_clock", "show_battery_percent" };
+static int stock_values[6] = { 1, 1, 0, 1, 1, 0 };
+static int refuse_sets = 0, stock_sets = 0;
+static int stockIndex(const char* name) {
+	for (int i = 0; i < 6; i++) {
+		if (!strcmp(stock_names[i], name)) return i;
+	}
+	return -1;
+}
+static int fakeStockGet(const char* name) {
+	int i = stockIndex(name);
+	return i < 0 ? -1 : stock_values[i];
+}
+static int fakeStockSet(const char* name, int on) {
+	int i = stockIndex(name);
+	if (i < 0 || (on != 0 && on != 1) || refuse_sets) return -1;
+	stock_values[i] = on;
+	stock_sets++;
+	return 0;
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -103,6 +128,8 @@ static MosaicHost fake = {
 	.hide_quick_tile = fakeHide,
 	.rename_quick_tile = fakeRename,
 	.power_off = fakePowerOff,
+	.stock_toggle_get = fakeStockGet,
+	.stock_toggle_set = fakeStockSet,
 };
 
 static int find(const char* id) {
@@ -200,6 +227,28 @@ static void testModel(void) {
 	CHECK_STR(cmd, "'/card/it'\\''s.pak/bin/manage.sh' 'turn-off'");
 	CHECK(!Qmp_manageCommand("/card/Launcher.pak", "turn-off", cmd, 20));
 	CHECK(!Qmp_manageCommand("", "turn-off", cmd, sizeof(cmd)));
+
+	// every toggle's name is the SDK's
+	CHECK_STR(Qmp_toggleFor("save")->name, MOSAIC_TOGGLE_NOTIFY_MANUAL_SAVE);
+	CHECK_STR(Qmp_toggleFor("load")->name, MOSAIC_TOGGLE_NOTIFY_LOAD);
+	CHECK_STR(Qmp_toggleFor("screenshot")->name, MOSAIC_TOGGLE_NOTIFY_SCREENSHOT);
+	CHECK_STR(Qmp_toggleFor("adjustments")->name, MOSAIC_TOGGLE_NOTIFY_ADJUSTMENTS);
+	CHECK_STR(Qmp_toggleFor("clock")->name, MOSAIC_TOGGLE_SHOW_CLOCK);
+	CHECK_STR(Qmp_toggleFor("battery")->name, MOSAIC_TOGGLE_SHOW_BATTERY_PERCENT);
+	CHECK_STR(Qmp_toggleFor("haptics")->name, MOSAIC_TOGGLE_HAPTICS);
+	CHECK(Qmp_toggleFor(" CLOCK ") == Qmp_toggleFor("show_clock"));
+	CHECK_STR(Qmp_toggleFor("clock")->label, "Clock");
+	CHECK(Qmp_toggleFor("wifi") == NULL && Qmp_toggleFor(NULL) == NULL);
+
+	const QmpToggle* picked[QMP_MAX];
+	skipped = -1;
+	CHECK(Qmp_parseToggles("", picked, QMP_MAX, &skipped) == 0 && skipped == 0);
+	n = Qmp_parseToggles("clock, nope, Save,show_clock,,haptics", picked, QMP_MAX, &skipped);
+	CHECK(n == 3 && skipped == 1);
+	CHECK(picked[0] == Qmp_toggleFor("clock"));
+	CHECK(picked[1] == Qmp_toggleFor("save"));
+	CHECK(picked[2] == Qmp_toggleFor("haptics"));
+	CHECK(Qmp_parseToggles("save, load, clock", picked, 2, NULL) == 2);
 }
 
 int main(void) {
@@ -314,6 +363,59 @@ int main(void) {
 	fake.size = offsetof(MosaicHost, power_off);
 	CHECK(p->init(&fake) == 0);
 	CHECK(find("quick-menu-plus.stock") < 0 && find("quick-menu-plus.awake") >= 0);
+	fake.size = sizeof(MosaicHost);
+
+	// the default toggles: a tile for each in-game notification, before
+	// Stay awake and Reboot to stock
+	reset();
+	toggles_setting = NULL;
+	CHECK(p->init(&fake) == 0);
+	CHECK(action_count == 6 && tile_count == 6);
+	CHECK_STR(tile_action[0], "quick-menu-plus.toggle.save");
+	CHECK_STR(tile_action[1], "quick-menu-plus.toggle.load");
+	CHECK_STR(tile_action[2], "quick-menu-plus.toggle.screenshot");
+	CHECK_STR(tile_action[3], "quick-menu-plus.toggle.adjustments");
+	CHECK_STR(tile_action[4], "quick-menu-plus.awake");
+	CHECK_STR(tile_action[5], "quick-menu-plus.stock");
+	CHECK_STR(action_label[0], "Save notices");
+	CHECK(tile_row[0] == MOSAIC_QUICK_TOP && tile_is_on[0] != NULL);
+
+	// a tile shows the setting and flips it
+	int shot = find("quick-menu-plus.toggle.screenshot");
+	CHECK(action_available[shot](action_data[shot]));
+	CHECK(!tile_is_on[shot](action_data[shot]));
+	action_run[shot](action_data[shot]);
+	CHECK(stock_values[2] == 1 && tile_is_on[shot](action_data[shot]));
+	CHECK_STR(toasted, "Screenshot notices on");
+	action_run[shot](action_data[shot]);
+	CHECK(stock_values[2] == 0);
+	CHECK_STR(toasted, "Screenshot notices off");
+
+	// a refused change says so and leaves it
+	refuse_sets = 1;
+	stock_sets = 0;
+	action_run[shot](action_data[shot]);
+	CHECK(stock_values[2] == 0 && stock_sets == 0);
+	CHECK_STR(toasted, "Couldn't change Screenshot notices");
+	refuse_sets = 0;
+
+	// the setting picks them, and a name the launcher doesn't know gets none
+	reset();
+	toggles_setting = "battery, haptics, clock";
+	awake_setting = stock_setting = "off";
+	CHECK(p->init(&fake) == 0);
+	CHECK(tile_count == 2);
+	CHECK_STR(tile_action[0], "quick-menu-plus.toggle.battery");
+	CHECK_STR(tile_action[1], "quick-menu-plus.toggle.clock");
+	CHECK_STR(action_label[0], "Battery %");
+	CHECK(!tile_is_on[0](action_data[0]) && tile_is_on[1](action_data[1]));
+
+	// a launcher without stock toggles: the other tiles only
+	reset();
+	awake_setting = stock_setting = NULL;
+	fake.size = offsetof(MosaicHost, stock_toggle_get);
+	CHECK(p->init(&fake) == 0);
+	CHECK(tile_count == 2 && find("quick-menu-plus.toggle.clock") < 0);
 	fake.size = sizeof(MosaicHost);
 
 	unlink(QMP_AWAKE_FILE);

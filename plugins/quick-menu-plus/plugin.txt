@@ -5,6 +5,8 @@ api=1
 setting.labels=text|Tile labels (Recents=Played, ...)|
 # tiles to hide, by name or a plugin tile's action id, eg. Pak Store, Bluetooth
 setting.hide=text|Hidden tiles (Pak Store, ...)|
+# stock settings with a toggle tile, from save, load, screenshot, adjustments (the in-game notifications), clock, battery, haptics
+setting.toggles=text|Toggle tiles (save, load, clock, ...)|save, load, screenshot, adjustments
 # a Stay awake tile that holds off auto-sleep while it's on
 setting.awake_tile=toggle|Stay awake tile on the quick menu|on
 # a Reboot to stock tile that turns the launcher off and reboots into stock NextUI

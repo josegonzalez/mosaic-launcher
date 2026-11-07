@@ -32,6 +32,25 @@ int Qmp_parseLabels(const char* setting, QmpLabel* out, int max, int* skipped);
 // Returns how many are in out.
 int Qmp_parseHidden(const char* setting, char out[][QMP_NAME_LEN], int max);
 
+// A stock NextUI setting with a quick menu tile: the MOSAIC_TOGGLE_* name
+// the host takes, the short word the toggles setting uses, and the tile's
+// label.
+typedef struct QmpToggle {
+	const char* name;
+	const char* word;
+	const char* label;
+} QmpToggle;
+
+// The toggle a word or a MOSAIC_TOGGLE_* name stands for, ignoring case and
+// spaces around it, or NULL.
+const QmpToggle* Qmp_toggleFor(const char* word);
+
+// Reads the toggles setting, comma-separated words such as "save, clock",
+// into out, in the order given and without repeats. Words that aren't a
+// toggle are counted in skipped, when it isn't NULL. Returns how many are
+// in out.
+int Qmp_parseToggles(const char* setting, const QmpToggle** out, int max, int* skipped);
+
 // The pak a launcher binary at <pak>/bin/<platform>/nextui.elf belongs
 // to. Returns 1 and writes it, or 0 for a path that isn't laid out so.
 int Qmp_pakFromExe(const char* exe, char* out, size_t size);

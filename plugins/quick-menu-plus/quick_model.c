@@ -114,6 +114,57 @@ int Qmp_parseHidden(const char* setting, char out[][QMP_NAME_LEN], int max) {
 	return s.count;
 }
 
+// The names match MOSAIC_TOGGLE_* in mosaic_plugin.h, which this file
+// doesn't include so it stays apart from the host.
+static const QmpToggle toggles[] = {
+	{ "notify_manual_save", "save", "Save notices" },
+	{ "notify_load", "load", "Load notices" },
+	{ "notify_screenshot", "screenshot", "Screenshot notices" },
+	{ "notify_adjustments", "adjustments", "Adjustment notices" },
+	{ "show_clock", "clock", "Clock" },
+	{ "show_battery_percent", "battery", "Battery %" },
+	{ "haptics", "haptics", "Haptics" },
+};
+#define TOGGLE_COUNT (sizeof(toggles) / sizeof(toggles[0]))
+
+const QmpToggle* Qmp_toggleFor(const char* word) {
+	if (!word) return NULL;
+	char trimmed[QMP_NAME_LEN];
+	copyTrimmed(trimmed, sizeof(trimmed), word, word + strlen(word));
+	for (size_t i = 0; i < TOGGLE_COUNT; i++) {
+		if (!strcasecmp(trimmed, toggles[i].word) || !strcasecmp(trimmed, toggles[i].name)) return &toggles[i];
+	}
+	return NULL;
+}
+
+typedef struct ToggleState {
+	const QmpToggle** out;
+	int max;
+	int count;
+	int skipped;
+} ToggleState;
+
+static void addToggle(const char* part, void* data) {
+	ToggleState* s = data;
+	const QmpToggle* toggle = Qmp_toggleFor(part);
+	if (!toggle) {
+		s->skipped++;
+		return;
+	}
+	for (int i = 0; i < s->count; i++) {
+		if (s->out[i] == toggle) return;
+	}
+	if (s->count >= s->max) return;
+	s->out[s->count++] = toggle;
+}
+
+int Qmp_parseToggles(const char* setting, const QmpToggle** out, int max, int* skipped) {
+	ToggleState s = { out, max, 0, 0 };
+	eachPart(setting, addToggle, &s);
+	if (skipped) *skipped = s.skipped;
+	return s.count;
+}
+
 int Qmp_pakFromExe(const char* exe, char* out, size_t size) {
 	if (!exe || exe[0] != '/') return 0;
 	char path[1024];
