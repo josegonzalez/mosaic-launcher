@@ -21,13 +21,17 @@ jobs:
           submodules: true # the C tests build against vendor/NextUI's headers
 
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y bats shellcheck libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y bats shellcheck libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb
 
       - name: Lint
         run: make lint
 
       - name: Test
         run: make test
+
+      # the bundled plugins together, in both slot profiles, on a virtual display
+      - name: Plugin profiles
+        run: xvfb-run -a make test-profiles
 
   build:
     runs-on: ubuntu-24.04-arm

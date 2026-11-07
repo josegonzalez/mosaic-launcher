@@ -60,6 +60,8 @@ The bats tests run the pak scripts against a fake SD card, with a fake `mount` t
 
 `make smoke` starts the desktop build for a few seconds, then its settings screens, and fails if either exits on its own. Its logs (`build/smoke.log` and `build/smoke-settings.log`) are also handy for comparing startup output before and after a change.
 
+`make test-profiles` does the same with the bundled plugins together, in two profiles built from their `plugin.txt` files: everything on with the first owner of each exclusive slot, then each slot flipped to its next owner. Plugins whose `requires` can't be met are left off with a note. It fails if the launcher exits on its own or the loader refuses a plugin the profile didn't turn off; logs are in `build/profiles/`.
+
 ## Updating NextUI
 
 The launcher in `launcher/` started as upstream's `nextui.c`, split into modules:
