@@ -3,3 +3,5 @@ name=Favorites
 api=1
 # the collection in Collections/ that holds favorites, and the folder's name on the root
 setting.collection=text|Collection|Favorites
+# favorites sort first in every folder but Recently Played, collections and Favorites
+setting.pin=toggle|Pin to top|off

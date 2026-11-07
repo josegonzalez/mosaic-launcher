@@ -38,10 +38,14 @@ static void sayYes(void) {
 	if (answer_yes) answer_yes(NULL);
 	answer_yes = NULL;
 }
+static const char* pin_setting = NULL; // the "pin" setting, or NULL for its default
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id; (void)key;
+	(void)id;
+	if (!strcmp(key, "pin") && pin_setting) return pin_setting;
 	return fallback;
 }
+static int reloads = 0;
+static void fakeReload(void) { reloads++; }
 static NUIEntry* fakeEntryNew(const char* path, int type, const char* name) {
 	NUIEntry* e = calloc(1, sizeof(NUIEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);
@@ -98,6 +102,7 @@ static const NUIHost fake = {
 	.bind_button = fakeBind,
 	.toast = fakeToast,
 	.confirm = fakeConfirm,
+	.reload_lists = fakeReload,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -120,7 +125,73 @@ static void selectEntry(const char* path, int type) {
 	selected = fakeEntryNew(path, type, NULL);
 }
 
+// Sorts entries in place by the plugin's sort_compare, keeping the order of
+// pairs it has no opinion on, as the launcher does.
+static void sortBy(const NUIPlugin* p, NUIEntry** items, int n, const char* dir) {
+	for (int i = 1; i < n; i++) {
+		NUIEntry* e = items[i];
+		int j = i;
+		while (j > 0 && p->sort_compare(items[j - 1], e, dir) > 0) {
+			items[j] = items[j - 1];
+			j--;
+		}
+		items[j] = e;
+	}
+}
+
+static void testPinModel(void) {
+	const char* paths[] = { "/Roms/GB/Zelda.gb", "/Roms/PS/Game/Game.m3u", "/Tools/desktop/Clock.pak",
+		"/Roms/PS/Single/Single.cue", "", NULL };
+	PinSet set;
+	Pin_build(&set, paths, 6);
+	CHECK(set.count == 4); // empty and missing paths are skipped
+	CHECK(Pin_has(&set, "/Roms/GB/Zelda.gb"));
+	CHECK(Pin_has(&set, "/Tools/desktop/Clock.pak"));
+	CHECK(!Pin_has(&set, "/Roms/GB/Tetris.gb"));
+	CHECK(!Pin_has(&set, NULL));
+
+	// games and paks by their own path
+	CHECK(Pin_isPinned(&set, "/Roms/GB/Zelda.gb", NUI_ENTRY_ROM));
+	CHECK(!Pin_isPinned(&set, "/Roms/GB/Tetris.gb", NUI_ENTRY_ROM));
+	CHECK(Pin_isPinned(&set, "/Tools/desktop/Clock.pak", NUI_ENTRY_PAK));
+	CHECK(!Pin_isPinned(&set, "/Roms/GB/Zelda.gb", NUI_ENTRY_TOGGLE));
+	// a folder that launches a game, by its .m3u or .cue
+	CHECK(Pin_isPinned(&set, "/Roms/PS/Game", NUI_ENTRY_DIR));
+	CHECK(Pin_isPinned(&set, "/Roms/PS/Single", NUI_ENTRY_DIR));
+	CHECK(!Pin_isPinned(&set, "/Roms/PS", NUI_ENTRY_DIR));
+	CHECK(!Pin_isPinned(&set, "/Roms/PS/Game/", NUI_ENTRY_DIR));
+	// a disc inside a multi-disc game, by the game's .m3u
+	CHECK(Pin_isPinned(&set, "/Roms/PS/Game/Game (Disc 2).cue", NUI_ENTRY_ROM));
+	CHECK(Pin_isPinned(&set, "/Roms/PS/Game/Game.m3u", NUI_ENTRY_ROM));
+	CHECK(!Pin_isPinned(&set, "/Roms/PS/Other/Other (Disc 1).cue", NUI_ENTRY_ROM));
+	CHECK(!Pin_isPinned(&set, NULL, NUI_ENTRY_ROM));
+	PinSet none;
+	Pin_build(&none, paths, 0);
+	CHECK(!Pin_isPinned(&none, "/Roms/GB/Zelda.gb", NUI_ENTRY_ROM));
+
+	// which folders put favorites first
+	CHECK(Pin_applies("/Roms/GB", "/Favorites"));
+	CHECK(Pin_applies("/Tools/desktop", "/Favorites"));
+	CHECK(Pin_applies("/Recently Played Games", "/Favorites"));
+	CHECK(Pin_applies("/Favorites Old", "/Favorites"));
+	CHECK(!Pin_applies("/Recently Played", "/Favorites"));
+	CHECK(!Pin_applies("/Collections", "/Favorites"));
+	CHECK(!Pin_applies("/Collections/Favorites.txt", "/Favorites"));
+	CHECK(Pin_applies("/CollectionsX", "/Favorites"));
+	CHECK(!Pin_applies("/Favorites", "/Favorites"));
+	CHECK(!Pin_applies(NULL, "/Favorites"));
+
+	// pinned first, no opinion otherwise
+	CHECK(Pin_compare(1, 0) < 0);
+	CHECK(Pin_compare(0, 1) > 0);
+	CHECK(Pin_compare(1, 1) == 0);
+	CHECK(Pin_compare(0, 0) == 0);
+	CHECK(Pin_compare(5, 0) < 0);
+}
+
 int main(void) {
+	testPinModel();
+
 	CHECK(system("rm -rf '" CARD "' && mkdir -p '" CARD "/Roms/GB' '" CARD "/Roms/PS/Game' '" CARD "/Roms/PS/Single' '" USERDATA "/launcher'") == 0);
 	writeText(CARD "/Roms/GB/Tetris.gb", "");
 	writeText(CARD "/Roms/GB/Zelda.gb", "");
@@ -249,6 +320,61 @@ int main(void) {
 	CHECK(p->virtual_dir(CARD "/Favorites")->count == 0);
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Tetris.gb\n");
+
+	// pin to top is off by default: no opinion on any order
+	writeText(CARD "/Roms/GB/Tetris.gb", "");
+	writeText(CARD "/Roms/GB/Alpha.gb", "");
+	writeText(COLLECTION, "/Roms/GB/Zelda.gb\n/Roms/PS/Game/Game.m3u\n");
+	NUIEntry* alpha = fakeEntryNew(CARD "/Roms/GB/Alpha.gb", NUI_ENTRY_ROM, NULL);
+	NUIEntry* tetris = fakeEntryNew(CARD "/Roms/GB/Tetris.gb", NUI_ENTRY_ROM, NULL);
+	NUIEntry* zelda = fakeEntryNew(CARD "/Roms/GB/Zelda.gb", NUI_ENTRY_ROM, NULL);
+	CHECK(p->sort_compare(tetris, zelda, CARD "/Roms/GB") == 0);
+	CHECK(p->sort_compare(zelda, tetris, CARD "/Roms/GB") == 0);
+	int reloads_before = reloads;
+	selectEntry(CARD "/Roms/GB/Tetris.gb", NUI_ENTRY_ROM);
+	action_run(NULL);
+	CHECK(reloads == reloads_before); // nothing to re-sort
+	writeText(COLLECTION, "/Roms/GB/Zelda.gb\n/Roms/PS/Game/Game.m3u\n");
+
+	// with it on, favorites go first, each group in the launcher's order
+	pin_setting = "on";
+	CHECK(p->init(&fake) == 0);
+	CHECK(p->sort_compare(tetris, zelda, CARD "/Roms/GB") > 0);
+	CHECK(p->sort_compare(zelda, tetris, CARD "/Roms/GB") < 0);
+	CHECK(p->sort_compare(alpha, tetris, CARD "/Roms/GB") == 0);
+	NUIEntry* gb[] = { alpha, tetris, zelda };
+	sortBy(p, gb, 3, CARD "/Roms/GB");
+	CHECK(gb[0] == zelda && gb[1] == alpha && gb[2] == tetris);
+
+	// a multi-disc game's folder, by its .m3u
+	NUIEntry* game = fakeEntryNew(CARD "/Roms/PS/Game", NUI_ENTRY_DIR, NULL);
+	NUIEntry* single = fakeEntryNew(CARD "/Roms/PS/Single", NUI_ENTRY_DIR, NULL);
+	CHECK(p->sort_compare(single, game, CARD "/Roms/PS") > 0);
+
+	// Recently Played, collections and Favorites keep their own order, and
+	// so does anything off the card
+	CHECK(p->sort_compare(tetris, zelda, CARD "/Recently Played") == 0);
+	CHECK(p->sort_compare(tetris, zelda, COLLECTION) == 0);
+	CHECK(p->sort_compare(tetris, zelda, CARD "/Favorites") == 0);
+	CHECK(p->sort_compare(tetris, zelda, "/elsewhere") == 0);
+
+	// a new favorite moves up once the folder is listed again
+	reloads_before = reloads;
+	selectEntry(CARD "/Roms/GB/Tetris.gb", NUI_ENTRY_ROM);
+	action_run(NULL);
+	CHECK(reloads == reloads_before + 1);
+	CHECK(p->sort_compare(alpha, tetris, CARD "/Roms/GB") > 0);
+	CHECK(p->sort_compare(zelda, tetris, CARD "/Roms/GB") == 0);
+	// and back down once removed
+	action_run(NULL);
+	sayYes();
+	CHECK(reloads == reloads_before + 2);
+	CHECK(p->sort_compare(alpha, tetris, CARD "/Roms/GB") == 0);
+
+	// an edit made elsewhere shows the next time a folder is sorted
+	writeText(COLLECTION, "/Roms/GB/Alpha.gb\n");
+	CHECK(p->sort_compare(tetris, zelda, CARD "/Roms/PS") == 0); // another folder re-reads, and Zelda is gone
+	CHECK(p->sort_compare(alpha, zelda, CARD "/Roms/GB") < 0);
 
 	CHECK_DONE();
 }

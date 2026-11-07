@@ -75,7 +75,7 @@ Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files).
 
 | Plugin | What it does |
 |---|---|
-| `favorites` | A Favorites folder on the root. **Y** on the game list adds or removes the selected game or pak. |
+| `favorites` | A Favorites folder on the root. **Y** on the game list adds or removes the selected game or pak. The Pin to top setting (off by default) also sorts favorites first in whichever folder they're in, except Recently Played, collections and Favorites itself. Pin to top is from kUI and nx-redux. |
 | `smart-collections` | A Smart Collections folder on the root with one collection per franchise (Mario, Zelda, Sonic and so on), matched by game name across every system. **Y** on a collection dismisses it, and **Y** on the folder brings dismissed ones back. Settings add franchises, turn off the built-in list, and set the fewest games a collection needs. From kUI. |
 | `hidden` | Drops the games you hide from every list. **Y** on the game list hides the selected game or pak (the `button` setting picks another), and a Hidden folder on the root, shown while something is hidden, lists them so the same button unhides them. The list is `.userdata/<platform>/launcher/hidden.txt`, one full path per line. From MyMinUI. |
 | `numeric-prefix` | Names starting with `1) `, `01. ` or `[1] ` sort by that number (2 before 10), and the number is left off the name shown; turn the `hide` setting off to keep it. It reads the shown name, so it works for games, folders and `map.txt` names. Numbered entries come first, then the rest in the usual order. On the root only consoles move, staying between Recently Played and Collections. Recently Played and collections keep their own order. From marcelopcx and Ru_UI. |

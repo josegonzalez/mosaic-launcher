@@ -13,6 +13,10 @@
 // A multi-disc or cue-sheet game shows as a folder that launches when opened.
 // For those, and for a "Disc N" entry inside one, the favorite is the game's
 // .m3u (or its .cue), the same file stock records in Recently Played.
+//
+// With the "pin" setting on, favorites also sort first in whichever folder
+// they're in, keeping the launcher's order among them and among the rest.
+// Recently Played, collections and Favorites itself keep their own order.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -20,6 +24,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "nextui_plugin.h"
+#include "pin_model.h"
 
 #define ID "favorites"
 #define MAX_FAVORITES 256
@@ -33,6 +38,9 @@ static char list_path[MAX_PATH_LEN + 160];  // <sd>/Collections/Favorites.txt
 static char art_dir[MAX_PATH_LEN + 160];    // <sd>/Collections/Favorites, for its .media art
 static char favorites[MAX_FAVORITES][MAX_PATH_LEN]; // card-relative, eg. /Roms/GB/Tetris.gb
 static int count = 0;
+static int pin_on = 0;                      // the "pin" setting
+static PinSet pins;                         // favorites, for sort_compare
+static char sorted_dir[MAX_PATH_LEN];       // the folder sort_compare saw last
 
 static void say(const char* message) {
 	host->log(ID, message);
@@ -74,10 +82,18 @@ static void readList(const char* path) {
 	fclose(f);
 }
 
+// Builds the lookup again after favorites changes.
+static void relist(void) {
+	const char* paths[MAX_FAVORITES];
+	for (int i = 0; i < count; i++) paths[i] = favorites[i];
+	Pin_build(&pins, paths, count);
+}
+
 // Re-read every time: other tools can edit the collection too.
 static void load(void) {
 	count = 0;
 	readList(list_path);
+	relist();
 }
 
 static int save(void) {
@@ -186,9 +202,12 @@ static void change(const char* rel) {
 		if (NUI_HOST_HAS(host, toast)) host->toast(shown);
 		return;
 	}
+	relist();
 	if (save() == 0) say(message);
 	else snprintf(shown, sizeof(shown), "Couldn't save %s", folder_name);
 	if (NUI_HOST_HAS(host, toast)) host->toast(shown);
+	// list the folder again so the game moves to or from the top
+	if (pin_on && NUI_HOST_HAS(host, reload_lists)) host->reload_lists();
 	host->request_redraw();
 }
 
@@ -287,6 +306,20 @@ static int artPath(const NUIEntry* entry, int kind, char* out, size_t size) {
 	return 1;
 }
 
+// Favorites first, when the "pin" setting is on.
+static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+	if (!pin_on) return 0;
+	const char* dir = relative(dir_path);
+	if (!dir || !Pin_applies(dir, relative(folder_path))) return 0;
+	// re-read once per folder, not once per pair
+	if (strcmp(dir_path, sorted_dir) != 0) {
+		snprintf(sorted_dir, sizeof(sorted_dir), "%s", dir_path);
+		load();
+	}
+	return Pin_compare(Pin_isPinned(&pins, relative(host->entry_path(a)), host->entry_type(a)),
+		Pin_isPinned(&pins, relative(host->entry_path(b)), host->entry_type(b)));
+}
+
 static int init(const NUIHost* h) {
 	host = h;
 	const char* collection = host->cfg_get(ID, "collection", "Favorites");
@@ -296,7 +329,10 @@ static int init(const NUIHost* h) {
 	snprintf(collections_dir, sizeof(collections_dir), "%s/Collections", host->sdcard_path);
 	snprintf(list_path, sizeof(list_path), "%s/%s.txt", collections_dir, folder_name);
 	snprintf(art_dir, sizeof(art_dir), "%s/%s", collections_dir, folder_name);
+	pin_on = !strcmp(host->cfg_get(ID, "pin", "off"), "on");
+	sorted_dir[0] = '\0';
 	migrate();
+	load();
 
 	if (host->register_action("favorites.toggle", "FAVORITE", canToggle, toggle, NULL) != 0
 			|| host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "favorites.toggle") != 0) {
@@ -314,6 +350,7 @@ static const NUIPlugin plugin = {
 	.virtual_dir = virtualDir,
 	.filter = filter,
 	.art_path = artPath,
+	.sort_compare = sortCompare,
 };
 
 const NUIPlugin* nextui_plugin_get(const NUIHost* h) {

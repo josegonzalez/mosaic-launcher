@@ -66,9 +66,11 @@ $(BUILD)/test_cfgfile: test_cfgfile.c $(LAUNCHER)/cfgfile.c $(LAUNCHER)/cfgfile.
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -DTEST_DIR=\"$(BUILD)\" test_cfgfile.c $(LAUNCHER)/cfgfile.c -o $@
 
 # Plugins are tested against a fake host, by including their source.
-$(BUILD)/test_favorites: test_favorites.c ../../plugins/favorites/favorites.c $(SDK)/nextui_plugin.h check.h
+FAVORITES := ../../plugins/favorites
+
+$(BUILD)/test_favorites: test_favorites.c $(wildcard $(FAVORITES)/*.c $(FAVORITES)/*.h) $(SDK)/nextui_plugin.h check.h
 	mkdir -p $(BUILD)
-	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_SDCARD_PATH=\"$(BUILD)/favorites-card\" test_favorites.c -o $@
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_SDCARD_PATH=\"$(BUILD)/favorites-card\" test_favorites.c $(FAVORITES)/pin_model.c -o $@
 
 SMART := ../../plugins/smart-collections
 
