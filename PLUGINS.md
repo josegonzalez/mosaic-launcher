@@ -77,6 +77,7 @@ Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files).
 |---|---|
 | `favorites` | A Favorites folder on the root. **Y** on the game list adds or removes the selected game or pak. |
 | `smart-collections` | A Smart Collections folder on the root with one collection per franchise (Mario, Zelda, Sonic and so on), matched by game name across every system. **Y** on a collection dismisses it, and **Y** on the folder brings dismissed ones back. Settings add franchises, turn off the built-in list, and set the fewest games a collection needs. From kUI. |
+| `hidden` | Drops the games you hide from every list. **Y** on the game list hides the selected game or pak (the `button` setting picks another), and a Hidden folder on the root, shown while something is hidden, lists them so the same button unhides them. The list is `.userdata/<platform>/launcher/hidden.txt`, one full path per line. From MyMinUI. |
 
 Every hook in `NUIPlugin` is optional; leave out what you don't use. The launcher calls plugins only on its main thread. Both `NUIPlugin` and `NUIHost` start with their own `size`, and fields are only ever added at the end, so a plugin built against an older header keeps working with a newer launcher.
 
