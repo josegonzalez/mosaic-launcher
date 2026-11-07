@@ -1,4 +1,4 @@
-# nextui-launcher
+# mosaic-launcher
 
 A drop-in replacement for the NextUI launcher (`nextui.elf`) that runs on a stock NextUI card. The goal is a launcher with a plugin API, so features that today live in separate MinUI and NextUI forks can be installed and combined as plugins.
 
@@ -14,7 +14,7 @@ To go back to stock, open Launcher and choose **Turn off**. Deleting the `Launch
 
 Stock `MinUI.pak/launch.sh` runs `$SYSTEM_PATH/bin/nextui.elf` in a loop. Turning Launcher on installs a boot hook (`.userdata/<platform>/.hooks/boot.d/00-launcher.sync.sh`) that runs `bin/boot.sh` on every boot, and runs it once right away.
 
-`boot.sh` bind-mounts the stock binary to `/tmp/nextui-launcher/nextui.stock.elf`, then bind-mounts a small wrapper over `nextui.elf`. Nothing in `.system/` is modified, so NextUI updates never conflict. On devices that refuse file bind mounts it falls back to backing up the stock binary as `nextui.stock.elf` and copying the wrapper in place.
+`boot.sh` bind-mounts the stock binary to `/tmp/mosaic-launcher/nextui.stock.elf`, then bind-mounts a small wrapper over `nextui.elf`. Nothing in `.system/` is modified, so NextUI updates never conflict. On devices that refuse file bind mounts it falls back to backing up the stock binary as `nextui.stock.elf` and copying the wrapper in place.
 
 Each time `launch.sh` starts `nextui.elf`, the wrapper picks a binary. It runs stock when the launcher is off, when the pak has been uninstalled, or after our launcher crashes twice in a row. Otherwise it runs this pak's launcher. Shutdown signals (SIGTERM, SIGKILL) don't count as crashes, and any clean exit resets the count. Choosing **Try again** in the Launcher screen clears the crash guard.
 

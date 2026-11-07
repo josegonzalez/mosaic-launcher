@@ -14,12 +14,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "focus_model.h"
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 #define ID "focus-mode"
 #define FAVORITES_ID "favorites"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static FocusList favorites;
 static FocusRow rows[FOCUS_MAX + 1];
 
@@ -41,12 +41,12 @@ static int always(void* data) {
 static void toggle(void* data) {
 	int on = !isOn(data);
 	host->cfg_set(ID, "on", on ? "on" : "off");
-	if (NUI_HOST_HAS(host, toast)) host->toast(on ? "Focus mode on" : "Focus mode off");
-	if (NUI_HOST_HAS(host, reload_lists)) host->reload_lists();
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(on ? "Focus mode on" : "Focus mode off");
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	host->request_redraw();
 }
 
-static NUIList* rootReplace(void) {
+static MosaicList* rootReplace(void) {
 	if (!isOn(NULL)) return NULL;
 
 	// read here, not in init: favorites may load after this plugin
@@ -56,33 +56,33 @@ static NUIList* rootReplace(void) {
 	int count = Focus_rows(&favorites, host->sdcard_path, exists, rows);
 	if (count == 0) return NULL;
 
-	NUIList* root = host->list_new();
+	MosaicList* root = host->list_new();
 	for (int i = 0; i < count; i++) {
 		host->list_push(root, host->entry_new(rows[i].path, rows[i].type, rows[i].name));
 	}
 	return root;
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	if (host->register_action("focus-mode.toggle", "Focus", always, toggle, NULL) != 0
-			|| !NUI_HOST_HAS(host, quick_tile)
-			|| host->quick_tile("focus-mode.toggle", NUI_QUICK_TOP, NULL, NULL, isOn) != 0) {
+			|| !MOSAIC_HOST_HAS(host, quick_tile)
+			|| host->quick_tile("focus-mode.toggle", MOSAIC_QUICK_TOP, NULL, NULL, isOn) != 0) {
 		host->log(ID, "couldn't add the Focus tile; turn focus mode off from the Launcher pak");
 	}
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.root_replace = rootReplace,
 	.root_with_entries = 0, // other plugins' root entries stay off the focused root
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

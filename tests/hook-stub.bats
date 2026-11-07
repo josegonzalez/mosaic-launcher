@@ -31,8 +31,8 @@ setup() {
 @test "undoes a copy-mode install once the pak is uninstalled" {
 	touch "$BATS_TEST_TMPDIR/mount.fail"
 	"$HOOK"
-	grep -q NEXTUI_LAUNCHER_WRAPPER "$STOCK_BIN"
-	rm -rf "$PAK" "$NEXTUI_LAUNCHER_RUN_DIR"
+	grep -q MOSAIC_LAUNCHER_WRAPPER "$STOCK_BIN"
+	rm -rf "$PAK" "$MOSAIC_LAUNCHER_RUN_DIR"
 	run "$HOOK"
 	[ "$status" -eq 0 ]
 	[ ! -f "$HOOK" ]

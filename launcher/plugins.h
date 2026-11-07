@@ -1,7 +1,7 @@
 #ifndef PLUGINS_H
 #define PLUGINS_H
 
-// Finding, loading and calling plugins. See sdk/nextui_plugin.h for the API
+// Finding, loading and calling plugins. See sdk/mosaic_plugin.h for the API
 // they're written against.
 //
 // Plugins live in a directory holding plugin.txt and lib/<arch>/plugin.so:
@@ -9,13 +9,13 @@
 //   Launcher.pak/plugins/<name>.plugin/   bundled, off unless turned on
 //   Tools/<platform>/<name>.pak/          installed separately, on by default
 //
-// NEXTUI_LAUNCHER_PLUGIN_PATH, a colon-separated list of directories holding
+// MOSAIC_LAUNCHER_PLUGIN_PATH, a colon-separated list of directories holding
 // such plugin directories, replaces the bundled location (for desktop runs
 // and tests).
 
 #include <stddef.h>
 #include "actions.h"
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "pluginset.h"
 #include "launchcmd.h"
 
@@ -26,12 +26,12 @@
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
 // end would be reading garbage.
-#define Plugin_has(p, field) ((p)->size >= offsetof(NUIPlugin, field) + sizeof((p)->field))
+#define Plugin_has(p, field) ((p)->size >= offsetof(MosaicPlugin, field) + sizeof((p)->field))
 
 // The loaded plugins, in load order.
-const NUIPlugin* Plugins_at(int i);
+const MosaicPlugin* Plugins_at(int i);
 
-// Bindings plugins added to a screen (an enum NUIScreen), after the
+// Bindings plugins added to a screen (an enum MosaicScreen), after the
 // screen's own. Returns how many, and points *bindings at them.
 int Plugins_bindings(int screen, const Binding** bindings);
 int Plugins_bindButton(int screen, int button, int trigger, const char* action_id);
@@ -110,7 +110,7 @@ void Plugins_quit(void);
 int Plugins_discover(const PluginManifest** out);
 
 // Launcher.pak's directory, from where this binary runs, or
-// NEXTUI_LAUNCHER_PAK_DIR when set. Returns 0 if it can't tell.
+// MOSAIC_LAUNCHER_PAK_DIR when set. Returns 0 if it can't tell.
 int Plugins_pakDir(char* out, size_t size);
 
 // Creates PLUGIN_STATE_DIR, and its parents, if they're missing.

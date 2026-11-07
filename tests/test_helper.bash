@@ -11,7 +11,7 @@ setup_fake_card() {
 	export SYSTEM_PATH="$SDCARD_PATH/.system/$PLATFORM"
 	export USERDATA_PATH="$SDCARD_PATH/.userdata/$PLATFORM"
 	export LOGS_PATH="$USERDATA_PATH/logs"
-	export NEXTUI_LAUNCHER_RUN_DIR="$BATS_TEST_TMPDIR/run"
+	export MOSAIC_LAUNCHER_RUN_DIR="$BATS_TEST_TMPDIR/run"
 	STATE_DIR="$USERDATA_PATH/launcher"
 	STOCK_BIN="$SYSTEM_PATH/bin/nextui.elf"
 	RAN="$BATS_TEST_TMPDIR/ran"
@@ -67,8 +67,8 @@ cp -p "$BATS_TEST_TMPDIR/stash/\$key" "\$1"
 rm -f "$BATS_TEST_TMPDIR/stash/\$key"
 EOF
 	chmod +x "$fake/mount" "$fake/umount"
-	export NEXTUI_LAUNCHER_MOUNT="$fake/mount"
-	export NEXTUI_LAUNCHER_UMOUNT="$fake/umount"
+	export MOSAIC_LAUNCHER_MOUNT="$fake/mount"
+	export MOSAIC_LAUNCHER_UMOUNT="$fake/umount"
 }
 
 turn_on() {

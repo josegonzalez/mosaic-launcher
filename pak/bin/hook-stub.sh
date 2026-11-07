@@ -14,7 +14,7 @@ if [ -n "$pak_dir" ] && [ -x "$pak_dir/bin/boot.sh" ]; then
 fi
 
 bin="$SYSTEM_PATH/bin"
-if grep -q NEXTUI_LAUNCHER_WRAPPER "$bin/nextui.elf" 2>/dev/null && [ -f "$bin/nextui.stock.elf" ]; then
+if grep -q MOSAIC_LAUNCHER_WRAPPER "$bin/nextui.elf" 2>/dev/null && [ -f "$bin/nextui.stock.elf" ]; then
 	mv -f "$bin/nextui.stock.elf" "$bin/nextui.elf"
 fi
 rm -f "$0"

@@ -2,30 +2,30 @@
 // replaced root takes other plugins' entries.
 
 #include <stdio.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 
-static void rootEntries(NUIList* root) {
+static void rootEntries(MosaicList* root) {
 	char path[512];
 	snprintf(path, sizeof(path), "%s/Added", host->sdcard_path);
-	host->list_push(root, host->entry_new(path, NUI_ENTRY_DIR, "Added"));
+	host->list_push(root, host->entry_new(path, MOSAIC_ENTRY_DIR, "Added"));
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = "adder",
 	.init = init,
 	.root_entries = rootEntries,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

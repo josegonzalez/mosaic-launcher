@@ -27,7 +27,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "random_model.h"
 
 #define ID "random-game"
@@ -35,7 +35,7 @@
 #define MAX_DEPTH 3   // subfolders below a system folder that are scanned
 #define MAX_RECENTS 64 // more than the game switcher keeps
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char folder_path[RG_PATH_LEN]; // <sd>/Random game, the root row
 static char roms_path[RG_PATH_LEN];   // <sd>/Roms
 static char hidden_path[RG_PATH_LEN + 32]; // <userdata>/launcher/hidden.txt
@@ -54,7 +54,7 @@ static void say(const char* message) {
 }
 
 static void toast(const char* message) {
-	if (NUI_HOST_HAS(host, toast)) host->toast(message);
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
 
 static int exists(const char* path) {
@@ -136,10 +136,10 @@ static void scanDir(const char* dir, const char* system, int depth) {
 		char path[RG_PATH_LEN];
 		if (snprintf(path, sizeof(path), "%s/%s", dir, dp->d_name) >= (int)sizeof(path)) continue;
 
-		int type = NUI_ENTRY_ROM;
+		int type = MOSAIC_ENTRY_ROM;
 		if (isDir(path)) {
-			if (endsWith(dp->d_name, ".pak")) type = NUI_ENTRY_PAK;
-			else if (isGameFolder(path, dp->d_name)) type = NUI_ENTRY_DIR;
+			if (endsWith(dp->d_name, ".pak")) type = MOSAIC_ENTRY_PAK;
+			else if (isGameFolder(path, dp->d_name)) type = MOSAIC_ENTRY_DIR;
 			else {
 				if (depth < MAX_DEPTH) scanDir(path, system, depth + 1);
 				continue;
@@ -196,7 +196,7 @@ static int pick(int system, char* out, size_t size, int* type) {
 	static char recent_copies[MAX_RECENTS][RG_PATH_LEN];
 	const char* recents[MAX_RECENTS];
 	int recent_count = 0;
-	if (NUI_HOST_HAS(host, recents_count) && NUI_HOST_HAS(host, recent_path)) {
+	if (MOSAIC_HOST_HAS(host, recents_count) && MOSAIC_HOST_HAS(host, recent_path)) {
 		int count = host->recents_count();
 		for (int i = 0; i < count && recent_count < MAX_RECENTS; i++) {
 			const char* path = host->recent_path(i);
@@ -264,7 +264,7 @@ static int scope(void) {
 
 static int canPick(void* data) {
 	(void)data;
-	if (!NUI_HOST_HAS(host, open_path)) return 0;
+	if (!MOSAIC_HOST_HAS(host, open_path)) return 0;
 	int system = scope();
 	if (system == -1) {
 		scan();
@@ -280,7 +280,7 @@ static void pickHere(void* data) {
 
 static int canPickAll(void* data) {
 	(void)data;
-	if (!NUI_HOST_HAS(host, open_path)) return 0;
+	if (!MOSAIC_HOST_HAS(host, open_path)) return 0;
 	scan();
 	return library.count > 0;
 }
@@ -293,18 +293,18 @@ static void pickAll(void* data) {
 ///////////////////////////////////////
 // hooks
 
-static void rootEntries(NUIList* root) {
-	if (!NUI_HOST_HAS(host, open_path) || !isOn("root", "on")) return;
+static void rootEntries(MosaicList* root) {
+	if (!MOSAIC_HOST_HAS(host, open_path) || !isOn("root", "on")) return;
 	scan();
 	if (!library.count) return;
-	host->list_push(root, host->entry_new(folder_path, NUI_ENTRY_DIR, FOLDER_NAME));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, FOLDER_NAME));
 }
 
 // Opening the root row picks a game and shows it; tick launches it, since
 // a list hook can't. A reload while it's open keeps the same game.
-static NUIList* virtualDir(const char* path) {
+static MosaicList* virtualDir(const char* path) {
 	if (strcmp(path, folder_path) != 0) return NULL;
-	NUIList* list = host->list_new();
+	MosaicList* list = host->list_new();
 	if (!shown_path[0]) {
 		pending = 1;
 		if (!pick(-1, shown_path, sizeof(shown_path), &shown_type)) shown_path[0] = '\0';
@@ -333,7 +333,7 @@ static void tick(unsigned long now) {
 	host->open_path(shown_path, shown_type);
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
 	snprintf(roms_path, sizeof(roms_path), "%s/Roms", host->sdcard_path);
@@ -345,18 +345,18 @@ static int init(const NUIHost* h) {
 	pending = 0;
 	seed = (unsigned long long)time(NULL) ^ ((unsigned long long)getpid() << 32);
 
-	if (!NUI_HOST_HAS(host, open_path)) {
+	if (!MOSAIC_HOST_HAS(host, open_path)) {
 		say("this launcher can't open games for plugins; nothing to do");
 		return 0;
 	}
 	if (host->register_action("random-game.pick", "RANDOM", canPick, pickHere, NULL) != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "random-game.pick") != 0) {
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "random-game.pick") != 0) {
 		say("couldn't bind Y; pick a game from the root row or the quick menu");
 	}
 	if (isOn("tile", "off")) {
 		if (host->register_action("random-game.tile", "Random", canPickAll, pickAll, NULL) != 0
-				|| !NUI_HOST_HAS(host, quick_tile)
-				|| host->quick_tile("random-game.tile", NUI_QUICK_TOP, NULL, NULL, NULL) != 0) {
+				|| !MOSAIC_HOST_HAS(host, quick_tile)
+				|| host->quick_tile("random-game.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
 			say("couldn't add the Random tile");
 		}
 	}
@@ -368,9 +368,9 @@ static void quit(void) {
 	RG_setClear(&hidden);
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.quit = quit,
@@ -379,7 +379,7 @@ static const NUIPlugin plugin = {
 	.tick = tick,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

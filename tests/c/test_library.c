@@ -715,24 +715,24 @@ static void test_reload_keeps_the_selection_in_view(void) {
 // plugin sort and list_ready
 
 // Names starting with letter first; no opinion on the rest.
-static int pinLetter(const NUIEntry* a, const NUIEntry* b, char letter) {
+static int pinLetter(const MosaicEntry* a, const MosaicEntry* b, char letter) {
 	int pa = ((const Entry*)a)->name[0] == letter;
 	int pb = ((const Entry*)b)->name[0] == letter;
 	return pb - pa;
 }
-static int pinC(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int pinC(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	(void)dir_path;
 	return pinLetter(a, b, 'C');
 }
-static int pinB(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int pinB(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	(void)dir_path;
 	return pinLetter(a, b, 'B');
 }
-static int reverseNames(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int reverseNames(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	(void)dir_path;
 	return strcmp(((const Entry*)b)->name, ((const Entry*)a)->name);
 }
-static int noOpinion(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int noOpinion(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	(void)a;
 	(void)b;
 	(void)dir_path;
@@ -790,7 +790,7 @@ static void test_sort_chain_first_opinion_wins(void) {
 }
 
 static const char* sorted_dir = NULL;
-static int pinZelda(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int pinZelda(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	sorted_dir = dir_path;
 	return pinLetter(a, b, 'Z');
 }

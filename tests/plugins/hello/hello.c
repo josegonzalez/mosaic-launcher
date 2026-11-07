@@ -1,11 +1,11 @@
 // A plugin that only says hello, for checking the loader end to end.
 
 #include <stdio.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	char message[256];
 	const char* greeting = host->cfg_get("hello", "greeting", "hello");
@@ -15,14 +15,14 @@ static int init(const NUIHost* h) {
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = "hello",
 	.init = init,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

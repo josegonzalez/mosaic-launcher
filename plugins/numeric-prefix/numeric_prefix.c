@@ -20,12 +20,12 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "numprefix.h"
 
 #define ID "numeric-prefix"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static int hide_number = 1;
 static NumCache numbers;
 static int root_replaced = 0; // the root being listed isn't stock's
@@ -36,7 +36,7 @@ static int isRoot(const char* dir_path) {
 }
 
 // Keeps every entry; it only looks at the root's.
-static int filter(const NUIEntry* entry, const char* dir_path) {
+static int filter(const MosaicEntry* entry, const char* dir_path) {
 	if (!isRoot(dir_path)) return 1;
 	if (root_listed) {
 		root_replaced = 0;
@@ -46,7 +46,7 @@ static int filter(const NUIEntry* entry, const char* dir_path) {
 	return 1;
 }
 
-static int displayName(const NUIEntry* entry, char* out, size_t size) {
+static int displayName(const MosaicEntry* entry, char* out, size_t size) {
 	root_listed = 1; // filtering is over, for the root too
 	const char* path = host->entry_path(entry);
 	const char* name = host->entry_name(entry);
@@ -62,7 +62,7 @@ static int displayName(const NUIEntry* entry, char* out, size_t size) {
 	return 1;
 }
 
-static NumKey keyFor(const NUIEntry* entry, int on_root) {
+static NumKey keyFor(const MosaicEntry* entry, int on_root) {
 	const char* path = host->entry_path(entry);
 	NumKey key = { NUMPREFIX_ORDERED, 0, 0 };
 	if (on_root) key.group = NumPrefix_rootGroup(host->sdcard_path, path);
@@ -71,7 +71,7 @@ static NumKey keyFor(const NUIEntry* entry, int on_root) {
 	return key;
 }
 
-static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	if (NumPrefix_keepsOrder(host->sdcard_path, dir_path)) return 0;
 	int on_root = isRoot(dir_path);
 	if (on_root && root_replaced) return 0; // the owner's order
@@ -81,7 +81,7 @@ static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_pat
 }
 
 // Ends a listing even when it had nothing to name.
-static void listReady(const NUIList* list, const char* dir_path) {
+static void listReady(const MosaicList* list, const char* dir_path) {
 	(void)list;
 	(void)dir_path;
 	root_listed = 1;
@@ -91,7 +91,7 @@ static void quit(void) {
 	NumCache_clear(&numbers);
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	NumCache_init(&numbers);
 	root_replaced = 0;
@@ -100,9 +100,9 @@ static int init(const NUIHost* h) {
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.quit = quit,
@@ -112,7 +112,7 @@ static const NUIPlugin plugin = {
 	.list_ready = listReady,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

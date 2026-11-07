@@ -7,13 +7,13 @@
 #include "check.h"
 #include "../../plugins/all-games/all_games.c"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[512];
 	char name[256];
 	int type;
 };
-struct NUIList {
-	NUIEntry* items[64];
+struct MosaicList {
+	MosaicEntry* items[64];
 	int count;
 };
 
@@ -24,7 +24,7 @@ struct NUIList {
 #define PS ROMS "/PlayStation (PS)"
 
 static char tags_setting[8] = "";
-static const NUIList* current = NULL;
+static const MosaicList* current = NULL;
 static const char* current_path = CARD;
 static int selected_row = -1;
 static const char* newest_recent = NULL;
@@ -35,27 +35,27 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	return fallback;
 }
 static void fakeCfgSet(const char* id, const char* key, const char* value) { (void)id; (void)key; (void)value; }
-static NUIEntry* fakeEntryNew(const char* path, int type, const char* name) {
-	NUIEntry* e = calloc(1, sizeof(NUIEntry));
+static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
+	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);
 	snprintf(e->name, sizeof(e->name), "%s", name ? name : "");
 	e->type = type;
 	return e;
 }
-static const char* fakeEntryPath(const NUIEntry* e) { return e->path; }
-static const char* fakeEntryName(const NUIEntry* e) { return e->name; }
-static int fakeEntryType(const NUIEntry* e) { return e->type; }
-static NUIList* fakeListNew(void) { return calloc(1, sizeof(NUIList)); }
-static int fakeListCount(const NUIList* l) { return l->count; }
-static NUIEntry* fakeListGet(const NUIList* l, int i) { return i >= 0 && i < l->count ? l->items[i] : NULL; }
-static void fakeListPush(NUIList* l, NUIEntry* e) { if (l->count < 64) l->items[l->count++] = e; }
+static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
+static MosaicList* fakeListNew(void) { return calloc(1, sizeof(MosaicList)); }
+static int fakeListCount(const MosaicList* l) { return l->count; }
+static MosaicEntry* fakeListGet(const MosaicList* l, int i) { return i >= 0 && i < l->count ? l->items[i] : NULL; }
+static void fakeListPush(MosaicList* l, MosaicEntry* e) { if (l->count < 64) l->items[l->count++] = e; }
 static const char* fakeCurrentPath(void) { return current_path; }
 static void fakeRedraw(void) {}
-static int fakeSetName(NUIEntry* e, const char* name) {
+static int fakeSetName(MosaicEntry* e, const char* name) {
 	snprintf(e->name, sizeof(e->name), "%s", name);
 	return 0;
 }
-static const NUIList* fakeCurrentList(void) { return current; }
+static const MosaicList* fakeCurrentList(void) { return current; }
 static int fakeSelectedIndex(void) { return selected_row; }
 static int fakeSelectIndex(int i) {
 	if (!current || i < 0 || i >= current->count) return -1;
@@ -65,9 +65,9 @@ static int fakeSelectIndex(int i) {
 static int fakeRecentsCount(void) { return newest_recent ? 1 : 0; }
 static const char* fakeRecentPath(int i) { return i == 0 ? newest_recent : NULL; }
 
-static const NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static const MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/test",
@@ -104,7 +104,7 @@ static void writeText(const char* path, const char* text) {
 	fclose(f);
 }
 
-static void freeList(NUIList* list) {
+static void freeList(MosaicList* list) {
 	if (!list) return;
 	for (int i = 0; i < list->count; i++) free(list->items[i]);
 	free(list);
@@ -203,14 +203,14 @@ static void testPaths(void) {
 static void testIndex(void) {
 	AGIndex index;
 	AG_indexInit(&index);
-	CHECK(AG_indexAdd(&index, "/r/GB/b.gb", "tetris", NUI_ENTRY_ROM) == 0);
-	CHECK(AG_indexAdd(&index, "/r/GB/c.gb", "Asteroids", NUI_ENTRY_ROM) == 0);
-	CHECK(AG_indexAdd(&index, "/r/GB/a.gb", "Tetris", NUI_ENTRY_ROM) == 0);
-	CHECK(AG_indexAdd(&index, "/r/GB/p.pak", "Zork", NUI_ENTRY_PAK) == 0);
+	CHECK(AG_indexAdd(&index, "/r/GB/b.gb", "tetris", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(AG_indexAdd(&index, "/r/GB/c.gb", "Asteroids", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(AG_indexAdd(&index, "/r/GB/a.gb", "Tetris", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(AG_indexAdd(&index, "/r/GB/p.pak", "Zork", MOSAIC_ENTRY_PAK) == 0);
 	for (int i = 0; i < 200; i++) {
 		char path[32];
 		snprintf(path, sizeof(path), "/r/X/%03d", i);
-		CHECK(AG_indexAdd(&index, path, "Many", NUI_ENTRY_ROM) == 0); // grows
+		CHECK(AG_indexAdd(&index, path, "Many", MOSAIC_ENTRY_ROM) == 0); // grows
 	}
 	CHECK(AG_indexAddFolder(&index, "/r/GB", 42) == 0);
 	CHECK(index.game_count == 204);
@@ -218,7 +218,7 @@ static void testIndex(void) {
 	CHECK_STR(index.games[0].name, "Asteroids");
 	CHECK_STR(index.games[201].path, "/r/GB/a.gb"); // same name ignoring case: by path
 	CHECK_STR(index.games[202].path, "/r/GB/b.gb");
-	CHECK(index.games[203].type == NUI_ENTRY_PAK);
+	CHECK(index.games[203].type == MOSAIC_ENTRY_PAK);
 	CHECK(index.folders[0].mtime == 42);
 	AG_indexFree(&index);
 	CHECK(index.game_count == 0 && index.folder_count == 0 && index.games == NULL);
@@ -269,7 +269,7 @@ static void makeCard(void) {
 	age(GBC, 1000000000);
 }
 
-static int indexOf(const NUIList* list, const char* path) {
+static int indexOf(const MosaicList* list, const char* path) {
 	for (int i = 0; i < list->count; i++) {
 		if (!strcmp(list->items[i]->path, path)) return i;
 	}
@@ -278,12 +278,12 @@ static int indexOf(const NUIList* list, const char* path) {
 
 // The host's root listing: root_replace, other plugins' root entries, then
 // the sort by sort_compare (a stable insertion sort) and list_ready.
-static NUIList* listRoot(const NUIPlugin* p, const char* extra) {
-	NUIList* root = p->root_replace();
+static MosaicList* listRoot(const MosaicPlugin* p, const char* extra) {
+	MosaicList* root = p->root_replace();
 	if (!root) return NULL;
-	if (extra && p->root_with_entries) fakeListPush(root, fakeEntryNew(extra, NUI_ENTRY_DIR, "Favorites"));
+	if (extra && p->root_with_entries) fakeListPush(root, fakeEntryNew(extra, MOSAIC_ENTRY_DIR, "Favorites"));
 	for (int i = 1; i < root->count; i++) {
-		NUIEntry* e = root->items[i];
+		MosaicEntry* e = root->items[i];
 		int j = i - 1;
 		while (j >= 0 && p->sort_compare(root->items[j], e, CARD) > 0) {
 			root->items[j + 1] = root->items[j];
@@ -297,14 +297,14 @@ static NUIList* listRoot(const NUIPlugin* p, const char* extra) {
 
 static void testPlugin(void) {
 	makeCard();
-	const NUIPlugin* p = nextui_plugin_get(&fake);
-	CHECK(p->size == sizeof(NUIPlugin));
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
+	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "all-games");
 	CHECK(p->root_with_entries == 1);
 	CHECK(p->init(&fake) == 0);
 
 	// Systems and other plugins' folders first, then every game by name
-	NUIList* root = listRoot(p, CARD "/Favorites");
+	MosaicList* root = listRoot(p, CARD "/Favorites");
 	CHECK(root != NULL);
 	if (!root) return;
 	const char* want[][2] = {
@@ -326,10 +326,10 @@ static void testPlugin(void) {
 		CHECK_STR(root->items[i]->path, want[i][0]);
 		CHECK_STR(root->items[i]->name, want[i][1]);
 	}
-	CHECK(root->items[0]->type == NUI_ENTRY_DIR);
-	CHECK(root->items[indexOf(root, GB "/Kirby.gb")]->type == NUI_ENTRY_ROM);
-	CHECK(root->items[indexOf(root, PS "/Crash (USA)/Crash (USA).cue")]->type == NUI_ENTRY_ROM);
-	CHECK(root->items[indexOf(root, GB "/Tool.pak")]->type == NUI_ENTRY_PAK);
+	CHECK(root->items[0]->type == MOSAIC_ENTRY_DIR);
+	CHECK(root->items[indexOf(root, GB "/Kirby.gb")]->type == MOSAIC_ENTRY_ROM);
+	CHECK(root->items[indexOf(root, PS "/Crash (USA)/Crash (USA).cue")]->type == MOSAIC_ENTRY_ROM);
+	CHECK(root->items[indexOf(root, GB "/Tool.pak")]->type == MOSAIC_ENTRY_PAK);
 	CHECK(indexOf(root, GB "/Hacks/Deep/Deeper/Too Deep.gb") < 0);
 	CHECK(indexOf(root, ROMS "/Game Gear (GG)/Sonic.gg") < 0);
 
@@ -339,12 +339,12 @@ static void testPlugin(void) {
 	// a game folder's art is the folder's
 	char art[512];
 	int crash = indexOf(root, PS "/Crash (USA)/Crash (USA).cue");
-	CHECK(p->art_path(root->items[crash], NUI_ART_THUMBNAIL, art, sizeof(art)));
+	CHECK(p->art_path(root->items[crash], MOSAIC_ART_THUMBNAIL, art, sizeof(art)));
 	CHECK_STR(art, PS "/.media/Crash (USA).png");
-	CHECK(!p->art_path(root->items[crash], NUI_ART_LIST_BG, art, sizeof(art)));
-	CHECK(!p->art_path(root->items[indexOf(root, GB "/Kirby.gb")], NUI_ART_THUMBNAIL, art, sizeof(art)));
+	CHECK(!p->art_path(root->items[crash], MOSAIC_ART_LIST_BG, art, sizeof(art)));
+	CHECK(!p->art_path(root->items[indexOf(root, GB "/Kirby.gb")], MOSAIC_ART_THUMBNAIL, art, sizeof(art)));
 	current_path = PS "/Crash (USA)"; // inside the folder, stock's art
-	CHECK(!p->art_path(root->items[crash], NUI_ART_THUMBNAIL, art, sizeof(art)));
+	CHECK(!p->art_path(root->items[crash], MOSAIC_ART_THUMBNAIL, art, sizeof(art)));
 	current_path = CARD;
 
 	// back from a multi-disc game, its row is selected
@@ -376,7 +376,7 @@ static void testPlugin(void) {
 	// a listing without changes doesn't scan again; a changed folder does
 	touch(GBC "/Unseen.gbc");
 	age(GBC, 1000000000);
-	NUIList* again = listRoot(p, NULL);
+	MosaicList* again = listRoot(p, NULL);
 	CHECK(again && indexOf(again, GBC "/Unseen.gbc") < 0);
 	freeList(again);
 	age(GBC, 1000000100);
@@ -425,7 +425,7 @@ static void testPlugin(void) {
 	CHECK(system("rm -rf '" ROMS "' && mkdir -p '" GB "'") == 0);
 	CHECK(p->init(&fake) == 0);
 	CHECK(p->root_replace() == NULL);
-	CHECK(p->sort_compare(fakeEntryNew(GB "/a.gb", NUI_ENTRY_ROM, "a"), fakeEntryNew(CARD "/Favorites", NUI_ENTRY_DIR, "F"), CARD) == 0);
+	CHECK(p->sort_compare(fakeEntryNew(GB "/a.gb", MOSAIC_ENTRY_ROM, "a"), fakeEntryNew(CARD "/Favorites", MOSAIC_ENTRY_DIR, "F"), CARD) == 0);
 	p->quit();
 	CHECK(system("rm -rf '" ROMS "'") == 0);
 	CHECK(p->init(&fake) == 0);

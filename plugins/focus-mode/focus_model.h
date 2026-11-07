@@ -32,7 +32,7 @@ int Focus_load(FocusList* list, const char* path);
 // One row of the root. name is NULL to let the launcher name it.
 typedef struct FocusRow {
 	char path[FOCUS_PATH_LEN * 2];
-	int type; // an enum NUIEntryType
+	int type; // an enum MosaicEntryType
 	const char* name;
 } FocusRow;
 

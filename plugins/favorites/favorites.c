@@ -23,14 +23,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "pin_model.h"
 
 #define ID "favorites"
 #define MAX_FAVORITES 256
 #define MAX_PATH_LEN 512
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char folder_path[MAX_PATH_LEN];     // the virtual folder, <sd>/Favorites
 static char folder_name[128];               // its name on the root
 static char collections_dir[MAX_PATH_LEN];  // <sd>/Collections
@@ -141,19 +141,19 @@ static int fileNamedAfter(const char* dir, const char* ext, char* out, size_t si
 // The file to record for an entry, or 0 if it can't be a favorite. Mirrors
 // what stock records in Recently Played: a multi-disc game's .m3u, a
 // cue-sheet folder's .cue, otherwise the game or pak itself.
-static int favoriteFor(const NUIEntry* entry, char* out, size_t size) {
+static int favoriteFor(const MosaicEntry* entry, char* out, size_t size) {
 	if (!entry) return 0;
 	const char* path = host->entry_path(entry);
 	if (!relative(path)) return 0;
 
 	switch (host->entry_type(entry)) {
-		case NUI_ENTRY_PAK:
+		case MOSAIC_ENTRY_PAK:
 			snprintf(out, size, "%s", path);
 			return 1;
-		case NUI_ENTRY_DIR:
+		case MOSAIC_ENTRY_DIR:
 			// a folder that launches a game when opened
 			return fileNamedAfter(path, ".m3u", out, size) || fileNamedAfter(path, ".cue", out, size);
-		case NUI_ENTRY_ROM: {
+		case MOSAIC_ENTRY_ROM: {
 			// a disc of a multi-disc game: the game's .m3u, in the disc's folder
 			char dir[MAX_PATH_LEN];
 			snprintf(dir, sizeof(dir), "%s", path);
@@ -199,15 +199,15 @@ static void change(const char* rel) {
 	else {
 		say("favorites are full");
 		snprintf(shown, sizeof(shown), "%s is full", folder_name);
-		if (NUI_HOST_HAS(host, toast)) host->toast(shown);
+		if (MOSAIC_HOST_HAS(host, toast)) host->toast(shown);
 		return;
 	}
 	relist();
 	if (save() == 0) say(message);
 	else snprintf(shown, sizeof(shown), "Couldn't save %s", folder_name);
-	if (NUI_HOST_HAS(host, toast)) host->toast(shown);
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(shown);
 	// list the folder again so the game moves to or from the top
-	if (pin_on && NUI_HOST_HAS(host, reload_lists)) host->reload_lists();
+	if (pin_on && MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	host->request_redraw();
 }
 
@@ -223,14 +223,14 @@ static void removeConfirmed(void* data) {
 
 static void toggle(void* data) {
 	(void)data;
-	const NUIEntry* entry = host->selected_entry();
+	const MosaicEntry* entry = host->selected_entry();
 	char path[MAX_PATH_LEN * 2];
 	if (!favoriteFor(entry, path, sizeof(path))) return;
 	const char* rel = relative(path);
 
 	load();
 	// adding is instant; removing asks first, where the launcher can
-	if (indexOf(rel) >= 0 && NUI_HOST_HAS(host, confirm)) {
+	if (indexOf(rel) >= 0 && MOSAIC_HOST_HAS(host, confirm)) {
 		snprintf(pending, sizeof(pending), "%s", rel);
 		// name the favorite's file, not the entry: a disc entry is just "Disc 1"
 		char name[MAX_PATH_LEN];
@@ -249,20 +249,20 @@ static void toggle(void* data) {
 ///////////////////////////////////////
 // hooks
 
-static void rootEntries(NUIList* root) {
-	host->list_push(root, host->entry_new(folder_path, NUI_ENTRY_DIR, folder_name));
+static void rootEntries(MosaicList* root) {
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, folder_name));
 }
 
-static NUIList* virtualDir(const char* path) {
+static MosaicList* virtualDir(const char* path) {
 	if (strcmp(path, folder_path) != 0) return NULL;
 
 	load();
-	NUIList* list = host->list_new();
+	MosaicList* list = host->list_new();
 	for (int i = 0; i < count; i++) {
 		char full[MAX_PATH_LEN * 2];
 		snprintf(full, sizeof(full), "%s%.511s", host->sdcard_path, favorites[i]);
 		if (!exists(full)) continue; // keep it in the file in case the card comes back
-		int type = endsWith(full, ".pak") ? NUI_ENTRY_PAK : NUI_ENTRY_ROM;
+		int type = endsWith(full, ".pak") ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_ROM;
 		host->list_push(list, host->entry_new(full, type, NULL));
 	}
 	return list;
@@ -286,17 +286,17 @@ static int onlyHidden(const char* dir) {
 
 // Hides the art-only Collections/Favorites/ folder once the collection
 // file exists, so Collections doesn't list Favorites twice.
-static int filter(const NUIEntry* entry, const char* dir_path) {
+static int filter(const MosaicEntry* entry, const char* dir_path) {
 	if (!dir_path || strcmp(dir_path, collections_dir) != 0) return 1;
-	if (host->entry_type(entry) != NUI_ENTRY_DIR) return 1;
+	if (host->entry_type(entry) != MOSAIC_ENTRY_DIR) return 1;
 	if (strcmp(host->entry_path(entry), art_dir) != 0) return 1;
 	return !(exists(list_path) && onlyHidden(art_dir));
 }
 
 // The art folder's background for the Favorites folder on the root and for
 // the collection in Collections.
-static int artPath(const NUIEntry* entry, int kind, char* out, size_t size) {
-	if (kind != NUI_ART_FOLDER_BG) return 0;
+static int artPath(const MosaicEntry* entry, int kind, char* out, size_t size) {
+	if (kind != MOSAIC_ART_FOLDER_BG) return 0;
 	const char* path = host->entry_path(entry);
 	if (strcmp(path, folder_path) != 0 && strcmp(path, list_path) != 0) return 0;
 	char bg[sizeof(art_dir) + 16];
@@ -307,7 +307,7 @@ static int artPath(const NUIEntry* entry, int kind, char* out, size_t size) {
 }
 
 // Favorites first, when the "pin" setting is on.
-static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	if (!pin_on) return 0;
 	const char* dir = relative(dir_path);
 	if (!dir || !Pin_applies(dir, relative(folder_path))) return 0;
@@ -320,7 +320,7 @@ static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_pat
 		Pin_isPinned(&pins, relative(host->entry_path(b)), host->entry_type(b)));
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	const char* collection = host->cfg_get(ID, "collection", "Favorites");
 	if (!collection[0] || strchr(collection, '/')) collection = "Favorites";
@@ -335,15 +335,15 @@ static int init(const NUIHost* h) {
 	load();
 
 	if (host->register_action("favorites.toggle", "FAVORITE", canToggle, toggle, NULL) != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "favorites.toggle") != 0) {
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "favorites.toggle") != 0) {
 		say("couldn't bind Y; favorites can't be changed from the game list");
 	}
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.root_entries = rootEntries,
@@ -353,7 +353,7 @@ static const NUIPlugin plugin = {
 	.sort_compare = sortCompare,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

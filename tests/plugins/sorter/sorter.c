@@ -9,11 +9,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 #define ID "sorter"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char folder[512];
 static int ticks = 0;
 
@@ -27,19 +27,19 @@ static void say(const char* fmt, ...) {
 	host->log(ID, message);
 }
 
-static void rootEntries(NUIList* root) {
-	host->list_push(root, host->entry_new(folder, NUI_ENTRY_DIR, "Sorter"));
+static void rootEntries(MosaicList* root) {
+	host->list_push(root, host->entry_new(folder, MOSAIC_ENTRY_DIR, "Sorter"));
 }
 
-static void addGame(NUIList* list, const char* file, const char* name) {
+static void addGame(MosaicList* list, const char* file, const char* name) {
 	char path[600];
 	snprintf(path, sizeof(path), "%s/%s", folder, file);
-	host->list_push(list, host->entry_new(path, NUI_ENTRY_ROM, name));
+	host->list_push(list, host->entry_new(path, MOSAIC_ENTRY_ROM, name));
 }
 
-static NUIList* virtualDir(const char* path) {
+static MosaicList* virtualDir(const char* path) {
 	if (strcmp(path, folder) != 0) return NULL;
-	NUIList* list = host->list_new();
+	MosaicList* list = host->list_new();
 	addGame(list, "Tetris.gbc", "Tetris");
 	addGame(list, "Beta.gb", "Beta");
 	addGame(list, "Pinned.gb", "Pinned");
@@ -48,16 +48,16 @@ static NUIList* virtualDir(const char* path) {
 	return list;
 }
 
-static int isPinned(const NUIEntry* entry) {
+static int isPinned(const MosaicEntry* entry) {
 	return strstr(host->entry_path(entry), "/Pinned.gb") != NULL;
 }
 
-static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	if (strcmp(dir_path, folder) != 0) return 0;
 	return isPinned(b) - isPinned(a);
 }
 
-static void listReady(const NUIList* list, const char* dir_path) {
+static void listReady(const MosaicList* list, const char* dir_path) {
 	if (strcmp(dir_path, folder) != 0) return;
 	int count = host->list_count(list);
 	say("list_ready %i entries", count);
@@ -69,7 +69,7 @@ static void listReady(const NUIList* list, const char* dir_path) {
 	}
 	for (int i = 0; i < count && i < 16; i++) {
 		if (!collides[i]) continue;
-		NUIEntry* entry = host->list_get(list, i);
+		MosaicEntry* entry = host->list_get(list, i);
 		char name[300];
 		snprintf(name, sizeof(name), "%s (%s)", host->entry_name(entry), strrchr(host->entry_path(entry), '.') + 1);
 		say("renamed %s %i", name, host->entry_set_name(entry, name));
@@ -80,7 +80,7 @@ static void listReady(const NUIList* list, const char* dir_path) {
 static const char* order(void) {
 	static char text[512];
 	text[0] = '\0';
-	const NUIList* list = host->current_list();
+	const MosaicList* list = host->current_list();
 	for (int i = 0; list && i < host->list_count(list); i++) {
 		if (i) strncat(text, ",", sizeof(text) - strlen(text) - 1);
 		strncat(text, host->entry_name(host->list_get(list, i)), sizeof(text) - strlen(text) - 1);
@@ -89,7 +89,7 @@ static const char* order(void) {
 }
 
 static const char* selectedName(void) {
-	const NUIEntry* entry = host->selected_entry();
+	const MosaicEntry* entry = host->selected_entry();
 	return entry ? host->entry_name(entry) : "(null)";
 }
 
@@ -98,9 +98,9 @@ static void tick(unsigned long now) {
 	if (!host->current_list()) return;
 	ticks++;
 	if (ticks == 1) {
-		NUIEntry* first = host->list_get(host->current_list(), 0);
+		MosaicEntry* first = host->list_get(host->current_list(), 0);
 		say("set_name outside list_ready %i", host->entry_set_name(first, "Nope"));
-		say("open folder %i", host->open_path(folder, NUI_ENTRY_DIR));
+		say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
 		say("order %s", order());
 		say("selected index %i", host->selected_index());
 		say("select 3 %i, bad %i %i", host->select_index(3), host->select_index(99), host->select_index(-1));
@@ -111,10 +111,10 @@ static void tick(unsigned long now) {
 	}
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
-	if (!NUI_HOST_HAS(host, entry_set_name) || !NUI_HOST_HAS(host, current_list)
-			|| !NUI_HOST_HAS(host, selected_index) || !NUI_HOST_HAS(host, select_index)) {
+	if (!MOSAIC_HOST_HAS(host, entry_set_name) || !MOSAIC_HOST_HAS(host, current_list)
+			|| !MOSAIC_HOST_HAS(host, selected_index) || !MOSAIC_HOST_HAS(host, select_index)) {
 		host->log(ID, "the launcher is missing a host call");
 		return 1;
 	}
@@ -124,9 +124,9 @@ static int init(const NUIHost* h) {
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.root_entries = rootEntries,
@@ -136,7 +136,7 @@ static const NUIPlugin plugin = {
 	.list_ready = listReady,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

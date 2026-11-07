@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "smart_model.h"
 
 #define ID "smart-collections"
@@ -24,7 +24,7 @@
 #define MAX_PATH_LEN 512
 #define MAX_DEPTH 2 // subfolders below a system folder that are scanned
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char folder_path[MAX_PATH_LEN]; // <sd>/Smart Collections
 static SMCatalog catalog;
 static SMIndex index_;
@@ -109,14 +109,14 @@ static void scanDir(const char* dir, int depth) {
 		char path[MAX_PATH_LEN];
 		if (snprintf(path, sizeof(path), "%s/%s", dir, dp->d_name) >= (int)sizeof(path)) continue;
 
-		int type = NUI_ENTRY_ROM;
+		int type = MOSAIC_ENTRY_ROM;
 		if (isDir(path)) {
 			if (endsWith(dp->d_name, ".pak")) continue;
 			if (!isGameFolder(path, dp->d_name)) {
 				if (depth < MAX_DEPTH) scanDir(path, depth + 1);
 				continue;
 			}
-			type = NUI_ENTRY_DIR;
+			type = MOSAIC_ENTRY_DIR;
 		}
 
 		char name[256];
@@ -173,8 +173,8 @@ static void saveDismissed(void) {
 }
 
 static void changed(const char* message) {
-	if (NUI_HOST_HAS(host, toast)) host->toast(message);
-	if (NUI_HOST_HAS(host, reload_lists)) host->reload_lists();
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	host->request_redraw();
 }
 
@@ -195,8 +195,8 @@ static void dismissConfirmed(void* data) {
 
 static int canDismiss(void* data) {
 	(void)data;
-	const NUIEntry* entry = host->selected_entry();
-	if (!entry || host->entry_type(entry) != NUI_ENTRY_DIR) return 0;
+	const MosaicEntry* entry = host->selected_entry();
+	if (!entry || host->entry_type(entry) != MOSAIC_ENTRY_DIR) return 0;
 	int i = collectionAt(host->entry_path(entry));
 	return i >= 0 && !SM_setHas(&dismissed, catalog.items[i].name);
 }
@@ -205,7 +205,7 @@ static void dismiss(void* data) {
 	if (!canDismiss(data)) return;
 	int i = collectionAt(host->entry_path(host->selected_entry()));
 	snprintf(pending, sizeof(pending), "%s", catalog.items[i].name);
-	if (!NUI_HOST_HAS(host, confirm)) {
+	if (!MOSAIC_HOST_HAS(host, confirm)) {
 		dismissConfirmed(NULL);
 		return;
 	}
@@ -225,13 +225,13 @@ static void restoreConfirmed(void* data) {
 
 static int canRestore(void* data) {
 	(void)data;
-	const NUIEntry* entry = host->selected_entry();
+	const MosaicEntry* entry = host->selected_entry();
 	return entry && dismissed.count > 0 && !strcmp(host->entry_path(entry), folder_path);
 }
 
 static void restore(void* data) {
 	if (!canRestore(data)) return;
-	if (!NUI_HOST_HAS(host, confirm)) {
+	if (!MOSAIC_HOST_HAS(host, confirm)) {
 		restoreConfirmed(NULL);
 		return;
 	}
@@ -245,24 +245,24 @@ static void restore(void* data) {
 
 // Shown while any franchise has enough games, even if all are dismissed,
 // so they can be brought back.
-static void rootEntries(NUIList* root) {
+static void rootEntries(MosaicList* root) {
 	scan();
 	int found[SM_MAX_FRANCHISES];
 	if (SM_visible(&index_, &catalog, min_games, NULL, found) == 0) return;
-	host->list_push(root, host->entry_new(folder_path, NUI_ENTRY_DIR, FOLDER_NAME));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, FOLDER_NAME));
 }
 
-static NUIList* virtualDir(const char* path) {
+static MosaicList* virtualDir(const char* path) {
 	if (!strcmp(path, folder_path)) {
 		scan();
-		NUIList* list = host->list_new();
+		MosaicList* list = host->list_new();
 		int shown[SM_MAX_FRANCHISES];
 		int n = SM_visible(&index_, &catalog, min_games, &dismissed, shown);
 		for (int k = 0; k < n; k++) {
 			const char* name = catalog.items[shown[k]].name;
 			char dir[MAX_PATH_LEN + SM_NAME_LEN];
 			snprintf(dir, sizeof(dir), "%s/%s", folder_path, name);
-			host->list_push(list, host->entry_new(dir, NUI_ENTRY_DIR, name));
+			host->list_push(list, host->entry_new(dir, MOSAIC_ENTRY_DIR, name));
 		}
 		return list;
 	}
@@ -270,7 +270,7 @@ static NUIList* virtualDir(const char* path) {
 	size_t len = strlen(folder_path);
 	if (strncmp(path, folder_path, len) != 0 || path[len] != '/') return NULL;
 	scan();
-	NUIList* list = host->list_new();
+	MosaicList* list = host->list_new();
 	int i = collectionAt(path);
 	if (i < 0) return list;
 	for (int k = 0; k < index_.member_count[i]; k++) {
@@ -281,7 +281,7 @@ static NUIList* virtualDir(const char* path) {
 	return list;
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
 
@@ -295,11 +295,11 @@ static int init(const NUIHost* h) {
 	scanned = 0;
 
 	if (host->register_action("smart-collections.dismiss", "DISMISS", canDismiss, dismiss, NULL) != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "smart-collections.dismiss") != 0) {
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.dismiss") != 0) {
 		say("couldn't bind Y; collections can't be dismissed");
 	}
 	if (host->register_action("smart-collections.restore", "RESTORE", canRestore, restore, NULL) != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "smart-collections.restore") != 0) {
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.restore") != 0) {
 		say("couldn't bind Y; dismissed collections can't be brought back");
 	}
 	return 0;
@@ -309,9 +309,9 @@ static void quit(void) {
 	SM_indexFree(&index_);
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.quit = quit,
@@ -319,7 +319,7 @@ static const NUIPlugin plugin = {
 	.virtual_dir = virtualDir,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

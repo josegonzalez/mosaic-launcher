@@ -11,12 +11,12 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 #define ID "clear-recents"
 #define MAX_PATH_LEN 512
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char recents_path[MAX_PATH_LEN]; // <sd>/Recently Played
 
 static void say(const char* message) {
@@ -24,7 +24,7 @@ static void say(const char* message) {
 }
 
 static void toast(const char* message) {
-	if (NUI_HOST_HAS(host, toast)) host->toast(message);
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
 
 static int inRecents(void) {
@@ -34,7 +34,7 @@ static int inRecents(void) {
 
 // The selected entry's place in recents, or -1.
 static int selectedRecent(void) {
-	const NUIEntry* entry = host->selected_entry();
+	const MosaicEntry* entry = host->selected_entry();
 	if (!entry) return -1;
 	const char* path = host->entry_path(entry);
 	if (!path) return -1;
@@ -97,50 +97,50 @@ static const struct {
 	const char* name;
 	int button;
 } buttons[] = {
-	{ "Y", NUI_BUTTON_Y },
-	{ "L2", NUI_BUTTON_L2 },
-	{ "R2", NUI_BUTTON_R2 },
+	{ "Y", MOSAIC_BUTTON_Y },
+	{ "L2", MOSAIC_BUTTON_L2 },
+	{ "R2", MOSAIC_BUTTON_R2 },
 };
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(recents_path, sizeof(recents_path), "%s/Recently Played", host->sdcard_path);
 
-	if (!NUI_HOST_HAS(host, recents_clear) || !NUI_HOST_HAS(host, reload_lists) || !NUI_HOST_HAS(host, confirm)) {
+	if (!MOSAIC_HOST_HAS(host, recents_clear) || !MOSAIC_HOST_HAS(host, reload_lists) || !MOSAIC_HOST_HAS(host, confirm)) {
 		say("this launcher can't clear recents for plugins; nothing to do");
 		return 0;
 	}
 
 	const char* name = host->cfg_get(ID, "button", "Y");
-	int button = NUI_BUTTON_Y;
+	int button = MOSAIC_BUTTON_Y;
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 	if (host->register_action("clear-recents.remove", "REMOVE", canRemove, removeSelected, NULL) != 0
 			|| host->register_action("clear-recents.clear", "CLEAR ALL", canClearHere, clearAll, NULL) != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, button, NUI_TRIGGER_PRESS, "clear-recents.remove") != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, button, NUI_TRIGGER_PRESS, "clear-recents.clear") != 0) {
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "clear-recents.remove") != 0
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "clear-recents.clear") != 0) {
 		say("couldn't bind a button; clear recents from the quick menu");
 	}
 
 	if (strcmp(host->cfg_get(ID, "tile", "on"), "off") != 0) {
 		if (host->register_action("clear-recents.tile", "Clear recents", hasRecents, clearAll, NULL) != 0
-				|| !NUI_HOST_HAS(host, quick_tile)
-				|| host->quick_tile("clear-recents.tile", NUI_QUICK_TOP, NULL, NULL, NULL) != 0) {
+				|| !MOSAIC_HOST_HAS(host, quick_tile)
+				|| host->quick_tile("clear-recents.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
 			say("couldn't add the Clear recents tile");
 		}
 	}
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

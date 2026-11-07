@@ -12,11 +12,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 #define ID "menus"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static int ticks = 0;
 static int light = 1;
 
@@ -46,11 +46,11 @@ static void picked(int index, void* data) {
 	say("picked %i", index);
 }
 
-static NUIList* rootReplace(void) {
+static MosaicList* rootReplace(void) {
 	char path[512];
 	snprintf(path, sizeof(path), "%s/Menus", host->sdcard_path);
-	NUIList* root = host->list_new();
-	host->list_push(root, host->entry_new(path, NUI_ENTRY_DIR, "Menus Root"));
+	MosaicList* root = host->list_new();
+	host->list_push(root, host->entry_new(path, MOSAIC_ENTRY_DIR, "Menus Root"));
 	return root;
 }
 
@@ -59,7 +59,7 @@ static void tick(unsigned long now) {
 	ticks++;
 	if (ticks != 1) return;
 
-	const NUIList* list = host->current_list();
+	const MosaicList* list = host->current_list();
 	char names[512] = "";
 	for (int i = 0; list && i < host->list_count(list); i++) {
 		size_t len = strlen(names);
@@ -79,21 +79,21 @@ static void tick(unsigned long now) {
 	say("choose %i", host->choose("Pick", choices, 2, 1, picked, NULL));
 }
 
-static int init(const NUIHost* h);
+static int init(const MosaicHost* h);
 
-static NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.tick = tick,
 	.root_replace = rootReplace,
 };
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
-	if (!NUI_HOST_HAS(host, quick_tile) || !NUI_HOST_HAS(host, hide_quick_tile)
-			|| !NUI_HOST_HAS(host, choose) || !NUI_HOST_HAS(host, recent_set)) {
+	if (!MOSAIC_HOST_HAS(host, quick_tile) || !MOSAIC_HOST_HAS(host, hide_quick_tile)
+			|| !MOSAIC_HOST_HAS(host, choose) || !MOSAIC_HOST_HAS(host, recent_set)) {
 		host->log(ID, "the launcher is missing a host call");
 		return 1;
 	}
@@ -101,22 +101,22 @@ static int init(const NUIHost* h) {
 
 	host->register_action("menus.one", "ONE", always, runOne, NULL);
 	host->register_action("menus.two", "TWO", always, runTwo, NULL);
-	int one = host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "menus.one");
-	int two = host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "menus.two");
+	int one = host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "menus.one");
+	int two = host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "menus.two");
 	say("bound %i %i", one, two);
 
 	host->register_action("menus.tile", "Menus", always, runTile, NULL);
 	host->register_action("menus.light", "Light", always, runLight, NULL);
 	say("tiles %i %i, unknown %i, bad row %i",
-		host->quick_tile("menus.tile", NUI_QUICK_TOP, NULL, NULL, NULL),
-		host->quick_tile("menus.light", NUI_QUICK_BOTTOM, NULL, NULL, lightOn),
-		host->quick_tile("menus.missing", NUI_QUICK_TOP, NULL, NULL, NULL),
+		host->quick_tile("menus.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL),
+		host->quick_tile("menus.light", MOSAIC_QUICK_BOTTOM, NULL, NULL, lightOn),
+		host->quick_tile("menus.missing", MOSAIC_QUICK_TOP, NULL, NULL, NULL),
 		host->quick_tile("menus.tile", 9, NULL, NULL, NULL));
 	say("hide %i, empty %i", host->hide_quick_tile("Games", 1), host->hide_quick_tile("", 1));
 	return 0;
 }
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

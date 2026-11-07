@@ -152,13 +152,13 @@ typedef struct Effective {
 } Effective;
 
 static void effective(Effective* e) {
-	e->override_count = Plugins_overrides(NUI_SCREEN_GAMELIST, &e->overrides);
+	e->override_count = Plugins_overrides(MOSAIC_SCREEN_GAMELIST, &e->overrides);
 	e->screen_count = Bindings_drop(screenBindings, SCREEN_BINDINGS, e->overrides, e->override_count, e->screen);
 	e->letter_count = Bindings_drop(letterBindings, LETTER_BINDINGS, e->overrides, e->override_count, e->letters);
 	e->action_count = Bindings_drop(bindings, BINDING_COUNT, e->overrides, e->override_count, e->actions);
 	for (int i = 0; i < e->override_count; i++) e->actions[e->action_count++] = e->overrides[i];
 	const Binding* extra;
-	int extra_count = Plugins_bindings(NUI_SCREEN_GAMELIST, &extra);
+	int extra_count = Plugins_bindings(MOSAIC_SCREEN_GAMELIST, &extra);
 	e->shared_count = Bindings_drop(extra, extra_count, e->overrides, e->override_count, e->shared);
 }
 

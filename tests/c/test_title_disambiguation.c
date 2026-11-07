@@ -12,14 +12,14 @@
 #define GBC ROMS "/Game Boy Color (GBC)"
 #define NES ROMS "/Nintendo (FC)"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[512];
 	char name[256];
 	int type;
 };
 
-struct NUIList {
-	NUIEntry* items[16];
+struct MosaicList {
+	MosaicEntry* items[16];
 	int count;
 };
 
@@ -32,20 +32,20 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	if (setting && !strcmp(key, "same_system")) return setting;
 	return fallback;
 }
-static const char* fakeEntryPath(const NUIEntry* e) { return e->path; }
-static const char* fakeEntryName(const NUIEntry* e) { return e->name; }
-static int fakeEntryType(const NUIEntry* e) { return e->type; }
-static int fakeListCount(const NUIList* l) { return l->count; }
-static NUIEntry* fakeListGet(const NUIList* l, int i) { return i >= 0 && i < l->count ? l->items[i] : NULL; }
-static int fakeSetName(NUIEntry* e, const char* name) {
+static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
+static int fakeListCount(const MosaicList* l) { return l->count; }
+static MosaicEntry* fakeListGet(const MosaicList* l, int i) { return i >= 0 && i < l->count ? l->items[i] : NULL; }
+static int fakeSetName(MosaicEntry* e, const char* name) {
 	snprintf(e->name, sizeof(e->name), "%s", name);
 	set_names++;
 	return 0;
 }
 
-static const NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static const MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/test",
@@ -225,20 +225,20 @@ static void testList(void) {
 	CHECK(Titles_list(ROMS, 1, 1, one, one_path, labels) == 0 && labels[0] == NULL);
 }
 
-static NUIEntry entries[8];
-static NUIList list;
+static MosaicEntry entries[8];
+static MosaicList list;
 
 static void addEntry(const char* path, const char* name) {
-	NUIEntry* e = &entries[list.count];
+	MosaicEntry* e = &entries[list.count];
 	snprintf(e->path, sizeof(e->path), "%s", path);
 	snprintf(e->name, sizeof(e->name), "%s", name);
-	e->type = NUI_ENTRY_ROM;
+	e->type = MOSAIC_ENTRY_ROM;
 	list.items[list.count++] = e;
 }
 
 static void testPlugin(void) {
 	setting = NULL;
-	CHECK(nextui_plugin_get(&fake)->init(&fake) == 0);
+	CHECK(mosaic_plugin_get(&fake)->init(&fake) == 0);
 	CHECK(plugin.list_ready == listReady);
 
 	list.count = 0;
@@ -275,7 +275,7 @@ static void testPlugin(void) {
 	CHECK_STR(entries[1].name, "Tetris.gbc");
 
 	// an older launcher without entry_set_name skips the plugin
-	NUIHost old = fake;
+	MosaicHost old = fake;
 	old.entry_set_name = NULL;
 	CHECK(plugin.init(&old) != 0);
 }

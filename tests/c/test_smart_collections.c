@@ -6,17 +6,17 @@
 #include "check.h"
 #include "../../plugins/smart-collections/smart_collections.c"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[512];
 	char name[128];
 	int type;
 };
-struct NUIList {
-	NUIEntry* items[64];
+struct MosaicList {
+	MosaicEntry* items[64];
 	int count;
 };
 
-static NUIEntry* selected = NULL;
+static MosaicEntry* selected = NULL;
 static int (*available[4])(void*);
 static void (*run[4])(void*);
 static int actions = 0;
@@ -59,21 +59,21 @@ static void fakeCfgSet(const char* id, const char* key, const char* value) {
 	snprintf(cfg_values[i], 1024, "%s", value);
 }
 
-static NUIEntry* fakeEntryNew(const char* path, int type, const char* name) {
-	NUIEntry* e = calloc(1, sizeof(NUIEntry));
+static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
+	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);
 	snprintf(e->name, sizeof(e->name), "%s", name ? name : "");
 	e->type = type;
 	return e;
 }
-static const char* fakeEntryPath(const NUIEntry* e) { return e->path; }
-static const char* fakeEntryName(const NUIEntry* e) { return e->name; }
-static int fakeEntryType(const NUIEntry* e) { return e->type; }
-static NUIList* fakeListNew(void) { return calloc(1, sizeof(NUIList)); }
-static int fakeListCount(const NUIList* l) { return l->count; }
-static NUIEntry* fakeListGet(const NUIList* l, int i) { return l->items[i]; }
-static void fakeListPush(NUIList* l, NUIEntry* e) { if (l->count < 64) l->items[l->count++] = e; }
-static const NUIEntry* fakeSelected(void) { return selected; }
+static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
+static MosaicList* fakeListNew(void) { return calloc(1, sizeof(MosaicList)); }
+static int fakeListCount(const MosaicList* l) { return l->count; }
+static MosaicEntry* fakeListGet(const MosaicList* l, int i) { return l->items[i]; }
+static void fakeListPush(MosaicList* l, MosaicEntry* e) { if (l->count < 64) l->items[l->count++] = e; }
+static const MosaicEntry* fakeSelected(void) { return selected; }
 static void fakeRedraw(void) {}
 static void fakeReload(void) { reloads++; }
 static int fakeRegister(const char* id, const char* label, int (*avail)(void*), void (*go)(void*), void* data) {
@@ -85,7 +85,7 @@ static int fakeRegister(const char* id, const char* label, int (*avail)(void*), 
 }
 static int fakeBind(int screen, int button, int trigger, const char* id) {
 	(void)trigger; (void)id;
-	if (screen == NUI_SCREEN_GAMELIST && button == NUI_BUTTON_Y) bound_y++;
+	if (screen == MOSAIC_SCREEN_GAMELIST && button == MOSAIC_BUTTON_Y) bound_y++;
 	return 0;
 }
 
@@ -103,9 +103,9 @@ static int pressY(void) {
 #define CARD TEST_SDCARD_PATH
 #define FOLDER CARD "/Smart Collections"
 
-static const NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static const MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/test",
@@ -223,11 +223,11 @@ static void testModel(void) {
 	// grouping: a game can be in two franchises, and others aren't kept
 	SMIndex index;
 	SM_indexInit(&index);
-	CHECK(SM_indexAdd(&index, &catalog, "/r/b.gb", "Super Mario Land", NUI_ENTRY_ROM) == 1);
-	CHECK(SM_indexAdd(&index, &catalog, "/r/a.wii", "Mario & Sonic at the Olympic Games", NUI_ENTRY_ROM) == 2);
-	CHECK(SM_indexAdd(&index, &catalog, "/r/c.gb", "Tetris", NUI_ENTRY_ROM) == 1);
-	CHECK(SM_indexAdd(&index, &catalog, "/r/d.gb", "Some Other Game", NUI_ENTRY_ROM) == 0);
-	CHECK(SM_indexAdd(&index, &catalog, "/r/e.gb", "dr. mario", NUI_ENTRY_ROM) == 1);
+	CHECK(SM_indexAdd(&index, &catalog, "/r/b.gb", "Super Mario Land", MOSAIC_ENTRY_ROM) == 1);
+	CHECK(SM_indexAdd(&index, &catalog, "/r/a.wii", "Mario & Sonic at the Olympic Games", MOSAIC_ENTRY_ROM) == 2);
+	CHECK(SM_indexAdd(&index, &catalog, "/r/c.gb", "Tetris", MOSAIC_ENTRY_ROM) == 1);
+	CHECK(SM_indexAdd(&index, &catalog, "/r/d.gb", "Some Other Game", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(SM_indexAdd(&index, &catalog, "/r/e.gb", "dr. mario", MOSAIC_ENTRY_ROM) == 1);
 	CHECK(index.game_count == 4);
 	SM_indexSort(&index, &catalog);
 	int mario = SM_find(&catalog, "Mario");
@@ -263,7 +263,7 @@ static void testModel(void) {
 	CHECK(index.game_count == 0);
 }
 
-static NUIEntry* named(NUIList* list, const char* name) {
+static MosaicEntry* named(MosaicList* list, const char* name) {
 	for (int i = 0; i < list->count; i++) {
 		if (!strcmp(list->items[i]->name, name)) return list->items[i];
 	}
@@ -297,23 +297,23 @@ static void testPlugin(void) {
 	writeText(CARD "/Roms/Arcade (FBN)/map.txt", "sf2.zip\tStreet Fighter II\nsf2ce.zip\tStreet Fighter II' - Champion Edition\nmario.zip\t.Mario Bros.\n");
 	touch(CARD "/Roms/Unplayable (NOPE)/Super Mario Bros.nes"); // no emulator
 
-	const NUIPlugin* p = nextui_plugin_get(&fake);
-	CHECK(p->size == sizeof(NUIPlugin));
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
+	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "smart-collections");
 	CHECK(p->init(&fake) == 0);
 	CHECK(actions == 2 && bound_y == 2);
 
 	// one folder on the root
-	NUIList* root = fakeListNew();
+	MosaicList* root = fakeListNew();
 	p->root_entries(root);
 	CHECK(root->count == 1);
 	CHECK_STR(root->items[0]->path, FOLDER);
 	CHECK_STR(root->items[0]->name, "Smart Collections");
-	CHECK(root->items[0]->type == NUI_ENTRY_DIR);
+	CHECK(root->items[0]->type == MOSAIC_ENTRY_DIR);
 	CHECK(p->virtual_dir(CARD "/Roms") == NULL);
 
 	// franchises with two games or more, by name
-	NUIList* top = p->virtual_dir(FOLDER);
+	MosaicList* top = p->virtual_dir(FOLDER);
 	CHECK(top->count == 4);
 	if (top->count == 4) {
 		CHECK_STR(top->items[0]->name, "Final Fantasy");
@@ -321,35 +321,35 @@ static void testPlugin(void) {
 		CHECK_STR(top->items[2]->name, "Street Fighter");
 		CHECK_STR(top->items[3]->name, "Zelda");
 		CHECK_STR(top->items[1]->path, FOLDER "/Mario");
-		CHECK(top->items[1]->type == NUI_ENTRY_DIR);
+		CHECK(top->items[1]->type == MOSAIC_ENTRY_DIR);
 	}
 
 	// across systems and subfolders, skipping hidden, disabled, mapped-away
 	// games and systems without an emulator
-	NUIList* mario = p->virtual_dir(FOLDER "/Mario");
+	MosaicList* mario = p->virtual_dir(FOLDER "/Mario");
 	CHECK(mario->count == 3);
 	if (mario->count == 3) {
 		CHECK_STR(mario->items[0]->name, "Super Mario Land");
 		CHECK_STR(mario->items[1]->name, "Super Mario Land DX");
 		CHECK_STR(mario->items[1]->path, CARD "/Roms/Game Boy (GB)/Hacks/Super Mario Land DX.gb");
 		CHECK_STR(mario->items[2]->name, "Super Mario World");
-		CHECK(mario->items[2]->type == NUI_ENTRY_ROM);
+		CHECK(mario->items[2]->type == MOSAIC_ENTRY_ROM);
 	}
 
 	// a multi-disc folder is one game, and map.txt names count
-	NUIList* ff = p->virtual_dir(FOLDER "/Final Fantasy");
+	MosaicList* ff = p->virtual_dir(FOLDER "/Final Fantasy");
 	CHECK(ff->count == 2);
 	if (ff->count == 2) {
 		CHECK_STR(ff->items[1]->name, "Final Fantasy VII");
 		CHECK_STR(ff->items[1]->path, CARD "/Roms/PlayStation (PS)/Final Fantasy VII (USA)");
-		CHECK(ff->items[1]->type == NUI_ENTRY_DIR);
+		CHECK(ff->items[1]->type == MOSAIC_ENTRY_DIR);
 	}
-	NUIList* sf = p->virtual_dir(FOLDER "/Street Fighter");
+	MosaicList* sf = p->virtual_dir(FOLDER "/Street Fighter");
 	CHECK(sf->count == 2);
 	if (sf->count == 2) CHECK_STR(sf->items[0]->name, "Street Fighter II");
 
 	// an unknown collection is an empty folder, not the launcher's to list
-	NUIList* none = p->virtual_dir(FOLDER "/Nothing");
+	MosaicList* none = p->virtual_dir(FOLDER "/Nothing");
 	CHECK(none && none->count == 0);
 
 	// Y does nothing on a game, or on the folder with nothing dismissed
@@ -367,7 +367,7 @@ static void testPlugin(void) {
 	CHECK_STR(toasted, "Dismissed Mario");
 	CHECK(reloads == 1);
 	CHECK_STR(fakeCfgGet(ID, "dismissed", ""), "Mario");
-	NUIList* after = p->virtual_dir(FOLDER);
+	MosaicList* after = p->virtual_dir(FOLDER);
 	CHECK(after->count == 3);
 	CHECK(named(after, "Mario") == NULL);
 
@@ -417,7 +417,7 @@ static void testPlugin(void) {
 	fakeCfgSet(ID, "builtin", "off");
 	fakeCfgSet(ID, "extra", "Super, Legend");
 	CHECK(p->init(&fake) == 0);
-	NUIList* mine = p->virtual_dir(FOLDER);
+	MosaicList* mine = p->virtual_dir(FOLDER);
 	CHECK(mine->count == 2);
 	if (mine->count == 2) {
 		CHECK_STR(mine->items[0]->name, "Legend");

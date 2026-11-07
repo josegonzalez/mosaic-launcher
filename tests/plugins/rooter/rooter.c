@@ -8,11 +8,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 #define ID "rooter"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char folder[512];
 static int replaced = 0; // times root_replace ran
 static int listed = 0;   // times the folder was listed
@@ -32,29 +32,29 @@ static const char* shown(const char* s) {
 	return s ? s : "(null)";
 }
 
-static NUIList* rootReplace(void) {
+static MosaicList* rootReplace(void) {
 	replaced++;
 	host->log(ID, "root_replace called");
-	NUIList* root = host->list_new();
-	host->list_push(root, host->entry_new(folder, NUI_ENTRY_DIR, "Rooter"));
+	MosaicList* root = host->list_new();
+	host->list_push(root, host->entry_new(folder, MOSAIC_ENTRY_DIR, "Rooter"));
 	return root;
 }
 
-static NUIList* virtualDir(const char* path) {
+static MosaicList* virtualDir(const char* path) {
 	if (strcmp(path, folder) != 0) return NULL;
 	listed++;
-	NUIList* list = host->list_new();
-	host->list_push(list, host->entry_new(host->cfg_get(ID, "rom", ""), NUI_ENTRY_ROM, "Game"));
+	MosaicList* list = host->list_new();
+	host->list_push(list, host->entry_new(host->cfg_get(ID, "rom", ""), MOSAIC_ENTRY_ROM, "Game"));
 	return list;
 }
 
-static int preLaunch(const NUILaunch* launch) {
+static int preLaunch(const MosaicLaunch* launch) {
 	say("pre_launch %s", launch->path);
-	return NUI_LAUNCH_CANCEL;
+	return MOSAIC_LAUNCH_CANCEL;
 }
 
 static const char* selectedPath(void) {
-	const NUIEntry* entry = host->selected_entry();
+	const MosaicEntry* entry = host->selected_entry();
 	return entry ? host->entry_path(entry) : NULL;
 }
 
@@ -68,9 +68,9 @@ static void tick(unsigned long now) {
 		say("past the end %s", shown(host->recent_path(99)));
 
 		const char* rom = host->cfg_get(ID, "rom", "");
-		say("open rom %i", host->open_path(rom, NUI_ENTRY_ROM));
-		say("open missing %i", host->open_path("/nowhere/Missing.gb", NUI_ENTRY_ROM));
-		int opened = host->open_path(folder, NUI_ENTRY_DIR);
+		say("open rom %i", host->open_path(rom, MOSAIC_ENTRY_ROM));
+		say("open missing %i", host->open_path("/nowhere/Missing.gb", MOSAIC_ENTRY_ROM));
+		int opened = host->open_path(folder, MOSAIC_ENTRY_DIR);
 		say("open folder %i, now in %s", opened, shown(host->current_path()));
 
 		int removed = host->recent_remove(0);
@@ -88,21 +88,21 @@ static void tick(unsigned long now) {
 	}
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
-	if (!NUI_HOST_HAS(host, open_path) || !NUI_HOST_HAS(host, recents_count) || !NUI_HOST_HAS(host, recent_path)
-			|| !NUI_HOST_HAS(host, recent_remove) || !NUI_HOST_HAS(host, recents_clear) || !NUI_HOST_HAS(host, reload_lists)) {
+	if (!MOSAIC_HOST_HAS(host, open_path) || !MOSAIC_HOST_HAS(host, recents_count) || !MOSAIC_HOST_HAS(host, recent_path)
+			|| !MOSAIC_HOST_HAS(host, recent_remove) || !MOSAIC_HOST_HAS(host, recents_clear) || !MOSAIC_HOST_HAS(host, reload_lists)) {
 		host->log(ID, "the launcher is missing a host call");
 		return 1;
 	}
 	snprintf(folder, sizeof(folder), "%s/Rooter", host->sdcard_path);
-	say("open from init %i", host->open_path(folder, NUI_ENTRY_DIR));
+	say("open from init %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.virtual_dir = virtualDir,
@@ -111,7 +111,7 @@ static const NUIPlugin plugin = {
 	.root_replace = rootReplace,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

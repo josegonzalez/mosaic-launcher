@@ -21,7 +21,7 @@ void Pin_build(PinSet* set, const char* const* paths, int count);
 // True when the card-relative path is in the set.
 int Pin_has(const PinSet* set, const char* rel);
 
-// True when an entry (a card-relative path and an enum NUIEntryType) is a
+// True when an entry (a card-relative path and an enum MosaicEntryType) is a
 // favorite, matching what the favorites toggle records: a folder that
 // launches a game means its .m3u or .cue, and a disc inside one means the
 // folder's .m3u. Checks names only, without looking at the card.

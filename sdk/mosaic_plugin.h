@@ -1,5 +1,5 @@
 /*
- * nextui_plugin.h - the plugin API for nextui-launcher.
+ * mosaic_plugin.h - the plugin API for mosaic-launcher.
  *
  * MIT License. Copyright (c) 2026 Jose Diaz-Gonzalez. See sdk/LICENSE.
  *
@@ -8,7 +8,7 @@
  *
  * A plugin is a shared object exporting one function:
  *
- *     const NUIPlugin* nextui_plugin_get(const NUIHost* host);
+ *     const MosaicPlugin* mosaic_plugin_get(const MosaicHost* host);
  *
  * It returns a description of the plugin with whichever hooks it
  * implements; every hook is optional. The launcher calls into the plugin
@@ -19,8 +19,8 @@
  * other has. Fields are only ever added at the end.
  */
 
-#ifndef NEXTUI_PLUGIN_H
-#define NEXTUI_PLUGIN_H
+#ifndef MOSAIC_PLUGIN_H
+#define MOSAIC_PLUGIN_H
 
 #include <stddef.h>
 
@@ -28,80 +28,80 @@
 extern "C" {
 #endif
 
-#define NUI_API_VERSION 1
+#define MOSAIC_API_VERSION 1
 
 ///////////////////////////////////////
 // Things the launcher owns. Plugins only hold pointers to them.
 
-typedef struct NUIEntry NUIEntry; // one row in a list: a folder, game, pak or toggle
-typedef struct NUIList NUIList;   // an ordered list of entries
+typedef struct MosaicEntry MosaicEntry; // one row in a list: a folder, game, pak or toggle
+typedef struct MosaicList MosaicList;   // an ordered list of entries
 
-enum NUIEntryType {
-	NUI_ENTRY_DIR,
-	NUI_ENTRY_PAK,
-	NUI_ENTRY_ROM,
-	NUI_ENTRY_TOGGLE,
+enum MosaicEntryType {
+	MOSAIC_ENTRY_DIR,
+	MOSAIC_ENTRY_PAK,
+	MOSAIC_ENTRY_ROM,
+	MOSAIC_ENTRY_TOGGLE,
 };
 
 // Screens a binding can target.
-enum NUIScreen {
-	NUI_SCREEN_GAMELIST,
-	NUI_SCREEN_SWITCHER,
-	NUI_SCREEN_QUICKMENU,
+enum MosaicScreen {
+	MOSAIC_SCREEN_GAMELIST,
+	MOSAIC_SCREEN_SWITCHER,
+	MOSAIC_SCREEN_QUICKMENU,
 };
 
 // Buttons a binding can use.
-enum NUIButton {
-	NUI_BUTTON_A,
-	NUI_BUTTON_B,
-	NUI_BUTTON_X,
-	NUI_BUTTON_Y,
-	NUI_BUTTON_L1,
-	NUI_BUTTON_R1,
-	NUI_BUTTON_L2,
-	NUI_BUTTON_R2,
-	NUI_BUTTON_START,
-	NUI_BUTTON_SELECT,
+enum MosaicButton {
+	MOSAIC_BUTTON_A,
+	MOSAIC_BUTTON_B,
+	MOSAIC_BUTTON_X,
+	MOSAIC_BUTTON_Y,
+	MOSAIC_BUTTON_L1,
+	MOSAIC_BUTTON_R1,
+	MOSAIC_BUTTON_L2,
+	MOSAIC_BUTTON_R2,
+	MOSAIC_BUTTON_START,
+	MOSAIC_BUTTON_SELECT,
 };
 
-enum NUITrigger {
-	NUI_TRIGGER_PRESS,
-	NUI_TRIGGER_RELEASE,
+enum MosaicTrigger {
+	MOSAIC_TRIGGER_PRESS,
+	MOSAIC_TRIGGER_RELEASE,
 };
 
 // Images art_path can supply.
-enum NUIArtKind {
-	NUI_ART_THUMBNAIL, // a game's art beside the list
-	NUI_ART_FOLDER_BG, // the background while a folder is selected
-	NUI_ART_LIST_BG,   // the background while a game in a folder is selected
+enum MosaicArtKind {
+	MOSAIC_ART_THUMBNAIL, // a game's art beside the list
+	MOSAIC_ART_FOLDER_BG, // the background while a folder is selected
+	MOSAIC_ART_LIST_BG,   // the background while a game in a folder is selected
 };
 
 // The quick menu's rows a plugin tile can go in.
-enum NUIQuickRow {
-	NUI_QUICK_TOP,    // the large labelled tiles: Recents, Games, Tools
-	NUI_QUICK_BOTTOM, // the small icons: Settings, Wifi, Sleep, Power off
+enum MosaicQuickRow {
+	MOSAIC_QUICK_TOP,    // the large labelled tiles: Recents, Games, Tools
+	MOSAIC_QUICK_BOTTOM, // the small icons: Settings, Wifi, Sleep, Power off
 };
 
-// What pre_launch decides. NUI_LAUNCH_REPLACE runs the command set with
+// What pre_launch decides. MOSAIC_LAUNCH_REPLACE runs the command set with
 // host->replace_launch in place of the launch; a launcher older than that
 // field launches as usual.
-enum NUILaunchResult {
-	NUI_LAUNCH_CONTINUE,
-	NUI_LAUNCH_CANCEL,
-	NUI_LAUNCH_REPLACE,
+enum MosaicLaunchResult {
+	MOSAIC_LAUNCH_CONTINUE,
+	MOSAIC_LAUNCH_CANCEL,
+	MOSAIC_LAUNCH_REPLACE,
 };
 
-typedef struct NUILaunch {
+typedef struct MosaicLaunch {
 	const char* path; // the rom or pak being launched
-	int type;         // NUI_ENTRY_ROM or NUI_ENTRY_PAK
-} NUILaunch;
+	int type;         // MOSAIC_ENTRY_ROM or MOSAIC_ENTRY_PAK
+} MosaicLaunch;
 
 ///////////////////////////////////////
 // What the launcher offers plugins.
 
-typedef struct NUIHost {
-	size_t size;     // sizeof(NUIHost) in the launcher
-	int api_version; // NUI_API_VERSION the launcher was built with
+typedef struct MosaicHost {
+	size_t size;     // sizeof(MosaicHost) in the launcher
+	int api_version; // MOSAIC_API_VERSION the launcher was built with
 
 	const char* platform;      // eg. "tg5040"
 	const char* sdcard_path;   // eg. "/mnt/SDCARD"
@@ -116,18 +116,18 @@ typedef struct NUIHost {
 	void (*cfg_set)(const char* plugin_id, const char* key, const char* value);
 
 	// Entries. A new entry belongs to whoever it's pushed into.
-	NUIEntry* (*entry_new)(const char* path, int type, const char* name);
-	const char* (*entry_path)(const NUIEntry* entry);
-	const char* (*entry_name)(const NUIEntry* entry);
-	int (*entry_type)(const NUIEntry* entry);
+	MosaicEntry* (*entry_new)(const char* path, int type, const char* name);
+	const char* (*entry_path)(const MosaicEntry* entry);
+	const char* (*entry_name)(const MosaicEntry* entry);
+	int (*entry_type)(const MosaicEntry* entry);
 
-	NUIList* (*list_new)(void);
-	int (*list_count)(const NUIList* list);
-	NUIEntry* (*list_get)(const NUIList* list, int index);
-	void (*list_push)(NUIList* list, NUIEntry* entry);
+	MosaicList* (*list_new)(void);
+	int (*list_count)(const MosaicList* list);
+	MosaicEntry* (*list_get)(const MosaicList* list, int index);
+	void (*list_push)(MosaicList* list, MosaicEntry* entry);
 
 	// What the user is looking at. Either can be NULL.
-	const NUIEntry* (*selected_entry)(void);
+	const MosaicEntry* (*selected_entry)(void);
 	const char* (*current_path)(void);
 
 	void (*request_redraw)(void);
@@ -135,13 +135,13 @@ typedef struct NUIHost {
 	// Actions are named things the user can do; bindings put them on
 	// buttons. Plugin bindings rank after the screen's own, so they can
 	// only use buttons the screen leaves free. Both return 0 on success.
-	// For now only NUI_SCREEN_GAMELIST accepts bindings.
+	// For now only MOSAIC_SCREEN_GAMELIST accepts bindings.
 	int (*register_action)(const char* id, const char* label,
 		int (*available)(void* data), void (*run)(void* data), void* data);
 	int (*bind_button)(int screen, int button, int trigger, const char* action_id);
 
 	// Fields below were added after the first release; check for them with
-	// NUI_HOST_HAS before calling.
+	// MOSAIC_HOST_HAS before calling.
 
 	// A short message at the bottom of the screen for a moment, eg. "Added
 	// to favorites". A new one replaces the last.
@@ -160,7 +160,7 @@ typedef struct NUIHost {
 	void (*confirm)(const char* message, const char* yes_label, void (*on_yes)(void* data), void* data);
 	void (*keyboard)(const char* title, const char* initial, void (*on_done)(const char* text, void* data), void* data);
 
-	// Opens a game, pak or folder (an enum NUIEntryType) the way selecting
+	// Opens a game, pak or folder (an enum MosaicEntryType) the way selecting
 	// it in the game list would: a game or pak launches, after pre_launch,
 	// and a folder opens, launching its .cue or .m3u if it has one. Returns
 	// 1 when it opened or the launch is queued, 0 when it didn't (a missing
@@ -184,7 +184,7 @@ typedef struct NUIHost {
 	// Renames an entry from inside list_ready. The new name is what the
 	// list draws and what the letter index uses. Returns 0, or -1 when
 	// called anywhere but list_ready.
-	int (*entry_set_name)(NUIEntry* entry, const char* name);
+	int (*entry_set_name)(MosaicEntry* entry, const char* name);
 
 	// The list the user is looking at, read with list_count and list_get,
 	// or NULL before the lists exist. Don't keep it: it's freed when the
@@ -193,12 +193,12 @@ typedef struct NUIHost {
 	// the selection to a row, scrolling to keep it in view, and returns 0,
 	// or -1 for a row that isn't there. Call them from an action or tick,
 	// not from a list hook, which may be listing another folder.
-	const NUIList* (*current_list)(void);
+	const MosaicList* (*current_list)(void);
 	int (*selected_index)(void);
 	int (*select_index)(int index);
 
 	// Quick menu tiles. quick_tile puts a registered action on the quick
-	// menu as a tile in row (an enum NUIQuickRow), after the built-in ones:
+	// menu as a tile in row (an enum MosaicQuickRow), after the built-in ones:
 	// its label is the action's, A runs it, and it shows only while the
 	// action is available. icon is a PNG to draw on it, or NULL. With
 	// is_on, the tile has an on/off state (called with the action's data),
@@ -247,11 +247,11 @@ typedef struct NUIHost {
 	// by another: the first in load order keeps it, and the loader logs
 	// the refusal. Call it from init, where it returns 0, or -1 for an
 	// unknown action, a taken button or a bad argument. For now only
-	// NUI_SCREEN_GAMELIST takes overrides.
+	// MOSAIC_SCREEN_GAMELIST takes overrides.
 	int (*override_button)(int screen, int button, int trigger, const char* action_id);
 
 	// Called from pre_launch, sets the command to run instead of the
-	// launch, then pre_launch returns NUI_LAUNCH_REPLACE. program is a file
+	// launch, then pre_launch returns MOSAIC_LAUNCH_REPLACE. program is a file
 	// on the card, such as another emulator pak's launch.sh or minarch.elf;
 	// args (up to 8, each under 256 bytes, no newlines) follow it. For a
 	// game, the path the launcher would have launched comes last, after it
@@ -290,25 +290,25 @@ typedef struct NUIHost {
 
 	// 1 when stock's root would list Recently Played: Show Recents is on
 	// in Settings and there are recents. A root_replace can add the folder
-	// itself, as a NUI_ENTRY_DIR at sdcard_path + "/Recently Played".
+	// itself, as a MOSAIC_ENTRY_DIR at sdcard_path + "/Recently Played".
 	int (*show_recents)(void);
-} NUIHost;
+} MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
 // newer features when they're there and do without on older launchers.
-#define NUI_HOST_HAS(host, field) \
-	((host)->size >= offsetof(NUIHost, field) + sizeof((host)->field) && (host)->field)
+#define MOSAIC_HOST_HAS(host, field) \
+	((host)->size >= offsetof(MosaicHost, field) + sizeof((host)->field) && (host)->field)
 
 ///////////////////////////////////////
 // What a plugin offers the launcher.
 
-typedef struct NUIPlugin {
-	size_t size;     // sizeof(NUIPlugin) in the plugin
-	int api_version; // NUI_API_VERSION the plugin was built with
+typedef struct MosaicPlugin {
+	size_t size;     // sizeof(MosaicPlugin) in the plugin
+	int api_version; // MOSAIC_API_VERSION the plugin was built with
 	const char* id;  // must match id= in plugin.txt
 
 	// Return 0 to load, anything else to be skipped. quit runs at exit.
-	int (*init)(const NUIHost* host);
+	int (*init)(const MosaicHost* host);
 	void (*quit)(void);
 
 	// Lists. root_entries adds to the top-level list, after the consoles
@@ -316,14 +316,14 @@ typedef struct NUIPlugin {
 	// returns a list (from host->list_new) for a path the plugin owns, or
 	// NULL to let the launcher list it. filter returns 0 to hide an entry.
 	// display_name writes a new name and returns 1, or returns 0.
-	void (*root_entries)(NUIList* root);
-	NUIList* (*virtual_dir)(const char* path);
-	int (*filter)(const NUIEntry* entry, const char* dir_path);
-	int (*display_name)(const NUIEntry* entry, char* out, size_t size);
+	void (*root_entries)(MosaicList* root);
+	MosaicList* (*virtual_dir)(const char* path);
+	int (*filter)(const MosaicEntry* entry, const char* dir_path);
+	int (*display_name)(const MosaicEntry* entry, char* out, size_t size);
 
 	// Launching. pre_launch runs before a game or pak starts and can cancel
 	// it; post_return runs when the launcher starts again afterwards.
-	int (*pre_launch)(const NUILaunch* launch);
+	int (*pre_launch)(const MosaicLaunch* launch);
 	void (*post_return)(void);
 
 	// Called every frame with SDL_GetTicks().
@@ -334,18 +334,18 @@ typedef struct NUIPlugin {
 	void (*after_resume)(void);
 	void (*before_poweroff)(void);
 
-	// Art. Writes the image to use for an entry (an enum NUIArtKind) and
+	// Art. Writes the image to use for an entry (an enum MosaicArtKind) and
 	// returns 1, or returns 0 to let the launcher look in its usual place.
 	// The first plugin to answer wins. The image doesn't have to exist; the
 	// launcher falls back as it would for its own path.
-	int (*art_path)(const NUIEntry* entry, int kind, char* out, size_t size);
+	int (*art_path)(const MosaicEntry* entry, int kind, char* out, size_t size);
 
 	// The root slot. A plugin with slots=root in its plugin.txt can return
 	// the whole top-level list (from host->list_new) in place of the stock
 	// one, or NULL to keep stock's. Only the slot's owner is asked. Other
 	// plugins' root_entries are added to a replaced root only when the
 	// owner sets root_with_entries.
-	NUIList* (*root_replace)(void);
+	MosaicList* (*root_replace)(void);
 
 	// Ordering a list. After the launcher sorts a folder its own way, it
 	// sorts it again with every plugin's sort_compare, in load order: for
@@ -354,7 +354,7 @@ typedef struct NUIPlugin {
 	// the pair keeps the launcher's order. Return 0 for lists you don't
 	// care about. Recents and collections are passed too, in their own
 	// order.
-	int (*sort_compare)(const NUIEntry* a, const NUIEntry* b, const char* dir_path);
+	int (*sort_compare)(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path);
 
 	// Sees a whole list once it's filtered, named and sorted, before it's
 	// shown, so it can rename entries with host->entry_set_name based on
@@ -363,7 +363,7 @@ typedef struct NUIPlugin {
 	// the list is sorted again by name and then by sort_compare, as for
 	// display_name, except recents and collections, which keep their
 	// order. It can't add, remove or reorder entries.
-	void (*list_ready)(const NUIList* list, const char* dir_path);
+	void (*list_ready)(const MosaicList* list, const char* dir_path);
 
 	// With root_replace: 1 runs plugins' root_entries on the replaced root,
 	// in load order and after the entries root_replace returned, as for
@@ -379,10 +379,10 @@ typedef struct NUIPlugin {
 	// place and name. It runs whenever recents load: at start, and when the
 	// lists reload.
 	int (*repair_path)(const char* missing, char* out, size_t size);
-} NUIPlugin;
+} MosaicPlugin;
 
-#define NUI_PLUGIN_ENTRY "nextui_plugin_get"
-typedef const NUIPlugin* (*NUIPluginGet)(const NUIHost* host);
+#define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"
+typedef const MosaicPlugin* (*MosaicPluginGet)(const MosaicHost* host);
 
 #ifdef __cplusplus
 }

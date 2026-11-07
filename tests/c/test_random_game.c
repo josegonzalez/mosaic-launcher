@@ -5,13 +5,13 @@
 #include "check.h"
 #include "../../plugins/random-game/random_game.c"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[1024];
 	char name[128];
 	int type;
 };
-struct NUIList {
-	NUIEntry* items[16];
+struct MosaicList {
+	MosaicEntry* items[16];
 	int count;
 };
 
@@ -49,15 +49,15 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	return fallback;
 }
 static void fakeCfgSet(const char* id, const char* key, const char* value) { (void)id; (void)key; (void)value; }
-static NUIEntry* fakeEntryNew(const char* path, int type, const char* name) {
-	NUIEntry* e = calloc(1, sizeof(NUIEntry));
+static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
+	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);
 	snprintf(e->name, sizeof(e->name), "%s", name ? name : "");
 	e->type = type;
 	return e;
 }
-static NUIList* fakeListNew(void) { return calloc(1, sizeof(NUIList)); }
-static void fakeListPush(NUIList* l, NUIEntry* e) { l->items[l->count++] = e; }
+static MosaicList* fakeListNew(void) { return calloc(1, sizeof(MosaicList)); }
+static void fakeListPush(MosaicList* l, MosaicEntry* e) { l->items[l->count++] = e; }
 static const char* fakeCurrentPath(void) { return current; }
 static void fakeRedraw(void) {}
 static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
@@ -91,9 +91,9 @@ static int fakeQuickTile(const char* id, int row, const char* icon, const char* 
 	return 0;
 }
 
-static NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/test",
@@ -121,7 +121,7 @@ static void writeText(const char* path, const char* text) {
 	fclose(f);
 }
 
-static void freeList(NUIList* list) {
+static void freeList(MosaicList* list) {
 	if (!list) return;
 	for (int i = 0; i < list->count; i++) free(list->items[i]);
 	free(list);
@@ -180,9 +180,9 @@ static void testSystems(void) {
 
 	RGLibrary lib;
 	RG_init(&lib);
-	CHECK(RG_add(&lib, "/r/Game Boy (GB)/Tetris.gb", NUI_ENTRY_ROM, "Game Boy (GB)") == 0);
-	CHECK(RG_add(&lib, "/r/NES (FC)/Mario.nes", NUI_ENTRY_ROM, "NES (FC)") == 0);
-	CHECK(RG_add(&lib, "/r/Game Boy (MGB)/Pokemon.gb", NUI_ENTRY_ROM, "Game Boy (MGB)") == 0);
+	CHECK(RG_add(&lib, "/r/Game Boy (GB)/Tetris.gb", MOSAIC_ENTRY_ROM, "Game Boy (GB)") == 0);
+	CHECK(RG_add(&lib, "/r/NES (FC)/Mario.nes", MOSAIC_ENTRY_ROM, "NES (FC)") == 0);
+	CHECK(RG_add(&lib, "/r/Game Boy (MGB)/Pokemon.gb", MOSAIC_ENTRY_ROM, "Game Boy (MGB)") == 0);
 	CHECK(lib.count == 3);
 	CHECK(lib.system_count == 2);
 	CHECK(lib.games[0].system == lib.games[2].system);
@@ -254,10 +254,10 @@ static void testPlayed(void) {
 static void testWeights(void) {
 	RGLibrary lib;
 	RG_init(&lib);
-	RG_add(&lib, "/r/GB (GB)/Tetris.gb", NUI_ENTRY_ROM, "GB (GB)");
-	RG_add(&lib, "/r/GB (GB)/Kirby.gb", NUI_ENTRY_ROM, "GB (GB)");
-	RG_add(&lib, "/r/GB (GB)/Hidden.gb", NUI_ENTRY_ROM, "GB (GB)");
-	RG_add(&lib, "/r/NES (FC)/Mario.nes", NUI_ENTRY_ROM, "NES (FC)");
+	RG_add(&lib, "/r/GB (GB)/Tetris.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
+	RG_add(&lib, "/r/GB (GB)/Kirby.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
+	RG_add(&lib, "/r/GB (GB)/Hidden.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
+	RG_add(&lib, "/r/NES (FC)/Mario.nes", MOSAIC_ENTRY_ROM, "NES (FC)");
 
 	RGPathSet hidden_set;
 	RG_setInit(&hidden_set);
@@ -296,10 +296,10 @@ static void testPick(void) {
 	// times as often as one with one, over every number the source can give
 	RGLibrary lib;
 	RG_init(&lib);
-	RG_add(&lib, "/r/GB (GB)/A.gb", NUI_ENTRY_ROM, "GB (GB)");
-	RG_add(&lib, "/r/GB (GB)/B.gb", NUI_ENTRY_ROM, "GB (GB)");
-	RG_add(&lib, "/r/NES (FC)/C.nes", NUI_ENTRY_ROM, "NES (FC)");
-	RG_add(&lib, "/r/GB (GB)/D.gb", NUI_ENTRY_ROM, "GB (GB)");
+	RG_add(&lib, "/r/GB (GB)/A.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
+	RG_add(&lib, "/r/GB (GB)/B.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
+	RG_add(&lib, "/r/NES (FC)/C.nes", MOSAIC_ENTRY_ROM, "NES (FC)");
+	RG_add(&lib, "/r/GB (GB)/D.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
 	unsigned weights[4];
 	unsigned long total = RG_weights(&lib, -1, NULL, NULL, 0, RG_UNPLAYED_WEIGHT, weights);
 	CHECK(total == 16);
@@ -355,7 +355,7 @@ static void start(void) {
 	bound[0] = tile_action[0] = toasted[0] = opened[0] = '\0';
 	bound_button = opened_type = -1;
 	opens = 0;
-	CHECK(nextui_plugin_get(&fake)->init(&fake) == 0);
+	CHECK(mosaic_plugin_get(&fake)->init(&fake) == 0);
 }
 
 static void testScan(void) {
@@ -370,11 +370,11 @@ static void testScan(void) {
 		if (strstr(g->path, "/Disc Game")) {
 			disc++;
 			CHECK_STR(g->path, NES "/Disc Game");
-			CHECK(g->type == NUI_ENTRY_DIR);
+			CHECK(g->type == MOSAIC_ENTRY_DIR);
 		}
 		if (strstr(g->path, "Doom.pak")) {
 			pak++;
-			CHECK(g->type == NUI_ENTRY_PAK);
+			CHECK(g->type == MOSAIC_ENTRY_PAK);
 		}
 		if (strstr(g->path, "Secret") || strstr(g->path, "Hidden") || strstr(g->path, "Old")) secret++;
 		if (strstr(g->path, "Nothing")) nothing++;
@@ -392,7 +392,7 @@ static void testButton(void) {
 	if (at < 0) return;
 	CHECK_STR(actions[at].label, "RANDOM");
 	CHECK_STR(bound, "random-game.pick");
-	CHECK(bound_button == NUI_BUTTON_Y);
+	CHECK(bound_button == MOSAIC_BUTTON_Y);
 	CHECK(findAction("random-game.tile") < 0); // the tile is off by default
 
 	// where Y picks
@@ -417,7 +417,7 @@ static void testButton(void) {
 		seed = (unsigned long long)i * 7919 + 1;
 		actions[at].run(NULL);
 		CHECK_STR(opened, GB "/Kirby.gb");
-		CHECK(opened_type == NUI_ENTRY_ROM);
+		CHECK(opened_type == MOSAIC_ENTRY_ROM);
 	}
 
 	// everything there hidden
@@ -462,13 +462,13 @@ static void testButton(void) {
 static void testRootRow(void) {
 	cfg_root[0] = '\0';
 	start();
-	NUIList* root = fakeListNew();
+	MosaicList* root = fakeListNew();
 	plugin.root_entries(root);
 	CHECK(root->count == 1);
 	if (root->count == 1) {
 		CHECK_STR(root->items[0]->path, CARD "/Random game");
 		CHECK_STR(root->items[0]->name, "Random game");
-		CHECK(root->items[0]->type == NUI_ENTRY_DIR);
+		CHECK(root->items[0]->type == MOSAIC_ENTRY_DIR);
 	}
 	freeList(root);
 
@@ -476,7 +476,7 @@ static void testRootRow(void) {
 
 	// opening it shows a game, and the next frame launches it
 	snprintf(current, sizeof(current), "%s", CARD);
-	NUIList* list = plugin.virtual_dir(CARD "/Random game");
+	MosaicList* list = plugin.virtual_dir(CARD "/Random game");
 	CHECK(list && list->count == 1);
 	char picked[1024] = "";
 	if (list && list->count == 1) snprintf(picked, sizeof(picked), "%s", list->items[0]->path);
@@ -539,14 +539,14 @@ static void testTile(void) {
 }
 
 static void testOldLauncher(void) {
-	fake.size = offsetof(NUIHost, open_path);
+	fake.size = offsetof(MosaicHost, open_path);
 	start();
 	CHECK(action_count == 0);
-	NUIList* root = fakeListNew();
+	MosaicList* root = fakeListNew();
 	plugin.root_entries(root);
 	CHECK(root->count == 0);
 	freeList(root);
-	fake.size = sizeof(NUIHost);
+	fake.size = sizeof(MosaicHost);
 }
 
 int main(void) {

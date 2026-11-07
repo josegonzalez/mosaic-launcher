@@ -34,7 +34,7 @@ build_plugin() {
 }
 
 run_launcher() {
-	NEXTUI_LAUNCHER_PLUGIN_PATH="$WORK/plugins" "$ROOT/scripts/desktop-smoke.sh" "$1" 3 >/dev/null 2>&1
+	MOSAIC_LAUNCHER_PLUGIN_PATH="$WORK/plugins" "$ROOT/scripts/desktop-smoke.sh" "$1" 3 >/dev/null 2>&1
 }
 
 # expect <line>: plugin $plugin logged line in $log
@@ -204,7 +204,7 @@ grep -qF "plugins: remapper overrides Y press on the game list with nothing" "$l
 grep -qF "plugins: rival can't override A on the game list, remapper already has it" "$log" || fail "the A conflict wasn't logged"
 grep -qF "plugins: remapper overrides Y, so rival.y bound to it doesn't run" "$log" || fail "the overridden Y binding wasn't logged"
 grep -qF "plugins: rival can't replace the launch, remapper already did" "$log" || fail "the launch conflict wasn't logged"
-grep -qF "plugins: rival returned NUI_LAUNCH_REPLACE without a replace_launch command" "$log" || fail "rival's empty replace wasn't logged"
+grep -qF "plugins: rival returned MOSAIC_LAUNCH_REPLACE without a replace_launch command" "$log" || fail "rival's empty replace wasn't logged"
 grep -qF "plugins: remapper replaced the launch of $ROM" "$log" || fail "the replaced launch wasn't logged"
 grep -q "quick menu: top row .*Games (Library)" "$log" || fail "the Games tile wasn't relabelled"
 plugin=rival

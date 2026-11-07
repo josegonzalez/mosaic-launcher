@@ -2,7 +2,7 @@
 
 To write a plugin of your own, start from [`template/`](template/): copy it into a new repo, and it builds the plugin and packages it as a pak.
 
-A plugin is a shared object the launcher loads at startup. It's written against one header, [`sdk/nextui_plugin.h`](sdk/nextui_plugin.h), which is MIT licensed and doesn't include anything from NextUI, so a plugin can use any license.
+A plugin is a shared object the launcher loads at startup. It's written against one header, [`sdk/mosaic_plugin.h`](sdk/mosaic_plugin.h), which is MIT licensed and doesn't include anything from NextUI, so a plugin can use any license.
 
 ## Layout
 
@@ -32,33 +32,33 @@ requires=
 conflicts=
 ```
 
-- `id` must match the `id` in the plugin's `NUIPlugin`.
+- `id` must match the `id` in the plugin's `MosaicPlugin`.
 - `setting.<key>=<type>|<label>|<default>[|<options>]` declares a setting the Launcher pak's Plugins page shows and edits. `type` is `toggle` (`on` or `off`), `choice` (one of the comma-separated `options`) or `text` (typed on the on-screen keyboard). The plugin reads the value with `host->cfg_get(id, key, default)`. Changes take effect the next time the launcher starts, which is when the user leaves the Launcher pak.
-- `api` is the `NUI_API_VERSION` the plugin was built against. A plugin for a different version is skipped.
+- `api` is the `MOSAIC_API_VERSION` the plugin was built against. A plugin for a different version is skipped.
 - `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`. Only one plugin can own a slot.
 - `requires` lists plugins that must also load. `conflicts` lists plugins that can't load alongside it.
 
 ## The entry point
 
 ```c
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	host->log("hello", "hello");
 	return 0; // anything else skips the plugin
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = "hello",
 	.init = init,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	return &plugin;
 }
 ```
@@ -85,7 +85,7 @@ Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files).
 | `random-game` | Picks a game at random and launches it. **Y** on the game list picks from the system you're in, or from every system on the root. A Random game row on the root (the `root` setting, on by default) and a Random tile on the quick menu (the `tile` setting, off by default) pick from every system. Every game is as likely as any other, so bigger systems come up more often, and with the `unplayed` setting on (the default) games not in Recently Played are four times as likely. Games the `hidden` plugin hides are never picked. From casualducko and kUI. |
 | `clear-recents` | Clears Recently Played. A Clear recents tile on the quick menu (the `tile` setting, on by default) shows while there are recents, and in Recently Played **Y** (the `button` setting picks another) removes the selected game or clears them all, opening a menu of the two when both apply. Clearing asks first, then lists the folders again, so the quick menu's Recents tile goes away. Outside Recently Played the button is left to other plugins. From MyMinUI, MinUI-Zero, nx-redux and Nocturne. |
 
-Every hook in `NUIPlugin` is optional; leave out what you don't use. The launcher calls plugins only on its main thread. Both `NUIPlugin` and `NUIHost` start with their own `size`, and fields are only ever added at the end, so a plugin built against an older header keeps working with a newer launcher.
+Every hook in `MosaicPlugin` is optional; leave out what you don't use. The launcher calls plugins only on its main thread. Both `MosaicPlugin` and `MosaicHost` start with their own `size`, and fields are only ever added at the end, so a plugin built against an older header keeps working with a newer launcher.
 
 ## Turning plugins on and off
 
@@ -106,7 +106,7 @@ Plugins listed there load first, in that order. `slot.<name>=<id>` picks which p
 Newer host fields may be missing on an older launcher. Check before calling:
 
 ```c
-if (NUI_HOST_HAS(host, toast)) host->toast("Added to Favorites");
+if (MOSAIC_HOST_HAS(host, toast)) host->toast("Added to Favorites");
 ```
 
 - `toast(message)` shows a short message at the bottom of the screen.
@@ -115,24 +115,24 @@ if (NUI_HOST_HAS(host, toast)) host->toast("Added to Favorites");
 - `keyboard(title, initial, on_done, data)` lets the user type text; `on_done` gets the text, or `NULL` if they cancelled with Y. A types the highlighted key, B deletes, X toggles shift, START finishes.
 
 Both dialogs return straight away and call back once they close, so open them from an action (a button press), not from a list hook.
-- `art_path` in `NUIPlugin` lets a plugin pick the thumbnail, folder background or list background for an entry.
-- `root_replace()` in `NUIPlugin` returns the whole root list in place of the stock one, or `NULL` to keep stock's. Only the owner of the `root` slot (`slots=root` in `plugin.txt`) is asked, and other plugins' `root_entries` aren't added to a replaced root unless it sets `root_with_entries`. Recents still load for the game switcher.
+- `art_path` in `MosaicPlugin` lets a plugin pick the thumbnail, folder background or list background for an entry.
+- `root_replace()` in `MosaicPlugin` returns the whole root list in place of the stock one, or `NULL` to keep stock's. Only the owner of the `root` slot (`slots=root` in `plugin.txt`) is asked, and other plugins' `root_entries` aren't added to a replaced root unless it sets `root_with_entries`. Recents still load for the game switcher.
 - `open_path(path, type)` opens a game, pak or folder the way selecting it in the game list would, including `pre_launch` and recents. It returns 1 when it opened or the launch is queued, and 0 for a missing file, a cancelled launch, or a call from `init`, before the lists exist.
 - `recents_count()`, `recent_path(index)`, `recent_remove(index)` and `recents_clear()` read and change the recently played list, newest first. `recent_path` returns the full path, or `NULL` past the end. Changes are saved at once.
 - `reload_lists()` lists the open folders again from the card on the next frame, keeping each selection on the same entry where it can. Call it after deleting or renaming a game or clearing recents. A folder other than the root that the reload empties is closed, as if the user had backed out of it.
-- `sort_compare(a, b, dir_path)` in `NUIPlugin` orders a list, such as pinned games first or by a number in the name. The launcher sorts a folder its own way first, then by every plugin's `sort_compare` in load order: for each pair, the first plugin to return non-zero decides (negative puts `a` first), and a pair no plugin has an opinion on keeps the launcher's order. Return 0 for lists you don't handle. Recents and collections are passed too, in their own order. The letter index L1 and R1 jump through follows the final order.
-- `list_ready(list, dir_path)` in `NUIPlugin` sees a whole list once it's filtered, named and sorted, before it's shown, so a plugin can rename entries based on their siblings, such as titles that collide. Plugins run in load order. It can't add, remove or reorder entries. If a name changed, the list is sorted again by name and then by `sort_compare`, as for `display_name`, except recents and collections, which keep their order.
+- `sort_compare(a, b, dir_path)` in `MosaicPlugin` orders a list, such as pinned games first or by a number in the name. The launcher sorts a folder its own way first, then by every plugin's `sort_compare` in load order: for each pair, the first plugin to return non-zero decides (negative puts `a` first), and a pair no plugin has an opinion on keeps the launcher's order. Return 0 for lists you don't handle. Recents and collections are passed too, in their own order. The letter index L1 and R1 jump through follows the final order.
+- `list_ready(list, dir_path)` in `MosaicPlugin` sees a whole list once it's filtered, named and sorted, before it's shown, so a plugin can rename entries based on their siblings, such as titles that collide. Plugins run in load order. It can't add, remove or reorder entries. If a name changed, the list is sorted again by name and then by `sort_compare`, as for `display_name`, except recents and collections, which keep their order.
 - `entry_set_name(entry, name)` renames an entry from inside `list_ready`. The new name is what the list draws and what the letter index uses. It returns 0, or -1 anywhere else.
 - `current_list()` returns the list the user is looking at, read with `list_count` and `list_get`, or `NULL` before the lists exist. Don't keep it past the call you got it in: it's freed when the user leaves the folder or the lists reload. `selected_index()` returns the selected row in it, or -1 when it's empty. `select_index(index)` moves the selection to a row, scrolling only as far as it takes to show it, and returns 0, or -1 for a row that isn't there. Call them from an action or `tick`, not from a list hook.
-- `quick_tile(action_id, row, icon, icon_off, is_on)` puts an action from `register_action` on the quick menu, after the built-in tiles of `row`: `NUI_QUICK_TOP` (the large labelled tiles such as Recents and Games) or `NUI_QUICK_BOTTOM` (the small icons such as Wifi and Power off). The tile is labelled with the action's label, A runs it, and it shows only while the action is available. `icon` is a PNG to draw on it, or `NULL`; a bottom tile without one shows its label. With `is_on`, the tile has an on/off state, `icon_off` is drawn while it's off, and the background is `.media/quick_<label>_off.png` as for stock's toggles. If the action opens a folder, the game list shows it. It returns 0, or -1 for an unknown action or row.
+- `quick_tile(action_id, row, icon, icon_off, is_on)` puts an action from `register_action` on the quick menu, after the built-in tiles of `row`: `MOSAIC_QUICK_TOP` (the large labelled tiles such as Recents and Games) or `MOSAIC_QUICK_BOTTOM` (the small icons such as Wifi and Power off). The tile is labelled with the action's label, A runs it, and it shows only while the action is available. `icon` is a PNG to draw on it, or `NULL`; a bottom tile without one shows its label. With `is_on`, the tile has an on/off state, `icon_off` is drawn while it's off, and the background is `.media/quick_<label>_off.png` as for stock's toggles. If the action opens a folder, the game list shows it. It returns 0, or -1 for an unknown action or row.
 - `hide_quick_tile(name, hidden)` hides a built-in tile by name (`Recents`, `Collections`, `Games`, `Tools`, `Settings`, `Pak Store`, `Wifi`, `Bluetooth`, `Sleep`, `Reboot`, `Poweroff`), or a plugin tile by its action id, while `hidden` is 1, and shows it again with 0.
 
 The quick menu's tiles are built at start and again whenever the lists reload, which is also when tile actions' `available` is checked, so clearing recents and calling `reload_lists` removes the Recents tile straight away.
 - Plugin actions bound to the same game list button and trigger share it: when only one of them is available, the button runs it, and when two or more are, it opens a menu titled with the selected entry that lists them, and runs the one picked. The game list's bottom left hints show the first plugin button with an available action, labelled with that action, or `MORE` when it opens a menu.
 - `choose(title, choices, count, selected, on_pick, data)` shows a full-screen list of choices, drawn like the Launcher pak's menus, with the cursor on `selected`. `on_pick` runs after it closes, with the index picked with A, or -1 if the user backed out with B. The strings are copied. It returns 0, or -1 for no choices or more than 64. Like the other dialogs, open it from an action.
 - `recent_set(index, path)` points a recent at a new full path on the card, such as a renamed game, keeping its place and name, and saves at once. It returns 0, or -1 for a bad index, a path off the card, or a path another recent already has.
-- `root_with_entries` in `NUIPlugin`, set to 1 by the `root` slot owner, adds plugins' `root_entries` to its replaced root, after the entries `root_replace` returned, as for the stock root (its own `root_entries` too, if it has one). Leaving it 0 keeps the replaced root to itself, as focus mode wants.
-- `override_button(screen, button, trigger, action_id)` puts an action on a game list button in place of what the game list does with it, on press (`NUI_TRIGGER_PRESS`) or release (`NUI_TRIGGER_RELEASE`). The action is one from `register_action` or one of the game list's own, listed below. The override takes the whole button: the game list's own bindings on it and plugins' `bind_button` ones stop running, whatever their trigger, and a `NULL` action leaves the button doing nothing. The game list's hints follow its actions to their new buttons, so swapping A and X swaps their hints too, and an override with a plugin's action can show in the bottom left hint when no `bind_button` one does. A plugin can override a button more than once, for press and release, or for several actions on one trigger, where the first available one runs (so A can resume when there's something to resume and open otherwise). A button one plugin overrides can't be overridden by another: the first in load order keeps it and the loader logs the refusal, and it logs `bind_button` bindings an override stops. Call it from `init`; it returns 0, or -1 for an unknown action, a button another plugin has, a call from anywhere else or a bad argument. Only `NUI_SCREEN_GAMELIST` takes overrides so far.
+- `root_with_entries` in `MosaicPlugin`, set to 1 by the `root` slot owner, adds plugins' `root_entries` to its replaced root, after the entries `root_replace` returned, as for the stock root (its own `root_entries` too, if it has one). Leaving it 0 keeps the replaced root to itself, as focus mode wants.
+- `override_button(screen, button, trigger, action_id)` puts an action on a game list button in place of what the game list does with it, on press (`MOSAIC_TRIGGER_PRESS`) or release (`MOSAIC_TRIGGER_RELEASE`). The action is one from `register_action` or one of the game list's own, listed below. The override takes the whole button: the game list's own bindings on it and plugins' `bind_button` ones stop running, whatever their trigger, and a `NULL` action leaves the button doing nothing. The game list's hints follow its actions to their new buttons, so swapping A and X swaps their hints too, and an override with a plugin's action can show in the bottom left hint when no `bind_button` one does. A plugin can override a button more than once, for press and release, or for several actions on one trigger, where the first available one runs (so A can resume when there's something to resume and open otherwise). A button one plugin overrides can't be overridden by another: the first in load order keeps it and the loader logs the refusal, and it logs `bind_button` bindings an override stops. Call it from `init`; it returns 0, or -1 for an unknown action, a button another plugin has, a call from anywhere else or a bad argument. Only `MOSAIC_SCREEN_GAMELIST` takes overrides so far.
 
   | Action | Stock button | What it does |
   |---|---|---|
@@ -145,13 +145,13 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   | `gamelist.quick_menu` | MENU, tap | opens the quick menu |
 
   The same ids work for FN buttons as `action:<id>`. MENU and the d-pad can't be overridden. A built-in action moved to another button fires once per press or release; only its stock button repeats or taps.
-- `pre_launch` can return `NUI_LAUNCH_REPLACE` after calling `replace_launch(program, args, count)`, to run another command in place of the launch, such as another emulator pak or a different core. `program` is a file on the card (checked after resolving links and `..`), such as `Emus/<platform>/<name>.pak/launch.sh` or minarch; up to 8 `args` follow it, each under 256 bytes and without newlines. For a game, the path the launcher would have launched goes last, after it has picked the disc to resume; for a pak nothing is added. Each part is single-quoted the way the launcher quotes its own commands. Paks' `pre-launch.sh` scripts still run first and can still cancel, and recents, resume, play time and `post_return` work as for any launch. If two plugins replace a launch, the first in load order wins and the second's `replace_launch` returns -1, which the loader logs. It returns 0, or -1 outside `pre_launch`, for a program that isn't a file on the card, or for arguments that don't fit. A launcher without `replace_launch` treats `NUI_LAUNCH_REPLACE` as `NUI_LAUNCH_CONTINUE`.
+- `pre_launch` can return `MOSAIC_LAUNCH_REPLACE` after calling `replace_launch(program, args, count)`, to run another command in place of the launch, such as another emulator pak or a different core. `program` is a file on the card (checked after resolving links and `..`), such as `Emus/<platform>/<name>.pak/launch.sh` or minarch; up to 8 `args` follow it, each under 256 bytes and without newlines. For a game, the path the launcher would have launched goes last, after it has picked the disc to resume; for a pak nothing is added. Each part is single-quoted the way the launcher quotes its own commands. Paks' `pre-launch.sh` scripts still run first and can still cancel, and recents, resume, play time and `post_return` work as for any launch. If two plugins replace a launch, the first in load order wins and the second's `replace_launch` returns -1, which the loader logs. It returns 0, or -1 outside `pre_launch`, for a program that isn't a file on the card, or for arguments that don't fit. A launcher without `replace_launch` treats `MOSAIC_LAUNCH_REPLACE` as `MOSAIC_LAUNCH_CONTINUE`.
 - `rename_quick_tile(name, label)` relabels a built-in tile in the quick menu's top row (`Recents`, `Collections`, `Games` or `Tools`), and `NULL` or `""` puts its own label back. Hiding and art still go by the built-in name. It returns 0, or -1 for any other name; the bottom row's built-ins are icons without labels.
 - `battery_level()` returns the battery's charge from 0 to 100, and `is_charging()` returns 1 while it charges and 0 otherwise, as the status bar shows them. Both return -1 on a platform without a battery, which today is desktop, so a plugin like a low battery guard can report itself unsupported there.
 - `led_count()` returns how many LEDs the device's LED settings control, and 0 on devices without controllable LEDs and on desktop. The host doesn't set them: a plugin writes the platform's own LED files in `/sys`, and the launcher's LED rules set them again when the device starts or stops charging, gets low on battery, or sleeps.
 - `power_off(reboot)` powers the device off, or reboots it when `reboot` is 1, the way the quick menu's Poweroff and Reboot tiles do: on the next frame, after every plugin's `before_poweroff`, with stock's "Powering off" or "Rebooting" screen. On desktop both quit the launcher.
-- `show_recents()` returns 1 when stock's root would list Recently Played: Show Recents is on in Settings and a recent's game is on the card. A `root_replace` can match stock by adding the folder itself, as a `NUI_ENTRY_DIR` entry at `sdcard_path` + `/Recently Played`. Recents load as the root is built, so ask from `root_replace` or later; from `init` it returns 0.
-- `repair_path(missing, out, size)` in `NUIPlugin` is asked about each line of `recent.txt` whose file is no longer on the card, which stock drops. It can write the full path the file moved to and return 1, or return 0; the first plugin in load order to answer wins. The new path is used only when it's on the card (a game or pak) and isn't already a recent, and recents are saved with it, keeping the line's place and name; the launcher logs both repairs and refusals. It runs whenever recents load: at start and when the lists reload. Lines whose file is there never reach it.
+- `show_recents()` returns 1 when stock's root would list Recently Played: Show Recents is on in Settings and a recent's game is on the card. A `root_replace` can match stock by adding the folder itself, as a `MOSAIC_ENTRY_DIR` entry at `sdcard_path` + `/Recently Played`. Recents load as the root is built, so ask from `root_replace` or later; from `init` it returns 0.
+- `repair_path(missing, out, size)` in `MosaicPlugin` is asked about each line of `recent.txt` whose file is no longer on the card, which stock drops. It can write the full path the file moved to and return 1, or return 0; the first plugin in load order to answer wins. The new path is used only when it's on the card (a game or pak) and isn't already a recent, and recents are saved with it, keeping the line's place and name; the launcher logs both repairs and refusals. It runs whenever recents load: at start and when the lists reload. Lines whose file is there never reach it.
 - When a plugin's `init` declines to start, everything it registered goes with it: its actions (and an action it re-registered goes back to the earlier one), `bind_button` bindings, overrides, quick menu tiles, hidden and renamed tiles, `inhibit_sleep` hold and a `power_off` request.
 
 ## Without writing C

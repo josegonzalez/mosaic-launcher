@@ -5,13 +5,13 @@
 #include "check.h"
 #include "../../plugins/focus-mode/focus_mode.c"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[1024];
 	char name[128];
 	int type;
 };
-struct NUIList {
-	NUIEntry* items[FOCUS_MAX + 1];
+struct MosaicList {
+	MosaicEntry* items[FOCUS_MAX + 1];
 	int count;
 };
 
@@ -38,15 +38,15 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 static void fakeCfgSet(const char* id, const char* key, const char* value) {
 	if (!strcmp(id, "focus-mode") && !strcmp(key, "on")) snprintf(focus_on, sizeof(focus_on), "%s", value);
 }
-static NUIEntry* fakeEntryNew(const char* path, int type, const char* name) {
-	NUIEntry* e = calloc(1, sizeof(NUIEntry));
+static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
+	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);
 	snprintf(e->name, sizeof(e->name), "%s", name ? name : "");
 	e->type = type;
 	return e;
 }
-static NUIList* fakeListNew(void) { return calloc(1, sizeof(NUIList)); }
-static void fakeListPush(NUIList* l, NUIEntry* e) { l->items[l->count++] = e; }
+static MosaicList* fakeListNew(void) { return calloc(1, sizeof(MosaicList)); }
+static void fakeListPush(MosaicList* l, MosaicEntry* e) { l->items[l->count++] = e; }
 static void fakeRedraw(void) {}
 static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
 	(void)data;
@@ -66,9 +66,9 @@ static int fakeQuickTile(const char* id, int row, const char* icon, const char* 
 static void fakeToast(const char* m) { snprintf(toasted, sizeof(toasted), "%s", m); }
 static void fakeReload(void) { reloads++; }
 
-static const NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static const MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/test",
@@ -92,7 +92,7 @@ static void writeText(const char* path, const char* text) {
 	fclose(f);
 }
 
-static void freeList(NUIList* list) {
+static void freeList(MosaicList* list) {
 	if (!list) return;
 	for (int i = 0; i < list->count; i++) free(list->items[i]);
 	free(list);
@@ -163,11 +163,11 @@ static void testRows(void) {
 	list.count = 2;
 	CHECK(Focus_rows(&list, "/sd", everythingExists, out) == 3);
 	CHECK_STR(out[0].path, "/sd/Roms/GB/Tetris.gb");
-	CHECK(out[0].type == NUI_ENTRY_ROM && out[0].name == NULL);
+	CHECK(out[0].type == MOSAIC_ENTRY_ROM && out[0].name == NULL);
 	CHECK_STR(out[1].path, "/sd/Tools/test/Clock.pak");
-	CHECK(out[1].type == NUI_ENTRY_PAK);
+	CHECK(out[1].type == MOSAIC_ENTRY_PAK);
 	CHECK_STR(out[2].path, "/sd/Roms");
-	CHECK(out[2].type == NUI_ENTRY_DIR);
+	CHECK(out[2].type == MOSAIC_ENTRY_DIR);
 	CHECK_STR(out[2].name, "All systems");
 
 	// favorites off the card are skipped, and with none left it's stock's root
@@ -187,7 +187,7 @@ static void testRows(void) {
 // the plugin
 
 static void testPlugin(void) {
-	const NUIPlugin* p = nextui_plugin_get(&fake);
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
 	CHECK_STR(p->id, "focus-mode");
 	CHECK(p->root_replace != NULL);
 	CHECK(p->root_with_entries == 0); // the decision: no other plugins' root entries
@@ -195,7 +195,7 @@ static void testPlugin(void) {
 	CHECK_STR(last_action, "focus-mode.toggle");
 	CHECK_STR(last_label, "Focus");
 	CHECK_STR(tile_action, "focus-mode.toggle");
-	CHECK(tile_row == NUI_QUICK_TOP);
+	CHECK(tile_row == MOSAIC_QUICK_TOP);
 	CHECK(action_available(NULL));
 	CHECK(tile_is_on(NULL)); // on by default
 
@@ -205,13 +205,13 @@ static void testPlugin(void) {
 	CHECK(p->root_replace() == NULL);
 
 	writeText(CARD "/Collections/Favorites.txt", "/Roms/GB/Kirby.gb\n/Roms/GB/Gone.gb\n/Tools/test/Clock.pak\n");
-	NUIList* root = p->root_replace();
+	MosaicList* root = p->root_replace();
 	CHECK(root && root->count == 3);
 	if (root && root->count == 3) {
 		CHECK_STR(root->items[0]->path, CARD "/Roms/GB/Kirby.gb");
-		CHECK(root->items[0]->type == NUI_ENTRY_ROM);
+		CHECK(root->items[0]->type == MOSAIC_ENTRY_ROM);
 		CHECK_STR(root->items[1]->path, CARD "/Tools/test/Clock.pak");
-		CHECK(root->items[1]->type == NUI_ENTRY_PAK);
+		CHECK(root->items[1]->type == MOSAIC_ENTRY_PAK);
 		CHECK_STR(root->items[2]->path, CARD "/Roms");
 		CHECK_STR(root->items[2]->name, "All systems");
 	}

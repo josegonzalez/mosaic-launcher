@@ -1,5 +1,5 @@
 #!/bin/sh
-# NEXTUI_LAUNCHER_WRAPPER
+# MOSAIC_LAUNCHER_WRAPPER
 #
 # Stands in for $SYSTEM_PATH/bin/nextui.elf. MinUI.pak/launch.sh starts it in a
 # loop, and each start picks this pak's launcher or the stock one.
@@ -8,7 +8,7 @@
 # after the pak is uninstalled mid-session. It must not source anything from
 # the pak for the same reason.
 
-RUN_DIR="${NEXTUI_LAUNCHER_RUN_DIR:-/tmp/nextui-launcher}"
+RUN_DIR="${MOSAIC_LAUNCHER_RUN_DIR:-/tmp/mosaic-launcher}"
 STATE_DIR="$USERDATA_PATH/launcher"
 
 stock="$RUN_DIR/nextui.stock.elf"

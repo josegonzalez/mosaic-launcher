@@ -21,13 +21,13 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "games_model.h"
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 #define ID "all-games"
 #define MAX_PATH_LEN 512
 #define MAX_DEPTH 2 // subfolders below a system folder that are scanned
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char roms_path[MAX_PATH_LEN]; // <sd>/Roms
 static AGIndex index_;
 static int scanned = 0;
@@ -113,9 +113,9 @@ static void scanDir(const char* dir, int depth) {
 
 		char launch[MAX_PATH_LEN * 2];
 		const char* game = path;
-		int type = NUI_ENTRY_ROM;
+		int type = MOSAIC_ENTRY_ROM;
 		if (isDirEntry(dp, path)) {
-			if (endsWith(dp->d_name, ".pak")) type = NUI_ENTRY_PAK;
+			if (endsWith(dp->d_name, ".pak")) type = MOSAIC_ENTRY_PAK;
 			else if (gameFolderLaunch(path, dp->d_name, launch, sizeof(launch))) game = launch;
 			else {
 				if (depth < MAX_DEPTH) scanDir(path, depth + 1);
@@ -171,13 +171,13 @@ static int cardChanged(void) {
 ///////////////////////////////////////
 // hooks
 
-static NUIList* rootReplace(void) {
+static MosaicList* rootReplace(void) {
 	replaced = 0;
 	if (!scanned || cardChanged()) scan();
 	if (index_.game_count == 0) return NULL; // stock's root, so Tools and the rest stay in reach
 
-	NUIList* root = host->list_new();
-	host->list_push(root, host->entry_new(roms_path, NUI_ENTRY_DIR, AG_SYSTEMS_NAME));
+	MosaicList* root = host->list_new();
+	host->list_push(root, host->entry_new(roms_path, MOSAIC_ENTRY_DIR, AG_SYSTEMS_NAME));
 	for (int i = 0; i < index_.game_count; i++) {
 		const AGGame* game = &index_.games[i];
 		host->list_push(root, host->entry_new(game->path, game->type, game->name));
@@ -186,7 +186,7 @@ static NUIList* rootReplace(void) {
 	return root;
 }
 
-static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	if (!replaced || !isRoot(dir_path)) return 0;
 	return AG_rootCompare(roms_path, host->entry_path(a), host->entry_path(b));
 }
@@ -194,12 +194,12 @@ static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_pat
 // Games from different systems that ended up with the same name get their
 // system's tag. Another plugin that already told them apart leaves
 // nothing to do here.
-static void listReady(const NUIList* list, const char* dir_path) {
-	if (!tags || !replaced || !isRoot(dir_path) || !NUI_HOST_HAS(host, entry_set_name)) return;
+static void listReady(const MosaicList* list, const char* dir_path) {
+	if (!tags || !replaced || !isRoot(dir_path) || !MOSAIC_HOST_HAS(host, entry_set_name)) return;
 	int count = host->list_count(list);
 	if (count < 2) return;
 
-	NUIEntry** games = malloc(sizeof(NUIEntry*) * (size_t)count);
+	MosaicEntry** games = malloc(sizeof(MosaicEntry*) * (size_t)count);
 	const char** names = malloc(sizeof(char*) * (size_t)count);
 	char (*systems)[AG_NAME_LEN] = malloc(sizeof(*systems) * (size_t)count);
 	const char** system_ptrs = malloc(sizeof(char*) * (size_t)count);
@@ -207,7 +207,7 @@ static void listReady(const NUIList* list, const char* dir_path) {
 	int n = 0;
 	if (games && names && systems && system_ptrs && tagged) {
 		for (int i = 0; i < count; i++) {
-			NUIEntry* entry = host->list_get(list, i);
+			MosaicEntry* entry = host->list_get(list, i);
 			char system[AG_NAME_LEN];
 			if (!entry || !AG_systemOf(roms_path, host->entry_path(entry), system, sizeof(system))) continue;
 			games[n] = entry;
@@ -233,8 +233,8 @@ static void listReady(const NUIList* list, const char* dir_path) {
 }
 
 // A game folder is listed as its .cue or .m3u; its art is the folder's.
-static int artPath(const NUIEntry* entry, int kind, char* out, size_t size) {
-	if (kind != NUI_ART_THUMBNAIL || !replaced || !isRoot(host->current_path())) return 0;
+static int artPath(const MosaicEntry* entry, int kind, char* out, size_t size) {
+	if (kind != MOSAIC_ART_THUMBNAIL || !replaced || !isRoot(host->current_path())) return 0;
 	const char* path = host->entry_path(entry);
 	if (!AG_systemOf(roms_path, path, NULL, 0)) return 0;
 	return AG_folderArt(path, out, size);
@@ -250,11 +250,11 @@ static void postReturn(void) {
 static void tick(unsigned long now) {
 	(void)now;
 	if (!placing) return;
-	if (!NUI_HOST_HAS(host, current_list) || !NUI_HOST_HAS(host, select_index) || !NUI_HOST_HAS(host, recent_path)) {
+	if (!MOSAIC_HOST_HAS(host, current_list) || !MOSAIC_HOST_HAS(host, select_index) || !MOSAIC_HOST_HAS(host, recent_path)) {
 		placing = 0;
 		return;
 	}
-	const NUIList* list = host->current_list();
+	const MosaicList* list = host->current_list();
 	if (!list) return; // the lists aren't there yet
 	placing = 0;
 	if (!replaced || !isRoot(host->current_path())) return;
@@ -271,7 +271,7 @@ static void tick(unsigned long now) {
 	}
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(roms_path, sizeof(roms_path), "%s/Roms", host->sdcard_path);
 	tags = strcmp(host->cfg_get(ID, "tags", "on"), "off") != 0;
@@ -286,9 +286,9 @@ static void quit(void) {
 	AG_indexFree(&index_);
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.quit = quit,
@@ -301,7 +301,7 @@ static const NUIPlugin plugin = {
 	.root_with_entries = 1, // other plugins' root folders join the list
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

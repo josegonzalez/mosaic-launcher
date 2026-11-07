@@ -171,13 +171,13 @@ for name in all alternate; do
 
 	cp "$txt" "$STATE/plugins.txt"
 	rm -f "$STATE/loading" "$STATE/plugins_paused"
-	NEXTUI_LAUNCHER_PLUGIN_PATH="$PLUGINS" "$ROOT/scripts/desktop-smoke.sh" "$WORK/$name.log" 4 >/dev/null ||
+	MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" "$ROOT/scripts/desktop-smoke.sh" "$WORK/$name.log" 4 >/dev/null ||
 		fail "the launcher exited early in the $name profile"
 	check_log "$WORK/$name.log" "$txt"
 
 	SDCARD_PATH=$CARD USERDATA_PATH=$CARD/.userdata/desktop SYSTEM_PATH=$CARD/.system/desktop \
-		PLATFORM=desktop NEXTUI_LAUNCHER_PAK_DIR="$ROOT/pak" NEXTUI_LAUNCHER_RUN_DIR="$ROOT/build/run" \
-		NEXTUI_LAUNCHER_PLUGIN_PATH="$PLUGINS" \
+		PLATFORM=desktop MOSAIC_LAUNCHER_PAK_DIR="$ROOT/pak" MOSAIC_LAUNCHER_RUN_DIR="$ROOT/build/run" \
+		MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" \
 		"$ROOT/scripts/desktop-smoke.sh" "$WORK/$name-settings.log" 4 --settings plugins >/dev/null ||
 		fail "the plugin settings exited early in the $name profile"
 done

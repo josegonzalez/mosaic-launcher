@@ -29,9 +29,9 @@ setup() {
 	turn_on
 	run "$PAK/bin/boot.sh" mount
 	[ "$status" -eq 0 ]
-	[ "$(sed -n 1p "$MOUNT_LOG")" = "mount --bind $STOCK_BIN $NEXTUI_LAUNCHER_RUN_DIR/nextui.stock.elf" ]
-	[ "$(sed -n 2p "$MOUNT_LOG")" = "mount --bind $NEXTUI_LAUNCHER_RUN_DIR/wrapper.sh $STOCK_BIN" ]
-	[ "$(cat "$NEXTUI_LAUNCHER_RUN_DIR/mode")" = bind ]
+	[ "$(sed -n 1p "$MOUNT_LOG")" = "mount --bind $STOCK_BIN $MOSAIC_LAUNCHER_RUN_DIR/nextui.stock.elf" ]
+	[ "$(sed -n 2p "$MOUNT_LOG")" = "mount --bind $MOSAIC_LAUNCHER_RUN_DIR/wrapper.sh $STOCK_BIN" ]
+	[ "$(cat "$MOSAIC_LAUNCHER_RUN_DIR/mode")" = bind ]
 	[ ! -f "$SYSTEM_PATH/bin/nextui.stock.elf" ]
 	start_launcher
 	[ "$(ran_last)" = ours ]
@@ -49,8 +49,8 @@ setup() {
 	touch "$BATS_TEST_TMPDIR/mount.fail"
 	run "$PAK/bin/boot.sh" mount
 	[ "$status" -eq 0 ]
-	[ "$(cat "$NEXTUI_LAUNCHER_RUN_DIR/mode")" = copy ]
-	grep -q NEXTUI_LAUNCHER_WRAPPER "$STOCK_BIN"
+	[ "$(cat "$MOSAIC_LAUNCHER_RUN_DIR/mode")" = copy ]
+	grep -q MOSAIC_LAUNCHER_WRAPPER "$STOCK_BIN"
 	"$SYSTEM_PATH/bin/nextui.stock.elf"
 	[ "$(ran_last)" = stock ]
 	start_launcher
@@ -61,10 +61,10 @@ setup() {
 	turn_on
 	touch "$BATS_TEST_TMPDIR/mount.fail"
 	"$PAK/bin/boot.sh" mount
-	rm -rf "$NEXTUI_LAUNCHER_RUN_DIR" "$BATS_TEST_TMPDIR/mount.fail"
+	rm -rf "$MOSAIC_LAUNCHER_RUN_DIR" "$BATS_TEST_TMPDIR/mount.fail"
 	run "$PAK/bin/boot.sh" mount
 	[ "$status" -eq 0 ]
-	[ "$(cat "$NEXTUI_LAUNCHER_RUN_DIR/mode")" = copy ]
+	[ "$(cat "$MOSAIC_LAUNCHER_RUN_DIR/mode")" = copy ]
 	"$SYSTEM_PATH/bin/nextui.stock.elf"
 	[ "$(ran_last)" = stock ]
 }
@@ -73,7 +73,7 @@ setup() {
 	turn_on
 	touch "$BATS_TEST_TMPDIR/mount.fail"
 	"$PAK/bin/boot.sh" mount
-	rm -rf "$NEXTUI_LAUNCHER_RUN_DIR"
+	rm -rf "$MOSAIC_LAUNCHER_RUN_DIR"
 	fake_elf "$STOCK_BIN" updated-stock
 	"$PAK/bin/boot.sh" mount
 	"$SYSTEM_PATH/bin/nextui.stock.elf"
@@ -85,7 +85,7 @@ setup() {
 	"$PAK/bin/boot.sh" mount
 	run "$PAK/bin/boot.sh" unmount
 	[ "$status" -eq 0 ]
-	[ ! -d "$NEXTUI_LAUNCHER_RUN_DIR" ]
+	[ ! -d "$MOSAIC_LAUNCHER_RUN_DIR" ]
 	start_launcher
 	[ "$(ran_last)" = stock ]
 }
@@ -97,7 +97,7 @@ setup() {
 	run "$PAK/bin/boot.sh" unmount
 	[ "$status" -eq 0 ]
 	[ ! -f "$SYSTEM_PATH/bin/nextui.stock.elf" ]
-	! grep -q NEXTUI_LAUNCHER_WRAPPER "$STOCK_BIN"
+	! grep -q MOSAIC_LAUNCHER_WRAPPER "$STOCK_BIN"
 	start_launcher
 	[ "$(ran_last)" = stock ]
 }

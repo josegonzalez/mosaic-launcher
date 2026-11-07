@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "focus_model.h"
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 const char* Focus_collectionName(const char* setting) {
 	if (!setting || !setting[0] || strchr(setting, '/')) return "Favorites";
@@ -45,7 +45,7 @@ int Focus_rows(const FocusList* list, const char* sdcard, int (*exists)(const ch
 		snprintf(row->path, sizeof(row->path), "%s%s", sdcard, list->items[i]);
 		if (!exists(row->path)) continue; // kept in the file in case the card comes back
 		// as the launcher types a collection's entries
-		row->type = endsWith(row->path, ".pak") ? NUI_ENTRY_PAK : NUI_ENTRY_ROM;
+		row->type = endsWith(row->path, ".pak") ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_ROM;
 		row->name = NULL;
 		n++;
 	}
@@ -53,7 +53,7 @@ int Focus_rows(const FocusList* list, const char* sdcard, int (*exists)(const ch
 
 	FocusRow* all = &out[n++];
 	snprintf(all->path, sizeof(all->path), "%s/Roms", sdcard);
-	all->type = NUI_ENTRY_DIR;
+	all->type = MOSAIC_ENTRY_DIR;
 	all->name = FOCUS_ALL_NAME;
 	return n;
 }

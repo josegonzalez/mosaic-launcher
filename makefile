@@ -1,5 +1,5 @@
 ###########################################################
-# nextui-launcher
+# mosaic-launcher
 #
 # Runs on the host (macOS or Linux). Device builds happen inside the
 # LoveRetro toolchain images; the desktop build uses the host compiler.
@@ -56,7 +56,7 @@ plugins-desktop:
 # plugins available (turn them on in .userdata/desktop/launcher/plugins.txt).
 run-desktop: desktop plugins-desktop
 	bash $(NEXTUI)/workspace/desktop/prepare_fake_sd_root.sh
-	NEXTUI_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/desktop-plugins \
+	MOSAIC_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/desktop-plugins \
 		$(DESKTOP_LIBRARY_PATH)=$(DESKTOP_PREFIX_LOCAL)/lib ./build/desktop/nextui.elf
 
 ###########################################################
@@ -96,8 +96,8 @@ FAKE_CARD = /var/tmp/nextui/sdcard
 smoke: desktop
 	./scripts/desktop-smoke.sh build/smoke.log
 	SDCARD_PATH=$(FAKE_CARD) USERDATA_PATH=$(FAKE_CARD)/.userdata/desktop SYSTEM_PATH=$(FAKE_CARD)/.system/desktop \
-		PLATFORM=desktop NEXTUI_LAUNCHER_PAK_DIR=$(CURDIR)/pak NEXTUI_LAUNCHER_RUN_DIR=$(CURDIR)/build/run \
-		NEXTUI_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/plugins \
+		PLATFORM=desktop MOSAIC_LAUNCHER_PAK_DIR=$(CURDIR)/pak MOSAIC_LAUNCHER_RUN_DIR=$(CURDIR)/build/run \
+		MOSAIC_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/plugins \
 		./scripts/desktop-smoke.sh build/smoke-settings.log 4 --settings
 
 # Loads test plugins (one good, one crashing) into the desktop build.
@@ -114,7 +114,7 @@ test-profiles: desktop plugins-desktop
 lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh
 	@# the template ships its own copy of the SDK; it must match
-	cmp sdk/nextui_plugin.h template/sdk/nextui_plugin.h
+	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h
 	cmp sdk/LICENSE template/sdk/LICENSE
 
 # What changed in upstream's launcher between two NextUI tags, for porting.

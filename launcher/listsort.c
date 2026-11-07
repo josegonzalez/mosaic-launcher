@@ -15,7 +15,7 @@ static int compareRanked(const void* x, const void* y) {
 	const Ranked* a = x;
 	const Ranked* b = y;
 	for (int i = 0; i < chain_count; i++) {
-		int order = chain[i]((const NUIEntry*)a->item, (const NUIEntry*)b->item, chain_dir);
+		int order = chain[i]((const MosaicEntry*)a->item, (const MosaicEntry*)b->item, chain_dir);
 		if (order) return order < 0 ? -1 : 1;
 	}
 	return a->index - b->index;

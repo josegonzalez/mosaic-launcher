@@ -17,13 +17,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "hiddenset.h"
 
 #define ID "hidden"
 #define MAX_PATH_LEN 512
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char folder_path[MAX_PATH_LEN]; // the virtual folder, <sd>/Hidden
 static char state_dir[MAX_PATH_LEN];   // <userdata>/launcher
 static char list_path[MAX_PATH_LEN + 16]; // <userdata>/launcher/hidden.txt
@@ -68,12 +68,12 @@ static int save(void) {
 }
 
 static void toast(const char* message) {
-	if (NUI_HOST_HAS(host, toast)) host->toast(message);
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
 
 // Lists change on disk, so have the launcher list them again.
 static void reload(void) {
-	if (NUI_HOST_HAS(host, reload_lists)) host->reload_lists();
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	else host->request_redraw();
 }
 
@@ -93,19 +93,19 @@ static int isGameFolder(const char* dir) {
 
 // The path to hide for an entry, or 0 if it isn't a game: a game or pak
 // itself, a game folder, or for a disc inside a game folder, that folder.
-static int pathFor(const NUIEntry* entry, char* out, size_t size) {
+static int pathFor(const MosaicEntry* entry, char* out, size_t size) {
 	if (!entry) return 0;
 	const char* path = host->entry_path(entry);
 	if (!path || !path[0]) return 0;
 	switch (host->entry_type(entry)) {
-		case NUI_ENTRY_PAK:
+		case MOSAIC_ENTRY_PAK:
 			snprintf(out, size, "%s", path);
 			return 1;
-		case NUI_ENTRY_DIR:
+		case MOSAIC_ENTRY_DIR:
 			if (!isGameFolder(path)) return 0;
 			snprintf(out, size, "%s", path);
 			return 1;
-		case NUI_ENTRY_ROM: {
+		case MOSAIC_ENTRY_ROM: {
 			char dir[MAX_PATH_LEN];
 			snprintf(dir, sizeof(dir), "%s", path);
 			char* slash = strrchr(dir, '/');
@@ -176,13 +176,13 @@ static void hide(void* data) {
 static int canUnhide(void* data) {
 	(void)data;
 	if (!inFolder()) return 0;
-	const NUIEntry* entry = host->selected_entry();
+	const MosaicEntry* entry = host->selected_entry();
 	return entry && HiddenSet_contains(&hidden, host->entry_path(entry));
 }
 
 static void unhide(void* data) {
 	(void)data;
-	const NUIEntry* entry = host->selected_entry();
+	const MosaicEntry* entry = host->selected_entry();
 	if (!inFolder() || !entry) return;
 	char path[MAX_PATH_LEN * 2];
 	snprintf(path, sizeof(path), "%s", host->entry_path(entry));
@@ -211,27 +211,27 @@ static int anyOnCard(void) {
 	return 0;
 }
 
-static void rootEntries(NUIList* root) {
+static void rootEntries(MosaicList* root) {
 	refresh();
 	if (!anyOnCard()) return;
-	host->list_push(root, host->entry_new(folder_path, NUI_ENTRY_DIR, "Hidden"));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, "Hidden"));
 }
 
-static NUIList* virtualDir(const char* path) {
+static MosaicList* virtualDir(const char* path) {
 	if (strcmp(path, folder_path) != 0) return NULL;
 	refresh();
-	NUIList* list = host->list_new();
+	MosaicList* list = host->list_new();
 	for (int i = 0; i < hidden.count; i++) {
 		const char* item = hidden.paths[i];
 		struct stat st;
 		if (stat(item, &st) != 0) continue; // keep it in the file in case the card comes back
-		int type = endsWith(item, ".pak") ? NUI_ENTRY_PAK : S_ISDIR(st.st_mode) ? NUI_ENTRY_DIR : NUI_ENTRY_ROM;
+		int type = endsWith(item, ".pak") ? MOSAIC_ENTRY_PAK : S_ISDIR(st.st_mode) ? MOSAIC_ENTRY_DIR : MOSAIC_ENTRY_ROM;
 		host->list_push(list, host->entry_new(item, type, NULL));
 	}
 	return list;
 }
 
-static int filter(const NUIEntry* entry, const char* dir_path) {
+static int filter(const MosaicEntry* entry, const char* dir_path) {
 	if (!hidden.count) return 1;
 	if (dir_path && !strcmp(dir_path, folder_path)) return 1;
 	return !isHidden(host->entry_path(entry));
@@ -245,13 +245,13 @@ static const struct {
 	const char* name;
 	int button;
 } buttons[] = {
-	{ "Y", NUI_BUTTON_Y },
-	{ "L2", NUI_BUTTON_L2 },
-	{ "R2", NUI_BUTTON_R2 },
-	{ "SELECT", NUI_BUTTON_SELECT },
+	{ "Y", MOSAIC_BUTTON_Y },
+	{ "L2", MOSAIC_BUTTON_L2 },
+	{ "R2", MOSAIC_BUTTON_R2 },
+	{ "SELECT", MOSAIC_BUTTON_SELECT },
 };
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(folder_path, sizeof(folder_path), "%s/Hidden", host->sdcard_path);
 	snprintf(state_dir, sizeof(state_dir), "%s/launcher", host->userdata_path);
@@ -262,23 +262,23 @@ static int init(const NUIHost* h) {
 	refresh();
 
 	const char* name = host->cfg_get(ID, "button", "Y");
-	int button = NUI_BUTTON_Y;
+	int button = MOSAIC_BUTTON_Y;
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 
 	if (host->register_action("hidden.hide", "HIDE", canHide, hide, NULL) != 0
 			|| host->register_action("hidden.unhide", "UNHIDE", canUnhide, unhide, NULL) != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, button, NUI_TRIGGER_PRESS, "hidden.hide") != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, button, NUI_TRIGGER_PRESS, "hidden.unhide") != 0) {
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "hidden.hide") != 0
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "hidden.unhide") != 0) {
 		say("couldn't bind a button; games can't be hidden from the game list");
 	}
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.quit = quit,
@@ -287,7 +287,7 @@ static const NUIPlugin plugin = {
 	.filter = filter,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

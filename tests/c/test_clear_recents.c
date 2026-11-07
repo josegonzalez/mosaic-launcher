@@ -4,7 +4,7 @@
 #include "check.h"
 #include "../../plugins/clear-recents/clear_recents.c"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[512];
 	int type;
 };
@@ -17,8 +17,8 @@ struct NUIEntry {
 static char recents[8][512];
 static int recent_count = 0;
 
-static NUIEntry chosen;
-static NUIEntry* selected = NULL;
+static MosaicEntry chosen;
+static MosaicEntry* selected = NULL;
 static char current[512];
 static const char* button_setting = NULL;
 static const char* tile_setting = NULL;
@@ -48,9 +48,9 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	if (tile_setting && !strcmp(key, "tile")) return tile_setting;
 	return fallback;
 }
-static const char* fakeEntryPath(const NUIEntry* e) { return e->path; }
-static int fakeEntryType(const NUIEntry* e) { return e->type; }
-static const NUIEntry* fakeSelected(void) { return selected; }
+static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
+static const MosaicEntry* fakeSelected(void) { return selected; }
 static const char* fakeCurrentPath(void) { return current; }
 static void fakeRedraw(void) {}
 static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
@@ -64,7 +64,7 @@ static int fakeRegister(const char* id, const char* label, int (*available)(void
 	return 0;
 }
 static int fakeBind(int screen, int button, int trigger, const char* id) {
-	if (screen != NUI_SCREEN_GAMELIST || trigger != NUI_TRIGGER_PRESS || bound_count >= 4) return -1;
+	if (screen != MOSAIC_SCREEN_GAMELIST || trigger != MOSAIC_TRIGGER_PRESS || bound_count >= 4) return -1;
 	bound_button[bound_count] = button;
 	snprintf(bound_action[bound_count], sizeof(bound_action[0]), "%s", id);
 	bound_count++;
@@ -97,9 +97,9 @@ static int fakeRecentRemove(int index) {
 static void fakeRecentsClear(void) { recent_count = 0; clears++; }
 static void fakeReload(void) { reloads++; }
 
-static NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/test",
@@ -129,7 +129,7 @@ static void setRecents(int count, const char* const* paths) {
 
 static void selectEntry(const char* path) {
 	snprintf(chosen.path, sizeof(chosen.path), "%s", path);
-	chosen.type = NUI_ENTRY_ROM;
+	chosen.type = MOSAIC_ENTRY_ROM;
 	selected = &chosen;
 }
 
@@ -153,8 +153,8 @@ static void answer(int yes) {
 }
 
 int main(void) {
-	const NUIPlugin* p = nextui_plugin_get(&fake);
-	CHECK(p->size == sizeof(NUIPlugin));
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
+	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "clear-recents");
 	CHECK(p->init(&fake) == 0);
 
@@ -166,10 +166,10 @@ int main(void) {
 	CHECK_STR(action_label[remove], "REMOVE");
 	CHECK_STR(action_label[clear], "CLEAR ALL");
 	CHECK_STR(action_label[tile], "Clear recents");
-	CHECK(bound_count == 2 && bound_button[0] == NUI_BUTTON_Y && bound_button[1] == NUI_BUTTON_Y);
+	CHECK(bound_count == 2 && bound_button[0] == MOSAIC_BUTTON_Y && bound_button[1] == MOSAIC_BUTTON_Y);
 	CHECK_STR(bound_action[0], "clear-recents.remove");
 	CHECK_STR(bound_action[1], "clear-recents.clear");
-	CHECK(tile_count == 1 && tile_row == NUI_QUICK_TOP);
+	CHECK(tile_count == 1 && tile_row == MOSAIC_QUICK_TOP);
 	CHECK_STR(tile_action, "clear-recents.tile");
 
 	// no recents: no tile, and nothing on the button anywhere
@@ -249,20 +249,20 @@ int main(void) {
 	CHECK(p->init(&fake) == 0);
 	CHECK(action_count == 2 && find("clear-recents.tile") < 0);
 	CHECK(tile_count == 0);
-	CHECK(bound_count == 2 && bound_button[0] == NUI_BUTTON_L2 && bound_button[1] == NUI_BUTTON_L2);
+	CHECK(bound_count == 2 && bound_button[0] == MOSAIC_BUTTON_L2 && bound_button[1] == MOSAIC_BUTTON_L2);
 	reset();
 	button_setting = "nonsense";
 	tile_setting = NULL;
 	p->init(&fake);
-	CHECK(bound_count == 2 && bound_button[0] == NUI_BUTTON_Y);
+	CHECK(bound_count == 2 && bound_button[0] == MOSAIC_BUTTON_Y);
 	CHECK(tile_count == 1);
 
 	// an older launcher without the recents calls: loads, does nothing
 	reset();
-	fake.size = offsetof(NUIHost, recents_count);
+	fake.size = offsetof(MosaicHost, recents_count);
 	CHECK(p->init(&fake) == 0);
 	CHECK(action_count == 0 && bound_count == 0 && tile_count == 0);
-	fake.size = sizeof(NUIHost);
+	fake.size = sizeof(MosaicHost);
 
 	CHECK_DONE();
 }

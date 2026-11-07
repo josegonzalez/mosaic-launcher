@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "pin_model.h"
 
 #define PIN_PATH_LEN 1024
@@ -43,11 +43,11 @@ int Pin_isPinned(const PinSet* set, const char* rel, int type) {
 	if (!rel || !set->count) return 0;
 	size_t len = strlen(rel);
 	switch (type) {
-		case NUI_ENTRY_PAK:
+		case MOSAIC_ENTRY_PAK:
 			return Pin_has(set, rel);
-		case NUI_ENTRY_DIR:
+		case MOSAIC_ENTRY_DIR:
 			return hasNamedAfter(set, rel, len, ".m3u") || hasNamedAfter(set, rel, len, ".cue");
-		case NUI_ENTRY_ROM: {
+		case MOSAIC_ENTRY_ROM: {
 			if (Pin_has(set, rel)) return 1;
 			const char* slash = strrchr(rel, '/');
 			return slash && hasNamedAfter(set, rel, (size_t)(slash - rel), ".m3u");

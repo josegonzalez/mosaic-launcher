@@ -3,11 +3,11 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 
 #define ID "rival"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
@@ -24,31 +24,31 @@ static void runY(void* data) {
 	say("y ran");
 }
 
-static int preLaunch(const NUILaunch* launch) {
+static int preLaunch(const MosaicLaunch* launch) {
 	(void)launch;
 	say("replace %i", host->replace_launch(host->cfg_get(ID, "emu", ""), NULL, 0));
-	return NUI_LAUNCH_REPLACE;
+	return MOSAIC_LAUNCH_REPLACE;
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	say("override A %i, B %i",
-		host->override_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_A, NUI_TRIGGER_RELEASE, "gamelist.open"),
-		host->override_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_B, NUI_TRIGGER_PRESS, "gamelist.back"));
+		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_A, MOSAIC_TRIGGER_RELEASE, "gamelist.open"),
+		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_B, MOSAIC_TRIGGER_PRESS, "gamelist.back"));
 	host->register_action("rival.y", "RIVAL", NULL, runY, NULL);
-	say("bind Y %i", host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "rival.y"));
+	say("bind Y %i", host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "rival.y"));
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.pre_launch = preLaunch,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

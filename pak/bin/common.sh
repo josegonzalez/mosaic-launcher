@@ -9,7 +9,7 @@
 STATE_DIR="$USERDATA_PATH/launcher"
 
 # Per-boot state. tmpfs, so a reboot always starts from stock.
-RUN_DIR="${NEXTUI_LAUNCHER_RUN_DIR:-/tmp/nextui-launcher}"
+RUN_DIR="${MOSAIC_LAUNCHER_RUN_DIR:-/tmp/mosaic-launcher}"
 
 STOCK_BIN="$SYSTEM_PATH/bin/nextui.elf"
 STOCK_BACKUP="$SYSTEM_PATH/bin/nextui.stock.elf"
@@ -19,12 +19,12 @@ SUPPORTED_FILE="$PAK_DIR/supported-versions.txt"
 OUR_BIN="$PAK_DIR/bin/$PLATFORM/nextui.elf"
 
 # Tests swap these for fakes; macOS has no bind mounts.
-MOUNT="${NEXTUI_LAUNCHER_MOUNT:-mount}"
-UMOUNT="${NEXTUI_LAUNCHER_UMOUNT:-umount}"
+MOUNT="${MOSAIC_LAUNCHER_MOUNT:-mount}"
+UMOUNT="${MOSAIC_LAUNCHER_UMOUNT:-umount}"
 
 # Every copy of wrapper.sh contains this string, which is how copy mode tells
 # our wrapper apart from a stock binary that a NextUI update put back.
-WRAPPER_MARKER="NEXTUI_LAUNCHER_WRAPPER"
+WRAPPER_MARKER="MOSAIC_LAUNCHER_WRAPPER"
 
 # The build hash of the installed NextUI, from the second line of version.txt.
 nextui_build_hash() {

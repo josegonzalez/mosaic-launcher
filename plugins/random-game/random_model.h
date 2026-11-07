@@ -14,7 +14,7 @@
 // itself) or a pak, and the system it's in, as an index into systems.
 typedef struct RGGame {
 	char* path;
-	int type; // an enum NUIEntryType
+	int type; // an enum MosaicEntryType
 	int system;
 } RGGame;
 

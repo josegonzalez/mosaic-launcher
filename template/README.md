@@ -1,19 +1,19 @@
 # Launcher plugin template
 
-A starting point for a plugin for [nextui-launcher](https://github.com/josegonzalez/nextui-launcher), packaged as its own pak.
+A starting point for a plugin for [mosaic-launcher](https://github.com/josegonzalez/mosaic-launcher), packaged as its own pak.
 
 ## Make it yours
 
 1. Copy this directory into a new repo.
 2. Set `id` and `name` in `plugin.txt`, and the same `id` in `src/plugin.c`.
-3. Write the plugin in `src/`. The API is in `sdk/nextui_plugin.h`, and [PLUGINS.md](https://github.com/josegonzalez/nextui-launcher/blob/main/PLUGINS.md) explains it.
+3. Write the plugin in `src/`. The API is in `sdk/mosaic_plugin.h`, and [PLUGINS.md](https://github.com/josegonzalez/mosaic-launcher/blob/main/PLUGINS.md) explains it.
 
 ## Build
 
 ```shell
 make           # lib/aarch64/plugin.so, for every NextUI device (needs Docker or podman)
 make pak       # build/<name>.pak.zip
-make desktop   # a build for nextui-launcher's desktop build, for trying it out
+make desktop   # a build for mosaic-launcher's desktop build, for trying it out
 ```
 
 ## Install

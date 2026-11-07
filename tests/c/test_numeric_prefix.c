@@ -11,7 +11,7 @@
 #include "../../plugins/numeric-prefix/numeric_prefix.c"
 #include "../../plugins/all-games/games_model.h"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[512];
 	char name[128];
 	int type;
@@ -25,16 +25,16 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	if (setting && !strcmp(key, "hide")) return setting;
 	return fallback;
 }
-static const char* fakeEntryPath(const NUIEntry* e) { return e->path; }
-static const char* fakeEntryName(const NUIEntry* e) { return e->name; }
-static int fakeEntryType(const NUIEntry* e) { return e->type; }
+static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
 
 #define CARD "/mnt/SDCARD"
 #define GB CARD "/Roms/Game Boy (GB)"
 
-static const NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static const MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/test",
@@ -175,8 +175,8 @@ static void testCache(void) {
 ///////////////////////////////////////
 // listing like the launcher
 
-static NUIEntry entries[16];
-static NUIEntry* list[16];
+static MosaicEntry entries[16];
+static MosaicEntry* list[16];
 static int count;
 
 static void reset(void) {
@@ -184,7 +184,7 @@ static void reset(void) {
 }
 
 static void add(const char* path, const char* name, int type) {
-	NUIEntry* e = &entries[count];
+	MosaicEntry* e = &entries[count];
 	snprintf(e->path, sizeof(e->path), "%s", path);
 	snprintf(e->name, sizeof(e->name), "%s", name);
 	e->type = type;
@@ -192,20 +192,20 @@ static void add(const char* path, const char* name, int type) {
 }
 
 static int byName(const void* a, const void* b) {
-	return strcasecmp((*(NUIEntry**)a)->name, (*(NUIEntry**)b)->name);
+	return strcasecmp((*(MosaicEntry**)a)->name, (*(MosaicEntry**)b)->name);
 }
 
 // The plugin after numeric-prefix in the chain, or NULL.
-typedef int (*Compare)(const NUIEntry* a, const NUIEntry* b, const char* dir_path);
+typedef int (*Compare)(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path);
 static Compare then = NULL;
 
 // all games' sort_compare on its root: folders above games
-static int allGamesCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+static int allGamesCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	if (strcmp(dir_path, CARD)) return 0;
 	return AG_rootCompare(CARD "/Roms", a->path, b->path);
 }
 
-static int chained(const NUIPlugin* p, const NUIEntry* a, const NUIEntry* b, const char* dir) {
+static int chained(const MosaicPlugin* p, const MosaicEntry* a, const MosaicEntry* b, const char* dir) {
 	int order = p->sort_compare(a, b, dir);
 	if (!order && then) order = then(a, b, dir);
 	return order;
@@ -213,7 +213,7 @@ static int chained(const NUIPlugin* p, const NUIEntry* a, const NUIEntry* b, con
 
 // filter, display names, then (unless the list keeps its order) a sort by
 // name, then a stable sort by the plugins, then list_ready
-static void listing(const NUIPlugin* p, const char* dir, int sort_by_name) {
+static void listing(const MosaicPlugin* p, const char* dir, int sort_by_name) {
 	for (int i = 0; p->filter && i < count; i++) CHECK(p->filter(list[i], dir));
 	for (int i = 0; i < count; i++) {
 		char name[128];
@@ -224,7 +224,7 @@ static void listing(const NUIPlugin* p, const char* dir, int sort_by_name) {
 	}
 	if (sort_by_name) qsort(list, count, sizeof(list[0]), byName);
 	for (int i = 1; i < count; i++) {
-		NUIEntry* e = list[i];
+		MosaicEntry* e = list[i];
 		int j = i;
 		while (j > 0 && chained(p, list[j - 1], e, dir) > 0) {
 			list[j] = list[j - 1];
@@ -240,16 +240,16 @@ static void checkOrder(const char* const* want, int n) {
 	for (int i = 0; i < n && i < count; i++) CHECK_STR(list[i]->name, want[i]);
 }
 
-static void testGames(const NUIPlugin* p) {
+static void testGames(const MosaicPlugin* p) {
 	reset();
-	add(GB "/10) Tetris.gb", "10) Tetris", NUI_ENTRY_ROM);
-	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
-	add(GB "/Zelda.gb", "Zelda", NUI_ENTRY_ROM);
-	add(GB "/[1] Wario.gb", "[1] Wario", NUI_ENTRY_ROM);
-	add(GB "/Alleyway.gb", "Alleyway", NUI_ENTRY_ROM);
-	add(GB "/03. Metroid", "03. Metroid", NUI_ENTRY_DIR);
-	add(GB "/1942.gb", "1942", NUI_ENTRY_ROM);
-	add(GB "/mapped.gb", "4) Mapped", NUI_ENTRY_ROM); // from map.txt
+	add(GB "/10) Tetris.gb", "10) Tetris", MOSAIC_ENTRY_ROM);
+	add(GB "/2) Kirby.gb", "2) Kirby", MOSAIC_ENTRY_ROM);
+	add(GB "/Zelda.gb", "Zelda", MOSAIC_ENTRY_ROM);
+	add(GB "/[1] Wario.gb", "[1] Wario", MOSAIC_ENTRY_ROM);
+	add(GB "/Alleyway.gb", "Alleyway", MOSAIC_ENTRY_ROM);
+	add(GB "/03. Metroid", "03. Metroid", MOSAIC_ENTRY_DIR);
+	add(GB "/1942.gb", "1942", MOSAIC_ENTRY_ROM);
+	add(GB "/mapped.gb", "4) Mapped", MOSAIC_ENTRY_ROM); // from map.txt
 	listing(p, GB, 1);
 	const char* want[] = { "Wario", "Kirby", "Metroid", "Mapped", "Tetris", "1942", "Alleyway", "Zelda" };
 	checkOrder(want, 8);
@@ -262,31 +262,31 @@ static void testGames(const NUIPlugin* p) {
 
 	// the same number keeps the launcher's order
 	reset();
-	add(GB "/1) Beta.gb", "1) Beta", NUI_ENTRY_ROM);
-	add(GB "/1) Alpha.gb", "1) Alpha", NUI_ENTRY_ROM);
+	add(GB "/1) Beta.gb", "1) Beta", MOSAIC_ENTRY_ROM);
+	add(GB "/1) Alpha.gb", "1) Alpha", MOSAIC_ENTRY_ROM);
 	listing(p, GB, 1);
 	const char* tie[] = { "Alpha", "Beta" };
 	checkOrder(tie, 2);
 
 	// a map.txt name without a number drops the old one
 	reset();
-	add(GB "/mapped.gb", "Mapped", NUI_ENTRY_ROM);
-	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
+	add(GB "/mapped.gb", "Mapped", MOSAIC_ENTRY_ROM);
+	add(GB "/2) Kirby.gb", "2) Kirby", MOSAIC_ENTRY_ROM);
 	listing(p, GB, 1);
 	const char* unmapped[] = { "Kirby", "Mapped" };
 	checkOrder(unmapped, 2);
 }
 
-static void testRoot(const NUIPlugin* p) {
+static void testRoot(const MosaicPlugin* p) {
 	reset();
-	add(CARD "/Recently Played", "Recently Played", NUI_ENTRY_DIR);
-	add(CARD "/Roms/Game Boy Advance (GBA)", "Game Boy Advance", NUI_ENTRY_DIR);
-	add(CARD "/Roms/10) Super Nintendo (SFC)", "10) Super Nintendo", NUI_ENTRY_DIR);
-	add(CARD "/Roms/2) Game Boy (GB)", "2) Game Boy", NUI_ENTRY_DIR);
-	add(CARD "/Roms/Nintendo (FC)", "Nintendo", NUI_ENTRY_DIR);
-	add(CARD "/Collections", "Collections", NUI_ENTRY_DIR);
-	add(CARD "/Favorites", "1) Favorites", NUI_ENTRY_DIR);
-	add(CARD "/Tools/tg5040", "Tools", NUI_ENTRY_DIR);
+	add(CARD "/Recently Played", "Recently Played", MOSAIC_ENTRY_DIR);
+	add(CARD "/Roms/Game Boy Advance (GBA)", "Game Boy Advance", MOSAIC_ENTRY_DIR);
+	add(CARD "/Roms/10) Super Nintendo (SFC)", "10) Super Nintendo", MOSAIC_ENTRY_DIR);
+	add(CARD "/Roms/2) Game Boy (GB)", "2) Game Boy", MOSAIC_ENTRY_DIR);
+	add(CARD "/Roms/Nintendo (FC)", "Nintendo", MOSAIC_ENTRY_DIR);
+	add(CARD "/Collections", "Collections", MOSAIC_ENTRY_DIR);
+	add(CARD "/Favorites", "1) Favorites", MOSAIC_ENTRY_DIR);
+	add(CARD "/Tools/tg5040", "Tools", MOSAIC_ENTRY_DIR);
 	listing(p, CARD, 0);
 	const char* want[] = { "Recently Played", "Game Boy", "Super Nintendo", "Game Boy Advance", "Nintendo",
 		"Collections", "Favorites", "Tools" };
@@ -294,10 +294,10 @@ static void testRoot(const NUIPlugin* p) {
 
 	// collections promoted to the root move like consoles
 	reset();
-	add(CARD "/Recently Played", "Recently Played", NUI_ENTRY_DIR);
-	add(CARD "/Collections/Beat em ups.txt", "Beat em ups", NUI_ENTRY_DIR);
-	add(CARD "/Collections/1) Best.txt", "1) Best", NUI_ENTRY_DIR);
-	add(CARD "/Tools/tg5040", "Tools", NUI_ENTRY_DIR);
+	add(CARD "/Recently Played", "Recently Played", MOSAIC_ENTRY_DIR);
+	add(CARD "/Collections/Beat em ups.txt", "Beat em ups", MOSAIC_ENTRY_DIR);
+	add(CARD "/Collections/1) Best.txt", "1) Best", MOSAIC_ENTRY_DIR);
+	add(CARD "/Tools/tg5040", "Tools", MOSAIC_ENTRY_DIR);
 	listing(p, CARD, 0);
 	const char* promoted[] = { "Recently Played", "Best", "Beat em ups", "Tools" };
 	checkOrder(promoted, 4);
@@ -305,14 +305,14 @@ static void testRoot(const NUIPlugin* p) {
 
 // A root a plugin replaced keeps its owner's order: all games' keeps its
 // folders above its games, and focus mode's has no sort of its own.
-static void testReplacedRoot(const NUIPlugin* p) {
+static void testReplacedRoot(const MosaicPlugin* p) {
 	reset();
-	add(CARD "/Roms", "Systems", NUI_ENTRY_DIR);
-	add(GB "/10) Tetris.gb", "10) Tetris", NUI_ENTRY_ROM);
-	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
-	add(GB "/Alleyway.gb", "Alleyway", NUI_ENTRY_ROM);
-	add(CARD "/Favorites", "Favorites", NUI_ENTRY_DIR);
-	add(CARD "/Random game", "Random game", NUI_ENTRY_DIR);
+	add(CARD "/Roms", "Systems", MOSAIC_ENTRY_DIR);
+	add(GB "/10) Tetris.gb", "10) Tetris", MOSAIC_ENTRY_ROM);
+	add(GB "/2) Kirby.gb", "2) Kirby", MOSAIC_ENTRY_ROM);
+	add(GB "/Alleyway.gb", "Alleyway", MOSAIC_ENTRY_ROM);
+	add(CARD "/Favorites", "Favorites", MOSAIC_ENTRY_DIR);
+	add(CARD "/Random game", "Random game", MOSAIC_ENTRY_DIR);
 	then = allGamesCompare;
 	listing(p, CARD, 1);
 	then = NULL;
@@ -320,34 +320,34 @@ static void testReplacedRoot(const NUIPlugin* p) {
 	checkOrder(games, 6);
 
 	reset();
-	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
-	add(GB "/1) Wario.gb", "1) Wario", NUI_ENTRY_ROM);
-	add(CARD "/Roms", "All systems", NUI_ENTRY_DIR);
+	add(GB "/2) Kirby.gb", "2) Kirby", MOSAIC_ENTRY_ROM);
+	add(GB "/1) Wario.gb", "1) Wario", MOSAIC_ENTRY_ROM);
+	add(CARD "/Roms", "All systems", MOSAIC_ENTRY_DIR);
 	listing(p, CARD, 1);
 	const char* focus[] = { "All systems", "Kirby", "Wario" };
 	checkOrder(focus, 3);
 }
 
-static void testKeptOrder(const NUIPlugin* p) {
+static void testKeptOrder(const MosaicPlugin* p) {
 	reset();
-	add(GB "/Zelda.gb", "Zelda", NUI_ENTRY_ROM);
-	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
-	add(GB "/1) Wario.gb", "1) Wario", NUI_ENTRY_ROM);
+	add(GB "/Zelda.gb", "Zelda", MOSAIC_ENTRY_ROM);
+	add(GB "/2) Kirby.gb", "2) Kirby", MOSAIC_ENTRY_ROM);
+	add(GB "/1) Wario.gb", "1) Wario", MOSAIC_ENTRY_ROM);
 	listing(p, CARD "/Recently Played", 0);
 	const char* want[] = { "Zelda", "Kirby", "Wario" };
 	checkOrder(want, 3);
 
 	reset();
-	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
-	add(GB "/1) Wario.gb", "1) Wario", NUI_ENTRY_ROM);
+	add(GB "/2) Kirby.gb", "2) Kirby", MOSAIC_ENTRY_ROM);
+	add(GB "/1) Wario.gb", "1) Wario", MOSAIC_ENTRY_ROM);
 	listing(p, CARD "/Collections/Mine.txt", 0);
 	const char* collection[] = { "Kirby", "Wario" };
 	checkOrder(collection, 2);
 
 	// the collections folder itself is sorted
 	reset();
-	add(CARD "/Collections/2) Kirby.txt", "2) Kirby", NUI_ENTRY_DIR);
-	add(CARD "/Collections/1) Wario.txt", "1) Wario", NUI_ENTRY_DIR);
+	add(CARD "/Collections/2) Kirby.txt", "2) Kirby", MOSAIC_ENTRY_DIR);
+	add(CARD "/Collections/1) Wario.txt", "1) Wario", MOSAIC_ENTRY_DIR);
 	listing(p, CARD "/Collections", 1);
 	const char* folder[] = { "Wario", "Kirby" };
 	checkOrder(folder, 2);
@@ -355,12 +355,12 @@ static void testKeptOrder(const NUIPlugin* p) {
 
 static void testShown(void) {
 	setting = "off";
-	const NUIPlugin* p = nextui_plugin_get(&fake);
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
 	CHECK(p->init(&fake) == 0);
 	reset();
-	add(GB "/10) Tetris.gb", "10) Tetris", NUI_ENTRY_ROM);
-	add(GB "/Alleyway.gb", "Alleyway", NUI_ENTRY_ROM);
-	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
+	add(GB "/10) Tetris.gb", "10) Tetris", MOSAIC_ENTRY_ROM);
+	add(GB "/Alleyway.gb", "Alleyway", MOSAIC_ENTRY_ROM);
+	add(GB "/2) Kirby.gb", "2) Kirby", MOSAIC_ENTRY_ROM);
 	listing(p, GB, 1);
 	const char* want[] = { "2) Kirby", "10) Tetris", "Alleyway" };
 	checkOrder(want, 3);
@@ -374,8 +374,8 @@ int main(void) {
 	testGroups();
 	testCache();
 
-	const NUIPlugin* p = nextui_plugin_get(&fake);
-	CHECK(p->size == sizeof(NUIPlugin));
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
+	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "numeric-prefix");
 	CHECK(p->init(&fake) == 0);
 	testGames(p);

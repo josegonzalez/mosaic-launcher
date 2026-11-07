@@ -8,13 +8,13 @@
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
 #endif
 
-#define LAUNCHED_MARKER "/tmp/nextui-launcher-launched" // a launch went ahead; post_return is due
+#define LAUNCHED_MARKER "/tmp/mosaic-launcher-launched" // a launch went ahead; post_return is due
 #define LOADING_MARKER PLUGIN_STATE_DIR "/loading"
 #define PAUSED_MARKER PLUGIN_STATE_DIR "/plugins_paused"
 
 typedef struct LoadedPlugin {
 	void* handle;
-	const NUIPlugin* plugin;
+	const MosaicPlugin* plugin;
 	char id[64];
 	Hash* cfg; // loaded on first cfg_get or cfg_set
 	int owns_root; // claims the root slot, so its root_replace is asked
@@ -100,7 +100,7 @@ static void scan(const char* parent, const char* suffix, int bundled) {
 }
 
 int Plugins_pakDir(char* out, size_t size) {
-	const char* override = getenv("NEXTUI_LAUNCHER_PAK_DIR");
+	const char* override = getenv("MOSAIC_LAUNCHER_PAK_DIR");
 	if (override && override[0]) {
 		snprintf(out, size, "%s", override);
 		return 1;
@@ -123,7 +123,7 @@ static void discover(void) {
 	static int done = 0;
 	if (done) return;
 	done = 1;
-	const char* override = getenv("NEXTUI_LAUNCHER_PLUGIN_PATH");
+	const char* override = getenv("MOSAIC_LAUNCHER_PLUGIN_PATH");
 	if (override && override[0]) {
 		char dirs[1024];
 		snprintf(dirs, sizeof(dirs), "%s", override);
@@ -215,27 +215,27 @@ save:
 	fclose(f);
 }
 
-static NUIEntry* hostEntryNew(const char* path, int type, const char* name) {
+static MosaicEntry* hostEntryNew(const char* path, int type, const char* name) {
 	if (!path) return NULL;
 	Entry* entry = name ? Entry_newNamed((char*)path, type, (char*)name) : Entry_new((char*)path, type);
-	return (NUIEntry*)entry;
+	return (MosaicEntry*)entry;
 }
-static const char* hostEntryPath(const NUIEntry* e) { return e ? ((const Entry*)e)->path : NULL; }
-static const char* hostEntryName(const NUIEntry* e) { return e ? ((const Entry*)e)->name : NULL; }
-static int hostEntryType(const NUIEntry* e) { return e ? ((const Entry*)e)->type : -1; }
+static const char* hostEntryPath(const MosaicEntry* e) { return e ? ((const Entry*)e)->path : NULL; }
+static const char* hostEntryName(const MosaicEntry* e) { return e ? ((const Entry*)e)->name : NULL; }
+static int hostEntryType(const MosaicEntry* e) { return e ? ((const Entry*)e)->type : -1; }
 
-static NUIList* hostListNew(void) { return (NUIList*)Array_new(); }
-static int hostListCount(const NUIList* l) { return l ? ((const Array*)l)->count : 0; }
-static NUIEntry* hostListGet(const NUIList* l, int i) {
+static MosaicList* hostListNew(void) { return (MosaicList*)Array_new(); }
+static int hostListCount(const MosaicList* l) { return l ? ((const Array*)l)->count : 0; }
+static MosaicEntry* hostListGet(const MosaicList* l, int i) {
 	const Array* a = (const Array*)l;
 	if (!a || i < 0 || i >= a->count) return NULL;
 	return a->items[i];
 }
-static void hostListPush(NUIList* l, NUIEntry* e) {
+static void hostListPush(MosaicList* l, MosaicEntry* e) {
 	if (l && e) Array_push((Array*)l, e);
 }
 
-static const NUIEntry* hostSelectedEntry(void) {
+static const MosaicEntry* hostSelectedEntry(void) {
 	if (!state.top || state.top->entries->count == 0) return NULL;
 	return state.top->entries->items[state.top->selected];
 }
@@ -274,7 +274,7 @@ static void hostInhibitSleep(const char* plugin_id, int on) {
 }
 
 static int hostOpenPath(const char* path, int type) {
-	if (type != NUI_ENTRY_ROM && type != NUI_ENTRY_PAK && type != NUI_ENTRY_DIR) return 0;
+	if (type != MOSAIC_ENTRY_ROM && type != MOSAIC_ENTRY_PAK && type != MOSAIC_ENTRY_DIR) return 0;
 	return Entry_openPath(path, type);
 }
 
@@ -308,7 +308,7 @@ static void hostReloadLists(void) {
 static int listing = 0;
 static int list_renamed = 0;
 
-static int hostEntrySetName(NUIEntry* e, const char* name) {
+static int hostEntrySetName(MosaicEntry* e, const char* name) {
 	if (!listing || !e || !name || !name[0]) return -1;
 	Entry* entry = (Entry*)e;
 	free(entry->name);
@@ -317,8 +317,8 @@ static int hostEntrySetName(NUIEntry* e, const char* name) {
 	return 0;
 }
 
-static const NUIList* hostCurrentList(void) {
-	return state.top ? (const NUIList*)state.top->entries : NULL;
+static const MosaicList* hostCurrentList(void) {
+	return state.top ? (const MosaicList*)state.top->entries : NULL;
 }
 static int hostSelectedIndex(void) {
 	if (!state.top || state.top->entries->count == 0) return -1;
@@ -336,8 +336,8 @@ static int hostSelectIndex(int index) {
 
 static int hostQuickTile(const char* action_id, int row, const char* icon, const char* icon_off, int (*is_on)(void* data)) {
 	int quick_row;
-	if (row == NUI_QUICK_TOP) quick_row = QUICK_ROW_TOP;
-	else if (row == NUI_QUICK_BOTTOM) quick_row = QUICK_ROW_BOTTOM;
+	if (row == MOSAIC_QUICK_TOP) quick_row = QUICK_ROW_TOP;
+	else if (row == MOSAIC_QUICK_BOTTOM) quick_row = QUICK_ROW_BOTTOM;
 	else return -1;
 	if (QuickTiles_add(action_id, quick_row, icon, icon_off, is_on) != 0) {
 		LOG_warn("plugins: can't add a quick menu tile for %s\n", action_id ? action_id : "(null)");
@@ -397,9 +397,9 @@ static int hostShowRecents(void) {
 	return 0;
 }
 
-static const NUIHost host = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static const MosaicHost host = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = PLATFORM,
 	.sdcard_path = SDCARD_PATH,
 	.userdata_path = USERDATA_PATH,
@@ -451,8 +451,8 @@ static const NUIHost host = {
 // loading
 
 static void load(const PluginManifest* m) {
-	if (m->api != NUI_API_VERSION) {
-		LOG_warn("plugins: %s targets API %i, this launcher has %i, skipping\n", m->id, m->api, NUI_API_VERSION);
+	if (m->api != MOSAIC_API_VERSION) {
+		LOG_warn("plugins: %s targets API %i, this launcher has %i, skipping\n", m->id, m->api, MOSAIC_API_VERSION);
 		return;
 	}
 
@@ -468,11 +468,11 @@ static void load(const PluginManifest* m) {
 		LOG_warn("plugins: %s failed to load: %s\n", m->id, dlerror());
 		return;
 	}
-	NUIPluginGet get = (NUIPluginGet)dlsym(handle, NUI_PLUGIN_ENTRY);
-	const NUIPlugin* plugin = get ? get(&host) : NULL;
-	if (!plugin || plugin->size < offsetof(NUIPlugin, init) || plugin->api_version != NUI_API_VERSION
+	MosaicPluginGet get = (MosaicPluginGet)dlsym(handle, MOSAIC_PLUGIN_ENTRY);
+	const MosaicPlugin* plugin = get ? get(&host) : NULL;
+	if (!plugin || plugin->size < offsetof(MosaicPlugin, init) || plugin->api_version != MOSAIC_API_VERSION
 			|| !plugin->id || strcmp(plugin->id, m->id) != 0) {
-		LOG_warn("plugins: %s doesn't describe itself as plugin %s for API %i, skipping\n", so, m->id, NUI_API_VERSION);
+		LOG_warn("plugins: %s doesn't describe itself as plugin %s for API %i, skipping\n", so, m->id, MOSAIC_API_VERSION);
 		dlclose(handle);
 		return;
 	}
@@ -568,7 +568,7 @@ void Plugins_init(void) {
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
 		for (int i = 0; i < loaded_count; i++) {
-			const NUIPlugin* p = loaded[i].plugin;
+			const MosaicPlugin* p = loaded[i].plugin;
 			if (Plugin_has(p, post_return) && p->post_return) p->post_return();
 		}
 	}
@@ -614,16 +614,16 @@ typedef struct ButtonInfo {
 } ButtonInfo;
 
 static const ButtonInfo buttons[] = {
-	{ NUI_BUTTON_A, BTN_A, "A" },
-	{ NUI_BUTTON_B, BTN_B, "B" },
-	{ NUI_BUTTON_X, BTN_X, "X" },
-	{ NUI_BUTTON_Y, BTN_Y, "Y" },
-	{ NUI_BUTTON_L1, BTN_L1, "L1" },
-	{ NUI_BUTTON_R1, BTN_R1, "R1" },
-	{ NUI_BUTTON_L2, BTN_L2, "L2" },
-	{ NUI_BUTTON_R2, BTN_R2, "R2" },
-	{ NUI_BUTTON_START, BTN_START, "START" },
-	{ NUI_BUTTON_SELECT, BTN_SELECT, "SELECT" },
+	{ MOSAIC_BUTTON_A, BTN_A, "A" },
+	{ MOSAIC_BUTTON_B, BTN_B, "B" },
+	{ MOSAIC_BUTTON_X, BTN_X, "X" },
+	{ MOSAIC_BUTTON_Y, BTN_Y, "Y" },
+	{ MOSAIC_BUTTON_L1, BTN_L1, "L1" },
+	{ MOSAIC_BUTTON_R1, BTN_R1, "R1" },
+	{ MOSAIC_BUTTON_L2, BTN_L2, "L2" },
+	{ MOSAIC_BUTTON_R2, BTN_R2, "R2" },
+	{ MOSAIC_BUTTON_START, BTN_START, "START" },
+	{ MOSAIC_BUTTON_SELECT, BTN_SELECT, "SELECT" },
 };
 
 static const ButtonInfo* buttonInfo(int button) {
@@ -635,8 +635,8 @@ static const ButtonInfo* buttonInfo(int button) {
 
 int Plugins_bindButton(int screen, int button, int trigger, const char* action_id) {
 	// only the game list dispatches through bindings so far
-	if (screen != NUI_SCREEN_GAMELIST) return -1;
-	if (trigger != NUI_TRIGGER_PRESS && trigger != NUI_TRIGGER_RELEASE) return -1;
+	if (screen != MOSAIC_SCREEN_GAMELIST) return -1;
+	if (trigger != MOSAIC_TRIGGER_PRESS && trigger != MOSAIC_TRIGGER_RELEASE) return -1;
 	const Action* action = Actions_find(action_id);
 	if (!action) {
 		LOG_warn("plugins: can't bind unknown action %s\n", action_id ? action_id : "(null)");
@@ -647,7 +647,7 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 
 	Binding* b = &pluginBindings[screen][pluginBindingCount[screen]++];
 	b->button = info->btn;
-	b->trigger = trigger == NUI_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
+	b->trigger = trigger == MOSAIC_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
 	b->glyph = info->glyph;
 	b->action = action;
 
@@ -684,7 +684,7 @@ static int hostOverrideButton(int screen, int button, int trigger, const char* a
 		return -1;
 	}
 	const char* id = loaded[initializing].id;
-	if (screen != NUI_SCREEN_GAMELIST || (trigger != NUI_TRIGGER_PRESS && trigger != NUI_TRIGGER_RELEASE)) return -1;
+	if (screen != MOSAIC_SCREEN_GAMELIST || (trigger != MOSAIC_TRIGGER_PRESS && trigger != MOSAIC_TRIGGER_RELEASE)) return -1;
 	const ButtonInfo* info = buttonInfo(button);
 	if (!info) return -1;
 	const Action* action = NULL;
@@ -695,7 +695,7 @@ static int hostOverrideButton(int screen, int button, int trigger, const char* a
 			return -1;
 		}
 	}
-	int btn_trigger = trigger == NUI_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
+	int btn_trigger = trigger == MOSAIC_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
 	for (int i = 0; i < overrideCount[screen]; i++) {
 		const Binding* other = &overrideBindings[screen][i];
 		if (other->button != info->btn) continue;
@@ -718,7 +718,7 @@ static int hostOverrideButton(int screen, int button, int trigger, const char* a
 	b->action = action;
 	overrideOwner[screen][at] = initializing;
 	LOG_info("plugins: %s overrides %s %s on the game list with %s\n", id, info->glyph,
-		trigger == NUI_TRIGGER_RELEASE ? "release" : "press", action ? action->id : "nothing");
+		trigger == MOSAIC_TRIGGER_RELEASE ? "release" : "press", action ? action->id : "nothing");
 	return 0;
 }
 
@@ -762,16 +762,16 @@ int Plugins_overrides(int screen, const Binding** bindings) {
 
 #define EACH_PLUGIN_WITH(field) \
 	for (int i_ = 0; i_ < loaded_count; i_++) \
-		for (const NUIPlugin* p = loaded[i_].plugin; p && Plugin_has(p, field) && p->field; p = NULL)
+		for (const MosaicPlugin* p = loaded[i_].plugin; p && Plugin_has(p, field) && p->field; p = NULL)
 
 void Plugins_rootEntries(Array* root) {
-	EACH_PLUGIN_WITH(root_entries) p->root_entries((NUIList*)root);
+	EACH_PLUGIN_WITH(root_entries) p->root_entries((MosaicList*)root);
 }
 
 Array* Plugins_rootReplace(int* with_entries) {
 	*with_entries = 0;
 	for (int i = 0; i < loaded_count; i++) {
-		const NUIPlugin* p = loaded[i].plugin;
+		const MosaicPlugin* p = loaded[i].plugin;
 		if (!loaded[i].owns_root) continue;
 		// slot resolution lets only one plugin claim it
 		if (!Plugin_has(p, root_replace) || !p->root_replace) return NULL;
@@ -784,7 +784,7 @@ Array* Plugins_rootReplace(int* with_entries) {
 
 Array* Plugins_virtualDir(const char* path) {
 	EACH_PLUGIN_WITH(virtual_dir) {
-		NUIList* list = p->virtual_dir(path);
+		MosaicList* list = p->virtual_dir(path);
 		if (list) return (Array*)list;
 	}
 	return NULL;
@@ -800,7 +800,7 @@ Array* Plugins_filter(Array* entries, const char* dir_path) {
 		Entry* entry = entries->items[i];
 		int keep = 1;
 		EACH_PLUGIN_WITH(filter) {
-			if (keep && !p->filter((const NUIEntry*)entry, dir_path)) keep = 0;
+			if (keep && !p->filter((const MosaicEntry*)entry, dir_path)) keep = 0;
 		}
 		if (keep) Array_push(kept, entry);
 		else Entry_free(entry);
@@ -816,7 +816,7 @@ int Plugins_displayNames(Array* entries) {
 			Entry* entry = entries->items[i];
 			char name[256];
 			name[0] = '\0';
-			if (p->display_name((const NUIEntry*)entry, name, sizeof(name)) && name[0]) {
+			if (p->display_name((const MosaicEntry*)entry, name, sizeof(name)) && name[0]) {
 				free(entry->name);
 				entry->name = strdup(name);
 				renamed = 1;
@@ -839,7 +839,7 @@ int Plugins_listReady(Array* entries, const char* dir_path) {
 	int was_renamed = list_renamed;
 	listing = 1;
 	list_renamed = 0;
-	EACH_PLUGIN_WITH(list_ready) p->list_ready((const NUIList*)entries, dir_path);
+	EACH_PLUGIN_WITH(list_ready) p->list_ready((const MosaicList*)entries, dir_path);
 	int renamed = list_renamed;
 	listing = was_listing;
 	list_renamed = was_renamed;
@@ -877,22 +877,22 @@ int Plugins_preLaunch(const char* path, int type) {
 	// paks' own pre-launch.sh scripts first; they don't need plugins on
 	if (!PakHooks_preLaunch(path, type)) return 0;
 
-	NUILaunch launch = { .path = path, .type = type };
+	MosaicLaunch launch = { .path = path, .type = type };
 	for (int i = 0; i < loaded_count; i++) {
-		const NUIPlugin* p = loaded[i].plugin;
+		const MosaicPlugin* p = loaded[i].plugin;
 		if (!Plugin_has(p, pre_launch) || !p->pre_launch) continue;
 		launching = i;
 		pending_set = 0;
 		int result = p->pre_launch(&launch);
 		launching = -1;
-		if (result == NUI_LAUNCH_CANCEL) {
+		if (result == MOSAIC_LAUNCH_CANCEL) {
 			LOG_info("plugins: launch of %s cancelled by a plugin\n", path);
 			replacer = -1;
 			return 0;
 		}
-		if (result != NUI_LAUNCH_REPLACE) continue;
+		if (result != MOSAIC_LAUNCH_REPLACE) continue;
 		if (!pending_set) {
-			LOG_warn("plugins: %s returned NUI_LAUNCH_REPLACE without a replace_launch command, ignoring it\n", loaded[i].id);
+			LOG_warn("plugins: %s returned MOSAIC_LAUNCH_REPLACE without a replace_launch command, ignoring it\n", loaded[i].id);
 			continue;
 		}
 		replacement = pending;
@@ -909,16 +909,16 @@ const LaunchCmd* Plugins_launchReplacement(void) {
 }
 
 int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
-	int nui_kind;
+	int mosaic_kind;
 	switch (kind) {
-		case ART_THUMBNAIL: nui_kind = NUI_ART_THUMBNAIL; break;
-		case ART_FOLDER_BG: nui_kind = NUI_ART_FOLDER_BG; break;
-		case ART_LIST_BG: nui_kind = NUI_ART_LIST_BG; break;
+		case ART_THUMBNAIL: mosaic_kind = MOSAIC_ART_THUMBNAIL; break;
+		case ART_FOLDER_BG: mosaic_kind = MOSAIC_ART_FOLDER_BG; break;
+		case ART_LIST_BG: mosaic_kind = MOSAIC_ART_LIST_BG; break;
 		default: return 0;
 	}
 	EACH_PLUGIN_WITH(art_path) {
 		out[0] = '\0';
-		if (p->art_path((const NUIEntry*)entry, nui_kind, out, size) && out[0]) return 1;
+		if (p->art_path((const MosaicEntry*)entry, mosaic_kind, out, size) && out[0]) return 1;
 	}
 	return 0;
 }
@@ -947,6 +947,6 @@ void Plugins_beforePoweroff(void) {
 	EACH_PLUGIN_WITH(before_poweroff) p->before_poweroff();
 }
 
-const NUIPlugin* Plugins_at(int i) {
+const MosaicPlugin* Plugins_at(int i) {
 	return (i >= 0 && i < loaded_count) ? loaded[i].plugin : NULL;
 }

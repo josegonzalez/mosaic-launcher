@@ -6,17 +6,17 @@
 #include "check.h"
 #include "../../plugins/hidden/hidden.c"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[512];
 	char name[128];
 	int type;
 };
-struct NUIList {
-	NUIEntry* items[64];
+struct MosaicList {
+	MosaicEntry* items[64];
 	int count;
 };
 
-static NUIEntry* selected = NULL;
+static MosaicEntry* selected = NULL;
 static char current[512];
 static const char* setting = NULL; // the button setting, or NULL for the default
 static int registered = 0;
@@ -35,21 +35,21 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	if (setting && !strcmp(key, "button")) return setting;
 	return fallback;
 }
-static NUIEntry* fakeEntryNew(const char* path, int type, const char* name) {
-	NUIEntry* e = calloc(1, sizeof(NUIEntry));
+static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
+	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);
 	snprintf(e->name, sizeof(e->name), "%s", name ? name : "");
 	e->type = type;
 	return e;
 }
-static const char* fakeEntryPath(const NUIEntry* e) { return e->path; }
-static const char* fakeEntryName(const NUIEntry* e) { return e->name; }
-static int fakeEntryType(const NUIEntry* e) { return e->type; }
-static NUIList* fakeListNew(void) { return calloc(1, sizeof(NUIList)); }
-static int fakeListCount(const NUIList* l) { return l->count; }
-static NUIEntry* fakeListGet(const NUIList* l, int i) { return l->items[i]; }
-static void fakeListPush(NUIList* l, NUIEntry* e) { l->items[l->count++] = e; }
-static const NUIEntry* fakeSelected(void) { return selected; }
+static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
+static MosaicList* fakeListNew(void) { return calloc(1, sizeof(MosaicList)); }
+static int fakeListCount(const MosaicList* l) { return l->count; }
+static MosaicEntry* fakeListGet(const MosaicList* l, int i) { return l->items[i]; }
+static void fakeListPush(MosaicList* l, MosaicEntry* e) { l->items[l->count++] = e; }
+static const MosaicEntry* fakeSelected(void) { return selected; }
 static const char* fakeCurrentPath(void) { return current; }
 static void fakeRedraw(void) {}
 static void fakeReload(void) { reloads++; }
@@ -77,9 +77,9 @@ static int fakeBind(int screen, int button, int trigger, const char* id) {
 #define LIST USERDATA "/launcher/hidden.txt"
 #define GB CARD "/Roms/GB"
 
-static const NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static const MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
 	.sdcard_path = CARD,
 	.userdata_path = USERDATA,
@@ -123,8 +123,8 @@ static void selectEntry(const char* path, int type) {
 }
 
 // Whether the plugin keeps an entry in dir.
-static int kept(const NUIPlugin* p, const char* path, const char* dir) {
-	NUIEntry* e = fakeEntryNew(path, NUI_ENTRY_ROM, NULL);
+static int kept(const MosaicPlugin* p, const char* path, const char* dir) {
+	MosaicEntry* e = fakeEntryNew(path, MOSAIC_ENTRY_ROM, NULL);
 	int keep = p->filter(e, dir);
 	free(e);
 	return keep;
@@ -212,13 +212,13 @@ int main(void) {
 	writeText(CARD "/Roms/PS/Game/Game.m3u", "Game (Disc 1).cue\n");
 	writeText(CARD "/Roms/PS/Single/Single.cue", "");
 
-	const NUIPlugin* p = nextui_plugin_get(&fake);
-	CHECK(p->size == sizeof(NUIPlugin));
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
+	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "hidden");
 	CHECK(p->init(&fake) == 0);
 	CHECK(registered == 2);
-	CHECK(bound_screen == NUI_SCREEN_GAMELIST);
-	CHECK(bound_count == 2 && bound_button[0] == NUI_BUTTON_Y && bound_button[1] == NUI_BUTTON_Y);
+	CHECK(bound_screen == MOSAIC_SCREEN_GAMELIST);
+	CHECK(bound_count == 2 && bound_button[0] == MOSAIC_BUTTON_Y && bound_button[1] == MOSAIC_BUTTON_Y);
 	CHECK_STR(bound_action[0], "hidden.hide");
 	CHECK_STR(bound_action[1], "hidden.unhide");
 	int (*canHide)(void*) = available_for[0];
@@ -227,7 +227,7 @@ int main(void) {
 	void (*unhideIt)(void*) = run_for[1];
 
 	// nothing hidden: no folder on the root, and every entry kept
-	NUIList* root = fakeListNew();
+	MosaicList* root = fakeListNew();
 	p->root_entries(root);
 	CHECK(root->count == 0);
 	CHECK(kept(p, GB "/Tetris.gb", GB));
@@ -237,18 +237,18 @@ int main(void) {
 	snprintf(current, sizeof(current), "%s", GB);
 	selected = NULL;
 	CHECK(!canHide(NULL));
-	selectEntry(GB, NUI_ENTRY_DIR);
+	selectEntry(GB, MOSAIC_ENTRY_DIR);
 	CHECK(!canHide(NULL));
 	// nor can another plugin's virtual folders, which leaves their buttons free
-	selectEntry(CARD "/Smart Collections", NUI_ENTRY_DIR);
+	selectEntry(CARD "/Smart Collections", MOSAIC_ENTRY_DIR);
 	CHECK(!canHide(NULL));
-	selectEntry(CARD "/Smart Collections/Mario", NUI_ENTRY_DIR);
+	selectEntry(CARD "/Smart Collections/Mario", MOSAIC_ENTRY_DIR);
 	CHECK(!canHide(NULL));
-	selectEntry(CARD "/Tools/test/Clock.pak", NUI_ENTRY_PAK);
+	selectEntry(CARD "/Tools/test/Clock.pak", MOSAIC_ENTRY_PAK);
 	CHECK(canHide(NULL));
-	selectEntry(CARD "/Roms/PS/Single", NUI_ENTRY_DIR);
+	selectEntry(CARD "/Roms/PS/Single", MOSAIC_ENTRY_DIR);
 	CHECK(canHide(NULL));
-	selectEntry(GB "/Tetris.gb", NUI_ENTRY_ROM);
+	selectEntry(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
 	CHECK(canHide(NULL));
 	CHECK(!canUnhide(NULL)); // only in the Hidden folder
 
@@ -270,13 +270,13 @@ int main(void) {
 	if (root->count == 1) {
 		CHECK_STR(root->items[0]->path, CARD "/Hidden");
 		CHECK_STR(root->items[0]->name, "Hidden");
-		CHECK(root->items[0]->type == NUI_ENTRY_DIR);
+		CHECK(root->items[0]->type == MOSAIC_ENTRY_DIR);
 	}
 
 	// a disc hides its game folder, which hides the .m3u wherever it's listed
-	selectEntry(CARD "/Roms/PS/Game/Game (Disc 1).cue", NUI_ENTRY_ROM);
+	selectEntry(CARD "/Roms/PS/Game/Game (Disc 1).cue", MOSAIC_ENTRY_ROM);
 	hideIt(NULL);
-	selectEntry(CARD "/Tools/test/Clock.pak", NUI_ENTRY_PAK);
+	selectEntry(CARD "/Tools/test/Clock.pak", MOSAIC_ENTRY_PAK);
 	hideIt(NULL);
 	readText(LIST, saved, sizeof(saved));
 	CHECK_STR(saved, GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
@@ -284,21 +284,21 @@ int main(void) {
 	CHECK(!kept(p, CARD "/Roms/PS/Game/Game.m3u", CARD "/Collections/Mine.txt"));
 
 	// the Hidden folder lists them, with their types, and keeps them
-	NUIList* list = p->virtual_dir(CARD "/Hidden");
+	MosaicList* list = p->virtual_dir(CARD "/Hidden");
 	CHECK(list->count == 3);
 	if (list->count == 3) {
 		CHECK_STR(list->items[0]->path, GB "/Tetris.gb");
-		CHECK(list->items[0]->type == NUI_ENTRY_ROM);
+		CHECK(list->items[0]->type == MOSAIC_ENTRY_ROM);
 		CHECK_STR(list->items[1]->path, CARD "/Roms/PS/Game");
-		CHECK(list->items[1]->type == NUI_ENTRY_DIR);
+		CHECK(list->items[1]->type == MOSAIC_ENTRY_DIR);
 		CHECK_STR(list->items[2]->path, CARD "/Tools/test/Clock.pak");
-		CHECK(list->items[2]->type == NUI_ENTRY_PAK);
+		CHECK(list->items[2]->type == MOSAIC_ENTRY_PAK);
 		CHECK(p->filter(list->items[0], CARD "/Hidden") == 1);
 	}
 
 	// in the Hidden folder the button unhides instead
 	snprintf(current, sizeof(current), "%s", CARD "/Hidden");
-	selectEntry(GB "/Tetris.gb", NUI_ENTRY_ROM);
+	selectEntry(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
 	CHECK(!canHide(NULL));
 	CHECK(canUnhide(NULL));
 	reloads = 0;
@@ -318,7 +318,7 @@ int main(void) {
 
 	// unhiding the last one on the card drops the folder from the root,
 	// but a hidden game whose file is gone stays saved
-	selectEntry(GB "/Zelda.gb", NUI_ENTRY_ROM);
+	selectEntry(GB "/Zelda.gb", MOSAIC_ENTRY_ROM);
 	unhideIt(NULL);
 	readText(LIST, saved, sizeof(saved));
 	CHECK_STR(saved, GB "/Gone.gb\n");
@@ -332,13 +332,13 @@ int main(void) {
 	setting = "L2";
 	bound_count = 0;
 	CHECK(p->init(&fake) == 0);
-	CHECK(bound_count == 2 && bound_button[0] == NUI_BUTTON_L2 && bound_button[1] == NUI_BUTTON_L2);
+	CHECK(bound_count == 2 && bound_button[0] == MOSAIC_BUTTON_L2 && bound_button[1] == MOSAIC_BUTTON_L2);
 	CHECK(HiddenSet_contains(&hidden, GB "/Gone.gb")); // read at start
 	p->quit();
 	setting = "nonsense";
 	bound_count = 0;
 	p->init(&fake);
-	CHECK(bound_count == 2 && bound_button[0] == NUI_BUTTON_Y);
+	CHECK(bound_count == 2 && bound_button[0] == MOSAIC_BUTTON_Y);
 	p->quit();
 
 	CHECK_DONE();

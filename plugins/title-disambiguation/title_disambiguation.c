@@ -14,16 +14,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "titles.h"
 
 #define ID "title-disambiguation"
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static int same_system = 1;
 static char roms[512];
 
-static void listReady(const NUIList* list, const char* dir_path) {
+static void listReady(const MosaicList* list, const char* dir_path) {
 	(void)dir_path;
 	int count = host->list_count(list);
 	if (count < 2) return;
@@ -32,7 +32,7 @@ static void listReady(const NUIList* list, const char* dir_path) {
 	char** labels = malloc((size_t)count * sizeof(char*));
 	if (names && paths && labels) {
 		for (int i = 0; i < count; i++) {
-			const NUIEntry* entry = host->list_get(list, i);
+			const MosaicEntry* entry = host->list_get(list, i);
 			names[i] = host->entry_name(entry);
 			paths[i] = host->entry_path(entry);
 		}
@@ -49,9 +49,9 @@ static void listReady(const NUIList* list, const char* dir_path) {
 	free(labels);
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
-	if (!NUI_HOST_HAS(host, entry_set_name)) {
+	if (!MOSAIC_HOST_HAS(host, entry_set_name)) {
 		host->log(ID, "this launcher can't rename entries");
 		return 1;
 	}
@@ -60,15 +60,15 @@ static int init(const NUIHost* h) {
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.list_ready = listReady,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }
