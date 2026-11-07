@@ -127,36 +127,7 @@ void Switcher_render(void) {
 				ax = (screen->w - aw) / 2;
 				ay = (screen->h - ah) / 2;
 
-				if(lastScreen == SCREEN_GAME) {
-					// need to flip once so streaming_texture1 is updated
-					GFX_flipHidden();
-					GFX_animateSurfaceOpacity(bmp,0,0,screen->w,screen->h,0,255,CFG_getMenuTransitions() ? 150:20,LAYER_ALL);
-				} else if(lastScreen == SCREEN_GAMELIST) {
-
-					GFX_drawOnLayer(blackBG,0,0,screen->w,screen->h,1.0f,0,LAYER_BACKGROUND);
-					GFX_drawOnLayer(bmp,ax,ay,aw, ah,1.0f,0,LAYER_BACKGROUND);
-					GFX_flipHidden();
-					SDL_Surface *tmpNewScreen = GFX_captureRendererToSurface();
-					GFX_clearLayers(LAYER_ALL);
-					folderbgchanged=1;
-					GFX_drawOnLayer(tmpOldScreen,0,0,screen->w, screen->h,1.0f,0,LAYER_ALL);
-					GFX_animateSurface(tmpNewScreen,0,0-screen->h,0,0,screen->w,screen->h,CFG_getMenuTransitions() ? 100:20,255,255,LAYER_BACKGROUND);
-					SDL_FreeSurface(tmpNewScreen);
-
-				} else if(lastScreen == SCREEN_GAMESWITCHER) {
-					GFX_flipHidden();
-					GFX_drawOnLayer(blackBG,0,0,screen->w, screen->h,1.0f,0,LAYER_BACKGROUND);
-					if(gsanimdir == SLIDE_LEFT)
-						GFX_animateSurface(bmp,ax+screen->w,ay,ax,ay,aw,ah,CFG_getMenuTransitions() ? 80:20,0,255,LAYER_ALL);
-					else if(gsanimdir == SLIDE_RIGHT)
-						GFX_animateSurface(bmp,ax-screen->w,ay,ax,ay,aw,ah,CFG_getMenuTransitions() ? 80:20,0,255,LAYER_ALL);
-
-					GFX_drawOnLayer(bmp,ax,ay,aw,ah,1.0f,0,LAYER_BACKGROUND);
-				} else if(lastScreen == SCREEN_QUICKMENU) {
-					GFX_flipHidden();
-					GFX_drawOnLayer(blackBG,0,0,screen->w, screen->h,1.0f,0,LAYER_BACKGROUND);
-					GFX_drawOnLayer(bmp,ax,ay,aw,ah,1.0f,0,LAYER_BACKGROUND);
-				}
+				Transition_showPreview(bmp, (SDL_Rect){ax, ay, aw, ah}, lastScreen, gsanimdir);
 				SDL_FreeSurface(bmp);  // Free after rendering
 			}
 		}
@@ -164,17 +135,7 @@ void Switcher_render(void) {
 			SDL_Rect preview_rect = {ox,oy,screen->w,screen->h};
 			SDL_Surface * tmpsur = SDL_CreateRGBSurfaceWithFormat(0,screen->w,screen->h,screen->format->BitsPerPixel,screen->format->format);
 			SDL_FillRect(tmpsur, &preview_rect, THEME_COLOR7);
-			if(lastScreen == SCREEN_GAME) {
-				GFX_animateSurfaceOpacity(tmpsur,0,0,screen->w,screen->h,255,0,CFG_getMenuTransitions() ? 150:20,LAYER_BACKGROUND);
-			} else if(lastScreen == SCREEN_GAMELIST) {
-				GFX_animateSurface(tmpsur,0,0-screen->h,0,0,screen->w,screen->h,CFG_getMenuTransitions() ? 100:20,255,255,LAYER_ALL);
-			} else if(lastScreen == SCREEN_GAMESWITCHER) {
-				GFX_flipHidden();
-				if(gsanimdir == SLIDE_LEFT)
-					GFX_animateSurface(tmpsur,0+screen->w,0,0,0,screen->w,screen->h,CFG_getMenuTransitions() ? 80:20,0,255,LAYER_ALL);
-				else if(gsanimdir == SLIDE_RIGHT)
-					GFX_animateSurface(tmpsur,0-screen->w,0,0,0,screen->w,screen->h,CFG_getMenuTransitions() ? 80:20,0,255,LAYER_ALL);
-			}
+			Transition_showPlaceholder(tmpsur, lastScreen, gsanimdir);
 			SDL_FreeSurface(tmpsur);
 			GFX_blitMessage(font.large, TR("No Preview"), screen, &preview_rect);
 		}

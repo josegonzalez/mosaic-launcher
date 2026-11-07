@@ -81,6 +81,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `quickitems.c` | the quick menu's pak shortcuts and toggles: which appear, their icons, and what they do |
 | `tr.c` | `TR()`, which every piece of fixed UI text passes through where it's drawn |
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
+| `transitions.c` | the folder slide and the game switcher's entrance animations |
 
 FN buttons can be bound to a launcher action as well as a pak, with `action:<id>` (eg. `action:gamelist.back`) in place of `pak:<name>`.
 

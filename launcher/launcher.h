@@ -33,5 +33,6 @@
 #include "quickitems.h"
 #include "tr.h"
 #include "actions.h"
+#include "transitions.h"
 
 #endif
