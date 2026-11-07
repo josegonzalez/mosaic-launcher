@@ -29,5 +29,6 @@
 #include "nav.h"
 #include "imgloader.h"
 #include "screens.h"
+#include "art.h"
 
 #endif

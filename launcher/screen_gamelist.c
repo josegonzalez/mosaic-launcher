@@ -148,25 +148,11 @@ void GameList_render(void) {
 	// background and game art file path stuff
 	Entry* entry = top->entries->items[top->selected];
 	assert(entry);
-	char tmp_path[MAX_PATH];
-	strncpy(tmp_path, entry->path, sizeof(tmp_path) - 1);
-	tmp_path[sizeof(tmp_path) - 1] = '\0';
-
-	char* res_name = strrchr(tmp_path, '/');
-	if (res_name) res_name++;
-
 	char path_copy[1024];
 	strncpy(path_copy, entry->path, sizeof(path_copy) - 1);
 	path_copy[sizeof(path_copy) - 1] = '\0';
 
 	char* rompath = dirname(path_copy);
-
-	char res_copy[1024];
-	strncpy(res_copy, res_name, sizeof(res_copy) - 1);
-	res_copy[sizeof(res_copy) - 1] = '\0';
-
-	char* dot = strrchr(res_copy, '.');
-	if (dot) *dot = '\0';
 
 	static int lastType = -1;
 
@@ -175,7 +161,7 @@ void GameList_render(void) {
 
 	// load folder background
 	char defaultBgPath[512];
-	snprintf(defaultBgPath, sizeof(defaultBgPath), SDCARD_PATH "/bg.png");
+	resolveArt(ART_DEFAULT_BG, NULL, defaultBgPath, sizeof(defaultBgPath));
 
 	if(((entry->type == ENTRY_DIR || entry->type == ENTRY_ROM) && CFG_getRomsUseFolderBackground())) {
 		char *newBg = entry->type == ENTRY_DIR ? entry->path:rompath;
@@ -184,13 +170,13 @@ void GameList_render(void) {
 			char tmppath[512];
 			strncpy(folderBgPath, newBg, sizeof(folderBgPath) - 1);
 			if (entry->type == ENTRY_DIR)
-				snprintf(tmppath, sizeof(tmppath), "%s/.media/bg.png", folderBgPath);
+				resolveArt(ART_FOLDER_BG, folderBgPath, tmppath, sizeof(tmppath));
 			else if (entry->type == ENTRY_ROM)
-				snprintf(tmppath, sizeof(tmppath), "%s/.media/bglist.png", folderBgPath);
+				resolveArt(ART_LIST_BG, folderBgPath, tmppath, sizeof(tmppath));
 			if(!exists(tmppath)) {
 				// Safeguard: If no background is available, still render the text to leave the user a way out
 				list_show_entry_names = true;
-				snprintf(tmppath, sizeof(tmppath), defaultBgPath, folderBgPath);
+				resolveArt(ART_DEFAULT_BG, NULL, tmppath, sizeof(tmppath));
 			}
 			startLoadFolderBackground(tmppath, onBackgroundLoaded, NULL);
 		}
@@ -207,7 +193,7 @@ void GameList_render(void) {
 	if (total > 0) {
 		if(CFG_getShowGameArt()) {
 			char thumbpath[1024];
-			snprintf(thumbpath, sizeof(thumbpath), "%s/.media/%s.png", rompath, res_copy);
+			resolveArt(ART_THUMBNAIL, entry->path, thumbpath, sizeof(thumbpath));
 			had_thumb = 0;
 			startLoadThumb(thumbpath, onThumbLoaded, NULL);
 			int max_w = (int)(screen->w - (screen->w * CFG_getGameArtWidth()));

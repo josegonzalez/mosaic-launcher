@@ -101,10 +101,12 @@ void QuickMenu_render(void) {
 	char newBgPath[MAX_PATH];
 	char fallbackBgPath[MAX_PATH];
 
-	sprintf(newBgPath, SDCARD_PATH "/.media/quick_%s%s.png", current->name, 
+	char bgSubject[MAX_PATH];
+	snprintf(bgSubject, sizeof(bgSubject), "%s%s", current->name,
 		!strcmp(current->name,"Wifi") && !CFG_getWifi() || 							// wifi or wifi_off, based on state
 		!strcmp(current->name,"Bluetooth") && !CFG_getBluetooth() ? "_off" : "");	// bluetooth or bluetooth_off, based on state
-	sprintf(fallbackBgPath, SDCARD_PATH "/.media/quick.png");
+	resolveArt(ART_QUICK_BG, bgSubject, newBgPath, sizeof(newBgPath));
+	resolveArt(ART_QUICK_FALLBACK, NULL, fallbackBgPath, sizeof(fallbackBgPath));
 
 	// background
 	if(!exists(newBgPath))
@@ -168,7 +170,7 @@ void QuickMenu_render(void) {
 			GFX_blitRectColor(ASSET_STATE_BG, screen, &item_rect, item_color);
 
 			char icon_path[MAX_PATH];
-			sprintf(icon_path, SDCARD_PATH "/.system/res/%s@%ix.png", item->name, FIXED_SCALE);
+			resolveArt(ART_QUICK_ICON, item->name, icon_path, sizeof(icon_path));
 			SDL_Surface* bmp = IMG_Load(icon_path);
 			if(bmp) {
 				SDL_Surface* converted = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);

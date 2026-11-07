@@ -73,6 +73,7 @@ pak:
 
 test:
 	bats tests
+	$(MAKE) -C tests/c
 
 # Starts the desktop build for a few seconds; fails if it exits on its own.
 smoke: desktop

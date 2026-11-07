@@ -56,7 +56,7 @@ make lint
 make test
 ```
 
-The tests run the pak scripts against a fake SD card, with a fake `mount` that copies files the way a bind mount looks from outside.
+The bats tests run the pak scripts against a fake SD card, with a fake `mount` that copies files the way a bind mount looks from outside. The C tests in `tests/c/` cover launcher code that doesn't need a display; they compile against the desktop platform headers, so they need SDL2's headers (`brew install sdl2`, or `libsdl2-dev`) but never open a window.
 
 `make smoke` starts the desktop build for a few seconds and fails if it exits on its own. Its log (`build/smoke.log`) is also handy for comparing startup output before and after a change.
 
@@ -77,6 +77,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `screen_gamelist.c` | game list input and rendering, plus the fade shown when launching |
 | `screen_switcher.c` | game switcher input and rendering |
 | `screen_quickmenu.c` | quick menu input and rendering |
+| `art.c` | where each kind of image (thumbnails, backgrounds, quick menu art) is looked up |
 
 Upstream changes have to be ported forward by hand. To see what changed upstream since the pinned tag:
 
