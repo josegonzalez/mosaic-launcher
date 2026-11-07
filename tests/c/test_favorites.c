@@ -23,6 +23,8 @@ static void (*action_run)(void*) = NULL;
 static int redraws = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
+static char toasted[160];
+static void fakeToast(const char* m) { snprintf(toasted, sizeof(toasted), "%s", m); }
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
 	(void)id; (void)key;
 	return fallback;
@@ -81,6 +83,7 @@ static const NUIHost fake = {
 	.request_redraw = fakeRedraw,
 	.register_action = fakeRegister,
 	.bind_button = fakeBind,
+	.toast = fakeToast,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -153,6 +156,7 @@ int main(void) {
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
 	CHECK(redraws == 1);
+	CHECK_STR(toasted, "Added to Favorites");
 
 	// a multi-disc game's folder, and a disc inside it, both mean its .m3u
 	selectEntry(CARD "/Roms/PS/Game", NUI_ENTRY_DIR);
@@ -164,6 +168,7 @@ int main(void) {
 	action_run(NULL); // same game, so this removes it
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
+	CHECK_STR(toasted, "Removed from Favorites");
 
 	// a single-disc folder means its .cue
 	selectEntry(CARD "/Roms/PS/Single", NUI_ENTRY_DIR);

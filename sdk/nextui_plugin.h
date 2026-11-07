@@ -130,7 +130,19 @@ typedef struct NUIHost {
 	int (*register_action)(const char* id, const char* label,
 		int (*available)(void* data), void (*run)(void* data), void* data);
 	int (*bind_button)(int screen, int button, int trigger, const char* action_id);
+
+	// Fields below were added after the first release; check for them with
+	// NUI_HOST_HAS before calling.
+
+	// A short message at the bottom of the screen for a moment, eg. "Added
+	// to favorites". A new one replaces the last.
+	void (*toast)(const char* message);
 } NUIHost;
+
+// True when the launcher's host table has this field, so a plugin can use
+// newer features when they're there and do without on older launchers.
+#define NUI_HOST_HAS(host, field) \
+	((host)->size >= offsetof(NUIHost, field) + sizeof((host)->field) && (host)->field)
 
 ///////////////////////////////////////
 // What a plugin offers the launcher.

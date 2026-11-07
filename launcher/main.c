@@ -86,6 +86,7 @@ int main (int argc, char *argv[]) {
 
 		PWR_update(&state.dirty, &show_setting, Plugins_beforeSleep, Plugins_afterResume);
 		Plugins_tick(now);
+		Toast_tick(now);
 
 		// user-assignable buttons, handled before the per-screen input so they work
 		// from the game list, the game switcher and the quick menu alike.
@@ -149,6 +150,7 @@ int main (int argc, char *argv[]) {
 			else {
 				if (active->update) active->update();
 				active->render();
+				Toast_render();
 			}
 
 			if(state.animationdirection != ANIM_NONE) {

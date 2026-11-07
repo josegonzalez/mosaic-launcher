@@ -247,6 +247,10 @@ static int hostBindButton(int screen, int button, int trigger, const char* actio
 	return Plugins_bindButton(screen, button, trigger, action_id);
 }
 
+static void hostToast(const char* message) {
+	Toast_show(message);
+}
+
 static const NUIHost host = {
 	.size = sizeof(NUIHost),
 	.api_version = NUI_API_VERSION,
@@ -269,6 +273,7 @@ static const NUIHost host = {
 	.request_redraw = hostRequestRedraw,
 	.register_action = hostRegisterAction,
 	.bind_button = hostBindButton,
+	.toast = hostToast,
 };
 
 ///////////////////////////////////////

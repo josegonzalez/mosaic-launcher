@@ -170,22 +170,29 @@ static void toggle(void* data) {
 
 	load();
 	char message[MAX_PATH_LEN + 32];
+	char shown[160];
 	int i = indexOf(rel);
 	if (i >= 0) {
 		memmove(&favorites[i], &favorites[i + 1], (size_t)(count - i - 1) * MAX_PATH_LEN);
 		count--;
 		snprintf(message, sizeof(message), "removed %s", rel);
+		snprintf(shown, sizeof(shown), "Removed from %s", folder_name);
 	}
 	else if (count < MAX_FAVORITES) {
 		// at the end, like adding to any collection, so a hand-ordered list keeps its order
 		snprintf(favorites[count++], MAX_PATH_LEN, "%s", rel);
 		snprintf(message, sizeof(message), "added %s", rel);
+		snprintf(shown, sizeof(shown), "Added to %s", folder_name);
 	}
 	else {
 		say("favorites are full");
+		snprintf(shown, sizeof(shown), "%s is full", folder_name);
+		if (NUI_HOST_HAS(host, toast)) host->toast(shown);
 		return;
 	}
 	if (save() == 0) say(message);
+	else snprintf(shown, sizeof(shown), "Couldn't save %s", folder_name);
+	if (NUI_HOST_HAS(host, toast)) host->toast(shown);
 	host->request_redraw();
 }
 

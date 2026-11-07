@@ -35,5 +35,6 @@
 #include "actions.h"
 #include "transitions.h"
 #include "plugins.h"
+#include "toast.h"
 
 #endif
