@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop plugins-desktop plugins-device build-% devices pak release test smoke test-plugins lint drift clean
+.PHONY: all desktop run-desktop plugins-desktop plugins-device build-% devices pak release test smoke test-plugins test-profiles lint drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -103,6 +103,13 @@ smoke: desktop
 # Loads test plugins (one good, one crashing) into the desktop build.
 test-plugins: desktop
 	./tests/plugins/run.sh
+
+# Runs the bundled plugins together in two profiles built from their
+# plugin.txt files: everything on, then each exclusive slot flipped to its
+# next owner. Fails if the launcher or its plugin settings exit on their own,
+# or the loader refuses a plugin the profile didn't turn off.
+test-profiles: desktop plugins-desktop
+	./scripts/plugin-profiles.sh
 
 lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh
