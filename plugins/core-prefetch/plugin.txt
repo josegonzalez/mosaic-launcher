@@ -1,0 +1,9 @@
+id=core-prefetch
+name=Core prefetch (unsupported on desktop)
+api=1
+# off warms only the core, not the game
+setting.rom=toggle|Warm the game too|on
+# the most read ahead per launch, across the core and the game
+setting.max_mb=choice|Most to read ahead (MB)|16|4,8,16,32,64
+# no new read starts after this long in pre_launch
+setting.max_ms=choice|Longest it waits (ms)|20|10,20,50,100
