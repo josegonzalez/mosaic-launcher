@@ -12,8 +12,9 @@ char* escapeSingleQuotes(char* str);
 void readyResumePath(char* rom_path, int type);
 void readyResume(Entry* entry);
 int autoResume(void);
-void openPak(char* path);
+// Both return 1 when the launch was queued, 0 when a plugin cancelled it.
+int openPak(char* path);
 int runFnAction(int index); // 0 == FN1, 1 == FN2. Returns 1 if something was launched.
-void openRom(char* path, char* last);
+int openRom(char* path, char* last);
 
 #endif

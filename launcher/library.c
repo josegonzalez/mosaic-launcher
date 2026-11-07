@@ -217,6 +217,10 @@ void Directory_index(Directory* self) {
 		Hash_free(map);
 	}
 
+	self->entries = Plugins_filter(self->entries, self->path);
+	// recents and collections keep their own order even when renamed
+	if (Plugins_displayNames(self->entries) && !skip_index) EntryArray_sort(self->entries);
+
 	Listing_markDuplicates(self->entries);
 	if (!skip_index) Listing_buildIndex(self);
 }
@@ -229,7 +233,8 @@ Directory* Directory_new(char* path, int selected) {
 	Directory* self = malloc(sizeof(Directory));
 	self->path = strdup(path);
 	self->name = strdup(display_name);
-	self->entries = Listing_source(path);
+	self->entries = Plugins_virtualDir(path);
+	if (!self->entries) self->entries = Listing_source(path);
 	self->alphas = IntArray_new();
 	self->selected = selected;
 	Directory_index(self);
@@ -659,6 +664,9 @@ Array* getRoot(void) {
 
     // Move entries to root
 	Array_yoink(root, entries);
+
+	// plugins' entries go after the consoles, before Tools
+	Plugins_rootEntries(root);
 
 	// Add tools if applicable
     if (hasTools() && CFG_getShowTools() && !state.simple_mode) {

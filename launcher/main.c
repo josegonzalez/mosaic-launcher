@@ -84,7 +84,8 @@ int main (int argc, char *argv[]) {
 		selected = state.top->selected;
 		total = state.top->entries->count;
 
-		PWR_update(&state.dirty, &show_setting, NULL, NULL);
+		PWR_update(&state.dirty, &show_setting, Plugins_beforeSleep, Plugins_afterResume);
+		Plugins_tick(now);
 
 		// user-assignable buttons, handled before the per-screen input so they work
 		// from the game list, the game switcher and the quick menu alike.

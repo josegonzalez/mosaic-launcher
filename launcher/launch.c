@@ -127,7 +127,9 @@ int autoResume(void) {
 	return 1;
 }
 
-void openPak(char* path) {
+int openPak(char* path) {
+	if (!Plugins_preLaunch(path, ENTRY_PAK)) return 0;
+
 	// NOTE: escapeSingleQuotes() modifies the passed string
 	// so we need to save the path before we call that
 	// if (prefixMatch(ROMS_PATH, path)) {
@@ -138,6 +140,7 @@ void openPak(char* path) {
 	char cmd[256];
 	sprintf(cmd, "'%s/launch.sh'", escapeSingleQuotes(path));
 	queueNext(cmd);
+	return 1;
 }
 
 // Run the action bound to a user-assignable button (0 == FN1, 1 == FN2).
@@ -169,6 +172,7 @@ int runFnAction(int index) {
 	char launch_path[256];
 	snprintf(launch_path, sizeof(launch_path), "%s/launch.sh", pak_path);
 	if (!exists(launch_path)) return 0; // stale binding, eg. the pak was deleted
+	if (!Plugins_preLaunch(pak_path, ENTRY_PAK)) return 0;
 
 	// unlike openPak() we save where the user *is*, not the pak itself, so exiting
 	// the pak comes back to the same spot in the list
@@ -183,8 +187,14 @@ int runFnAction(int index) {
 	queueNext(cmd);
 	return 1;
 }
-void openRom(char* path, char* last) {
+int openRom(char* path, char* last) {
 	LOG_info("openRom(%s,%s)\n", path, last);
+
+	// before anything is recorded: recents, resume slot, play time
+	if (!Plugins_preLaunch(path, ENTRY_ROM)) {
+		state.should_resume = 0;
+		return 0;
+	}
 
 	char sd_path[256];
 	strcpy(sd_path, path);
@@ -245,4 +255,5 @@ void openRom(char* path, char* last) {
 	// dont escape sd_path again because it was already escaped for gametimectl and function modifies input str aswell
 	sprintf(cmd, "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
 	queueNext(cmd);
+	return 1;
 }

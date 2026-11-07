@@ -26,3 +26,9 @@ void LOG_note(int level, const char* fmt, ...) {
 Array* QuickItem_entries(void) {
 	return Array_new();
 }
+
+// plugins.c loads shared objects; listing tests run with no plugins.
+void Plugins_rootEntries(Array* root) { (void)root; }
+Array* Plugins_virtualDir(const char* path) { (void)path; return NULL; }
+Array* Plugins_filter(Array* entries, const char* dir_path) { (void)dir_path; return entries; }
+int Plugins_displayNames(Array* entries) { (void)entries; return 0; }

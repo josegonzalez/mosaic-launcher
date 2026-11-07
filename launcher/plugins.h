@@ -32,6 +32,31 @@ const NUIPlugin* Plugins_at(int i);
 int Plugins_bindings(int screen, const Binding** bindings);
 int Plugins_bindButton(int screen, int button, int trigger, const char* action_id);
 
+///////////////////////////////////////
+// Hooks, called from the launcher. Each runs every loaded plugin's hook in
+// load order; with no plugins loaded they change nothing.
+
+// Appends plugins' entries to the root list.
+void Plugins_rootEntries(Array* root);
+
+// The first plugin list for a path it owns, or NULL.
+Array* Plugins_virtualDir(const char* path);
+
+// Drops entries any plugin hides. Takes ownership of entries.
+Array* Plugins_filter(Array* entries, const char* dir_path);
+
+// Lets plugins rename entries. Returns 1 if any name changed.
+int Plugins_displayNames(Array* entries);
+
+// Asks plugins before a launch. Returns 1 to go ahead, 0 if one cancelled.
+// Going ahead also arranges for post_return on the next start.
+int Plugins_preLaunch(const char* path, int type);
+
+void Plugins_tick(unsigned long now);
+void Plugins_beforeSleep(void);
+void Plugins_afterResume(void);
+void Plugins_beforePoweroff(void);
+
 // Loads plugins unless they're paused after a crash. Call once, before
 // Menu_init, since building the root list already runs plugin hooks.
 void Plugins_init(void);

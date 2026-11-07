@@ -119,6 +119,7 @@ typedef struct NUIHost {
 	// Actions are named things the user can do; bindings put them on
 	// buttons. Plugin bindings rank after the screen's own, so they can
 	// only use buttons the screen leaves free. Both return 0 on success.
+	// For now only NUI_SCREEN_GAMELIST accepts bindings.
 	int (*register_action)(const char* id, const char* label,
 		int (*available)(void* data), void (*run)(void* data), void* data);
 	int (*bind_button)(int screen, int button, int trigger, const char* action_id);
@@ -136,7 +137,8 @@ typedef struct NUIPlugin {
 	int (*init)(const NUIHost* host);
 	void (*quit)(void);
 
-	// Lists. root_entries appends to the top-level list. virtual_dir
+	// Lists. root_entries adds to the top-level list, after the consoles
+	// and before Tools. virtual_dir
 	// returns a list (from host->list_new) for a path the plugin owns, or
 	// NULL to let the launcher list it. filter returns 0 to hide an entry.
 	// display_name writes a new name and returns 1, or returns 0.

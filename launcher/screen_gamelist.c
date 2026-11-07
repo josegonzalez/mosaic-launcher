@@ -178,7 +178,12 @@ void GameList_handleInput(void) {
 	if (state.dirty && total>0)
 		readyResume(entry);
 
-	Bindings_dispatch(bindings, BINDING_COUNT);
+	if (!Bindings_dispatch(bindings, BINDING_COUNT)) {
+		// plugins' bindings rank after the game list's own
+		const Binding* extra;
+		int extra_count = Plugins_bindings(NUI_SCREEN_GAMELIST, &extra);
+		Bindings_dispatch(extra, extra_count);
+	}
 }
 
 // Decides what the next render draws: whether names show, which background

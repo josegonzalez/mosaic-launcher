@@ -203,11 +203,12 @@ void Entry_open(Entry* self) {
 			sprintf(last_path, "%s/%s", state.top->path, filename);
 			last = last_path;
 		}
-		openRom(self->path, last);
+		// a plugin cancelling the launch leaves us in the menu, not waiting for a game
+		if (!openRom(self->path, last)) state.startgame = 0;
 	}
 	else if (self->type==ENTRY_PAK) {
 		state.startgame = 1;
-		openPak(self->path);
+		if (!openPak(self->path)) state.startgame = 0;
 	}
 	else if (self->type==ENTRY_DIR) {
 		openDirectory(self->path, 1);

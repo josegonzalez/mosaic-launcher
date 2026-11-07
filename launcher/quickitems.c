@@ -11,10 +11,12 @@ static void toggleWifi(void) { WIFI_enable(!WIFI_enabled()); }
 static void toggleBluetooth(void) { BT_enable(!BT_enabled()); }
 static void sleepNow(void) { PWR_sleep(); }
 static void rebootNow(void) {
+	Plugins_beforePoweroff();
 	cleanupImageLoaderPool();  // Stop worker threads before SDL cleanup
 	PWR_powerOff(1);
 }
 static void powerOffNow(void) {
+	Plugins_beforePoweroff();
 	cleanupImageLoaderPool();  // Stop worker threads before SDL cleanup
 	PWR_powerOff(0);
 }

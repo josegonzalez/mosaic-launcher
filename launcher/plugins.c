@@ -8,6 +8,7 @@
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
 #endif
 
+#define LAUNCHED_MARKER "/tmp/nextui-launcher-launched" // a launch went ahead; post_return is due
 #define LOADING_MARKER PLUGIN_STATE_DIR "/loading"
 #define PAUSED_MARKER PLUGIN_STATE_DIR "/plugins_paused"
 #define CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
@@ -347,6 +348,14 @@ void Plugins_init(void) {
 		else LOG_info("plugins: not loading %s: %s\n", decisions[i].manifest->id, decisions[i].reason);
 	}
 	if (loaded_count == 0) unlink(LOADING_MARKER);
+
+	if (exists(LAUNCHED_MARKER)) {
+		unlink(LAUNCHED_MARKER);
+		for (int i = 0; i < loaded_count; i++) {
+			const NUIPlugin* p = loaded[i].plugin;
+			if (Plugin_has(p, post_return) && p->post_return) p->post_return();
+		}
+	}
 }
 
 void Plugins_started(void) {
@@ -395,7 +404,8 @@ static const ButtonInfo buttons[] = {
 };
 
 int Plugins_bindButton(int screen, int button, int trigger, const char* action_id) {
-	if (screen < 0 || screen >= SCREEN_COUNT) return -1;
+	// only the game list dispatches through bindings so far
+	if (screen != NUI_SCREEN_GAMELIST) return -1;
 	if (trigger != NUI_TRIGGER_PRESS && trigger != NUI_TRIGGER_RELEASE) return -1;
 	const Action* action = Actions_find(action_id);
 	if (!action) {
@@ -420,6 +430,89 @@ int Plugins_bindings(int screen, const Binding** bindings) {
 	if (screen < 0 || screen >= SCREEN_COUNT) return 0;
 	*bindings = pluginBindings[screen];
 	return pluginBindingCount[screen];
+}
+
+///////////////////////////////////////
+// hooks
+
+#define EACH_PLUGIN_WITH(field) \
+	for (int i_ = 0; i_ < loaded_count; i_++) \
+		for (const NUIPlugin* p = loaded[i_].plugin; p && Plugin_has(p, field) && p->field; p = NULL)
+
+void Plugins_rootEntries(Array* root) {
+	EACH_PLUGIN_WITH(root_entries) p->root_entries((NUIList*)root);
+}
+
+Array* Plugins_virtualDir(const char* path) {
+	EACH_PLUGIN_WITH(virtual_dir) {
+		NUIList* list = p->virtual_dir(path);
+		if (list) return (Array*)list;
+	}
+	return NULL;
+}
+
+Array* Plugins_filter(Array* entries, const char* dir_path) {
+	int any = 0;
+	EACH_PLUGIN_WITH(filter) any = 1;
+	if (!any) return entries;
+
+	Array* kept = Array_new();
+	for (int i = 0; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		int keep = 1;
+		EACH_PLUGIN_WITH(filter) {
+			if (keep && !p->filter((const NUIEntry*)entry, dir_path)) keep = 0;
+		}
+		if (keep) Array_push(kept, entry);
+		else Entry_free(entry);
+	}
+	Array_free(entries);
+	return kept;
+}
+
+int Plugins_displayNames(Array* entries) {
+	int renamed = 0;
+	EACH_PLUGIN_WITH(display_name) {
+		for (int i = 0; i < entries->count; i++) {
+			Entry* entry = entries->items[i];
+			char name[256];
+			name[0] = '\0';
+			if (p->display_name((const NUIEntry*)entry, name, sizeof(name)) && name[0]) {
+				free(entry->name);
+				entry->name = strdup(name);
+				renamed = 1;
+			}
+		}
+	}
+	return renamed;
+}
+
+int Plugins_preLaunch(const char* path, int type) {
+	NUILaunch launch = { .path = path, .type = type };
+	EACH_PLUGIN_WITH(pre_launch) {
+		if (p->pre_launch(&launch) == NUI_LAUNCH_CANCEL) {
+			LOG_info("plugins: launch of %s cancelled by a plugin\n", path);
+			return 0;
+		}
+	}
+	if (loaded_count > 0) putFile(LAUNCHED_MARKER, "");
+	return 1;
+}
+
+void Plugins_tick(unsigned long now) {
+	EACH_PLUGIN_WITH(tick) p->tick(now);
+}
+
+void Plugins_beforeSleep(void) {
+	EACH_PLUGIN_WITH(before_sleep) p->before_sleep();
+}
+
+void Plugins_afterResume(void) {
+	EACH_PLUGIN_WITH(after_resume) p->after_resume();
+}
+
+void Plugins_beforePoweroff(void) {
+	EACH_PLUGIN_WITH(before_poweroff) p->before_poweroff();
 }
 
 const NUIPlugin* Plugins_at(int i) {
