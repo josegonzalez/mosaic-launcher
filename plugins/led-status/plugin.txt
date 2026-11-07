@@ -1,0 +1,8 @@
+id=led-status
+name=LED status (unsupported on desktop)
+api=1
+# battery: red, yellow or green by the battery level; theme: one of stock's theme colours
+setting.mode=choice|LED colour follows|battery|battery,theme
+setting.low_at=choice|Red at or below (%)|20|10,15,20,25,30
+setting.mid_at=choice|Yellow at or below (%)|50|30,40,50,60,70
+setting.theme_color=choice|Theme colour|accent|main,accent,accent2,list_text,list_text_selected,hint,background
