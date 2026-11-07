@@ -52,6 +52,10 @@ int Plugins_displayNames(Array* entries);
 // Going ahead also arranges for post_return on the next start.
 int Plugins_preLaunch(const char* path, int type);
 
+// The first plugin's image for an entry, for ART_THUMBNAIL, ART_FOLDER_BG or
+// ART_LIST_BG (see art.h). Returns 1 if a plugin answered.
+int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size);
+
 void Plugins_tick(unsigned long now);
 void Plugins_beforeSleep(void);
 void Plugins_afterResume(void);

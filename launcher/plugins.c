@@ -499,6 +499,21 @@ int Plugins_preLaunch(const char* path, int type) {
 	return 1;
 }
 
+int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
+	int nui_kind;
+	switch (kind) {
+		case ART_THUMBNAIL: nui_kind = NUI_ART_THUMBNAIL; break;
+		case ART_FOLDER_BG: nui_kind = NUI_ART_FOLDER_BG; break;
+		case ART_LIST_BG: nui_kind = NUI_ART_LIST_BG; break;
+		default: return 0;
+	}
+	EACH_PLUGIN_WITH(art_path) {
+		out[0] = '\0';
+		if (p->art_path((const NUIEntry*)entry, nui_kind, out, size) && out[0]) return 1;
+	}
+	return 0;
+}
+
 void Plugins_tick(unsigned long now) {
 	EACH_PLUGIN_WITH(tick) p->tick(now);
 }

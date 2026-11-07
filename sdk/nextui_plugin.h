@@ -69,6 +69,13 @@ enum NUITrigger {
 	NUI_TRIGGER_RELEASE,
 };
 
+// Images art_path can supply.
+enum NUIArtKind {
+	NUI_ART_THUMBNAIL, // a game's art beside the list
+	NUI_ART_FOLDER_BG, // the background while a folder is selected
+	NUI_ART_LIST_BG,   // the background while a game in a folder is selected
+};
+
 // What pre_launch decides.
 enum NUILaunchResult {
 	NUI_LAUNCH_CONTINUE,
@@ -159,6 +166,12 @@ typedef struct NUIPlugin {
 	void (*before_sleep)(void);
 	void (*after_resume)(void);
 	void (*before_poweroff)(void);
+
+	// Art. Writes the image to use for an entry (an enum NUIArtKind) and
+	// returns 1, or returns 0 to let the launcher look in its usual place.
+	// The first plugin to answer wins. The image doesn't have to exist; the
+	// launcher falls back as it would for its own path.
+	int (*art_path)(const NUIEntry* entry, int kind, char* out, size_t size);
 } NUIPlugin;
 
 #define NUI_PLUGIN_ENTRY "nextui_plugin_get"

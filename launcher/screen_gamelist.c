@@ -214,10 +214,9 @@ void GameList_update(void) {
 			lastType = entry->type;
 			char tmppath[512];
 			strncpy(folderBgPath, newBg, sizeof(folderBgPath) - 1);
-			if (entry->type == ENTRY_DIR)
-				resolveArt(ART_FOLDER_BG, folderBgPath, tmppath, sizeof(tmppath));
-			else if (entry->type == ENTRY_ROM)
-				resolveArt(ART_LIST_BG, folderBgPath, tmppath, sizeof(tmppath));
+			int kind = entry->type == ENTRY_DIR ? ART_FOLDER_BG : ART_LIST_BG;
+			if (!Plugins_artPath(entry, kind, tmppath, sizeof(tmppath)))
+				resolveArt(kind, folderBgPath, tmppath, sizeof(tmppath));
 			if(!exists(tmppath)) {
 				// Safeguard: If no background is available, still render the text to leave the user a way out
 				list_show_entry_names = true;
@@ -238,7 +237,8 @@ void GameList_update(void) {
 	if (total > 0) {
 		if(CFG_getShowGameArt()) {
 			char thumbpath[1024];
-			resolveArt(ART_THUMBNAIL, entry->path, thumbpath, sizeof(thumbpath));
+			if (!Plugins_artPath(entry, ART_THUMBNAIL, thumbpath, sizeof(thumbpath)))
+				resolveArt(ART_THUMBNAIL, entry->path, thumbpath, sizeof(thumbpath));
 			had_thumb = 0;
 			startLoadThumb(thumbpath, onThumbLoaded, NULL);
 			int max_w = (int)(screen->w - (screen->w * CFG_getGameArtWidth()));
