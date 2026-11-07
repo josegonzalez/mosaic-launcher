@@ -32,13 +32,13 @@ static int isIdChar(int c) {
 	return isalnum(c) || c == '.' || c == '_' || c == '-';
 }
 
-// Copies the id in [start, end) with spaces trimmed. Returns 0, or -1 for
-// an empty, too long or badly spelled one.
-static int copyId(const char* start, const char* end, char out[REMAP_ID_LEN]) {
+// Copies the id in [start, end) with spaces trimmed into out, which holds
+// size. Returns 0, or -1 for an empty, too long or badly spelled one.
+static int copyId(const char* start, const char* end, char* out, size_t size) {
 	while (start < end && isspace((unsigned char)*start)) start++;
 	while (end > start && isspace((unsigned char)end[-1])) end--;
 	size_t len = (size_t)(end - start);
-	if (len == 0 || len >= REMAP_ID_LEN) return -1;
+	if (len == 0 || len >= size) return -1;
 	for (const char* p = start; p < end; p++) {
 		if (!isIdChar((unsigned char)*p)) return -1;
 	}
@@ -60,7 +60,7 @@ int Remap_parse(const char* value, RemapButton* out) {
 	const char* colon = strchr(value, ':');
 	if (colon) {
 		char word[16];
-		if (copyId(value, colon, word) != 0) return REMAP_BAD;
+		if (copyId(value, colon, word, sizeof(word)) != 0) return REMAP_BAD;
 		if (!strcasecmp(word, "press")) b.trigger = MOSAIC_TRIGGER_PRESS;
 		else if (!strcasecmp(word, "release")) b.trigger = MOSAIC_TRIGGER_RELEASE;
 		else return REMAP_BAD;
@@ -72,7 +72,7 @@ int Remap_parse(const char* value, RemapButton* out) {
 		const char* comma = strchr(p, ',');
 		const char* end = comma ? comma : p + strlen(p);
 		if (b.count >= REMAP_ACTIONS_MAX) return REMAP_BAD;
-		if (copyId(p, end, b.actions[b.count]) != 0) return REMAP_BAD;
+		if (copyId(p, end, b.actions[b.count], sizeof(b.actions[0])) != 0) return REMAP_BAD;
 		for (int i = 0; i < b.count; i++) {
 			if (!strcmp(b.actions[i], b.actions[b.count])) return REMAP_BAD;
 		}

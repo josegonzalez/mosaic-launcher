@@ -159,6 +159,7 @@ static void testParse(void) {
 	CHECK(Remap_parse("gamelist.open,gamelist.open", &b) == REMAP_BAD);
 	CHECK(Remap_parse("none,gamelist.open", &b) == REMAP_BAD);
 	CHECK(Remap_parse("press:release:gamelist.open", &b) == REMAP_BAD);
+	CHECK(Remap_parse("releasereleaserelease:gamelist.open", &b) == REMAP_BAD); // longer than any timing word
 	char long_id[REMAP_ID_LEN + 2];
 	memset(long_id, 'a', sizeof(long_id) - 1);
 	long_id[sizeof(long_id) - 1] = '\0';
