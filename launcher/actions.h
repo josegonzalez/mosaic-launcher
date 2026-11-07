@@ -11,9 +11,14 @@
 typedef struct Action {
 	const char* id;          // eg. "gamelist.open"; FN buttons bind as "action:<id>"
 	const char* label;       // hint text, passed through TR() when drawn
-	int (*available)(void);  // may it run now, and should its hint show
-	void (*run)(void);
+	int (*available)(void* data); // may it run now, and should its hint show; NULL means always
+	void (*run)(void* data);
+	void* data;              // passed to both, eg. a plugin's own state
 } Action;
+
+// True when the action exists and may run now.
+int Action_available(const Action* action);
+void Action_run(const Action* action);
 
 enum ActionTrigger {
 	TRIGGER_PRESS,

@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop build-% devices pak release test smoke lint drift clean
+.PHONY: all desktop run-desktop build-% devices pak release test smoke test-plugins lint drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -79,8 +79,12 @@ test:
 smoke: desktop
 	./scripts/desktop-smoke.sh build/smoke.log
 
+# Loads test plugins (one good, one crashing) into the desktop build.
+test-plugins: desktop
+	./tests/plugins/run.sh
+
 lint:
-	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh
+	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh
 
 # What changed in upstream's launcher between two NextUI tags, for porting.
 drift:

@@ -1,9 +1,11 @@
 #include "launcher.h"
 
-static int canResume(void) {
+static int canResume(void* data) {
+	(void)data;
 	return total>0 && state.can_resume;
 }
-static void resumeSelected(void) {
+static void resumeSelected(void* data) {
+	(void)data;
 	Entry* entry = state.top->entries->items[state.top->selected];
 	state.should_resume = 1;
 	Entry_open(entry);
@@ -11,10 +13,12 @@ static void resumeSelected(void) {
 	state.dirty = 1;
 }
 
-static int canOpen(void) {
+static int canOpen(void* data) {
+	(void)data;
 	return total>0;
 }
-static void openSelected(void) {
+static void openSelected(void* data) {
+	(void)data;
 	Entry* entry = state.top->entries->items[state.top->selected];
 	Entry_open(entry);
 	if(entry->type == ENTRY_DIR) {
@@ -26,10 +30,12 @@ static void openSelected(void) {
 	if (total>0) readyResume(state.top->entries->items[state.top->selected]);
 }
 
-static int canGoBack(void) {
+static int canGoBack(void* data) {
+	(void)data;
 	return state.stack->count>1;
 }
-static void goBack(void) {
+static void goBack(void* data) {
+	(void)data;
 	closeDirectory();
 	state.animationdirection = SLIDE_RIGHT;
 	total = state.top->entries->count;

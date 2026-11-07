@@ -24,8 +24,11 @@ int main (int argc, char *argv[]) {
 
 	// start my threaded image loader :D
 	initImageLoaderPool();
-	Menu_init();
+	// built-in actions first, so plugins can bind buttons to them
 	Screens_init();
+	// before Menu_init: building the root list already runs plugin hooks
+	Plugins_init();
+	Menu_init();
 	QuickMenu_setup();
 	// LOG_info("- menu init: %lu\n", SDL_GetTicks() - main_begin);
 
@@ -213,6 +216,7 @@ int main (int argc, char *argv[]) {
 			}
 			if(!state.startgame) // dont flip if game gonna start
 				GFX_flip(screen);
+			Plugins_started(); // a frame is up, so plugins survived starting
 
 			state.dirty = 0;
 		} else if(getAnimationDraw() || folderbgchanged || thumbchanged || is_scrolling) {
@@ -357,6 +361,8 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
+	Plugins_started(); // a clean exit isn't a crash either
+	Plugins_quit();
 	Menu_quit();
 	PWR_quit();
 	PAD_quit();

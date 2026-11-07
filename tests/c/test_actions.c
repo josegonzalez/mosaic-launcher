@@ -14,12 +14,12 @@ void LOG_note(int level, const char* fmt, ...) { (void)level; (void)fmt; }
 static int open_ok = 1, back_ok = 1, resume_ok = 1;
 static const char* ran = NULL;
 
-static int canOpen(void) { return open_ok; }
-static int canBack(void) { return back_ok; }
-static int canResume(void) { return resume_ok; }
-static void runOpen(void) { ran = "open"; }
-static void runBack(void) { ran = "back"; }
-static void runResume(void) { ran = "resume"; }
+static int canOpen(void* d) { (void)d; return open_ok; }
+static int canBack(void* d) { (void)d; return back_ok; }
+static int canResume(void* d) { (void)d; return resume_ok; }
+static void runOpen(void* d) { (void)d; ran = "open"; }
+static void runBack(void* d) { (void)d; ran = "back"; }
+static void runResume(void* d) { (void)d; ran = "resume"; }
 
 static const Action resumeAction = { "test.resume", "RESUME", canResume, runResume };
 static const Action openAction = { "test.open", "OPEN", canOpen, runOpen };

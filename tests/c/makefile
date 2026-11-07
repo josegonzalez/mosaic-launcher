@@ -7,19 +7,20 @@
 NEXTUI ?= $(abspath ../../vendor/NextUI/workspace)
 BUILD ?= $(abspath ../../build/tests)
 LAUNCHER := $(abspath ../../launcher)
+SDK := $(abspath ../../sdk)
 
 CC ?= cc
 SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
-CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(NEXTUI)/all/common \
+CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions
+TESTS = test_art test_library test_actions test_pluginset
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
 # so its #include_next finds the desktop platform.h. No -Werror: these link
 # stock code (utils.c, library.c) that has warnings of its own.
-CARD_CFLAGS = -std=gnu99 -Wall -Iplatform -I. -I$(LAUNCHER) -I$(NEXTUI)/all/common \
+CARD_CFLAGS = -std=gnu99 -Wall -Iplatform -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform -I$(NEXTUI)/desktop/libmsettings $(SDL_CFLAGS) \
 	-DUSE_SDL2 -DPLATFORM=\"desktop\" -DTEST_SDCARD_PATH=\"$(BUILD)/sdcard\"
 
@@ -44,6 +45,10 @@ ACTIONS_SOURCES = test_actions.c $(LAUNCHER)/actions.c $(LAUNCHER)/tr.c
 $(BUILD)/test_actions: $(ACTIONS_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h
 	mkdir -p $(BUILD)
 	$(CC) $(CARD_CFLAGS) $(ACTIONS_SOURCES) -o $@
+
+$(BUILD)/test_pluginset: test_pluginset.c $(LAUNCHER)/pluginset.c $(LAUNCHER)/pluginset.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) test_pluginset.c $(LAUNCHER)/pluginset.c -o $@
 
 clean:
 	rm -rf $(BUILD)

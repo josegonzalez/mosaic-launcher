@@ -60,6 +60,12 @@ in_fallback() {
 	[ -f "$STATE_DIR/fallback" ]
 }
 
+# Set by the launcher when it crashed while starting with plugins loaded. It
+# keeps running, without plugins, until the user tries again.
+plugins_paused() {
+	[ -f "$STATE_DIR/plugins_paused" ]
+}
+
 # bind, copy, or empty when nothing is active this boot.
 active_mode() {
 	if [ -f "$RUN_DIR/mode" ]; then

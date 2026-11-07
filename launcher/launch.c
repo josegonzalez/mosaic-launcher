@@ -150,8 +150,8 @@ int runFnAction(int index) {
 	size_t action_prefix_len = strlen(FN_ACTION_ACTION_PREFIX);
 	if (strncmp(action, FN_ACTION_ACTION_PREFIX, action_prefix_len)==0) {
 		const Action* bound = Actions_find(action + action_prefix_len);
-		if (!bound || (bound->available && !bound->available())) return 0;
-		bound->run();
+		if (!Action_available(bound)) return 0;
+		Action_run(bound);
 		return 1;
 	}
 

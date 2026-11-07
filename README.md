@@ -82,6 +82,10 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `tr.c` | `TR()`, which every piece of fixed UI text passes through where it's drawn |
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
 | `transitions.c` | the folder slide and the game switcher's entrance animations |
+| `pluginset.c` | which discovered plugins load, and in what order |
+| `plugins.c` | finding and loading plugins, the host table they call, and the crash guard |
+
+See [PLUGINS.md](PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build.
 
 FN buttons can be bound to a launcher action as well as a pak, with `action:<id>` (eg. `action:gamelist.back`) in place of `pak:<name>`.
 
@@ -100,4 +104,4 @@ The Launcher screen uses [minui-list](https://github.com/josegonzalez/minui-list
 
 ## License
 
-The launcher is derived from NextUI's `nextui.c`, so this project is under the [PolyForm Noncommercial License 1.0.0](LICENSE), the same as NextUI. The plugin SDK and plugin template, once added, will be written from scratch under a permissive license so third-party plugins can choose their own.
+The launcher is derived from NextUI's `nextui.c`, so this project is under the [PolyForm Noncommercial License 1.0.0](LICENSE), the same as NextUI. The plugin SDK in `sdk/` is written from scratch and [MIT licensed](sdk/LICENSE), so plugins can choose their own license.

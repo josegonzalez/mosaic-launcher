@@ -34,5 +34,6 @@
 #include "tr.h"
 #include "actions.h"
 #include "transitions.h"
+#include "plugins.h"
 
 #endif

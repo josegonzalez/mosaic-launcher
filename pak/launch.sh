@@ -39,6 +39,8 @@ status_text() {
 		echo "Off - using the stock launcher"
 	elif in_fallback; then
 		echo "Paused after crashes - using stock"
+	elif plugins_paused && [ -n "$(active_mode)" ]; then
+		echo "On, plugins paused after a crash"
 	elif [ -n "$(active_mode)" ]; then
 		echo "On"
 	else
@@ -50,7 +52,7 @@ write_menu() {
 	{
 		echo '{"items": ['
 		printf '{"name": "Status: %s", "features": {"unselectable": true}},\n' "$(status_text)"
-		if in_fallback; then
+		if in_fallback || plugins_paused; then
 			echo '{"name": "Try again"},'
 		fi
 		if is_enabled; then
@@ -70,7 +72,8 @@ turn_on() {
 
 	echo "$PAK_DIR" >"$STATE_DIR/pak_dir"
 	touch "$STATE_DIR/enabled"
-	rm -f "$STATE_DIR/fallback" "$STATE_DIR/crashes" "$STATE_DIR/unsupported"
+	rm -f "$STATE_DIR/fallback" "$STATE_DIR/crashes" "$STATE_DIR/unsupported" \
+		"$STATE_DIR/plugins_paused" "$STATE_DIR/loading"
 
 	mkdir -p "$(dirname "$HOOK_STUB")"
 	cp "$PAK_DIR/bin/hook-stub.sh" "$HOOK_STUB"
@@ -91,8 +94,8 @@ turn_off() {
 }
 
 try_again() {
-	rm -f "$STATE_DIR/fallback" "$STATE_DIR/crashes"
-	show_message "Crash guard reset.\nThe launcher starts when you leave this screen."
+	rm -f "$STATE_DIR/fallback" "$STATE_DIR/crashes" "$STATE_DIR/plugins_paused" "$STATE_DIR/loading"
+	show_message "Crash guard reset.\nThe launcher and its plugins start when you leave this screen."
 }
 
 while true; do

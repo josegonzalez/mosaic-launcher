@@ -32,15 +32,19 @@ static int fired(const Binding* binding) {
 	return PAD_justPressed(binding->button);
 }
 
-static int available(const Action* action) {
-	return action && (!action->available || action->available());
+int Action_available(const Action* action) {
+	return action && (!action->available || action->available(action->data));
+}
+
+void Action_run(const Action* action) {
+	if (action && action->run) action->run(action->data);
 }
 
 int Bindings_dispatch(const Binding* bindings, int count) {
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = &bindings[i];
-		if (fired(binding) && available(binding->action)) {
-			binding->action->run();
+		if (fired(binding) && Action_available(binding->action)) {
+			Action_run(binding->action);
 			return 1;
 		}
 	}
@@ -51,7 +55,7 @@ int Bindings_hints(const Binding* const* bindings, int count, char** pairs) {
 	int hints = 0;
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = bindings[i];
-		if (!available(binding->action)) continue;
+		if (!Action_available(binding->action)) continue;
 		pairs[hints * 2] = (char*)binding->glyph;
 		pairs[hints * 2 + 1] = TR(binding->action->label);
 		hints++;
