@@ -5,7 +5,8 @@
 # version, one that replaces the root and opens entries, one that sorts
 # and renames a folder and moves the selection, one that adds quick menu
 # tiles and shares a button, one that declines after registering things,
-# one that powers off, and one that crashes during startup.
+# one that powers off, one that sets stock toggles, and one that crashes
+# during startup.
 #
 #   tests/plugins/run.sh
 
@@ -283,6 +284,27 @@ expect "show_recents 0"
 rm -rf "$WORK/plugins/powerer.plugin" "$WORK/plugins/decliner.plugin" "$(dirname "$ROM")" "$EMU_PAK" "$STATE/plugins.txt"
 rmdir "$CARD/Emus/desktop" 2>/dev/null
 if [ -f "$WORK/recent.txt.saved" ]; then cp "$WORK/recent.txt.saved" "$RECENTS"; else rm -f "$RECENTS"; fi
+
+# toggler reads stock toggles, has a name off the list refused, and flips
+# Show clock, which stock saves to minuisettings.txt (in the folder named by
+# SHARED_USERDATA_PATH, which stock's launch.sh sets on a device)
+SETTINGS="$CARD/.userdata/shared/minuisettings.txt"
+mkdir -p "$(dirname "$SETTINGS")" "$STATE"
+[ -f "$SETTINGS" ] && cp "$SETTINGS" "$WORK/minuisettings.txt.saved"
+printf 'showclock=0\nhaptics=1\n' >"$SETTINGS"
+printf 'toggler=on\n' >"$STATE/plugins.txt"
+build_plugin toggler 'id=toggler\nname=Toggler\napi=1\n'
+SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/toggler.log" || fail "the launcher exited early with toggler loaded"
+log="$WORK/toggler.log"
+plugin=toggler
+expect "clock 0, haptics 1, wifi -1"
+expect "set clock 0, set wifi -1, set clock to 2 -1"
+expect "clock now 1"
+grep -q "plugins: refused to set stock toggle wifi to 1" "$log" || fail "the refused toggle wasn't logged"
+grep -q "^showclock=1$" "$SETTINGS" || fail "Show clock wasn't saved: $(grep showclock "$SETTINGS")"
+grep -q "^haptics=1$" "$SETTINGS" || fail "another toggle changed: $(grep haptics "$SETTINGS")"
+rm -rf "$WORK/plugins/toggler.plugin" "$STATE/plugins.txt"
+if [ -f "$WORK/minuisettings.txt.saved" ]; then cp "$WORK/minuisettings.txt.saved" "$SETTINGS"; else rm -f "$SETTINGS"; fi
 
 # the bundled plugins load and start cleanly
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building the bundled plugins"

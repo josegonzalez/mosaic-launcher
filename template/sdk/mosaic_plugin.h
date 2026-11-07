@@ -91,6 +91,16 @@ enum MosaicLaunchResult {
 	MOSAIC_LAUNCH_REPLACE,
 };
 
+// Stock NextUI settings stock_toggle_get and stock_toggle_set take, with
+// the row each is in stock's Settings app. Any other name is refused.
+#define MOSAIC_TOGGLE_NOTIFY_MANUAL_SAVE "notify_manual_save"     // notifications: Save states
+#define MOSAIC_TOGGLE_NOTIFY_LOAD "notify_load"                   // notifications: Load states
+#define MOSAIC_TOGGLE_NOTIFY_SCREENSHOT "notify_screenshot"       // notifications: Screenshots
+#define MOSAIC_TOGGLE_NOTIFY_ADJUSTMENTS "notify_adjustments"     // notifications: Vol / Display Adjustments
+#define MOSAIC_TOGGLE_SHOW_CLOCK "show_clock"                     // Show clock
+#define MOSAIC_TOGGLE_SHOW_BATTERY_PERCENT "show_battery_percent" // Show battery percentage
+#define MOSAIC_TOGGLE_HAPTICS "haptics"                           // Haptic feedback
+
 typedef struct MosaicLaunch {
 	const char* path; // the rom or pak being launched
 	int type;         // MOSAIC_ENTRY_ROM or MOSAIC_ENTRY_PAK
@@ -292,6 +302,15 @@ typedef struct MosaicHost {
 	// in Settings and there are recents. A root_replace can add the folder
 	// itself, as a MOSAIC_ENTRY_DIR at sdcard_path + "/Recently Played".
 	int (*show_recents)(void);
+
+	// Stock NextUI's own on/off settings, by a MOSAIC_TOGGLE_* name. They go
+	// through the launcher's settings, so the change is saved to
+	// minuisettings.txt at once, the status bar redraws with it, and games
+	// launched afterwards see it. stock_toggle_get returns 1 for on, 0 for
+	// off, or -1 for a name it doesn't know. stock_toggle_set takes 1 or 0
+	// and returns 0, or -1 for a name it doesn't know or another value.
+	int (*stock_toggle_get)(const char* name);
+	int (*stock_toggle_set)(const char* name, int on);
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use

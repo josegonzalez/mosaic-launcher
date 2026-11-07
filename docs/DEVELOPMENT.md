@@ -88,6 +88,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `settings.c` | the Launcher pak's screens, shown by `nextui.elf --settings` |
 | `listsort.c` | sorting a list by plugins' chained `sort_compare` hooks |
 | `launchcmd.c` | checking and quoting the command a plugin replaces a launch with |
+| `stocktoggles.c` | the stock settings plugins can read and set, through `CFG_get*` and `CFG_set*` |
 
 See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build.
 

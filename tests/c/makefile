@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -51,6 +51,16 @@ ACTIONS_SOURCES = test_actions.c $(LAUNCHER)/actions.c $(LAUNCHER)/tr.c
 $(BUILD)/test_actions: $(ACTIONS_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h
 	mkdir -p $(BUILD)
 	$(CC) $(CARD_CFLAGS) $(ACTIONS_SOURCES) -o $@
+
+# Against stock's config.c, on a card of its own since it writes minuisettings.txt.
+# Unfortified: reading a saved font style, stock copies the font name onto
+# itself, which macOS's checked strncpy stops.
+STOCK_TOGGLES_SOURCES = test_stock_toggles.c $(LAUNCHER)/stocktoggles.c $(NEXTUI)/all/common/config.c $(NEXTUI)/all/common/utils.c
+
+$(BUILD)/test_stock_toggles: $(STOCK_TOGGLES_SOURCES) $(LAUNCHER)/stocktoggles.h $(SDK)/mosaic_plugin.h check.h platform/platform.h
+	mkdir -p $(BUILD)
+	$(CC) $(filter-out -DTEST_SDCARD_PATH=%,$(CARD_CFLAGS)) -DTEST_SDCARD_PATH=\"$(BUILD)/stock-toggles-card\" -D_FORTIFY_SOURCE=0 \
+		$(STOCK_TOGGLES_SOURCES) -lm -o $@
 
 $(BUILD)/test_pluginset: test_pluginset.c $(LAUNCHER)/pluginset.c $(LAUNCHER)/pluginset.h check.h
 	mkdir -p $(BUILD)

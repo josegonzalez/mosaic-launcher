@@ -3,6 +3,7 @@
 #include "launcher.h"
 #include "pluginset.h"
 #include "plugins.h"
+#include "stocktoggles.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -397,6 +398,20 @@ static int hostShowRecents(void) {
 	return 0;
 }
 
+static int hostStockToggleGet(const char* name) {
+	return StockToggles_get(name);
+}
+static int hostStockToggleSet(const char* name, int on) {
+	if (StockToggles_set(name, on) != 0) {
+		LOG_warn("plugins: refused to set stock toggle %s to %i\n", name ? name : "(null)", on);
+		return -1;
+	}
+	LOG_info("plugins: a plugin set stock toggle %s to %i\n", name, on);
+	// the clock and battery percentage are in the status bar
+	state.dirty = 1;
+	return 0;
+}
+
 static const MosaicHost host = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -445,6 +460,8 @@ static const MosaicHost host = {
 	.led_count = hostLedCount,
 	.power_off = hostPowerOff,
 	.show_recents = hostShowRecents,
+	.stock_toggle_get = hostStockToggleGet,
+	.stock_toggle_set = hostStockToggleSet,
 };
 
 ///////////////////////////////////////
