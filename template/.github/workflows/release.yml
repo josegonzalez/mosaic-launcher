@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: ghcr.io/loveretro/tg5040-toolchain:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Build
+        run: make build CC="${CROSS_COMPILE}gcc"
+
+      - name: Upload
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: lib
+          path: lib
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Download build
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: lib
+          path: lib
+
+      - name: Package
+        run: make pak
+
+      - name: Upload pak
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: pak
+          path: build/*.pak.zip
+
+      # The Pak Store reads pak.json and expects a release tagged with its version.
+      - name: Release
+        if: github.ref_type == 'tag'
+        run: gh release create "${GITHUB_REF_NAME}" build/*.pak.zip --title "${GITHUB_REF_NAME}" --generate-notes

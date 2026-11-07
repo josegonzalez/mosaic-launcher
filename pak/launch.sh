@@ -143,6 +143,12 @@ try_again() {
 	show_message "Crash guard reset.\nThe launcher and its plugins start when you leave this screen."
 }
 
+# Plugin paks open the Plugins page directly: launch.sh plugins
+if [ "${1:-}" = "plugins" ]; then
+	plugins_page
+	exit 0
+fi
+
 while true; do
 	write_menu
 	rm -f "$WORK_DIR/selection"

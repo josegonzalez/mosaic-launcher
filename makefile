@@ -99,7 +99,10 @@ test-plugins: desktop
 	./tests/plugins/run.sh
 
 lint:
-	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh
+	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh
+	@# the template ships its own copy of the SDK; it must match
+	cmp sdk/nextui_plugin.h template/sdk/nextui_plugin.h
+	cmp sdk/LICENSE template/sdk/LICENSE
 
 # What changed in upstream's launcher between two NextUI tags, for porting.
 drift:

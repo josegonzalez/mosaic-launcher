@@ -1,0 +1,39 @@
+###########################################################
+# Builds the plugin and its pak.
+#
+#   make           lib/aarch64/plugin.so, in the tg5040 toolchain (Docker or podman)
+#   make desktop   lib/desktop-<os>-<arch>/plugin.so, with the host compiler
+#   make pak       build/<name>.pak.zip for the Pak Store
+#
+# One aarch64 build runs on every NextUI device; tg5040's toolchain has the
+# oldest sysroot, so building there keeps it compatible with all of them.
+###########################################################
+
+.PHONY: all build desktop pak clean
+
+NAME := $(shell sed -n 's/^name=//p' plugin.txt)
+CONTAINER_RUNTIME ?= $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null)
+DESKTOP_ARCH := desktop-$(shell uname -s | tr A-Z a-z)-$(shell uname -m)
+CFLAGS := -shared -fPIC -std=gnu99 -O2 -Wall -Werror -Isdk
+
+all:
+	$(CONTAINER_RUNTIME) run --rm -v $(CURDIR):/root/workspace ghcr.io/loveretro/tg5040-toolchain:latest \
+		/bin/bash -c 'cd /root/workspace && make build CC=$${CROSS_COMPILE}gcc'
+
+build:
+	mkdir -p lib/aarch64
+	$(CC) $(CFLAGS) src/*.c -o lib/aarch64/plugin.so
+
+desktop:
+	mkdir -p lib/$(DESKTOP_ARCH)
+	$(CC) $(CFLAGS) src/*.c -o lib/$(DESKTOP_ARCH)/plugin.so
+
+# The zip holds the pak's contents, which is what the Pak Store expects.
+pak:
+	@test -f lib/aarch64/plugin.so || (echo "run make first" && exit 1)
+	mkdir -p build
+	rm -f "build/$(NAME).pak.zip"
+	zip -r "build/$(NAME).pak.zip" plugin.txt launch.sh lib/aarch64 sdk/LICENSE
+
+clean:
+	rm -rf lib build

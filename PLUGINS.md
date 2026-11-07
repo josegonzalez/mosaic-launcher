@@ -1,5 +1,7 @@
 # Writing plugins
 
+To publish a plugin of your own, start from [`template/`](template/): copy it into a new repo, and it builds the plugin, packages it as a pak and releases it for the Pak Store.
+
 A plugin is a shared object the launcher loads at startup. It's written against one header, [`sdk/nextui_plugin.h`](sdk/nextui_plugin.h), which is MIT licensed and doesn't include anything from NextUI, so a plugin can use any license.
 
 ## Layout
