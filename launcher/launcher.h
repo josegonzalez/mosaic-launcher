@@ -32,5 +32,6 @@
 #include "art.h"
 #include "quickitems.h"
 #include "tr.h"
+#include "actions.h"
 
 #endif

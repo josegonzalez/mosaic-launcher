@@ -13,7 +13,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library
+TESTS = test_art test_library test_actions
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -38,6 +38,12 @@ LIBRARY_SOURCES = test_library.c stubs.c $(LAUNCHER)/library.c $(LAUNCHER)/conta
 $(BUILD)/test_library: $(LIBRARY_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h platform/platform.h
 	mkdir -p $(BUILD)
 	$(CC) $(CARD_CFLAGS) $(LIBRARY_SOURCES) -lm -o $@
+
+ACTIONS_SOURCES = test_actions.c $(LAUNCHER)/actions.c $(LAUNCHER)/tr.c
+
+$(BUILD)/test_actions: $(ACTIONS_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h
+	mkdir -p $(BUILD)
+	$(CC) $(CARD_CFLAGS) $(ACTIONS_SOURCES) -o $@
 
 clean:
 	rm -rf $(BUILD)

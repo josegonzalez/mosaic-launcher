@@ -1,5 +1,62 @@
 #include "launcher.h"
 
+static int canResume(void) {
+	return total>0 && can_resume;
+}
+static void resumeSelected(void) {
+	Entry* entry = top->entries->items[top->selected];
+	should_resume = 1;
+	Entry_open(entry);
+
+	dirty = 1;
+}
+
+static int canOpen(void) {
+	return total>0;
+}
+static void openSelected(void) {
+	Entry* entry = top->entries->items[top->selected];
+	Entry_open(entry);
+	if(entry->type == ENTRY_DIR) {
+		animationdirection = SLIDE_LEFT;
+		total = top->entries->count;
+	}
+	dirty = 1;
+
+	if (total>0) readyResume(top->entries->items[top->selected]);
+}
+
+static int canGoBack(void) {
+	return stack->count>1;
+}
+static void goBack(void) {
+	closeDirectory();
+	animationdirection = SLIDE_RIGHT;
+	total = top->entries->count;
+	dirty = 1;
+
+	if (total>0) readyResume(top->entries->items[top->selected]);
+}
+
+static const Action resumeAction = { "gamelist.resume", "RESUME", canResume, resumeSelected };
+static const Action openAction = { "gamelist.open", "OPEN", canOpen, openSelected };
+static const Action backAction = { "gamelist.back", "BACK", canGoBack, goBack };
+
+// In priority order: the first that fires and is available wins.
+static const Binding bindings[] = {
+	{ BTN_RESUME, TRIGGER_RELEASE, "X", &resumeAction },
+	{ BTN_A, TRIGGER_PRESS, "A", &openAction },
+	{ BTN_B, TRIGGER_PRESS, "B", &backAction },
+};
+#define BINDING_COUNT (int)(sizeof(bindings) / sizeof(bindings[0]))
+
+// The right-hand hint group, in display order.
+static const Binding* const navigationHints[] = { &bindings[2], &bindings[1] };
+
+void GameList_registerActions(void) {
+	for (int i = 0; i < BINDING_COUNT; i++) Actions_register(bindings[i].action);
+}
+
 void GameList_handleInput(void) {
 	if (PAD_tappedMenu(now)) {
 		currentScreen = SCREEN_QUICKMENU;
@@ -118,30 +175,7 @@ void GameList_handleInput(void) {
 	if (dirty && total>0)
 		readyResume(entry);
 
-	if (total>0 && can_resume && PAD_justReleased(BTN_RESUME)) {
-		should_resume = 1;
-		Entry_open(entry);
-
-		dirty = 1;
-	}
-	else if (total>0 && PAD_justPressed(BTN_A)) {
-		Entry_open(entry);
-		if(entry->type == ENTRY_DIR) {
-			animationdirection = SLIDE_LEFT;
-			total = top->entries->count;
-		}
-		dirty = 1;
-
-		if (total>0) readyResume(top->entries->items[top->selected]);
-	}
-	else if (PAD_justPressed(BTN_B) && stack->count>1) {
-		closeDirectory();
-		animationdirection = SLIDE_RIGHT;
-		total = top->entries->count;
-		dirty = 1;
-
-		if (total>0) readyResume(top->entries->items[top->selected]);
-	}
+	Bindings_dispatch(bindings, BINDING_COUNT);
 }
 
 void GameList_render(void) {
@@ -211,25 +245,18 @@ void GameList_render(void) {
 
 	// buttons
 	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
-	else if (can_resume) GFX_blitButtonGroup((char*[]){ "X",TR("RESUME"),  NULL }, 0, screen, 0);
+	// Stock shows the resume hint whenever resume state is set, even in an
+	// empty folder where the action can't run, so this keeps its own check.
+	else if (can_resume) GFX_blitButtonGroup((char*[]){ (char*)bindings[0].glyph,TR(resumeAction.label),  NULL }, 0, screen, 0);
 	else GFX_blitButtonGroup((char*[]){
 		BTN_SLEEP==BTN_POWER?"POWER":"MENU",
 		TR(BTN_SLEEP==BTN_POWER||simple_mode?"SLEEP":"INFO"),
 		NULL }, 0, screen, 0);
 
-	if (total==0) {
-		if (stack->count>1) {
-			GFX_blitButtonGroup((char*[]){ "B",TR("BACK"),  NULL }, 0, screen, 1);
-		}
-	}
-	else {
-		if (stack->count>1) {
-			GFX_blitButtonGroup((char*[]){ "B",TR("BACK"), "A",TR("OPEN"), NULL }, 1, screen, 1);
-		}
-		else {
-			GFX_blitButtonGroup((char*[]){ "A",TR("OPEN"), NULL }, 0, screen, 1);
-		}
-	}
+	// back and open, whichever are available; the last one is primary
+	char* hints[5];
+	int hint_count = Bindings_hints(navigationHints, 2, hints);
+	if (hint_count > 0) GFX_blitButtonGroup(hints, hint_count - 1, screen, 1);
 
 	// list
 	if (total > 0) {

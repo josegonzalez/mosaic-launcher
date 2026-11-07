@@ -146,7 +146,16 @@ int runFnAction(int index) {
 	const char* action = CFG_getFnAction(index);
 	if (!action || !action[0]) return 0; // unassigned
 
-	// only "launch a Tools pak" exists so far; ignore kinds we don't know so a card
+	// a registered launcher action, eg. "action:gamelist.back"
+	size_t action_prefix_len = strlen(FN_ACTION_ACTION_PREFIX);
+	if (strncmp(action, FN_ACTION_ACTION_PREFIX, action_prefix_len)==0) {
+		const Action* bound = Actions_find(action + action_prefix_len);
+		if (!bound || (bound->available && !bound->available())) return 0;
+		bound->run();
+		return 1;
+	}
+
+	// otherwise "launch a Tools pak"; ignore kinds we don't know so a card
 	// configured on a newer build just does nothing here instead of misfiring
 	size_t prefix_len = strlen(FN_ACTION_PAK_PREFIX);
 	if (strncmp(action, FN_ACTION_PAK_PREFIX, prefix_len)!=0) return 0;

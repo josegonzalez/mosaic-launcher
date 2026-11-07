@@ -25,6 +25,7 @@ int main (int argc, char *argv[]) {
 	// start my threaded image loader :D
 	initImageLoaderPool();
 	Menu_init();
+	Screens_init();
 	qm_row = 0;
 	qm_col = 0;
 	qm_slot = 0;

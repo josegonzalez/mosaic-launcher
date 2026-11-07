@@ -80,6 +80,9 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `art.c` | where each kind of image (thumbnails, backgrounds, quick menu art) is looked up |
 | `quickitems.c` | the quick menu's pak shortcuts and toggles: which appear, their icons, and what they do |
 | `tr.c` | `TR()`, which every piece of fixed UI text passes through where it's drawn |
+| `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
+
+FN buttons can be bound to a launcher action as well as a pak, with `action:<id>` (eg. `action:gamelist.back`) in place of `pak:<name>`.
 
 Upstream changes have to be ported forward by hand. To see what changed upstream since the pinned tag:
 

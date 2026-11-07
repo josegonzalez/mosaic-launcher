@@ -14,6 +14,10 @@ static const Screen quickmenu = {
 	.rendersWhileLaunching = 1,
 };
 
+void Screens_init(void) {
+	GameList_registerActions();
+}
+
 const Screen* Screen_get(int id) {
 	switch (id) {
 		case SCREEN_QUICKMENU: return &quickmenu;

@@ -18,6 +18,10 @@ typedef struct Screen {
 // Unknown ids get the game list, like stock's input and render chains.
 const Screen* Screen_get(int id);
 
+// Registers every screen's actions so FN buttons can bind to them.
+void Screens_init(void);
+void GameList_registerActions(void);
+
 void QuickMenu_handleInput(void);
 void QuickMenu_render(void);
 void Switcher_handleInput(void);
