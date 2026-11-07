@@ -1,0 +1,6 @@
+id=all-games
+name=All games
+api=1
+slots=root
+# the root lists every game across systems, after a Systems folder and other plugins' folders
+setting.tags=toggle|Show the system on shared names|on
