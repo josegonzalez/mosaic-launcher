@@ -1,0 +1,18 @@
+{
+  "name": "Launcher",
+  "version": "v0.1.0",
+  "type": "TOOL",
+  "description": "A plugin-capable replacement for the NextUI launcher.",
+  "author": "Jose Diaz-Gonzalez",
+  "repo_url": "https://github.com/josegonzalez/nextui-launcher",
+  "release_filename": "Launcher.pak.zip",
+  "changelog": {
+    "v0.1.0": "First release: runs the stock NextUI launcher through a switchable, crash-guarded wrapper."
+  },
+  "screenshots": [],
+  "platforms": [
+    "tg5040",
+    "tg5050",
+    "h700"
+  ]
+}

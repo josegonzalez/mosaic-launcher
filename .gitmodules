@@ -1,0 +1,5 @@
+[submodule "vendor/NextUI"]
+	path = vendor/NextUI
+	url = https://github.com/LoveRetro/NextUI
+	# libmsettings builds in place inside the vendored tree.
+	ignore = untracked
