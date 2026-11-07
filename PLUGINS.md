@@ -90,6 +90,25 @@ slot.layout=carousel
 
 Plugins listed there load first, in that order. `slot.<name>=<id>` picks which plugin owns an exclusive slot. Each plugin's own settings, from `cfg_set`, live in `.userdata/<platform>/launcher/<id>.cfg`.
 
+## Features added since the first API
+
+Newer host fields may be missing on an older launcher. Check before calling:
+
+```c
+if (NUI_HOST_HAS(host, toast)) host->toast("Added to Favorites");
+```
+
+- `toast(message)` shows a short message at the bottom of the screen.
+- `inhibit_sleep(id, on)` holds off auto-sleep until the same plugin releases it.
+- `art_path` in `NUIPlugin` lets a plugin pick the thumbnail, folder background or list background for an entry.
+
+## Without writing C
+
+Shell paks can hook into the launcher too:
+
+- **Before a launch:** `Tools/<platform>/<name>.pak/pre-launch.sh` runs before every game or pak launch, in pak name order. It gets `HOOK_PHASE=pre`, `HOOK_TYPE` (`rom` or `pak`), `HOOK_ROM_PATH` and `HOOK_PAK_PATH`. Exiting 1 cancels the launch; any other failure is logged and the launch goes ahead. This sits alongside stock NextUI's `.userdata/<platform>/.hooks/*.d/` folders, which still work and can't cancel.
+- **Staying awake:** while `/tmp/stay_awake` exists, the launcher holds off auto-sleep. Create it during a long download or sync and remove it afterwards. The power button still sleeps the device.
+
 ## When a plugin crashes
 
 The launcher marks plugin loading as in progress and clears the mark once its first frame is on screen. If it crashes before then, the next start pauses plugins and runs without them. The Launcher pak shows "plugins paused after a crash" and **Try again** turns them back on.

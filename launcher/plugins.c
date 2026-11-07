@@ -251,6 +251,12 @@ static void hostToast(const char* message) {
 	Toast_show(message);
 }
 
+static void hostInhibitSleep(const char* plugin_id, int on) {
+	char who[80];
+	snprintf(who, sizeof(who), "plugin:%s", plugin_id ? plugin_id : "?");
+	Awake_set(who, on);
+}
+
 static const NUIHost host = {
 	.size = sizeof(NUIHost),
 	.api_version = NUI_API_VERSION,
@@ -274,6 +280,7 @@ static const NUIHost host = {
 	.register_action = hostRegisterAction,
 	.bind_button = hostBindButton,
 	.toast = hostToast,
+	.inhibit_sleep = hostInhibitSleep,
 };
 
 ///////////////////////////////////////
@@ -493,6 +500,9 @@ int Plugins_displayNames(Array* entries) {
 }
 
 int Plugins_preLaunch(const char* path, int type) {
+	// paks' own pre-launch.sh scripts first; they don't need plugins on
+	if (!PakHooks_preLaunch(path, type)) return 0;
+
 	NUILaunch launch = { .path = path, .type = type };
 	EACH_PLUGIN_WITH(pre_launch) {
 		if (p->pre_launch(&launch) == NUI_LAUNCH_CANCEL) {

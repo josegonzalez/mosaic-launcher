@@ -69,6 +69,13 @@ grep -q "plugins: loaded favorites" "$WORK/bundled.log" || fail "favorites didn'
 grep -q "couldn't bind Y" "$WORK/bundled.log" && fail "favorites couldn't bind Y"
 rm -rf "$WORK/plugins"/*.plugin
 
+# /tmp/stay_awake holds off auto-sleep
+touch /tmp/stay_awake
+run_launcher "$WORK/awake.log" || fail "the launcher exited early with /tmp/stay_awake"
+rm -f /tmp/stay_awake
+grep -q "awake: holding off auto-sleep" "$WORK/awake.log" || fail "/tmp/stay_awake didn't hold off auto-sleep"
+grep -q "awake: holding off auto-sleep" "$WORK/hello.log" && fail "auto-sleep was held off without /tmp/stay_awake"
+
 # a crash while starting pauses plugins on the next start
 build_plugin crasher 'id=crasher\nname=Crasher\napi=1\n'
 run_launcher "$WORK/crash.log" && fail "the crashing plugin didn't crash the launcher"

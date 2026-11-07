@@ -137,6 +137,11 @@ typedef struct NUIHost {
 	// A short message at the bottom of the screen for a moment, eg. "Added
 	// to favorites". A new one replaces the last.
 	void (*toast)(const char* message);
+
+	// Holds off auto-sleep while on is 1, eg. during a download, until the
+	// same plugin calls it with 0. The power button still sleeps the device.
+	// Shell paks can do the same by creating /tmp/stay_awake.
+	void (*inhibit_sleep)(const char* plugin_id, int on);
 } NUIHost;
 
 // True when the launcher's host table has this field, so a plugin can use

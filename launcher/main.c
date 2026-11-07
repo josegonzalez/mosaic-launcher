@@ -28,6 +28,7 @@ int main (int argc, char *argv[]) {
 	Screens_init();
 	// before Menu_init: building the root list already runs plugin hooks
 	Plugins_init();
+	PakHooks_init();
 	Menu_init();
 	QuickMenu_setup();
 	// LOG_info("- menu init: %lu\n", SDL_GetTicks() - main_begin);
@@ -87,6 +88,7 @@ int main (int argc, char *argv[]) {
 		PWR_update(&state.dirty, &show_setting, Plugins_beforeSleep, Plugins_afterResume);
 		Plugins_tick(now);
 		Toast_tick(now);
+		Awake_tick(now);
 
 		// user-assignable buttons, handled before the per-screen input so they work
 		// from the game list, the game switcher and the quick menu alike.

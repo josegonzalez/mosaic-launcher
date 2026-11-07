@@ -36,5 +36,7 @@
 #include "transitions.h"
 #include "plugins.h"
 #include "toast.h"
+#include "awake.h"
+#include "pakhooks.h"
 
 #endif
