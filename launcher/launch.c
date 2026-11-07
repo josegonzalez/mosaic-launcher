@@ -3,7 +3,7 @@
 void queueNext(char* cmd) {
 	LOG_info("cmd: %s\n", cmd);
 	putFile("/tmp/next", cmd);
-	quit = 1;
+	state.quit = 1;
 }
 
 // based on https://stackoverflow.com/a/31775567/145965
@@ -42,8 +42,8 @@ char* escapeSingleQuotes(char* str) {
 }
 void readyResumePath(char* rom_path, int type) {
 	char* tmp;
-	can_resume = 0;
-	has_preview = 0;
+	state.can_resume = 0;
+	state.has_preview = 0;
 	char path[256];
 	strcpy(path, rom_path);
 
@@ -74,16 +74,16 @@ void readyResumePath(char* rom_path, int type) {
 	tmp = strrchr(path, '/') + 1;
 	strcpy(rom_file, tmp);
 
-	sprintf(slot_path, "%s/.minui/%s/%s.txt", SHARED_USERDATA_PATH, emu_name, rom_file); // /.userdata/.minui/<EMU>/<romname>.ext.txt
-	can_resume = exists(slot_path);
+	sprintf(state.slot_path, "%s/.minui/%s/%s.txt", SHARED_USERDATA_PATH, emu_name, rom_file); // /.userdata/.minui/<EMU>/<romname>.ext.txt
+	state.can_resume = exists(state.slot_path);
 
 	// slot_path contains a single integer representing the last used slot
-	if (can_resume) {
+	if (state.can_resume) {
 		char slot[16];
-		getFile(slot_path, slot, 16);
+		getFile(state.slot_path, slot, 16);
 		int s = atoi(slot);
-		sprintf(preview_path, "%s/.minui/%s/%s.%0d.bmp", SHARED_USERDATA_PATH, emu_name, rom_file, s); // /.userdata/.minui/<EMU>/<romname>.ext.<n>.bmp
-		has_preview = exists(preview_path);
+		sprintf(state.preview_path, "%s/.minui/%s/%s.%0d.bmp", SHARED_USERDATA_PATH, emu_name, rom_file, s); // /.userdata/.minui/<EMU>/<romname>.ext.<n>.bmp
+		state.has_preview = exists(state.preview_path);
 	}
 }
 void readyResume(Entry* entry) {
@@ -172,8 +172,8 @@ int runFnAction(int index) {
 
 	// unlike openPak() we save where the user *is*, not the pak itself, so exiting
 	// the pak comes back to the same spot in the list
-	if (top && top->entries->count>0) {
-		Entry* entry = top->entries->items[top->selected];
+	if (state.top && state.top->entries->count>0) {
+		Entry* entry = state.top->entries->items[state.top->selected];
 		saveLast(entry->path);
 	}
 
@@ -202,11 +202,11 @@ void openRom(char* path, char* last) {
 	char emu_name[256];
 	getEmuName(sd_path, emu_name);
 
-	if (should_resume) {
+	if (state.should_resume) {
 		char slot[16];
-		getFile(slot_path, slot, 16);
+		getFile(state.slot_path, slot, 16);
 		putFile(RESUME_SLOT_PATH, slot);
-		should_resume = 0;
+		state.should_resume = 0;
 
 		if (has_m3u) {
 			char rom_file[256];
@@ -236,7 +236,7 @@ void openRom(char* path, char* last) {
 
 	// NOTE: escapeSingleQuotes() modifies the passed string
 	// so we need to save the path before we call that
-	addRecent(recent_path, recent_alias); // yiiikes
+	addRecent(recent_path, state.recent_alias); // yiiikes
 	saveLast(last==NULL ? sd_path : last);
 	char act[256];
 	sprintf(act, "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));

@@ -67,7 +67,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | File | What it holds |
 |---|---|
 | `main.c` | startup and the main loop |
-| `state.c` | launcher-wide state shared between modules |
+| `state.c` | `LauncherState`, the launcher-wide state shared between modules |
 | `containers.c` | `Array`, `Hash` and `IntArray` |
 | `library.c` | entries, directories, recents, and the lists built from the card |
 | `launch.c` | handing off to games and paks, resume state, FN buttons |

@@ -42,11 +42,6 @@ SDL_Surface* tmpOldScreen;
 SDL_Surface* switcherSur;
 int ow;
 
-int qm_row;
-int qm_col;
-int qm_slot;
-int qm_shift;
-int qm_slots;
 
 int selected_row;
 float targetY;

@@ -1,41 +1,41 @@
 #include "launcher.h"
 
 static int canResume(void) {
-	return total>0 && can_resume;
+	return total>0 && state.can_resume;
 }
 static void resumeSelected(void) {
-	Entry* entry = top->entries->items[top->selected];
-	should_resume = 1;
+	Entry* entry = state.top->entries->items[state.top->selected];
+	state.should_resume = 1;
 	Entry_open(entry);
 
-	dirty = 1;
+	state.dirty = 1;
 }
 
 static int canOpen(void) {
 	return total>0;
 }
 static void openSelected(void) {
-	Entry* entry = top->entries->items[top->selected];
+	Entry* entry = state.top->entries->items[state.top->selected];
 	Entry_open(entry);
 	if(entry->type == ENTRY_DIR) {
-		animationdirection = SLIDE_LEFT;
-		total = top->entries->count;
+		state.animationdirection = SLIDE_LEFT;
+		total = state.top->entries->count;
 	}
-	dirty = 1;
+	state.dirty = 1;
 
-	if (total>0) readyResume(top->entries->items[top->selected]);
+	if (total>0) readyResume(state.top->entries->items[state.top->selected]);
 }
 
 static int canGoBack(void) {
-	return stack->count>1;
+	return state.stack->count>1;
 }
 static void goBack(void) {
 	closeDirectory();
-	animationdirection = SLIDE_RIGHT;
-	total = top->entries->count;
-	dirty = 1;
+	state.animationdirection = SLIDE_RIGHT;
+	total = state.top->entries->count;
+	state.dirty = 1;
 
-	if (total>0) readyResume(top->entries->items[top->selected]);
+	if (total>0) readyResume(state.top->entries->items[state.top->selected]);
 }
 
 static const Action resumeAction = { "gamelist.resume", "RESUME", canResume, resumeSelected };
@@ -60,18 +60,15 @@ void GameList_registerActions(void) {
 void GameList_handleInput(void) {
 	if (PAD_tappedMenu(now)) {
 		currentScreen = SCREEN_QUICKMENU;
-		qm_col = 0;
-		qm_row = 0;
-		qm_shift = 0;
-		qm_slot = 0;
-		dirty = 1;
+		QuickMenu_enter();
+		state.dirty = 1;
 		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
-		if (!HAS_POWER_BUTTON && !simple_mode) PWR_enableSleep();
+		if (!HAS_POWER_BUTTON && !state.simple_mode) PWR_enableSleep();
 	}
 	else if (PAD_tappedSelect(now)) {
 		currentScreen = SCREEN_GAMESWITCHER;
-		switcher_selected = 0;
-		dirty = 1;
+		state.switcher_selected = 0;
+		state.dirty = 1;
 	}
 	else if (total>0) {
 		if (PAD_justRepeated(BTN_UP)) {
@@ -83,12 +80,12 @@ void GameList_handleInput(void) {
 				if (selected<0) {
 					selected = total-1;
 					int start = total - MAIN_ROW_COUNT;
-					top->start = (start<0) ? 0 : start;
-					top->end = total;
+					state.top->start = (start<0) ? 0 : start;
+					state.top->end = total;
 				}
-				else if (selected<top->start) {
-					top->start -= 1;
-					top->end -= 1;
+				else if (selected<state.top->start) {
+					state.top->start -= 1;
+					state.top->end -= 1;
 				}
 			}
 		}
@@ -100,12 +97,12 @@ void GameList_handleInput(void) {
 				selected += 1;
 				if (selected>=total) {
 					selected = 0;
-					top->start = 0;
-					top->end = (total<MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
+					state.top->start = 0;
+					state.top->end = (total<MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
 				}
-				else if (selected>=top->end) {
-					top->start += 1;
-					top->end += 1;
+				else if (selected>=state.top->end) {
+					state.top->start += 1;
+					state.top->end += 1;
 				}
 			}
 		}
@@ -113,13 +110,13 @@ void GameList_handleInput(void) {
 			selected -= MAIN_ROW_COUNT;
 			if (selected<0) {
 				selected = 0;
-				top->start = 0;
-				top->end = (total<MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
+				state.top->start = 0;
+				state.top->end = (total<MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
 			}
-			else if (selected<top->start) {
-				top->start -= MAIN_ROW_COUNT;
-				if (top->start<0) top->start = 0;
-				top->end = top->start + MAIN_ROW_COUNT;
+			else if (selected<state.top->start) {
+				state.top->start -= MAIN_ROW_COUNT;
+				if (state.top->start<0) state.top->start = 0;
+				state.top->end = state.top->start + MAIN_ROW_COUNT;
 			}
 		}
 		else if (PAD_justRepeated(BTN_RIGHT)) {
@@ -127,52 +124,52 @@ void GameList_handleInput(void) {
 			if (selected>=total) {
 				selected = total-1;
 				int start = total - MAIN_ROW_COUNT;
-				top->start = (start<0) ? 0 : start;
-				top->end = total;
+				state.top->start = (start<0) ? 0 : start;
+				state.top->end = total;
 			}
-			else if (selected>=top->end) {
-				top->end += MAIN_ROW_COUNT;
-				if (top->end>total) top->end = total;
-				top->start = top->end - MAIN_ROW_COUNT;
+			else if (selected>=state.top->end) {
+				state.top->end += MAIN_ROW_COUNT;
+				if (state.top->end>total) state.top->end = total;
+				state.top->start = state.top->end - MAIN_ROW_COUNT;
 			}
 		}
 	}
 
 	if (PAD_justRepeated(BTN_L1) && !PAD_isPressed(BTN_R1) && !PWR_ignoreSettingInput(BTN_L1, show_setting)) { // previous alpha
-		Entry* entry = top->entries->items[selected];
+		Entry* entry = state.top->entries->items[selected];
 		int i = entry->alpha-1;
 		if (i>=0) {
-			selected = top->alphas->items[i];
+			selected = state.top->alphas->items[i];
 			if (total>MAIN_ROW_COUNT) {
-				top->start = selected;
-				top->end = top->start + MAIN_ROW_COUNT;
-				if (top->end>total) top->end = total;
-				top->start = top->end - MAIN_ROW_COUNT;
+				state.top->start = selected;
+				state.top->end = state.top->start + MAIN_ROW_COUNT;
+				if (state.top->end>total) state.top->end = total;
+				state.top->start = state.top->end - MAIN_ROW_COUNT;
 			}
 		}
 	}
 	else if (PAD_justRepeated(BTN_R1) && !PAD_isPressed(BTN_L1) && !PWR_ignoreSettingInput(BTN_R1, show_setting)) { // next alpha
-		Entry* entry = top->entries->items[selected];
+		Entry* entry = state.top->entries->items[selected];
 		int i = entry->alpha+1;
-		if (i<top->alphas->count) {
-			selected = top->alphas->items[i];
+		if (i<state.top->alphas->count) {
+			selected = state.top->alphas->items[i];
 			if (total>MAIN_ROW_COUNT) {
-				top->start = selected;
-				top->end = top->start + MAIN_ROW_COUNT;
-				if (top->end>total) top->end = total;
-				top->start = top->end - MAIN_ROW_COUNT;
+				state.top->start = selected;
+				state.top->end = state.top->start + MAIN_ROW_COUNT;
+				if (state.top->end>total) state.top->end = total;
+				state.top->start = state.top->end - MAIN_ROW_COUNT;
 			}
 		}
 	}
 
-	if (selected!=top->selected) {
-		top->selected = selected;
-		dirty = 1;
+	if (selected!=state.top->selected) {
+		state.top->selected = selected;
+		state.dirty = 1;
 	}
 
-	Entry* entry = top->entries->items[top->selected];
+	Entry* entry = state.top->entries->items[state.top->selected];
 
-	if (dirty && total>0)
+	if (state.dirty && total>0)
 		readyResume(entry);
 
 	Bindings_dispatch(bindings, BINDING_COUNT);
@@ -183,7 +180,7 @@ void GameList_handleInput(void) {
 // nothing.
 void GameList_update(void) {
 	// background and game art file path stuff
-	Entry* entry = top->entries->items[top->selected];
+	Entry* entry = state.top->entries->items[state.top->selected];
 	assert(entry);
 	char path_copy[1024];
 	strncpy(path_copy, entry->path, sizeof(path_copy) - 1);
@@ -194,7 +191,7 @@ void GameList_update(void) {
 	static int lastType = -1;
 
 	// this is only a choice on the root folder
-	list_show_entry_names = stack->count > 1 || CFG_getShowFolderNamesAtRoot();
+	list_show_entry_names = state.stack->count > 1 || CFG_getShowFolderNamesAtRoot();
 
 	// load folder background
 	char defaultBgPath[512];
@@ -252,10 +249,10 @@ void GameList_render(void) {
 	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
 	// Stock shows the resume hint whenever resume state is set, even in an
 	// empty folder where the action can't run, so this keeps its own check.
-	else if (can_resume) GFX_blitButtonGroup((char*[]){ (char*)bindings[0].glyph,TR(resumeAction.label),  NULL }, 0, screen, 0);
+	else if (state.can_resume) GFX_blitButtonGroup((char*[]){ (char*)bindings[0].glyph,TR(resumeAction.label),  NULL }, 0, screen, 0);
 	else GFX_blitButtonGroup((char*[]){
 		BTN_SLEEP==BTN_POWER?"POWER":"MENU",
-		TR(BTN_SLEEP==BTN_POWER||simple_mode?"SLEEP":"INFO"),
+		TR(BTN_SLEEP==BTN_POWER||state.simple_mode?"SLEEP":"INFO"),
 		NULL }, 0, screen, 0);
 
 	// back and open, whichever are available; the last one is primary
@@ -265,18 +262,18 @@ void GameList_render(void) {
 
 	// list
 	if (total > 0) {
-		selected_row = top->selected - top->start;
-		previousY = previous_row * PILL_SIZE;
+		selected_row = state.top->selected - state.top->start;
+		previousY = state.previous_row * PILL_SIZE;
 		targetY = selected_row * PILL_SIZE;
 		SDL_Color text_color = uintToColour(THEME_COLOR4_255); // list text color
-		for (int i = top->start, j = 0; i < top->end; i++, j++) {
-			Entry* entry = top->entries->items[i];
+		for (int i = state.top->start, j = 0; i < state.top->end; i++, j++) {
+			Entry* entry = state.top->entries->items[i];
 			char* entry_name = entry->name;
 			char* entry_unique = entry->unique;
 			int available_width = MAX(0,(had_thumb ? ox + SCALE1(BUTTON_MARGIN) : screen->w - SCALE1(BUTTON_MARGIN)) - SCALE1(PADDING * 2));
 			bool row_is_selected = (j == selected_row);
-			bool row_is_top = (i == top->start);
-			bool row_has_moved = (previous_row != selected_row || previous_depth != stack->count);
+			bool row_is_top = (i == state.top->start);
+			bool row_has_moved = (state.previous_row != selected_row || state.previous_depth != state.stack->count);
 			if (row_is_top && !(had_thumb))
 				available_width -= ow;
 
@@ -306,7 +303,7 @@ void GameList_render(void) {
 			if (row_is_selected) {
 				is_scrolling = list_show_entry_names && GFX_textShouldScroll(font.large,display_name, max_width - SCALE1(BUTTON_PADDING*2), fontMutex);
 				GFX_resetScrollText();
-				bool should_animate = previous_depth == stack->count;
+				bool should_animate = state.previous_depth == state.stack->count;
 				SDL_LockMutex(animMutex);
 				if(globalpill) {
 					SDL_FreeSurface(globalpill);
@@ -348,15 +345,15 @@ void GameList_render(void) {
 
 				GFX_flipHidden();
 				GFX_animateSurface(switcherSur,0,0,0,0-screen->h,screen->w,screen->h,CFG_getMenuTransitions() ? 100:20,255,255,LAYER_BACKGROUND);
-				animationdirection = ANIM_NONE;
+				state.animationdirection = ANIM_NONE;
 			}
 		}
 		if(lastScreen==SCREEN_OFF) {
 			GFX_animateSurfaceOpacity(blackBG,0,0,screen->w,screen->h,255,0,CFG_getMenuTransitions() ? 200:20,LAYER_THUMBNAIL);
 		}
 
-		previous_row = selected_row;
-		previous_depth = stack->count;
+		state.previous_row = selected_row;
+		state.previous_depth = state.stack->count;
 	}
 	else {
 		// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...

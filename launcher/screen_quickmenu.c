@@ -1,31 +1,54 @@
 #include "launcher.h"
 
+// cursor: row 0 is the top row of folders, row 1 the shortcuts and toggles
+static int qm_row;
+static int qm_col;
+// how the top row scrolls when it has more entries than fit
+static int qm_slot;
+static int qm_shift;
+static int qm_slots;
+
+void QuickMenu_setup(void) {
+	qm_row = 0;
+	qm_col = 0;
+	qm_slot = 0;
+	qm_shift = 0;
+	qm_slots = QUICK_SWITCHER_COUNT > state.quick->count ? state.quick->count : QUICK_SWITCHER_COUNT;
+}
+
+void QuickMenu_enter(void) {
+	qm_col = 0;
+	qm_row = 0;
+	qm_shift = 0;
+	qm_slot = 0;
+}
+
 void QuickMenu_handleInput(void) {
-	int qm_total = qm_row == 0 ? quick->count : quickActions->count;
+	int qm_total = qm_row == 0 ? state.quick->count : state.quickActions->count;
 
 	if (PAD_justPressed(BTN_B) || PAD_tappedMenu(now)) {
 		currentScreen = SCREEN_GAMELIST;
 		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
-		dirty = 1;
+		state.dirty = 1;
 	}
 	else if (PAD_justReleased(BTN_A)) {
-		Entry *selected = qm_row == 0 ? quick->items[qm_col] : quickActions->items[qm_col];
+		Entry *selected = qm_row == 0 ? state.quick->items[qm_col] : state.quickActions->items[qm_col];
 		if(selected->type != ENTRY_DIP) {
 			currentScreen = SCREEN_GAMELIST;
-			total = top->entries->count;
+			total = state.top->entries->count;
 			// prevent restoring list state, game list screen currently isnt our nav origin
-			top->selected = 0;
-			top->start = 0;
-			top->end = top->start + MAIN_ROW_COUNT;
-			restore_depth = -1;
-			restore_relative = -1;
-			restore_selected = 0;
-			restore_start = 0;
-			restore_end = 0;
+			state.top->selected = 0;
+			state.top->start = 0;
+			state.top->end = state.top->start + MAIN_ROW_COUNT;
+			state.restore_depth = -1;
+			state.restore_relative = -1;
+			state.restore_selected = 0;
+			state.restore_start = 0;
+			state.restore_end = 0;
 		}
 		Entry_open(selected);
-		if (top->entries->count > 0) readyResume(top->entries->items[top->selected]);
-		dirty = 1;
+		if (state.top->entries->count > 0) readyResume(state.top->entries->items[state.top->selected]);
+		state.dirty = 1;
 	}
 	else if (PAD_justPressed(BTN_RIGHT)) {
 		if(qm_row == 0 && qm_total > qm_slots) {
@@ -49,7 +72,7 @@ void QuickMenu_handleInput(void) {
 				qm_col = 0;
 			}
 		}
-		dirty = 1;
+		state.dirty = 1;
 	}
 	else if (PAD_justPressed(BTN_LEFT)) {
 		if(qm_row == 0  && qm_total > qm_slots) {
@@ -73,20 +96,20 @@ void QuickMenu_handleInput(void) {
 				qm_col = qm_total - 1;
 			}
 		}
-		dirty = 1;
+		state.dirty = 1;
 	}
 	else if(PAD_justPressed(BTN_DOWN)) {
 		if(qm_row == 0) {
 			qm_row = 1;
 			qm_col = 0;
-			dirty = 1;
+			state.dirty = 1;
 		}
 	}
 	else if(PAD_justPressed(BTN_UP)) {
 		if(qm_row == 1) {
 			qm_row = 0;
 			qm_col = qm_slot + qm_shift;
-			dirty = 1;
+			state.dirty = 1;
 		}
 	}
 }
@@ -94,7 +117,7 @@ void QuickMenu_handleInput(void) {
 // Picks and starts loading the selected tile's background. Draws nothing;
 // the loaded image is drawn by main()'s background flush.
 void QuickMenu_update(void) {
-	Entry *current = qm_row == 0 ? quick->items[qm_col] : quickActions->items[qm_col];
+	Entry *current = qm_row == 0 ? state.quick->items[qm_col] : state.quickActions->items[qm_col];
 	char newBgPath[MAX_PATH];
 	char fallbackBgPath[MAX_PATH];
 
@@ -155,10 +178,10 @@ void QuickMenu_render(void) {
 		// just to keep selection visible.
 		// every display should be able to fit three items, we shift horizontally to accomodate.
 		ox -= qm_shift * (item_size + SCALE1(MENU_ITEM_MARGIN));
-		for (int c = 0; c < quick->count; c++)
+		for (int c = 0; c < state.quick->count; c++)
 		{
 			SDL_Rect item_rect = {ox, oy, item_size, item_size};
-			Entry *item = quick->items[c];
+			Entry *item = state.quick->items[c];
 
 			SDL_Color text_color = uintToColour(THEME_COLOR4_255);
 			uint32_t item_color = THEME_COLOR3;
@@ -202,11 +225,11 @@ void QuickMenu_render(void) {
 
 		// secondary
 		ox = SCALE1(PADDING + MENU_MARGIN_X);
-		ox += (screen->w - SCALE1(PADDING + MENU_MARGIN_X + MENU_MARGIN_X + PADDING) - SCALE1(quickActions->count * PILL_SIZE) - SCALE1((quickActions->count - 1) * MENU_TOGGLE_MARGIN))/2;
+		ox += (screen->w - SCALE1(PADDING + MENU_MARGIN_X + MENU_MARGIN_X + PADDING) - SCALE1(state.quickActions->count * PILL_SIZE) - SCALE1((state.quickActions->count - 1) * MENU_TOGGLE_MARGIN))/2;
 		oy = SCALE1(PADDING + PILL_SIZE + BUTTON_MARGIN + MENU_MARGIN_Y + MENU_LINE_MARGIN) + item_size + item_extra_y / 2;
-		for (int c = 0; c < quickActions->count; c++) {
+		for (int c = 0; c < state.quickActions->count; c++) {
 			SDL_Rect item_rect = {ox, oy, SCALE1(PILL_SIZE), SCALE1(PILL_SIZE)};
-			Entry *item = quickActions->items[c];
+			Entry *item = state.quickActions->items[c];
 
 			SDL_Color text_color = uintToColour(THEME_COLOR4_255);
 			uint32_t item_color = THEME_COLOR3;

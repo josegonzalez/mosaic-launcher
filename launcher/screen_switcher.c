@@ -3,42 +3,42 @@
 void Switcher_handleInput(void) {
 	if (PAD_justPressed(BTN_B) || PAD_tappedSelect(now)) {
 		currentScreen = SCREEN_GAMELIST;
-		switcher_selected = 0;
-		dirty = 1;
+		state.switcher_selected = 0;
+		state.dirty = 1;
 		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
 	}
-	else if (recents->count > 0 && PAD_justReleased(BTN_A)) {
+	else if (state.recents->count > 0 && PAD_justReleased(BTN_A)) {
 		// this will drop us back into game switcher after leaving the game
 		putFile(GAME_SWITCHER_PERSIST_PATH, "unused");
-		startgame = 1;
-		Entry *selectedEntry = entryFromRecent(recents->items[switcher_selected]);
-		should_resume = can_resume;
+		state.startgame = 1;
+		Entry *selectedEntry = entryFromRecent(state.recents->items[state.switcher_selected]);
+		state.should_resume = state.can_resume;
 		Entry_open(selectedEntry);
-		dirty = 1;
+		state.dirty = 1;
 		Entry_free(selectedEntry);
 	}
-	else if (recents->count > 0 && PAD_justReleased(BTN_Y)) {
+	else if (state.recents->count > 0 && PAD_justReleased(BTN_Y)) {
 		// remove
-		Recent* recentEntry = recents->items[switcher_selected--];
-		Array_remove(recents, recentEntry);
+		Recent* recentEntry = state.recents->items[state.switcher_selected--];
+		Array_remove(state.recents, recentEntry);
 		Recent_free(recentEntry);
 		saveRecents();
-		if(switcher_selected < 0)
-			switcher_selected = recents->count - 1; // wrap
-		dirty = 1;
+		if(state.switcher_selected < 0)
+			state.switcher_selected = state.recents->count - 1; // wrap
+		state.dirty = 1;
 	}
 	else if (PAD_justPressed(BTN_RIGHT)) {
-		switcher_selected++;
-		if(switcher_selected == recents->count)
-			switcher_selected = 0; // wrap
-		dirty = 1;
+		state.switcher_selected++;
+		if(state.switcher_selected == state.recents->count)
+			state.switcher_selected = 0; // wrap
+		state.dirty = 1;
 		gsanimdir = SLIDE_LEFT;
 	}
 	else if (PAD_justPressed(BTN_LEFT)) {
-		switcher_selected--;
-		if(switcher_selected < 0)
-			switcher_selected = recents->count - 1; // wrap
-		dirty = 1;
+		state.switcher_selected--;
+		if(state.switcher_selected < 0)
+			state.switcher_selected = state.recents->count - 1; // wrap
+		state.dirty = 1;
 		gsanimdir = SLIDE_RIGHT;
 	}
 }
@@ -49,8 +49,8 @@ void Switcher_update(void) {
 	ox = 0;
 	oy = 0;
 
-	if(recents->count > 0) {
-		Entry *selectedEntry = entryFromRecent(recents->items[switcher_selected]);
+	if(state.recents->count > 0) {
+		Entry *selectedEntry = entryFromRecent(state.recents->items[state.switcher_selected]);
 		readyResume(selectedEntry);
 		Entry_free(selectedEntry);
 	}
@@ -60,8 +60,8 @@ void Switcher_render(void) {
 	GFX_clearLayers(LAYER_ALL);
 
 	// For all recents with resumable state (i.e. has savegame), show game switcher carousel
-	if(recents->count > 0) {
-		Entry *selectedEntry = entryFromRecent(recents->items[switcher_selected]);
+	if(state.recents->count > 0) {
+		Entry *selectedEntry = entryFromRecent(state.recents->items[state.switcher_selected]);
 		// title pill
 		{
 			int max_width = screen->w - SCALE1(PADDING * 2) - ow;
@@ -96,13 +96,13 @@ void Switcher_render(void) {
 
 		GFX_blitButtonGroup((char*[]){ "B",TR("BACK"),  NULL }, 0, screen, 0);
 
-		if(can_resume) GFX_blitButtonGroup((char*[]){ "Y", TR("REMOVE"), "A",TR("RESUME"), NULL }, 1, screen, 1);
+		if(state.can_resume) GFX_blitButtonGroup((char*[]){ "Y", TR("REMOVE"), "A",TR("RESUME"), NULL }, 1, screen, 1);
 		else GFX_blitButtonGroup((char*[]){ "A",TR("OPEN"), NULL }, 1, screen, 1);
 
-		if(has_preview) {
+		if(state.has_preview) {
 			// lotta memory churn here
 
-			SDL_Surface* bmp = IMG_Load(preview_path);
+			SDL_Surface* bmp = IMG_Load(state.preview_path);
 			SDL_Surface* raw_preview = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);
 			if (raw_preview) {
 				SDL_FreeSurface(bmp);

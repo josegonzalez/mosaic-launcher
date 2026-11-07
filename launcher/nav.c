@@ -134,28 +134,28 @@ void openDirectory(char* path, int auto_launch) {
 	}
 
 	// If this is the exact same directory for some reason, just return.
-	if(top && strcmp(top->path, path) == 0)
+	if(state.top && strcmp(state.top->path, path) == 0)
 		return;
 
 	// If this path is a direct subdirectory of top, push it on top of the stack
 	// If it isnt, we need to recreate the stack to keep navigation consistent
-	if(!top || isDirectSubdirectory(top, path)) {
+	if(!state.top || isDirectSubdirectory(state.top, path)) {
 		int selected = 0;
 		int start = 0;
 		int end = 0;
-		if (top && top->entries->count>0) {
-			if (restore_depth==stack->count && top->selected==restore_relative) {
-				selected = restore_selected;
-				start = restore_start;
-				end = restore_end;
+		if (state.top && state.top->entries->count>0) {
+			if (state.restore_depth==state.stack->count && state.top->selected==state.restore_relative) {
+				selected = state.restore_selected;
+				start = state.restore_start;
+				end = state.restore_end;
 			}
 		}
 
-		top = Directory_new(path, selected);
-		top->start = start;
-		top->end = end ? end : ((top->entries->count<MAIN_ROW_COUNT) ? top->entries->count : MAIN_ROW_COUNT);
+		state.top = Directory_new(path, selected);
+		state.top->start = start;
+		state.top->end = end ? end : ((state.top->entries->count<MAIN_ROW_COUNT) ? state.top->entries->count : MAIN_ROW_COUNT);
 
-		Array_push(stack, top);
+		Array_push(state.stack, state.top);
 	}
 	else {
 		// keep a copy of path, which might be a reference into stack which is about to be freed
@@ -163,21 +163,21 @@ void openDirectory(char* path, int auto_launch) {
 		strcpy(temp_path, path);
 
 		// construct a fresh stack by walking upwards until SDCARD_ROOT
-		DirectoryArray_free(stack);
+		DirectoryArray_free(state.stack);
 
-		stack = pathToStack(temp_path);
-		top = stack->items[stack->count - 1];
+		state.stack = pathToStack(temp_path);
+		state.top = state.stack->items[state.stack->count - 1];
 	}
 }
 
 void closeDirectory(void) {
-	restore_selected = top->selected;
-	restore_start = top->start;
-	restore_end = top->end;
-	DirectoryArray_pop(stack);
-	restore_depth = stack->count;
-	top = stack->items[stack->count-1];
-	restore_relative = top->selected;
+	state.restore_selected = state.top->selected;
+	state.restore_start = state.top->start;
+	state.restore_end = state.top->end;
+	DirectoryArray_pop(state.stack);
+	state.restore_depth = state.stack->count;
+	state.top = state.stack->items[state.stack->count-1];
+	state.restore_relative = state.top->selected;
 }
 void toggleQuick(Entry* self)
 {
@@ -188,11 +188,11 @@ void toggleQuick(Entry* self)
 }
 
 void Entry_open(Entry* self) {
-	recent_alias = self->name;  // yiiikes
+	state.recent_alias = self->name;  // yiiikes
 	if (self->type==ENTRY_ROM) {
-		startgame = 1;
+		state.startgame = 1;
 		char *last = NULL;
-		if (prefixMatch(COLLECTIONS_PATH, top->path)) {
+		if (prefixMatch(COLLECTIONS_PATH, state.top->path)) {
 			char* tmp;
 			char filename[256];
 
@@ -200,13 +200,13 @@ void Entry_open(Entry* self) {
 			if (tmp) strcpy(filename, tmp+1);
 
 			char last_path[256];
-			sprintf(last_path, "%s/%s", top->path, filename);
+			sprintf(last_path, "%s/%s", state.top->path, filename);
 			last = last_path;
 		}
 		openRom(self->path, last);
 	}
 	else if (self->type==ENTRY_PAK) {
-		startgame = 1;
+		state.startgame = 1;
 		openPak(self->path);
 	}
 	else if (self->type==ENTRY_DIR) {
@@ -218,7 +218,7 @@ void Entry_open(Entry* self) {
 }
 void saveLast(char* path) {
 	// special case for recently played
-	if (exactMatch(top->path, FAUX_RECENT_PATH)) {
+	if (exactMatch(state.top->path, FAUX_RECENT_PATH)) {
 		// NOTE: that we don't have to save the file because
 		// your most recently played game will always be at
 		// the top which is also the default selection
@@ -259,18 +259,18 @@ void loadLast(void) { // call after loading root directory
 				if (tmp) tmp[1] = '\0'; // 1 because we want to keep the opening parenthesis to avoid collating "Game Boy Color" and "Game Boy Advance" into "Game Boy"
 			}
 
-			for (int i=0; i<top->entries->count; i++) {
-				Entry* entry = top->entries->items[i];
+			for (int i=0; i<state.top->entries->count; i++) {
+				Entry* entry = state.top->entries->items[i];
 
 				// NOTE: strlen() is required for collated_path, '\0' wasn't reading as NULL for some reason
 				if (exactMatch(entry->path, path) || (strlen(collated_path) && prefixMatch(collated_path, entry->path)) || (prefixMatch(COLLECTIONS_PATH, full_path) && suffixMatch(filename, entry->path))) {
-					top->selected = i;
-					if (i>=top->end) {
-						top->start = i;
-						top->end = top->start + MAIN_ROW_COUNT;
-						if (top->end>top->entries->count) {
-							top->end = top->entries->count;
-							top->start = top->end - MAIN_ROW_COUNT;
+					state.top->selected = i;
+					if (i>=state.top->end) {
+						state.top->start = i;
+						state.top->end = state.top->start + MAIN_ROW_COUNT;
+						if (state.top->end>state.top->entries->count) {
+							state.top->end = state.top->entries->count;
+							state.top->start = state.top->end - MAIN_ROW_COUNT;
 						}
 					}
 					if (last->count==0 && !exactMatch(entry->path, FAUX_RECENT_PATH) && !(!exactMatch(entry->path, COLLECTIONS_PATH) && prefixMatch(COLLECTIONS_PATH, entry->path))) break; // don't show contents of auto-launch dirs
@@ -287,23 +287,23 @@ void loadLast(void) { // call after loading root directory
 
 	StringArray_free(last);
 
-	if (top->selected >= 0 && top->selected < top->entries->count) {
-		Entry *selected_entry = top->entries->items[top->selected];
+	if (state.top->selected >= 0 && state.top->selected < state.top->entries->count) {
+		Entry *selected_entry = state.top->entries->items[state.top->selected];
 		readyResume(selected_entry);
 	}
 }
 void QuickMenu_init(void) {
-	quick = getQuickEntries();
-	quickActions = getQuickToggles();
+	state.quick = getQuickEntries();
+	state.quickActions = getQuickToggles();
 }
 void QuickMenu_quit(void) {
-	EntryArray_free(quick);
-	EntryArray_free(quickActions);
+	EntryArray_free(state.quick);
+	EntryArray_free(state.quickActions);
 }
 
 void Menu_init(void) {
-	stack = Array_new(); // array of open Directories
-	recents = Array_new();
+	state.stack = Array_new(); // array of open Directories
+	state.recents = Array_new();
 
 	openDirectory(SDCARD_PATH, 0);
 	loadLast(); // restore state when available
@@ -311,8 +311,8 @@ void Menu_init(void) {
 	QuickMenu_init(); // needs Menu_init
 }
 void Menu_quit(void) {
-	RecentArray_free(recents);
-	DirectoryArray_free(stack);
+	RecentArray_free(state.recents);
+	DirectoryArray_free(state.stack);
 
 	QuickMenu_quit();
 }

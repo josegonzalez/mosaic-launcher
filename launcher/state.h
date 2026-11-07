@@ -1,38 +1,47 @@
 #ifndef STATE_H
 #define STATE_H
 
-// Launcher-wide state shared between modules. Defined in state.c.
+// Launcher-wide state shared between modules, in one place. Defined in
+// state.c. Screen-local state lives in screens.h.
 
 #include "containers.h"
 #include "library.h"
 
-extern char* recent_alias; // yiiikes
+typedef struct LauncherState {
+	char* recent_alias; // yiiikes
 
-extern Directory* top;
-extern Array* stack; // DirectoryArray
-extern Array* recents; // RecentArray
-extern Array* quick; // EntryArray
-extern Array* quickActions; // EntryArray
+	// what's open
+	Directory* top;
+	Array* stack; // DirectoryArray
+	Array* recents; // RecentArray
+	Array* quick; // EntryArray
+	Array* quickActions; // EntryArray
 
-extern int quit;
-extern int can_resume;
-extern int should_resume; // set to 1 on BTN_RESUME but only if can_resume==1
-extern int has_preview;
-extern int simple_mode;
-extern int switcher_selected;
-extern char slot_path[256];
-extern char preview_path[256];
-extern int animationdirection;
+	int quit;
+	int simple_mode;
+	int switcher_selected;
 
-extern int restore_depth;
-extern int restore_relative;
-extern int restore_selected;
-extern int restore_start;
-extern int restore_end;
-extern int startgame;
+	// resume state for the selected entry, from readyResume()
+	int can_resume;
+	int should_resume; // set to 1 on BTN_RESUME but only if can_resume==1
+	int has_preview;
+	char slot_path[256];
+	char preview_path[256];
 
-extern int dirty;
-extern int previous_row;
-extern int previous_depth;
+	// where to put the selection back after closing a folder
+	int restore_depth;
+	int restore_relative;
+	int restore_selected;
+	int restore_start;
+	int restore_end;
+
+	int startgame;
+	int animationdirection;
+	int dirty;
+	int previous_row;
+	int previous_depth;
+} LauncherState;
+
+extern LauncherState state;
 
 #endif

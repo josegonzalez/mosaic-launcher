@@ -26,6 +26,8 @@ const Screen* Screen_get(int id);
 void Screens_init(void);
 void GameList_registerActions(void);
 
+void QuickMenu_setup(void); // once, after Menu_init
+void QuickMenu_enter(void); // puts the cursor back on the first tile
 void QuickMenu_handleInput(void);
 void QuickMenu_update(void);
 void QuickMenu_render(void);
@@ -52,12 +54,6 @@ extern SDL_Surface* tmpOldScreen;
 extern SDL_Surface* switcherSur;
 extern int ow;
 
-// quick menu
-extern int qm_row;
-extern int qm_col;
-extern int qm_slot;
-extern int qm_shift;
-extern int qm_slots;
 
 // game list
 extern int selected_row;

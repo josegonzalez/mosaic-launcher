@@ -288,8 +288,8 @@ void RecentArray_free(Array* self) {
 void saveRecents(void) {
 	FILE* file = fopen(RECENT_PATH, "w");
 	if (file) {
-		for (int i=0; i<recents->count; i++) {
-			Recent* recent = recents->items[i];
+		for (int i=0; i<state.recents->count; i++) {
+			Recent* recent = state.recents->items[i];
 			fputs(recent->path, file);
 			if (recent->alias) {
 				fputs("\t", file);
@@ -302,18 +302,18 @@ void saveRecents(void) {
 }
 void addRecent(char* path, char* alias) {
 	path += strlen(SDCARD_PATH); // makes paths platform agnostic
-	int id = RecentArray_indexOf(recents, path);
+	int id = RecentArray_indexOf(state.recents, path);
 	if (id==-1) { // add
-		while (recents->count>=MAX_RECENTS) {
-			Recent_free(Array_pop(recents));
+		while (state.recents->count>=MAX_RECENTS) {
+			Recent_free(Array_pop(state.recents));
 		}
-		Array_unshift(recents, Recent_new(path, alias));
+		Array_unshift(state.recents, Recent_new(path, alias));
 	}
 	else if (id>0) { // bump to top
 		for (int i=id; i>0; i--) {
-			void* tmp = recents->items[i-1];
-			recents->items[i-1] = recents->items[i];
-			recents->items[i] = tmp;
+			void* tmp = state.recents->items[i-1];
+			state.recents->items[i-1] = state.recents->items[i];
+			state.recents->items[i] = tmp;
 		}
 	}
 	saveRecents();
@@ -386,8 +386,8 @@ int hasM3u(char* rom_path, char* m3u_path) { // NOTE: rom_path not dir_path
 int hasRecents(void) {
 	LOG_info("hasRecents %s\n", RECENT_PATH);
 	int has = 0;
-	RecentArray_free(recents);
-	recents = Array_new();
+	RecentArray_free(state.recents);
+	state.recents = Array_new();
 
 	Array* parent_paths = Array_new();
 	if (exists(CHANGE_DISC_PATH)) {
@@ -397,7 +397,7 @@ int hasRecents(void) {
 			char* disc_path = sd_path + strlen(SDCARD_PATH); // makes path platform agnostic
 			Recent* recent = Recent_new(disc_path, NULL);
 			if (recent->available) has += 1;
-			Array_push(recents, recent);
+			Array_push(state.recents, recent);
 
 			char parent_path[256];
 			strcpy(parent_path, disc_path);
@@ -429,7 +429,7 @@ int hasRecents(void) {
 			char sd_path[256];
 			sprintf(sd_path, "%s%s", SDCARD_PATH, path);
 			if (exists(sd_path)) {
-				if (recents->count<MAX_RECENTS) {
+				if (state.recents->count<MAX_RECENTS) {
 					// this logic replaces an existing disc from a multi-disc game with the last used
 					char m3u_path[256];
 					if (hasM3u(sd_path, m3u_path)) { // TODO: this might tank launch speed
@@ -455,7 +455,7 @@ int hasRecents(void) {
 
 					Recent* recent = Recent_new(path, alias);
 					if (recent->available) has += 1;
-					Array_push(recents, recent);
+					Array_push(state.recents, recent);
 				}
 			}
 		}
@@ -616,7 +616,7 @@ Array* getQuickEntries(void) {
 	Array* entries = Array_new();
 
 	// We assume Menu_init was already called and populated this
-	if (recents && recents->count)
+	if (state.recents && state.recents->count)
 		Array_push(entries, Entry_newNamed(FAUX_RECENT_PATH, ENTRY_DIR, "Recents"));
 
 	if (hasCollections())
@@ -626,7 +626,7 @@ Array* getQuickEntries(void) {
 	Array_push(entries, Entry_newNamed(ROMS_PATH, ENTRY_DIR, "Games"));
 
 	// Add tools if applicable
-    if (hasTools() && !simple_mode) {
+    if (hasTools() && !state.simple_mode) {
 		char tools_path[256];
 		snprintf(tools_path, sizeof(tools_path), "%s/Tools/%s", SDCARD_PATH, PLATFORM);
         Array_push(entries, Entry_new(tools_path, ENTRY_DIR));
@@ -661,7 +661,7 @@ Array* getRoot(void) {
 	Array_yoink(root, entries);
 
 	// Add tools if applicable
-    if (hasTools() && CFG_getShowTools() && !simple_mode) {
+    if (hasTools() && CFG_getShowTools() && !state.simple_mode) {
 		char tools_path[256];
 		snprintf(tools_path, sizeof(tools_path), "%s/Tools/%s", SDCARD_PATH, PLATFORM);
         Array_push(root, Entry_new(tools_path, ENTRY_DIR));
@@ -688,8 +688,8 @@ Entry* entryFromRecent(Recent* recent)
 
 Array* getRecents(void) {
 	Array* entries = Array_new();
-	for (int i=0; i<recents->count; i++) {
-		Recent *recent = recents->items[i];
+	for (int i=0; i<state.recents->count; i++) {
+		Recent *recent = state.recents->items[i];
 		Entry *entry = entryFromRecent(recent);
 		if(entry)
 			Array_push(entries, entry);

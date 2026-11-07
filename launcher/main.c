@@ -7,7 +7,7 @@ int main (int argc, char *argv[]) {
 
 	if (autoResume()) return 0; // nothing to do
 
-	simple_mode = exists(SIMPLE_MODE_PATH);
+	state.simple_mode = exists(SIMPLE_MODE_PATH);
 
 	LOG_info("NextUI\n");
 	InitSettings();
@@ -19,18 +19,14 @@ int main (int argc, char *argv[]) {
 	// LOG_info("- input init: %lu\n", SDL_GetTicks() - main_begin);
 	VIB_init();
 	PWR_init();
-	if (!HAS_POWER_BUTTON && !simple_mode) PWR_disableSleep();
+	if (!HAS_POWER_BUTTON && !state.simple_mode) PWR_disableSleep();
 	// LOG_info("- power init: %lu\n", SDL_GetTicks() - main_begin);
 
 	// start my threaded image loader :D
 	initImageLoaderPool();
 	Menu_init();
 	Screens_init();
-	qm_row = 0;
-	qm_col = 0;
-	qm_slot = 0;
-	qm_shift = 0;
-	qm_slots = QUICK_SWITCHER_COUNT > quick->count ? quick->count : QUICK_SWITCHER_COUNT;
+	QuickMenu_setup();
 	// LOG_info("- menu init: %lu\n", SDL_GetTicks() - main_begin);
 
 	lastScreen = SCREEN_OFF;
@@ -61,7 +57,7 @@ int main (int argc, char *argv[]) {
     int had_bt = PLAT_btIsConnected();
 	int had_sink = GetAudioSink();
 
-	selected_row = top->selected - top->start;
+	selected_row = state.top->selected - state.top->start;
 	is_scrolling = 0;
 	list_show_entry_names = true;
 
@@ -76,16 +72,16 @@ int main (int argc, char *argv[]) {
 	SDL_UnlockMutex(animMutex);
 
 	//LOG_info("Start time time %ims\n",SDL_GetTicks());
-	while (!quit) {
+	while (!state.quit) {
 		GFX_startFrame();
 		now = SDL_GetTicks();
 
 		PAD_poll();
 
-		selected = top->selected;
-		total = top->entries->count;
+		selected = state.top->selected;
+		total = state.top->entries->count;
 
-		PWR_update(&dirty, &show_setting, NULL, NULL);
+		PWR_update(&state.dirty, &show_setting, NULL, NULL);
 
 		// user-assignable buttons, handled before the per-screen input so they work
 		// from the game list, the game switcher and the quick menu alike.
@@ -98,28 +94,28 @@ int main (int argc, char *argv[]) {
 
 		int is_online = PWR_isOnline();
 		if (was_online!=is_online)
-			dirty = 1;
+			state.dirty = 1;
 		was_online = is_online;
 
         int has_bt = PLAT_btIsConnected();
         if (had_bt != has_bt)
-            dirty = 1;
+            state.dirty = 1;
         had_bt = has_bt;
 
 		int has_sink = GetAudioSink();
 		if (had_sink != has_sink)
-			dirty = 1;
+			state.dirty = 1;
 		had_sink = has_sink;
 
 		gsanimdir = ANIM_NONE;
 
 		Screen_get(currentScreen)->handleInput();
 
-		if(dirty) {
+		if(state.dirty) {
 			tmpOldScreen = NULL;
 			switcherSur = NULL;
 			// NOTE:22 This causes slowdown when CFG_getMenuTransitions is set to false because animationdirection turns > 0 somewhere but is never set back to 0 and so this code runs on every action, will fix later
-			if(animationdirection != ANIM_NONE || (lastScreen==SCREEN_GAMELIST && currentScreen == SCREEN_GAMESWITCHER)) {
+			if(state.animationdirection != ANIM_NONE || (lastScreen==SCREEN_GAMELIST && currentScreen == SCREEN_GAMESWITCHER)) {
 				if(tmpOldScreen) SDL_FreeSurface(tmpOldScreen);
 				tmpOldScreen = GFX_captureRendererToSurface();
 				SDL_SetSurfaceBlendMode(tmpOldScreen,SDL_BLENDMODE_BLEND);
@@ -145,16 +141,16 @@ int main (int argc, char *argv[]) {
 
 			ow = GFX_blitHardwareGroup(screen, show_setting);
 			const Screen* active = Screen_get(currentScreen);
-			if (startgame && !active->rendersWhileLaunching) LaunchFade_render();
+			if (state.startgame && !active->rendersWhileLaunching) LaunchFade_render();
 			else {
 				if (active->update) active->update();
 				active->render();
 			}
 
-			if(animationdirection != ANIM_NONE) {
-				if(CFG_getMenuTransitions()) Transition_slide(tmpOldScreen, animationdirection);
+			if(state.animationdirection != ANIM_NONE) {
+				if(CFG_getMenuTransitions()) Transition_slide(tmpOldScreen, state.animationdirection);
 				// animation done
-				animationdirection = ANIM_NONE;
+				state.animationdirection = ANIM_NONE;
 			}
 
 			if(lastScreen == SCREEN_QUICKMENU) {
@@ -215,10 +211,10 @@ int main (int argc, char *argv[]) {
 				}
 				SDL_UnlockMutex(animMutex);
 			}
-			if(!startgame) // dont flip if game gonna start
+			if(!state.startgame) // dont flip if game gonna start
 				GFX_flip(screen);
 
-			dirty = 0;
+			state.dirty = 0;
 		} else if(getAnimationDraw() || folderbgchanged || thumbchanged || is_scrolling) {
 			// honestly this whole thing is here only for the scrolling text, I set it now to run this at 30fps which is enough for scrolling text, should move this to seperate animation function eventually
 			Uint32 now = SDL_GetTicks();
@@ -273,7 +269,7 @@ int main (int argc, char *argv[]) {
 			if (currentScreen != SCREEN_GAMESWITCHER && currentScreen != SCREEN_QUICKMENU) {
 				if(is_scrolling && pillanimdone && currentAnimQueueSize < 1) {
 					int ow = GFX_blitHardwareGroup(screen, show_setting);
-					Entry* entry = top->entries->items[top->selected];
+					Entry* entry = state.top->entries->items[state.top->selected];
 					trimSortingMeta(&entry->name);
 					char* entry_text = entry->name;
 					if (entry->unique) {
@@ -282,7 +278,7 @@ int main (int argc, char *argv[]) {
 					}
 
 					int available_width = (had_thumb ? ox + SCALE1(BUTTON_MARGIN) : screen->w - SCALE1(BUTTON_MARGIN)) - SCALE1(PADDING * 2);
-					if (top->selected == top->start && !had_thumb) available_width -= ow;
+					if (state.top->selected == state.top->start && !had_thumb) available_width -= ow;
 
 					SDL_Color text_color = uintToColour(THEME_COLOR5_255);
 
@@ -295,7 +291,7 @@ int main (int argc, char *argv[]) {
 						GFX_scrollTextTexture(
 							font.large,
 							entry_text,
-							SCALE1(BUTTON_MARGIN + BUTTON_PADDING), SCALE1(PADDING + previous_row * PILL_SIZE) + text_offset_y,
+							SCALE1(BUTTON_MARGIN + BUTTON_PADDING), SCALE1(PADDING + state.previous_row * PILL_SIZE) + text_offset_y,
 							max_width - SCALE1(BUTTON_PADDING * 2),
 							0,
 							text_color,
@@ -319,7 +315,7 @@ int main (int argc, char *argv[]) {
 			else {
 				GFX_sync();
 			}
-			dirty = 0;
+			state.dirty = 0;
 		}
 		else {
 			// want to draw only if needed
@@ -344,7 +340,7 @@ int main (int argc, char *argv[]) {
 
 		// animation does not carry over between loops, this should only ever be set by
 		// input handling and directly consumed by the following render pass
-		assert(animationdirection == ANIM_NONE);
+		assert(state.animationdirection == ANIM_NONE);
 
 		// handle HDMI change
 		static int had_hdmi = -1;
@@ -353,11 +349,11 @@ int main (int argc, char *argv[]) {
 		if (has_hdmi!=had_hdmi) {
 			had_hdmi = has_hdmi;
 
-			Entry* entry = top->entries->items[top->selected];
+			Entry* entry = state.top->entries->items[state.top->selected];
 			LOG_info("restarting after HDMI change... (%s)\n", entry->path);
 			saveLast(entry->path); // NOTE: doesn't work in Recents (by design)
 			sleep(1); // cable-seating debounce; the output switch itself happens at next app start
-			quit = 1;
+			state.quit = 1;
 		}
 	}
 

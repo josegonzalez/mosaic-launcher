@@ -252,7 +252,7 @@ static void test_root_promotes_collections_without_consoles(void) {
 }
 
 int main(void) {
-	recents = Array_new();
+	state.recents = Array_new();
 	test_root_orders_collections_consoles_tools();
 	test_root_promotes_collections_without_consoles();
 	test_console_folder_sorted_and_hidden_files_skipped();

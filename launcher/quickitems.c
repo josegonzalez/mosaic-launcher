@@ -2,7 +2,7 @@
 
 static int wifiSupported(void) { return WIFI_supported(); }
 static int bluetoothSupported(void) { return BT_supported(); }
-static int sleepSupported(void) { return PLAT_supportsDeepSleep() && !simple_mode; }
+static int sleepSupported(void) { return PLAT_supportsDeepSleep() && !state.simple_mode; }
 
 static int wifiOn(void) { return CFG_getWifi(); }
 static int bluetoothOn(void) { return CFG_getBluetooth(); }
