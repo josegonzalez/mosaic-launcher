@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -129,6 +129,12 @@ CLEAR_RECENTS := ../../plugins/clear-recents
 $(BUILD)/test_clear_recents: test_clear_recents.c $(wildcard $(CLEAR_RECENTS)/*.c) $(SDK)/mosaic_plugin.h check.h
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) test_clear_recents.c -o $@
+
+GAME_ACTIONS := ../../plugins/game-actions
+
+$(BUILD)/test_game_actions: test_game_actions.c $(wildcard $(GAME_ACTIONS)/*.c $(GAME_ACTIONS)/*.h) $(SDK)/nextui_plugin.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_SDCARD_PATH=\"$(BUILD)/game-actions-card\" test_game_actions.c $(GAME_ACTIONS)/actions_model.c -o $@
 
 clean:
 	rm -rf $(BUILD)

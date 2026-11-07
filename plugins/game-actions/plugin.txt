@@ -1,0 +1,10 @@
+id=game-actions
+name=Game actions
+api=1
+# the game list button for rename, delete and add to collection, shared with other plugins' actions on it
+setting.button=choice|Game actions button|Y|Y,L2,R2
+setting.rename=toggle|Rename|on
+setting.delete=toggle|Delete game|on
+setting.collections=toggle|Add to collection|on
+# off keeps a deleted game's saves, states and emulator settings
+setting.saves=toggle|Delete saves and states with a game|on
