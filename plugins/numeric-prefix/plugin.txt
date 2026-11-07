@@ -1,0 +1,5 @@
+id=numeric-prefix
+name=Numeric prefix ordering
+api=1
+# leave the number off names like "1) Foo" while sorting by it
+setting.hide=toggle|Hide the number|on

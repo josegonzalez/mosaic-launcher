@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -81,6 +81,12 @@ HIDDEN := ../../plugins/hidden
 $(BUILD)/test_hidden: test_hidden.c $(HIDDEN)/hidden.c $(HIDDEN)/hiddenset.c $(HIDDEN)/hiddenset.h $(SDK)/nextui_plugin.h check.h
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_SDCARD_PATH=\"$(BUILD)/hidden-card\" test_hidden.c $(HIDDEN)/hiddenset.c -o $@
+
+NUMERIC := ../../plugins/numeric-prefix
+
+$(BUILD)/test_numeric_prefix: test_numeric_prefix.c $(wildcard $(NUMERIC)/*.c $(NUMERIC)/*.h) $(SDK)/nextui_plugin.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) test_numeric_prefix.c $(NUMERIC)/numprefix.c -o $@
 
 clean:
 	rm -rf $(BUILD)
