@@ -178,7 +178,10 @@ void GameList_handleInput(void) {
 	Bindings_dispatch(bindings, BINDING_COUNT);
 }
 
-void GameList_render(void) {
+// Decides what the next render draws: whether names show, which background
+// and thumbnail to load, and how much width the thumbnail takes. Draws
+// nothing.
+void GameList_update(void) {
 	// background and game art file path stuff
 	Entry* entry = top->entries->items[top->selected];
 	assert(entry);
@@ -242,7 +245,9 @@ void GameList_render(void) {
 				ox = screen->w;
 		}
 	}
+}
 
+void GameList_render(void) {
 	// buttons
 	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
 	// Stock shows the resume hint whenever resume state is set, even in an

@@ -43,15 +43,25 @@ void Switcher_handleInput(void) {
 	}
 }
 
-void Switcher_render(void) {
-	GFX_clearLayers(LAYER_ALL);
+// Loads the selected recent's resume state for the next render. Draws
+// nothing.
+void Switcher_update(void) {
 	ox = 0;
 	oy = 0;
+
+	if(recents->count > 0) {
+		Entry *selectedEntry = entryFromRecent(recents->items[switcher_selected]);
+		readyResume(selectedEntry);
+		Entry_free(selectedEntry);
+	}
+}
+
+void Switcher_render(void) {
+	GFX_clearLayers(LAYER_ALL);
 
 	// For all recents with resumable state (i.e. has savegame), show game switcher carousel
 	if(recents->count > 0) {
 		Entry *selectedEntry = entryFromRecent(recents->items[switcher_selected]);
-		readyResume(selectedEntry);
 		// title pill
 		{
 			int max_width = screen->w - SCALE1(PADDING * 2) - ow;

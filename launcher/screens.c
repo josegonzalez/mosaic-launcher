@@ -2,14 +2,17 @@
 
 static const Screen gamelist = {
 	.handleInput = GameList_handleInput,
+	.update = GameList_update,
 	.render = GameList_render,
 };
 static const Screen switcher = {
 	.handleInput = Switcher_handleInput,
+	.update = Switcher_update,
 	.render = Switcher_render,
 };
 static const Screen quickmenu = {
 	.handleInput = QuickMenu_handleInput,
+	.update = QuickMenu_update,
 	.render = QuickMenu_render,
 	.rendersWhileLaunching = 1,
 };

@@ -146,7 +146,10 @@ int main (int argc, char *argv[]) {
 			ow = GFX_blitHardwareGroup(screen, show_setting);
 			const Screen* active = Screen_get(currentScreen);
 			if (startgame && !active->rendersWhileLaunching) LaunchFade_render();
-			else active->render();
+			else {
+				if (active->update) active->update();
+				active->render();
+			}
 
 			if(animationdirection != ANIM_NONE) {
 				if(CFG_getMenuTransitions()) {

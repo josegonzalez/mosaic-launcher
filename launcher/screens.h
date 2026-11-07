@@ -9,6 +9,10 @@
 
 typedef struct Screen {
 	void (*handleInput)(void);
+	// Decides what render draws (art to load, layout, resume state) and
+	// draws nothing, so a different render can reuse it. Runs right before
+	// render on every dirty frame.
+	void (*update)(void);
 	void (*render)(void);
 	// While a game or pak is about to launch, every screen except the quick
 	// menu gives way to the launch fade.
@@ -23,10 +27,13 @@ void Screens_init(void);
 void GameList_registerActions(void);
 
 void QuickMenu_handleInput(void);
+void QuickMenu_update(void);
 void QuickMenu_render(void);
 void Switcher_handleInput(void);
+void Switcher_update(void);
 void Switcher_render(void);
 void GameList_handleInput(void);
+void GameList_update(void);
 void GameList_render(void);
 void LaunchFade_render(void);
 

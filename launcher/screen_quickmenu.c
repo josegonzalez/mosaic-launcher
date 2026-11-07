@@ -91,12 +91,9 @@ void QuickMenu_handleInput(void) {
 	}
 }
 
-void QuickMenu_render(void) {
-	if(lastScreen != SCREEN_QUICKMENU) {
-		GFX_clearLayers(LAYER_BACKGROUND);
-		GFX_clearLayers(LAYER_THUMBNAIL);
-	}
-
+// Picks and starts loading the selected tile's background. Draws nothing;
+// the loaded image is drawn by main()'s background flush.
+void QuickMenu_update(void) {
 	Entry *current = qm_row == 0 ? quick->items[qm_col] : quickActions->items[qm_col];
 	char newBgPath[MAX_PATH];
 	char fallbackBgPath[MAX_PATH];
@@ -114,6 +111,13 @@ void QuickMenu_render(void) {
 	if(strcmp(newBgPath, folderBgPath) != 0) {
 		strncpy(folderBgPath, newBgPath, sizeof(folderBgPath) - 1);
 		startLoadFolderBackground(newBgPath, onBackgroundLoaded, NULL);
+	}
+}
+
+void QuickMenu_render(void) {
+	if(lastScreen != SCREEN_QUICKMENU) {
+		GFX_clearLayers(LAYER_BACKGROUND);
+		GFX_clearLayers(LAYER_THUMBNAIL);
 	}
 
 	// buttons (duped and trimmed from below)
