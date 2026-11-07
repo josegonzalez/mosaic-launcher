@@ -1,0 +1,9 @@
+id=genre-view
+name=Genre view
+api=1
+# the fewest consoles a genre's folders need to come from
+setting.min=choice|Consoles a genre needs|1|1,2,3,4
+# folder names that aren't genres, comma-separated, eg. Hacks, Homebrew
+setting.skip=text|Folders that aren't genres|
+# which games show their system's tag: those sharing a name with another system's, every game, or none
+setting.tags=choice|Show the system|shared|shared,always,off
