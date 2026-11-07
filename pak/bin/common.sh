@@ -4,8 +4,8 @@
 # USERDATA_PATH, PLATFORM).
 # shellcheck disable=SC2034 # sourced; the callers use these
 
-# Persistent state, on the SD card. Pak Store updates and uninstalls never
-# touch .userdata, so this survives both.
+# Persistent state, on the SD card. Replacing or deleting the pak never
+# touches .userdata, so this survives both.
 STATE_DIR="$USERDATA_PATH/launcher"
 
 # Per-boot state. tmpfs, so a reboot always starts from stock.

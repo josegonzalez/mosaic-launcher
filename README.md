@@ -1,14 +1,14 @@
 # nextui-launcher
 
-A drop-in replacement for the NextUI launcher (`nextui.elf`) that installs from the Pak Store and runs on a stock NextUI card. The goal is a launcher with a plugin API, so features that today live in separate MinUI and NextUI forks can be installed and combined as plugins.
+A drop-in replacement for the NextUI launcher (`nextui.elf`) that runs on a stock NextUI card. The goal is a launcher with a plugin API, so features that today live in separate MinUI and NextUI forks can be installed and combined as plugins.
 
-This first release runs an unmodified copy of the stock launcher from the pinned NextUI release, behind a switch and a crash guard. Plugins come in later releases.
+This is a test project, not something that will be released for public use. Anyone who wants to try it builds and installs it themselves.
 
 ## Installing
 
-Install **Launcher** from the Pak Store (Tools > Pak Store), open it from Tools, and choose **Turn on**. The new launcher starts when you leave the Launcher screen.
+Build the pak (see below), unzip `build/Launcher.pak.zip` into `Tools/<platform>/Launcher.pak/` on the SD card, open **Launcher** from Tools, and choose **Turn on**. The new launcher starts when you leave the Launcher screen.
 
-To go back to stock, open Launcher and choose **Turn off**. Uninstalling the pak from the Pak Store also returns to stock after the next reboot.
+To go back to stock, open Launcher and choose **Turn off**. Deleting the `Launcher.pak` folder also returns to stock after the next reboot.
 
 ## How it takes over
 
@@ -20,7 +20,7 @@ Each time `launch.sh` starts `nextui.elf`, the wrapper picks a binary. It runs s
 
 The pak only activates on the NextUI release it was built against. It compares the build hash in `.system/version.txt` with `supported-versions.txt`, and leaves stock in place on any other release.
 
-State lives in `.userdata/<platform>/launcher/`, which Pak Store updates and uninstalls never touch.
+State lives in `.userdata/<platform>/launcher/`, which replacing or deleting the pak never touches.
 
 ## Building
 

@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop plugins-desktop plugins-device build-% devices pak release test smoke test-plugins test-profiles lint drift clean
+.PHONY: all desktop run-desktop plugins-desktop plugins-device build-% devices pak test smoke test-plugins test-profiles lint drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI

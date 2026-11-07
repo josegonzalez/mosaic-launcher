@@ -6,5 +6,5 @@ LAUNCHER="$SDCARD_PATH/Tools/$PLATFORM/Launcher.pak/launch.sh"
 if [ -x "$LAUNCHER" ]; then
 	exec "$LAUNCHER" plugins
 fi
-echo "Launcher.pak isn't installed; get it from the Pak Store" >&2
+echo "Launcher.pak isn't installed" >&2
 exit 1

@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
 
 permissions:
   contents: read
@@ -84,10 +82,6 @@ jobs:
       - build
       - plugins
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -114,19 +108,10 @@ jobs:
           done
 
       - name: Package
-        run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            RELEASE=1 ./scripts/package.sh "${GITHUB_REF_NAME}" tg5040 tg5050 h700
-          else
-            ./scripts/package.sh "$(git describe --tags --always)" tg5040 tg5050 h700
-          fi
+        run: ./scripts/package.sh "$(git describe --tags --always)" tg5040 tg5050 h700
 
       - name: Upload pak
         uses: actions/upload-artifact@v7.0.2
         with:
           name: Launcher.pak.zip
           path: build/Launcher.pak.zip
-
-      - name: Release
-        if: github.ref_type == 'tag'
-        run: gh release create "${GITHUB_REF_NAME}" build/Launcher.pak.zip --title "${GITHUB_REF_NAME}" --notes-from-tag

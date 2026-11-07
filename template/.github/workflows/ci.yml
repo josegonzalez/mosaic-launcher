@@ -1,15 +1,13 @@
-name: release
+name: ci
 
 on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -29,11 +27,9 @@ jobs:
           name: lib
           path: lib
 
-  release:
+  package:
     needs: build
     runs-on: ubuntu-24.04
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -52,8 +48,3 @@ jobs:
         with:
           name: pak
           path: build/*.pak.zip
-
-      # The Pak Store reads pak.json and expects a release tagged with its version.
-      - name: Release
-        if: github.ref_type == 'tag'
-        run: gh release create "${GITHUB_REF_NAME}" build/*.pak.zip --title "${GITHUB_REF_NAME}" --generate-notes

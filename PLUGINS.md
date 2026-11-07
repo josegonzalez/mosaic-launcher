@@ -1,6 +1,6 @@
 # Writing plugins
 
-To publish a plugin of your own, start from [`template/`](template/): copy it into a new repo, and it builds the plugin, packages it as a pak and releases it for the Pak Store.
+To write a plugin of your own, start from [`template/`](template/): copy it into a new repo, and it builds the plugin and packages it as a pak.
 
 A plugin is a shared object the launcher loads at startup. It's written against one header, [`sdk/nextui_plugin.h`](sdk/nextui_plugin.h), which is MIT licensed and doesn't include anything from NextUI, so a plugin can use any license.
 
@@ -17,7 +17,7 @@ Favorites.plugin/        or   Tools/<platform>/Launcher Favorites.pak/
 The launcher looks in two places:
 
 - `Launcher.pak/plugins/*.plugin/`, for plugins that ship with the launcher. These are off until turned on.
-- `Tools/<platform>/*.pak/` with a `plugin.txt`, for plugins installed as their own pak (for example from the Pak Store). These are on by default.
+- `Tools/<platform>/*.pak/` with a `plugin.txt`, for plugins installed as their own pak. These are on by default.
 
 Every current NextUI device is aarch64, so one `lib/aarch64/plugin.so` covers tg5040, tg5050 and h700. Build it against the oldest toolchain sysroot (tg5040's) so it runs on all of them. Desktop builds load `lib/desktop-<os>-<arch>/plugin.so`, eg. `lib/desktop-darwin-arm64/`.
 

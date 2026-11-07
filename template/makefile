@@ -3,7 +3,7 @@
 #
 #   make           lib/aarch64/plugin.so, in the tg5040 toolchain (Docker or podman)
 #   make desktop   lib/desktop-<os>-<arch>/plugin.so, with the host compiler
-#   make pak       build/<name>.pak.zip for the Pak Store
+#   make pak       build/<name>.pak.zip, to unzip into Tools/<platform>/<name>.pak
 #
 # One aarch64 build runs on every NextUI device; tg5040's toolchain has the
 # oldest sysroot, so building there keeps it compatible with all of them.
@@ -28,7 +28,7 @@ desktop:
 	mkdir -p lib/$(DESKTOP_ARCH)
 	$(CC) $(CFLAGS) src/*.c -o lib/$(DESKTOP_ARCH)/plugin.so
 
-# The zip holds the pak's contents, which is what the Pak Store expects.
+# The zip holds the pak's contents, not the pak directory itself.
 pak:
 	@test -f lib/aarch64/plugin.so || (echo "run make first" && exit 1)
 	mkdir -p build

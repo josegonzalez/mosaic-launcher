@@ -1,12 +1,12 @@
 #!/bin/sh
 #
-# Assemble build/Launcher.pak and zip it the way the Pak Store expects: the
-# zip holds the contents of the pak directory, not the directory itself.
+# Assemble build/Launcher.pak and zip it. The zip holds the contents of the
+# pak directory, not the directory itself, so it unzips into
+# Tools/<platform>/Launcher.pak.
 #
 #   ./scripts/package.sh <version> <platform>...
 #
 # Each platform needs build/<platform>/nextui.elf from `make build-<platform>`.
-# With RELEASE=1, the version must match pak.json.
 
 set -eu
 
@@ -17,14 +17,6 @@ if [ "$#" -lt 2 ]; then
 fi
 version="$1"
 shift
-
-if [ "${RELEASE:-}" = "1" ]; then
-	pak_version="$(sed -n 's/^ *"version": *"\(.*\)",*$/\1/p' "$ROOT/pak.json")"
-	if [ "$version" != "$pak_version" ]; then
-		echo "version $version does not match pak.json ($pak_version)" >&2
-		exit 1
-	fi
-fi
 
 OUT="$ROOT/build/Launcher.pak"
 ZIP="$ROOT/build/Launcher.pak.zip"

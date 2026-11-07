@@ -105,7 +105,7 @@ static void turnOn(void) {
 		readStatus(&s);
 		char text[256];
 		snprintf(text, sizeof(text), "%s\n%s: %s\n%s", TR("This build supports a different NextUI release."),
-			TR("Installed"), s.release[0] ? s.release : TR("unknown"), TR("Update Launcher from the Pak Store."));
+			TR("Installed"), s.release[0] ? s.release : TR("unknown"), TR("Install a Launcher build for this release."));
 		Modal_message(text);
 	}
 	else Modal_message(TR("Launcher could not start.\nThe stock launcher is still in use."));
