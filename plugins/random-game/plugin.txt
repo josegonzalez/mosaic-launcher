@@ -1,0 +1,9 @@
+id=random-game
+name=Random game
+api=1
+# games not in Recently Played are four times as likely
+setting.unplayed=toggle|Prefer unplayed games|on
+# a Random game row on the root that picks from every system
+setting.root=toggle|Random game on the root|on
+# a Random tile on the quick menu that picks from every system
+setting.tile=toggle|Random tile on the quick menu|off
