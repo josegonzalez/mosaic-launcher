@@ -50,7 +50,7 @@ make test
 
 The bats tests run the pak scripts against a fake SD card, with a fake `mount` that copies files the way a bind mount looks from outside. The C tests in `tests/c/` cover launcher code that doesn't need a display; they compile against the desktop platform headers, so they need SDL2's headers (`brew install sdl2`, or `libsdl2-dev`) but never open a window.
 
-`make smoke` starts the desktop build for a few seconds, then its settings screens, and fails if either exits on its own. Its logs (`build/smoke.log` and `build/smoke-settings.log`) are also handy for comparing startup output before and after a change.
+`make smoke` starts the desktop build for a few seconds, then its settings screens, and fails if either exits on its own. A run still going 5 seconds after SIGTERM gets SIGKILL and fails too, so a launcher that won't stop can't hold up the run. Its logs (`build/smoke.log` and `build/smoke-settings.log`) are also handy for comparing startup output before and after a change.
 
 `make test-profiles` does the same with the bundled plugins together, in two profiles built from their `plugin.txt` files: everything on with the first owner of each exclusive slot, then each slot flipped to its next owner. Plugins whose `requires` can't be met are left off with a note. It fails if the launcher exits on its own or the loader refuses a plugin the profile didn't turn off; logs are in `build/profiles/`.
 

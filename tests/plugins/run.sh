@@ -33,8 +33,13 @@ build_plugin() {
 		"$ROOT/tests/plugins/$1/$1.c" -o "$dir/lib/$ARCH/plugin.so" || fail "building $1"
 }
 
+# run_launcher <log>: 0 if it ran until stopped, 1 if it exited on its own,
+# 2 (also a failure here) if it had to be killed after ignoring SIGTERM
 run_launcher() {
 	MOSAIC_LAUNCHER_PLUGIN_PATH="$WORK/plugins" "$ROOT/scripts/desktop-smoke.sh" "$1" 3 >/dev/null 2>&1
+	status=$?
+	[ "$status" -eq 2 ] && fail "the launcher ignored SIGTERM and was killed; log in $1"
+	return "$status"
 }
 
 # expect <line>: plugin $plugin logged line in $log

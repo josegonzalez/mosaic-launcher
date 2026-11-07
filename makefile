@@ -91,7 +91,7 @@ test:
 	$(MAKE) -C tests/c
 
 # Starts the desktop build for a few seconds, then the Launcher pak's
-# settings screens; fails if either exits on its own.
+# settings screens; fails if either exits on its own or ignores SIGTERM.
 FAKE_CARD = /var/tmp/nextui/sdcard
 smoke: desktop
 	./scripts/desktop-smoke.sh build/smoke.log

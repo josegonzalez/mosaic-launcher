@@ -11,8 +11,9 @@
 # Plugins whose requires can't be met, or that conflict with one already on,
 # are left off with a note. For each profile this writes plugins.txt on the
 # fake card, runs the desktop build for a few seconds and then the Launcher
-# pak's plugin settings, and fails if either exits on its own or the log shows
-# a plugin refused for a reason the profile didn't choose.
+# pak's plugin settings, and fails if either exits on its own, doesn't stop on
+# SIGTERM, or the log shows a plugin refused for a reason the profile didn't
+# choose.
 #
 #   scripts/plugin-profiles.sh                       run both profiles
 #   scripts/plugin-profiles.sh print <profile> [dir] print a profile's
@@ -172,14 +173,14 @@ for name in all alternate; do
 	cp "$txt" "$STATE/plugins.txt"
 	rm -f "$STATE/loading" "$STATE/plugins_paused"
 	MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" "$ROOT/scripts/desktop-smoke.sh" "$WORK/$name.log" 4 >/dev/null ||
-		fail "the launcher exited early in the $name profile"
+		fail "the launcher failed in the $name profile"
 	check_log "$WORK/$name.log" "$txt"
 
 	SDCARD_PATH=$CARD USERDATA_PATH=$CARD/.userdata/desktop SYSTEM_PATH=$CARD/.system/desktop \
 		PLATFORM=desktop MOSAIC_LAUNCHER_PAK_DIR="$ROOT/pak" MOSAIC_LAUNCHER_RUN_DIR="$ROOT/build/run" \
 		MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" \
 		"$ROOT/scripts/desktop-smoke.sh" "$WORK/$name-settings.log" 4 --settings plugins >/dev/null ||
-		fail "the plugin settings exited early in the $name profile"
+		fail "the plugin settings failed in the $name profile"
 done
 
 rm -f "$STATE/plugins.txt" "$STATE/loading" "$STATE/plugins_paused"
