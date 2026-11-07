@@ -49,4 +49,12 @@ void QuickTiles_apply(Array* entries, int row);
 // Forgets every tile and hidden name.
 void QuickTiles_reset(void);
 
+// A copy of every tile, hidden name and label, to put back later with
+// QuickTiles_restore, which also frees it.
+typedef struct QuickTilesSaved QuickTilesSaved;
+QuickTilesSaved* QuickTiles_save(void);
+void QuickTiles_restore(QuickTilesSaved* saved);
+// Frees a copy without putting it back.
+void QuickTiles_discard(QuickTilesSaved* saved);
+
 #endif

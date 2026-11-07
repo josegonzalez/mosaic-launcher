@@ -40,4 +40,8 @@ int QuickItem_isOff(const Entry* entry);
 // unknown names.
 void QuickItem_activate(const Entry* entry);
 
+// What the Poweroff and Reboot tiles do: plugins' before_poweroff, then
+// powering off, or rebooting when reboot is 1.
+void QuickItem_powerOff(int reboot);
+
 #endif

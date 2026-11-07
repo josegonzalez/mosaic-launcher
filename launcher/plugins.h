@@ -86,6 +86,10 @@ const LaunchCmd* Plugins_launchReplacement(void);
 // ART_LIST_BG (see art.h). Returns 1 if a plugin answered.
 int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size);
 
+// The first plugin's new full path for a recent whose file is missing.
+// Returns 1 if a plugin answered.
+int Plugins_repairPath(const char* missing, char* out, size_t size);
+
 void Plugins_tick(unsigned long now);
 void Plugins_beforeSleep(void);
 void Plugins_afterResume(void);

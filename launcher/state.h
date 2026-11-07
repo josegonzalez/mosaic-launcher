@@ -40,6 +40,7 @@ typedef struct LauncherState {
 	int dirty;
 	int reload; // list the open folders again before the next frame's input
 	int rebuild_quick; // build the quick menu's tiles again before the next frame's input
+	int power_off; // a plugin asked to power off (1) or reboot (2) on the next frame
 	int previous_row;
 	int previous_depth;
 } LauncherState;

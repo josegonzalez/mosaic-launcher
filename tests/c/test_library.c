@@ -309,6 +309,59 @@ static void test_recents_remove_and_clear_save(void) {
 	CHECK_STR(readFile(RECENT_PATH), "");
 }
 
+// repair_path stand-in: missing games moved into "Moved/", except the
+// ones it has no answer for, plus a few bad answers.
+static int repair_calls = 0;
+static int repairPath(const char* missing, char* out, size_t size) {
+	repair_calls++;
+	const char* name = strrchr(missing, '/') + 1;
+	if (!strcmp(name, "Lost.gb")) return 0;
+	if (!strcmp(name, "Gone.gb")) snprintf(out, size, "%s", "/elsewhere/Gone.gb");          // off the card
+	else if (!strcmp(name, "Dup.gb")) snprintf(out, size, ROMS_PATH "/Game Boy (GB)/B.gb"); // a later recent
+	else if (!strcmp(name, "Up.gb")) snprintf(out, size, ROMS_PATH "/../Roms/Game Boy (GB)/Moved/Up.gb");
+	else snprintf(out, size, ROMS_PATH "/Game Boy (GB)/Moved/%s", name);
+	return 1;
+}
+
+static void test_recents_repair_missing(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/A.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/B.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Moved/Old.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Moved/Up.gb", "");
+	const char* lines =
+		"/Roms/Game Boy (GB)/A.gb\n"
+		"/Roms/Game Boy (GB)/Old.gb\tOldie\n"   // moved: repaired in place, alias kept
+		"/Roms/Game Boy (GB)/Lost.gb\n"          // no answer: dropped
+		"/Roms/Game Boy (GB)/Gone.gb\n"          // off the card: dropped
+		"/Roms/Game Boy (GB)/Dup.gb\n"           // already a recent: dropped
+		"/Roms/Game Boy (GB)/Up.gb\n"            // through ..: dropped
+		"/Roms/Game Boy (GB)/Nowhere.gb\n"       // the new path isn't there: dropped
+		"/Roms/Game Boy (GB)/B.gb\n";
+
+	// with no plugin, stock drops every missing line
+	writeFile(RECENT_PATH, lines);
+	CHECK(hasRecents());
+	CHECK_STR(readFile(RECENT_PATH), "/Roms/Game Boy (GB)/A.gb\n/Roms/Game Boy (GB)/B.gb\n");
+
+	// a plugin repairs what it can; files that exist are never asked about
+	stub_repair_path = repairPath;
+	repair_calls = 0;
+	writeFile(RECENT_PATH, lines);
+	CHECK(hasRecents());
+	CHECK(repair_calls == 6);
+	CHECK_STR(readFile(RECENT_PATH),
+		"/Roms/Game Boy (GB)/A.gb\n/Roms/Game Boy (GB)/Moved/Old.gb\tOldie\n/Roms/Game Boy (GB)/B.gb\n");
+	CHECK(state.recents->count == 3);
+
+	// once repaired, nothing is missing and the plugin isn't asked again
+	repair_calls = 0;
+	CHECK(hasRecents());
+	CHECK(repair_calls == 0);
+	stub_repair_path = NULL;
+}
+
 static void addFocusEntry(Array* root) {
 	Array_push(root, Entry_new(SDCARD_PATH "/Added", ENTRY_DIR));
 }
@@ -512,6 +565,62 @@ static void test_quick_tiles_rename(void) {
 	top = getQuickEntries();
 	if (top->count >= 2) CHECK_STR(QuickTiles_label(top->items[1]), "Games");
 	EntryArray_free(top);
+
+	QuickTiles_reset();
+	CHECK(!QuickTiles_any());
+}
+
+// A plugin whose init declines takes its tiles, hidden names and labels
+// with it: the loader saves them before init and puts them back.
+static void test_quick_tiles_save_restore(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/A.gb", "");
+	writeFile(RECENT_PATH, "/Roms/Game Boy (GB)/A.gb\n");
+	writeFile(TOOLS_PATH "/Clock.pak/launch.sh", "");
+	hasRecents();
+	Actions_register(&tileAction);
+	Actions_register(&lightAction);
+	char got[256];
+
+	// an earlier plugin's tile, hidden name and label stay
+	CHECK(QuickTiles_add("test.tile", QUICK_ROW_TOP, "/icon.png", NULL, NULL) == 0);
+	CHECK(QuickTiles_hide("Tools", 1) == 0);
+	CHECK(QuickTiles_rename("Games", "Library") == 0);
+	QuickTilesSaved* saved = QuickTiles_save();
+
+	// the declining one changes all three, then is undone
+	CHECK(QuickTiles_add("test.light", QUICK_ROW_TOP, NULL, NULL, lightIsOn) == 0);
+	CHECK(QuickTiles_add("test.tile", QUICK_ROW_TOP, "/other.png", NULL, NULL) == 0);
+	CHECK(QuickTiles_hide("Tools", 0) == 0);
+	CHECK(QuickTiles_hide("Recents", 1) == 0);
+	CHECK(QuickTiles_rename("Games", "Other") == 0);
+	CHECK(QuickTiles_rename("Recents", "Played") == 0);
+	QuickTiles_restore(saved);
+
+	Array* top = getQuickEntries();
+	rowNames(top, got, sizeof(got));
+	CHECK_STR(got, "Recents,Games,Tile");
+	if (top->count == 3) {
+		CHECK_STR(QuickTiles_label(top->items[0]), "Recents");
+		CHECK_STR(QuickTiles_label(top->items[1]), "Library");
+		const QuickTile* t = QuickTiles_forEntry(top->items[2]);
+		CHECK(t && t->icon && !strcmp(t->icon, "/icon.png") && t->isOn == NULL);
+	}
+	EntryArray_free(top);
+
+	// with nothing added before, restoring leaves no tiles at all
+	QuickTiles_reset();
+	saved = QuickTiles_save();
+	CHECK(QuickTiles_add("test.tile", QUICK_ROW_TOP, NULL, NULL, NULL) == 0);
+	CHECK(QuickTiles_hide("Games", 1) == 0);
+	QuickTiles_restore(saved);
+	CHECK(!QuickTiles_any());
+
+	// a copy that isn't needed is freed without changing anything
+	CHECK(QuickTiles_add("test.tile", QUICK_ROW_TOP, "/icon.png", NULL, NULL) == 0);
+	QuickTiles_discard(QuickTiles_save());
+	CHECK(QuickTiles_any());
 
 	QuickTiles_reset();
 	CHECK(!QuickTiles_any());
@@ -870,9 +979,11 @@ int main(void) {
 	test_collections_folder_lists_collections_as_folders();
 	test_root_replace_skips_stock_but_loads_recents();
 	test_recents_remove_and_clear_save();
+	test_recents_repair_missing();
 	test_root_replace_adds_entries_only_when_asked();
 	test_recents_set_rewrites_a_path();
 	test_quick_tiles_hide_and_add();
+	test_quick_tiles_save_restore();
 	test_quick_tiles_rename();
 	test_reload_follows_the_selected_entry();
 	test_reload_keeps_the_selection_in_view();

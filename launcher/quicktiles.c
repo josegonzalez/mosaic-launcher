@@ -133,3 +133,52 @@ void QuickTiles_reset(void) {
 		labels[i] = NULL;
 	}
 }
+
+struct QuickTilesSaved {
+	QuickTile tiles[MAX_TILES];
+	int tile_count;
+	char* hidden[MAX_HIDDEN];
+	int hidden_count;
+	char* labels[RENAMABLE_COUNT];
+};
+
+static char* copyExact(const char* s) {
+	return s ? strdup(s) : NULL;
+}
+
+QuickTilesSaved* QuickTiles_save(void) {
+	QuickTilesSaved* saved = calloc(1, sizeof(*saved));
+	for (int i = 0; i < tile_count; i++) {
+		saved->tiles[i] = tiles[i];
+		saved->tiles[i].icon = copyExact(tiles[i].icon);
+		saved->tiles[i].icon_off = copyExact(tiles[i].icon_off);
+	}
+	saved->tile_count = tile_count;
+	for (int i = 0; i < hidden_count; i++) saved->hidden[i] = strdup(hidden[i]);
+	saved->hidden_count = hidden_count;
+	for (int i = 0; i < RENAMABLE_COUNT; i++) saved->labels[i] = copyExact(labels[i]);
+	return saved;
+}
+
+void QuickTiles_restore(QuickTilesSaved* saved) {
+	if (!saved) return;
+	QuickTiles_reset();
+	// the copies move back in, so only the struct is freed
+	for (int i = 0; i < saved->tile_count; i++) tiles[i] = saved->tiles[i];
+	tile_count = saved->tile_count;
+	for (int i = 0; i < saved->hidden_count; i++) hidden[i] = saved->hidden[i];
+	hidden_count = saved->hidden_count;
+	for (int i = 0; i < RENAMABLE_COUNT; i++) labels[i] = saved->labels[i];
+	free(saved);
+}
+
+void QuickTiles_discard(QuickTilesSaved* saved) {
+	if (!saved) return;
+	for (int i = 0; i < saved->tile_count; i++) {
+		free(saved->tiles[i].icon);
+		free(saved->tiles[i].icon_off);
+	}
+	for (int i = 0; i < saved->hidden_count; i++) free(saved->hidden[i]);
+	for (int i = 0; i < RENAMABLE_COUNT; i++) free(saved->labels[i]);
+	free(saved);
+}

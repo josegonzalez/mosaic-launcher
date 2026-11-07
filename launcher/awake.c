@@ -26,7 +26,7 @@ void Awake_set(const char* who, int on) {
 
 void Awake_tick(unsigned long now) {
 	if (now >= next_file_check) {
-		file_held = exists(STAY_AWAKE_PATH);
+		file_held = exists(STAY_AWAKE_PATH) || exists(STAY_ALIVE_PATH);
 		next_file_check = now + FILE_CHECK_MS;
 	}
 

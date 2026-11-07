@@ -33,8 +33,15 @@ typedef struct Binding {
 	int (*fires)(int button); // when set, decides whether it fired instead of trigger
 } Binding;
 
+#define ACTIONS_MAX 64
+
 void Actions_register(const Action* action);
 const Action* Actions_find(const char* id);
+
+// The registered actions, in order, to put back later with Actions_restore.
+// Fills up to max of them into out and returns how many there are.
+int Actions_list(const Action** out, int max);
+void Actions_restore(const Action* const* saved, int count);
 
 // Runs the first binding whose button fired and whose action is available.
 // Returns 1 if one ran.

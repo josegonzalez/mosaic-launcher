@@ -95,6 +95,12 @@ int main (int argc, char *argv[]) {
 
 		PWR_update(&state.dirty, &show_setting, Plugins_beforeSleep, Plugins_afterResume);
 		Plugins_tick(now);
+		// a plugin asked to power off or reboot (host->power_off)
+		if (state.power_off) {
+			int reboot = state.power_off == 2;
+			state.power_off = 0;
+			QuickItem_powerOff(reboot);
+		}
 		Toast_tick(now);
 		Awake_tick(now);
 

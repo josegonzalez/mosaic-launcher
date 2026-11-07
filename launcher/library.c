@@ -465,6 +465,39 @@ int hasM3u(char* rom_path, char* m3u_path) { // NOTE: rom_path not dir_path
 	return exists(m3u_path);
 }
 
+// True when a card-relative path is already in recents or on a line of
+// recent.txt, where it may come later.
+static int recentListed(const char* path) {
+	if (RecentArray_indexOf(state.recents, (char*)path) >= 0) return 1;
+	FILE* file = fopen(RECENT_PATH, "r");
+	if (!file) return 0;
+	int listed = 0;
+	char line[256];
+	while (!listed && fgets(line, sizeof(line), file)) {
+		normalizeNewline(line);
+		trimTrailingNewlines(line);
+		char* tab = strchr(line, '\t');
+		if (tab) *tab = '\0';
+		listed = !strcmp(line, path);
+	}
+	fclose(file);
+	return listed;
+}
+
+// A plugin's new path for a recent whose file is missing, written to out
+// as a full path: only one on the card that isn't a recent already.
+static int repairRecent(const char* missing, char* out, size_t size) {
+	if (!Plugins_repairPath(missing, out, size)) return 0;
+	size_t len = strlen(SDCARD_PATH);
+	if (strncmp(out, SDCARD_PATH, len) != 0 || out[len] != '/' || strlen(out) >= 256
+			|| strstr(out, "/../") || suffixMatch("/..", out) || !exists(out) || recentListed(out + len)) {
+		LOG_warn("recents: can't repair %s with %s\n", missing, out);
+		return 0;
+	}
+	LOG_info("recents: repaired %s as %s\n", missing, out);
+	return 1;
+}
+
 int hasRecents(void) {
 	LOG_info("hasRecents %s\n", RECENT_PATH);
 	int has = 0;
@@ -510,6 +543,12 @@ int hasRecents(void) {
 
 			char sd_path[256];
 			sprintf(sd_path, "%s%s", SDCARD_PATH, path);
+			// plugins only see lines stock would drop
+			char repaired[256];
+			if (!exists(sd_path) && repairRecent(sd_path, repaired, sizeof(repaired))) {
+				snprintf(sd_path, sizeof(sd_path), "%s", repaired);
+				path = sd_path + strlen(SDCARD_PATH);
+			}
 			if (exists(sd_path)) {
 				if (state.recents->count<MAX_RECENTS) {
 					// this logic replaces an existing disc from a multi-disc game with the last used

@@ -1,7 +1,6 @@
 #include "launcher.h"
 
-#define MAX_ACTIONS 64
-static const Action* registry[MAX_ACTIONS];
+static const Action* registry[ACTIONS_MAX];
 static int registered = 0;
 
 void Actions_register(const Action* action) {
@@ -12,7 +11,7 @@ void Actions_register(const Action* action) {
 			return;
 		}
 	}
-	if (registered >= MAX_ACTIONS) {
+	if (registered >= ACTIONS_MAX) {
 		LOG_warn("too many actions, ignoring %s\n", action->id);
 		return;
 	}
@@ -25,6 +24,17 @@ const Action* Actions_find(const char* id) {
 		if (!strcmp(registry[i]->id, id)) return registry[i];
 	}
 	return NULL;
+}
+
+int Actions_list(const Action** out, int max) {
+	for (int i = 0; i < registered && i < max; i++) out[i] = registry[i];
+	return registered;
+}
+
+void Actions_restore(const Action* const* saved, int count) {
+	if (count > ACTIONS_MAX) count = ACTIONS_MAX;
+	for (int i = 0; i < count; i++) registry[i] = saved[i];
+	registered = count;
 }
 
 static int fired(const Binding* binding) {

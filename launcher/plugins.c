@@ -25,7 +25,11 @@ static int loaded_count = 0;
 static int initializing = -1; // the loaded plugin whose init is running
 static int launching = -1;    // the loaded plugin whose pre_launch is running
 
+#define SCREEN_COUNT 3
+
 static void dropOverrides(int owner);
+static void saveBindings(int* counts);
+static void dropBindings(const int* counts);
 static PluginManifest manifests[PLUGIN_MAX];
 static int manifest_count = 0;
 
@@ -363,6 +367,36 @@ static int hostRenameQuickTile(const char* name, const char* label) {
 	return 0;
 }
 
+// Desktop has no battery or LEDs; its platform code reports a full battery
+// on charge and LEDs that aren't there.
+#define HAS_BATTERY (strcmp(PLATFORM, "desktop") != 0)
+
+static int hostBatteryLevel(void) {
+	return HAS_BATTERY ? PWR_getBattery() : -1;
+}
+static int hostIsCharging(void) {
+	return HAS_BATTERY ? (PWR_isCharging() ? 1 : 0) : -1;
+}
+static int hostLedCount(void) {
+	return HAS_BATTERY ? LEDS_getCount() : 0;
+}
+
+static void hostPowerOff(int reboot) {
+	// on the next frame, from the main loop, as the quick menu's tiles do
+	state.power_off = reboot == 1 ? 2 : 1;
+	LOG_info("plugins: a plugin asked to %s\n", reboot == 1 ? "reboot" : "power off");
+}
+
+static int hostShowRecents(void) {
+	if (!CFG_getShowRecents() || !state.recents) return 0;
+	// as getRoot does: only recents whose game is on the card count
+	for (int i = 0; i < state.recents->count; i++) {
+		const Recent* recent = state.recents->items[i];
+		if (recent->available) return 1;
+	}
+	return 0;
+}
+
 static const NUIHost host = {
 	.size = sizeof(NUIHost),
 	.api_version = NUI_API_VERSION,
@@ -406,6 +440,11 @@ static const NUIHost host = {
 	.override_button = hostOverrideButton,
 	.replace_launch = hostReplaceLaunch,
 	.rename_quick_tile = hostRenameQuickTile,
+	.battery_level = hostBatteryLevel,
+	.is_charging = hostIsCharging,
+	.led_count = hostLedCount,
+	.power_off = hostPowerOff,
+	.show_recents = hostShowRecents,
 };
 
 ///////////////////////////////////////
@@ -448,17 +487,46 @@ static void load(const PluginManifest* m) {
 		LOG_warn("plugins: %s has root_replace but no slots=" ROOT_SLOT ", so it won't be asked\n", m->id);
 	}
 
+	// what init registers, to take back if it declines: its actions, tiles
+	// and bindings point into the code that's about to be unloaded
+	const Action* actions[ACTIONS_MAX];
+	int action_count = Actions_list(actions, ACTIONS_MAX);
+	QuickTilesSaved* tiles = QuickTiles_save();
+	int bindings[SCREEN_COUNT];
+	saveBindings(bindings);
+	int rebuild_quick = state.rebuild_quick;
+	int power_off = state.power_off;
+
 	initializing = loaded_count - 1;
 	int declined = Plugin_has(plugin, init) && plugin->init && plugin->init(&host) != 0;
 	initializing = -1;
 	if (declined) {
 		LOG_warn("plugins: %s declined to start\n", m->id);
 		dropOverrides(loaded_count - 1);
+		dropBindings(bindings);
+		QuickTiles_restore(tiles);
+		const Action* now[ACTIONS_MAX];
+		int now_count = Actions_list(now, ACTIONS_MAX);
+		for (int i = 0; i < now_count && i < ACTIONS_MAX; i++) {
+			int kept = 0;
+			for (int j = 0; j < action_count && !kept; j++) kept = now[i] == actions[j];
+			if (kept) continue;
+			// registered by this init, so made by hostRegisterAction
+			Action* action = (Action*)now[i];
+			free((char*)action->id);
+			free((char*)action->label);
+			free(action);
+		}
+		Actions_restore(actions, action_count);
+		state.rebuild_quick = rebuild_quick;
+		state.power_off = power_off;
+		hostInhibitSleep(m->id, 0);
 		if (p->cfg) Hash_free(p->cfg);
 		dlclose(handle);
 		loaded_count--;
 		return;
 	}
+	QuickTiles_discard(tiles);
 	LOG_info("plugins: loaded %s\n", m->id);
 }
 
@@ -533,7 +601,6 @@ int Plugins_count(void) {
 ///////////////////////////////////////
 // button bindings
 
-#define SCREEN_COUNT 3
 static Binding pluginBindings[SCREEN_COUNT][PLUGIN_BINDING_MAX];
 static int pluginBindingCount[SCREEN_COUNT];
 static Binding overrideBindings[SCREEN_COUNT][PLUGIN_OVERRIDE_MAX];
@@ -591,6 +658,15 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 	}
 	if (sharing) LOG_info("plugins: %s on the game list is shared by %i actions; with more than one available it opens a menu\n", info->glyph, sharing + 1);
 	return 0;
+}
+
+// bind_button only appends, so a declined init's bindings are the ones past
+// the counts from before it ran.
+static void saveBindings(int* counts) {
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) counts[screen] = pluginBindingCount[screen];
+}
+static void dropBindings(const int* counts) {
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) pluginBindingCount[screen] = counts[screen];
 }
 
 int Plugins_bindings(int screen, const Binding** bindings) {
@@ -843,6 +919,14 @@ int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
 	EACH_PLUGIN_WITH(art_path) {
 		out[0] = '\0';
 		if (p->art_path((const NUIEntry*)entry, nui_kind, out, size) && out[0]) return 1;
+	}
+	return 0;
+}
+
+int Plugins_repairPath(const char* missing, char* out, size_t size) {
+	EACH_PLUGIN_WITH(repair_path) {
+		out[0] = '\0';
+		if (p->repair_path(missing, out, size) == 1 && out[0]) return 1;
 	}
 	return 0;
 }

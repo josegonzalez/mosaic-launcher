@@ -268,6 +268,30 @@ typedef struct NUIHost {
 	// "". Hiding and art still go by the built-in name. Returns 0, or -1
 	// for any other name.
 	int (*rename_quick_tile)(const char* name, const char* label);
+
+	// The battery, as the status bar shows it. battery_level returns the
+	// charge from 0 to 100, and is_charging returns 1 while it charges and
+	// 0 otherwise. Both return -1 on a platform without a battery, such as
+	// desktop, so a plugin can report itself unsupported there.
+	int (*battery_level)(void);
+	int (*is_charging)(void);
+
+	// How many LEDs the device's LED settings control: 0 on devices without
+	// controllable LEDs, and on desktop. Setting them is up to the plugin,
+	// through the platform's own files in /sys, and the launcher's LED rules
+	// set them again when the device starts or stops charging, gets low on
+	// battery, or sleeps.
+	int (*led_count)(void);
+
+	// Powers the device off, or reboots it when reboot is 1, the way the
+	// quick menu's Poweroff and Reboot do: on the next frame, after every
+	// plugin's before_poweroff. On desktop both quit the launcher.
+	void (*power_off)(int reboot);
+
+	// 1 when stock's root would list Recently Played: Show Recents is on
+	// in Settings and there are recents. A root_replace can add the folder
+	// itself, as a NUI_ENTRY_DIR at sdcard_path + "/Recently Played".
+	int (*show_recents)(void);
 } NUIHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -346,6 +370,15 @@ typedef struct NUIPlugin {
 	// the stock root (the owner's own root_entries too, if it has one); 0,
 	// the default and what older plugins get, leaves them out.
 	int root_with_entries;
+
+	// Repairing recents. When a line in recent.txt names a file that's no
+	// longer on the card, which stock drops, this can write the full path
+	// it moved to and return 1, or return 0. The first plugin to answer
+	// wins. The new path is used only when it's on the card (a game or pak) and
+	// isn't a recent already; recents are saved with it, keeping the line's
+	// place and name. It runs whenever recents load: at start, and when the
+	// lists reload.
+	int (*repair_path)(const char* missing, char* out, size_t size);
 } NUIPlugin;
 
 #define NUI_PLUGIN_ENTRY "nextui_plugin_get"

@@ -10,16 +10,14 @@ static int bluetoothOn(void) { return CFG_getBluetooth(); }
 static void toggleWifi(void) { WIFI_enable(!WIFI_enabled()); }
 static void toggleBluetooth(void) { BT_enable(!BT_enabled()); }
 static void sleepNow(void) { PWR_sleep(); }
-static void rebootNow(void) {
+void QuickItem_powerOff(int reboot) {
+	Plugins_started(); // powering off before the first frame isn't a crash
 	Plugins_beforePoweroff();
 	cleanupImageLoaderPool();  // Stop worker threads before SDL cleanup
-	PWR_powerOff(1);
+	PWR_powerOff(reboot);
 }
-static void powerOffNow(void) {
-	Plugins_beforePoweroff();
-	cleanupImageLoaderPool();  // Stop worker threads before SDL cleanup
-	PWR_powerOff(0);
-}
+static void rebootNow(void) { QuickItem_powerOff(1); }
+static void powerOffNow(void) { QuickItem_powerOff(0); }
 
 static const QuickItem items[] = {
 	{ .name = "Settings", .kind = QUICK_PAK, .asset = ASSET_SETTINGS },

@@ -282,6 +282,25 @@ int main(void) {
 	Actions_register(&replacement);
 	CHECK(Actions_find("test.open") == &replacement);
 
+	// save and restore: what a declined plugin registered goes, and an
+	// action it replaced comes back
+	const Action* saved[ACTIONS_MAX];
+	int saved_count = Actions_list(saved, ACTIONS_MAX);
+	CHECK(saved_count == 2);
+	static const Action added = { "test.added", "ADD", NULL, runOpen };
+	static const Action taken = { "test.back", "TAKEN", NULL, runBack };
+	Actions_register(&added);
+	Actions_register(&taken);
+	CHECK(Actions_find("test.added") == &added);
+	CHECK(Actions_find("test.back") == &taken);
+	Actions_restore(saved, saved_count);
+	CHECK(Actions_find("test.added") == NULL);
+	CHECK(Actions_find("test.back") == &backAction);
+	CHECK(Actions_find("test.open") == &replacement);
+	const Action* now[ACTIONS_MAX];
+	CHECK(Actions_list(now, ACTIONS_MAX) == 2);
+	CHECK(Actions_list(now, 1) == 2); // the count, even when out is short
+
 	test_shared_buttons();
 	test_fires();
 	test_overrides();
