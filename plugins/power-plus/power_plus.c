@@ -16,6 +16,8 @@
 // later than the alarm, resumes as usual, and the alarm is cleared. It
 // doesn't power off while charging, or while /tmp/stay_awake or
 // /tmp/stay_alive exists. Without a writable wake alarm this part is off.
+// It's off by default too, until the wake alarm has been checked on a
+// device.
 //
 // Stock's own screen and suspend timeouts still decide when the device
 // sleeps and goes into deep sleep. On a platform without a battery, such as
@@ -217,7 +219,7 @@ static int init(const MosaicHost* h) {
 	PpGuard_init(&guard, warn_at, off_at);
 
 	sleep_period = 0;
-	if (isOn("sleep_off", "on")) {
+	if (isOn("sleep_off", "off")) {
 		if (access(PP_WAKEALARM_PATH, W_OK) == 0) {
 			sleep_period = 3600L * Pp_parseNumber(host->cfg_get(ID, "sleep_hours", "4"), 1, 72, PP_HOURS_DEFAULT);
 		}

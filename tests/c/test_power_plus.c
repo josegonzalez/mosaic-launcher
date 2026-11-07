@@ -270,6 +270,7 @@ static void testSleepOff(void) {
 	is_charging_now = 0;
 	unlink(PP_STAY_ALIVE_PATH);
 	writeFile(PP_WAKEALARM_PATH, "");
+	sleep_off_setting = "on";
 	start();
 	CHECK(sleep_period == 4 * 3600);
 	char alarm[32];
@@ -336,27 +337,32 @@ static void testSleepOff(void) {
 	beforePoweroff();
 	readFile(PP_WAKEALARM_PATH, alarm, sizeof(alarm));
 	CHECK_STR(alarm, "0");
+	sleep_off_setting = NULL;
 }
 
 static void testSleepOffUnavailable(void) {
 	battery = 50;
-	// turned off
-	writeFile(PP_WAKEALARM_PATH, "");
-	sleep_off_setting = "off";
-	start();
-	CHECK(sleep_period == 0);
-	beforeSleep();
-	char alarm[32];
-	readFile(PP_WAKEALARM_PATH, alarm, sizeof(alarm));
-	CHECK_STR(alarm, "");
-	sleep_off_setting = NULL;
+	// off by default, and turned off
+	const char* off[] = { NULL, "off" };
+	for (int i = 0; i < 2; i++) {
+		writeFile(PP_WAKEALARM_PATH, "");
+		sleep_off_setting = off[i];
+		start();
+		CHECK(sleep_period == 0);
+		beforeSleep();
+		char alarm[32];
+		readFile(PP_WAKEALARM_PATH, alarm, sizeof(alarm));
+		CHECK_STR(alarm, "");
+	}
 
 	// no wake alarm to set
 	unlink(PP_WAKEALARM_PATH);
+	sleep_off_setting = "on";
 	start();
 	CHECK(sleep_period == 0);
 	beforeSleep();
 	CHECK(access(PP_WAKEALARM_PATH, F_OK) != 0);
+	sleep_off_setting = NULL;
 }
 
 int main(void) {
