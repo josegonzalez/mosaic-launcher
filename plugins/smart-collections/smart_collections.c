@@ -1,0 +1,325 @@
+// Smart collections: a folder on the root holding one collection per game
+// franchise (Mario, Zelda, Sonic and so on), built from game names across
+// every system.
+//
+// The card is scanned once per launcher start, the first time the root is
+// listed. Games are matched by name, the same name the game list shows
+// (map.txt aliases included), against a built-in list of franchises plus
+// any the "extra" setting adds. A franchise becomes a collection once it
+// has "min" games.
+//
+// Y on a collection dismisses it; the plugin remembers dismissed ones in
+// its .cfg. Y on the Smart Collections folder brings them all back.
+
+#include <dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include "nextui_plugin.h"
+#include "smart_model.h"
+
+#define ID "smart-collections"
+#define FOLDER_NAME "Smart Collections"
+#define MAX_PATH_LEN 512
+#define MAX_DEPTH 2 // subfolders below a system folder that are scanned
+
+static const NUIHost* host;
+static char folder_path[MAX_PATH_LEN]; // <sd>/Smart Collections
+static SMCatalog catalog;
+static SMIndex index_;
+static SMNameSet dismissed;
+static int min_games = 2;
+static int scanned = 0;
+
+static void say(const char* message) {
+	host->log(ID, message);
+}
+
+static int exists(const char* path) {
+	struct stat st;
+	return stat(path, &st) == 0;
+}
+
+static int isDir(const char* path) {
+	struct stat st;
+	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+static int endsWith(const char* s, const char* suffix) {
+	size_t a = strlen(s), b = strlen(suffix);
+	return a >= b && !strcmp(s + a - b, suffix);
+}
+
+// Names stock leaves out of its lists.
+static int hidden(const char* name) {
+	return name[0] == '.' || endsWith(name, ".disabled") || !strcmp(name, "map.txt");
+}
+
+static char* readFile(const char* path) {
+	FILE* f = fopen(path, "r");
+	if (!f) return NULL;
+	fseek(f, 0, SEEK_END);
+	long size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	char* text = size >= 0 ? malloc((size_t)size + 1) : NULL;
+	if (text) text[fread(text, 1, (size_t)size, f)] = '\0';
+	fclose(f);
+	return text;
+}
+
+///////////////////////////////////////
+// scanning
+
+// True when a system folder has an emulator, as stock checks before
+// listing it: the emulator is the tag in the folder's last parentheses.
+static int hasEmulator(const char* system) {
+	char emu[256];
+	const char* open = strrchr(system, '(');
+	if (snprintf(emu, sizeof(emu), "%s", open ? open + 1 : system) >= (int)sizeof(emu)) return 0;
+	char* close = strchr(emu, ')');
+	if (open && close) *close = '\0';
+
+	char path[MAX_PATH_LEN * 2];
+	if (snprintf(path, sizeof(path), "%s/.system/%s/paks/Emus/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
+			&& exists(path)) return 1;
+	return snprintf(path, sizeof(path), "%s/Emus/%s/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
+		&& exists(path);
+}
+
+// A folder that launches a game when opened: it holds a .cue or .m3u
+// named after itself.
+static int isGameFolder(const char* path, const char* name) {
+	char file[MAX_PATH_LEN * 2];
+	if (snprintf(file, sizeof(file), "%s/%s.cue", path, name) < (int)sizeof(file) && exists(file)) return 1;
+	return snprintf(file, sizeof(file), "%s/%s.m3u", path, name) < (int)sizeof(file) && exists(file);
+}
+
+static void scanDir(const char* dir, int depth) {
+	DIR* dh = opendir(dir);
+	if (!dh) return;
+
+	char map_path[MAX_PATH_LEN + 16];
+	snprintf(map_path, sizeof(map_path), "%s/map.txt", dir);
+	char* map = readFile(map_path);
+
+	struct dirent* dp;
+	while ((dp = readdir(dh)) != NULL) {
+		if (hidden(dp->d_name)) continue;
+		char path[MAX_PATH_LEN];
+		if (snprintf(path, sizeof(path), "%s/%s", dir, dp->d_name) >= (int)sizeof(path)) continue;
+
+		int type = NUI_ENTRY_ROM;
+		if (isDir(path)) {
+			if (endsWith(dp->d_name, ".pak")) continue;
+			if (!isGameFolder(path, dp->d_name)) {
+				if (depth < MAX_DEPTH) scanDir(path, depth + 1);
+				continue;
+			}
+			type = NUI_ENTRY_DIR;
+		}
+
+		char name[256];
+		if (!map || !SM_mapLookup(map, dp->d_name, name, sizeof(name))) SM_cleanName(dp->d_name, name, sizeof(name));
+		if (hidden(name)) continue; // map.txt can hide a game
+		SM_indexAdd(&index_, &catalog, path, name, type);
+	}
+	closedir(dh);
+	free(map);
+}
+
+static void scan(void) {
+	if (scanned) return;
+	scanned = 1;
+
+	char roms[MAX_PATH_LEN];
+	snprintf(roms, sizeof(roms), "%s/Roms", host->sdcard_path);
+	DIR* dh = opendir(roms);
+	if (!dh) return;
+	struct dirent* dp;
+	while ((dp = readdir(dh)) != NULL) {
+		if (hidden(dp->d_name) || !hasEmulator(dp->d_name)) continue;
+		char path[MAX_PATH_LEN];
+		if (snprintf(path, sizeof(path), "%s/%s", roms, dp->d_name) >= (int)sizeof(path)) continue;
+		if (isDir(path)) scanDir(path, 0);
+	}
+	closedir(dh);
+	SM_indexSort(&index_, &catalog);
+
+	int shown[SM_MAX_FRANCHISES];
+	char message[128];
+	snprintf(message, sizeof(message), "%d games in %d collections",
+		index_.game_count, SM_visible(&index_, &catalog, min_games, &dismissed, shown));
+	say(message);
+}
+
+///////////////////////////////////////
+// paths
+
+// The collection a path under the folder names, or -1.
+static int collectionAt(const char* path) {
+	size_t len = strlen(folder_path);
+	if (!path || strncmp(path, folder_path, len) != 0 || path[len] != '/') return -1;
+	return SM_find(&catalog, path + len + 1);
+}
+
+///////////////////////////////////////
+// dismissing and restoring
+
+static void saveDismissed(void) {
+	char list[SM_MAX_FRANCHISES * SM_NAME_LEN];
+	SM_setFormat(&dismissed, list, sizeof(list));
+	host->cfg_set(ID, "dismissed", list);
+}
+
+static void changed(const char* message) {
+	if (NUI_HOST_HAS(host, toast)) host->toast(message);
+	if (NUI_HOST_HAS(host, reload_lists)) host->reload_lists();
+	host->request_redraw();
+}
+
+// The collection waiting on the dismiss dialog.
+static char pending[SM_NAME_LEN];
+
+static void dismissConfirmed(void* data) {
+	(void)data;
+	if (!pending[0] || !SM_setAdd(&dismissed, pending)) return;
+	saveDismissed();
+	char message[SM_NAME_LEN + 32];
+	snprintf(message, sizeof(message), "dismissed %s", pending);
+	say(message);
+	snprintf(message, sizeof(message), "Dismissed %s", pending);
+	pending[0] = '\0';
+	changed(message);
+}
+
+static int canDismiss(void* data) {
+	(void)data;
+	const NUIEntry* entry = host->selected_entry();
+	if (!entry || host->entry_type(entry) != NUI_ENTRY_DIR) return 0;
+	int i = collectionAt(host->entry_path(entry));
+	return i >= 0 && !SM_setHas(&dismissed, catalog.items[i].name);
+}
+
+static void dismiss(void* data) {
+	if (!canDismiss(data)) return;
+	int i = collectionAt(host->entry_path(host->selected_entry()));
+	snprintf(pending, sizeof(pending), "%s", catalog.items[i].name);
+	if (!NUI_HOST_HAS(host, confirm)) {
+		dismissConfirmed(NULL);
+		return;
+	}
+	char question[SM_NAME_LEN + 32];
+	snprintf(question, sizeof(question), "Dismiss %s?", pending);
+	host->confirm(question, "DISMISS", dismissConfirmed, NULL);
+}
+
+static void restoreConfirmed(void* data) {
+	(void)data;
+	if (!dismissed.count) return;
+	dismissed.count = 0;
+	saveDismissed();
+	say("brought back dismissed collections");
+	changed("Dismissed collections are back");
+}
+
+static int canRestore(void* data) {
+	(void)data;
+	const NUIEntry* entry = host->selected_entry();
+	return entry && dismissed.count > 0 && !strcmp(host->entry_path(entry), folder_path);
+}
+
+static void restore(void* data) {
+	if (!canRestore(data)) return;
+	if (!NUI_HOST_HAS(host, confirm)) {
+		restoreConfirmed(NULL);
+		return;
+	}
+	char question[64];
+	snprintf(question, sizeof(question), "Bring back %d dismissed collection%s?", dismissed.count, dismissed.count == 1 ? "" : "s");
+	host->confirm(question, "RESTORE", restoreConfirmed, NULL);
+}
+
+///////////////////////////////////////
+// hooks
+
+// Shown while any franchise has enough games, even if all are dismissed,
+// so they can be brought back.
+static void rootEntries(NUIList* root) {
+	scan();
+	int found[SM_MAX_FRANCHISES];
+	if (SM_visible(&index_, &catalog, min_games, NULL, found) == 0) return;
+	host->list_push(root, host->entry_new(folder_path, NUI_ENTRY_DIR, FOLDER_NAME));
+}
+
+static NUIList* virtualDir(const char* path) {
+	if (!strcmp(path, folder_path)) {
+		scan();
+		NUIList* list = host->list_new();
+		int shown[SM_MAX_FRANCHISES];
+		int n = SM_visible(&index_, &catalog, min_games, &dismissed, shown);
+		for (int k = 0; k < n; k++) {
+			const char* name = catalog.items[shown[k]].name;
+			char dir[MAX_PATH_LEN + SM_NAME_LEN];
+			snprintf(dir, sizeof(dir), "%s/%s", folder_path, name);
+			host->list_push(list, host->entry_new(dir, NUI_ENTRY_DIR, name));
+		}
+		return list;
+	}
+
+	size_t len = strlen(folder_path);
+	if (strncmp(path, folder_path, len) != 0 || path[len] != '/') return NULL;
+	scan();
+	NUIList* list = host->list_new();
+	int i = collectionAt(path);
+	if (i < 0) return list;
+	for (int k = 0; k < index_.member_count[i]; k++) {
+		const SMGame* game = &index_.games[index_.members[i][k]];
+		if (!exists(game->path)) continue; // deleted since the scan
+		host->list_push(list, host->entry_new(game->path, game->type, game->name));
+	}
+	return list;
+}
+
+static int init(const NUIHost* h) {
+	host = h;
+	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
+
+	SM_catalogInit(&catalog);
+	if (strcmp(host->cfg_get(ID, "builtin", "on"), "off") != 0) SM_catalogAddBuiltin(&catalog);
+	SM_catalogAddList(&catalog, host->cfg_get(ID, "extra", ""));
+	min_games = atoi(host->cfg_get(ID, "min", "2"));
+	if (min_games < 1) min_games = 1;
+	SM_setParse(&dismissed, host->cfg_get(ID, "dismissed", ""));
+	SM_indexInit(&index_);
+	scanned = 0;
+
+	if (host->register_action("smart-collections.dismiss", "DISMISS", canDismiss, dismiss, NULL) != 0
+			|| host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "smart-collections.dismiss") != 0) {
+		say("couldn't bind Y; collections can't be dismissed");
+	}
+	if (host->register_action("smart-collections.restore", "RESTORE", canRestore, restore, NULL) != 0
+			|| host->bind_button(NUI_SCREEN_GAMELIST, NUI_BUTTON_Y, NUI_TRIGGER_PRESS, "smart-collections.restore") != 0) {
+		say("couldn't bind Y; dismissed collections can't be brought back");
+	}
+	return 0;
+}
+
+static void quit(void) {
+	SM_indexFree(&index_);
+}
+
+static const NUIPlugin plugin = {
+	.size = sizeof(NUIPlugin),
+	.api_version = NUI_API_VERSION,
+	.id = ID,
+	.init = init,
+	.quit = quit,
+	.root_entries = rootEntries,
+	.virtual_dir = virtualDir,
+};
+
+const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+	(void)h;
+	return &plugin;
+}

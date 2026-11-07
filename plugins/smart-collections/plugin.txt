@@ -1,0 +1,9 @@
+id=smart-collections
+name=Smart Collections
+api=1
+# the franchises that ship with the plugin, such as Mario, Zelda and Sonic
+setting.builtin=toggle|Built-in franchises|on
+# more franchises, comma-separated, eg. Kirby, Bomberman
+setting.extra=text|More franchises|
+# the fewest games a franchise needs to become a collection
+setting.min=choice|Smallest collection|2|1,2,3,5,10

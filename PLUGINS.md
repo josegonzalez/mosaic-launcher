@@ -76,6 +76,7 @@ Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files).
 | Plugin | What it does |
 |---|---|
 | `favorites` | A Favorites folder on the root. **Y** on the game list adds or removes the selected game or pak. |
+| `smart-collections` | A Smart Collections folder on the root with one collection per franchise (Mario, Zelda, Sonic and so on), matched by game name across every system. **Y** on a collection dismisses it, and **Y** on the folder brings dismissed ones back. Settings add franchises, turn off the built-in list, and set the fewest games a collection needs. From kUI. |
 
 Every hook in `NUIPlugin` is optional; leave out what you don't use. The launcher calls plugins only on its main thread. Both `NUIPlugin` and `NUIHost` start with their own `size`, and fields are only ever added at the end, so a plugin built against an older header keeps working with a newer launcher.
 
