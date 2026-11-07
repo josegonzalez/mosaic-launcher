@@ -184,23 +184,7 @@ void toggleQuick(Entry* self)
 	if(!self)
 		return;
 
-	if(!strcmp(self->name, "Wifi")) {
-		WIFI_enable(!WIFI_enabled());
-	}
-	else if(!strcmp(self->name, "Bluetooth")) {
-		BT_enable(!BT_enabled());
-	}
-	else if(!strcmp(self->name, "Sleep")) {
-		PWR_sleep();
-	}
-	else if(!strcmp(self->name, "Reboot")) {
-		cleanupImageLoaderPool();  // Stop worker threads before SDL cleanup
-		PWR_powerOff(1);
-	}
-	else if(!strcmp(self->name, "Poweroff")) {
-		cleanupImageLoaderPool();  // Stop worker threads before SDL cleanup
-		PWR_powerOff(0);
-	}
+	QuickItem_activate(self->name);
 }
 
 void Entry_open(Entry* self) {

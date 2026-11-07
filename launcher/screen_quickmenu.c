@@ -102,9 +102,8 @@ void QuickMenu_render(void) {
 	char fallbackBgPath[MAX_PATH];
 
 	char bgSubject[MAX_PATH];
-	snprintf(bgSubject, sizeof(bgSubject), "%s%s", current->name,
-		!strcmp(current->name,"Wifi") && !CFG_getWifi() || 							// wifi or wifi_off, based on state
-		!strcmp(current->name,"Bluetooth") && !CFG_getBluetooth() ? "_off" : "");	// bluetooth or bluetooth_off, based on state
+	// wifi or wifi_off, bluetooth or bluetooth_off, based on state
+	snprintf(bgSubject, sizeof(bgSubject), "%s%s", current->name, QuickItem_isOff(current->name) ? "_off" : "");
 	resolveArt(ART_QUICK_BG, bgSubject, newBgPath, sizeof(newBgPath));
 	resolveArt(ART_QUICK_FALLBACK, NULL, fallbackBgPath, sizeof(fallbackBgPath));
 
@@ -217,21 +216,7 @@ void QuickMenu_render(void) {
 
 			GFX_blitPillColor(ASSET_WHITE_PILL, screen, &item_rect, item_color, RGB_WHITE);
 
-			int asset = ASSET_WIFI_OFF;
-			if (!strcmp(item->name,"Wifi"))
-				asset = CFG_getWifi() ? ASSET_WIFI : ASSET_WIFI_OFF;
-			else if (!strcmp(item->name,"Bluetooth"))
-				asset = CFG_getBluetooth() ? ASSET_BLUETOOTH : ASSET_BLUETOOTH_OFF;
-			else if (!strcmp(item->name,"Sleep"))
-				asset = ASSET_SUSPEND;
-			else if (!strcmp(item->name,"Reboot"))
-				asset = ASSET_RESTART;
-			else if (!strcmp(item->name,"Poweroff"))
-				asset = ASSET_POWEROFF;
-			else if (!strcmp(item->name,"Settings"))
-				asset = ASSET_SETTINGS;
-			else if (!strcmp(item->name,"Pak Store"))
-				asset = ASSET_STORE;
+			int asset = QuickItem_asset(item->name);
 
 			SDL_Rect rect;
 			GFX_assetRect(asset, &rect);
