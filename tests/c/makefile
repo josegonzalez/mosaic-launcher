@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override test_netplay
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -191,6 +191,12 @@ OVERRIDE := ../../plugins/emulator-override
 $(BUILD)/test_emulator_override: test_emulator_override.c $(wildcard $(OVERRIDE)/*.c $(OVERRIDE)/*.h) $(LAUNCHER)/launchcmd.c $(LAUNCHER)/launchcmd.h $(SDK)/mosaic_plugin.h check.h
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -I$(LAUNCHER) -DTEST_SDCARD_PATH=\"$(BUILD)/emulator-override-card\" test_emulator_override.c $(OVERRIDE)/override_model.c $(LAUNCHER)/launchcmd.c -o $@
+
+NETPLAY := ../../plugins/netplay
+
+$(BUILD)/test_netplay: test_netplay.c $(wildcard $(NETPLAY)/*.c $(NETPLAY)/*.h) $(SDK)/mosaic_plugin.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_SDCARD_PATH=\"$(BUILD)/netplay-card\" test_netplay.c $(NETPLAY)/netplay_model.c -o $@
 
 clean:
 	rm -rf $(BUILD)
