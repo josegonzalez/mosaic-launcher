@@ -66,6 +66,14 @@ Build it as a shared object, with no references into the launcher:
 gcc -shared -fPIC -I sdk hello.c -o lib/aarch64/plugin.so
 ```
 
+Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files). `make plugins-device` builds them all for devices in the tg5040 toolchain, `make plugins-desktop` for the desktop build, and `make pak` bundles them into `Launcher.pak/plugins/`. `make run-desktop` runs the desktop build with them available; turn one on with `<id>=on` in `/var/tmp/nextui/sdcard/.userdata/desktop/launcher/plugins.txt`.
+
+## Bundled plugins
+
+| Plugin | What it does |
+|---|---|
+| `favorites` | A Favorites folder on the root. **Y** on the game list adds or removes the selected game or pak. |
+
 Every hook in `NUIPlugin` is optional; leave out what you don't use. The launcher calls plugins only on its main thread. Both `NUIPlugin` and `NUIHost` start with their own `size`, and fields are only ever added at the end, so a plugin built against an older header keeps working with a newer launcher.
 
 ## Turning plugins on and off

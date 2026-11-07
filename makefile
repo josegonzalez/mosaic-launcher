@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop build-% devices pak release test smoke test-plugins lint drift clean
+.PHONY: all desktop run-desktop plugins-desktop plugins-device build-% devices pak release test smoke test-plugins lint drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -45,11 +45,19 @@ desktop: $(HOST_BIN)/gcc
 	$(MAKE) -C launcher PLATFORM=desktop CROSS_COMPILE=$(HOST_BIN)/ \
 		PREFIX=$(DESKTOP_PREFIX) PREFIX_LOCAL=$(DESKTOP_PREFIX_LOCAL)
 
+DESKTOP_PLUGIN_ARCH := desktop-$(shell uname -s | tr A-Z a-z)-$(shell uname -m)
+
+# The bundled plugins, for loading into the desktop build.
+plugins-desktop:
+	$(MAKE) -C plugins ARCH=$(DESKTOP_PLUGIN_ARCH) OUT=$(CURDIR)/build/desktop-plugins
+
 # Runs the desktop build against the faux SD card at /var/tmp/nextui/sdcard
-# that upstream's prepare script creates from the skeleton.
-run-desktop: desktop
+# that upstream's prepare script creates from the skeleton, with the bundled
+# plugins available (turn them on in .userdata/desktop/launcher/plugins.txt).
+run-desktop: desktop plugins-desktop
 	bash $(NEXTUI)/workspace/desktop/prepare_fake_sd_root.sh
-	$(DESKTOP_LIBRARY_PATH)=$(DESKTOP_PREFIX_LOCAL)/lib ./build/desktop/nextui.elf
+	NEXTUI_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/desktop-plugins \
+		$(DESKTOP_LIBRARY_PATH)=$(DESKTOP_PREFIX_LOCAL)/lib ./build/desktop/nextui.elf
 
 ###########################################################
 # devices
@@ -60,7 +68,14 @@ build-%:
 		ghcr.io/loveretro/$*-toolchain:latest \
 		/bin/bash -c 'cd /root/workspace && make -C launcher PLATFORM=$*'
 
-devices: $(addprefix build-,$(PLATFORMS))
+# One aarch64 build of the plugins, in the oldest sysroot, for every device.
+plugins-device:
+	@test -n "$(CONTAINER_RUNTIME)" || (echo "docker or podman is required" && exit 1)
+	$(CONTAINER_RUNTIME) run --rm -v $(CURDIR):/root/workspace \
+		ghcr.io/loveretro/tg5040-toolchain:latest \
+		/bin/bash -c 'cd /root/workspace && make -C plugins ARCH=aarch64 CC=$${CROSS_COMPILE}gcc OUT=/root/workspace/build/plugins'
+
+devices: $(addprefix build-,$(PLATFORMS)) plugins-device
 
 ###########################################################
 # packaging

@@ -53,10 +53,30 @@ jobs:
           name: nextui-${{ matrix.platform }}
           path: build/${{ matrix.platform }}/nextui.elf
 
+  # One aarch64 build of the bundled plugins, in the oldest sysroot, runs on
+  # every device.
+  plugins:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: ghcr.io/loveretro/tg5040-toolchain:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Build
+        run: make -C plugins ARCH=aarch64 CC="${CROSS_COMPILE}gcc" OUT="$PWD/build/plugins"
+
+      - name: Upload
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: plugins
+          path: build/plugins
+
   package:
     needs:
       - check
       - build
+      - plugins
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -73,6 +93,12 @@ jobs:
         uses: actions/download-artifact@v8.0.2
         with:
           pattern: nextui-*
+
+      - name: Download plugins
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: plugins
+          path: build/plugins
 
       - name: Place builds
         run: |

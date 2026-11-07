@@ -1,0 +1,3 @@
+id=favorites
+name=Favorites
+api=1

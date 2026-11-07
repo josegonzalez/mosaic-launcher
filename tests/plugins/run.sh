@@ -62,6 +62,13 @@ grep -q "plugins: hello targets API 99" "$WORK/api.log" || fail "the API mismatc
 grep -q "plugins: loaded hello" "$WORK/api.log" && fail "a mismatched plugin loaded"
 rm -rf "$WORK/plugins/hello.plugin"
 
+# the bundled plugins load and start cleanly
+make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building the bundled plugins"
+run_launcher "$WORK/bundled.log" || fail "the launcher exited early with the bundled plugins"
+grep -q "plugins: loaded favorites" "$WORK/bundled.log" || fail "favorites didn't load"
+grep -q "couldn't bind Y" "$WORK/bundled.log" && fail "favorites couldn't bind Y"
+rm -rf "$WORK/plugins"/*.plugin
+
 # a crash while starting pauses plugins on the next start
 build_plugin crasher 'id=crasher\nname=Crasher\napi=1\n'
 run_launcher "$WORK/crash.log" && fail "the crashing plugin didn't crash the launcher"

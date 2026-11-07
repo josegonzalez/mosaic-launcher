@@ -84,7 +84,17 @@ for platform in "$@"; do
 	chmod +x "$OUT/bin/$platform"/*
 done
 
+# Bundled plugins, from `make plugins-device`. They ship turned off.
+if [ -d "$ROOT/build/plugins" ]; then
+	for plugin in "$ROOT"/build/plugins/*.plugin; do
+		[ -f "$plugin/lib/aarch64/plugin.so" ] || continue
+		mkdir -p "$OUT/plugins"
+		cp -R "$plugin" "$OUT/plugins/"
+	done
+fi
+
 cp "$ROOT/LICENSE" "$OUT/licenses/nextui-launcher.txt"
+cp "$ROOT/sdk/LICENSE" "$OUT/licenses/nextui-launcher-sdk.txt"
 for tool in minui-presenter minui-list; do
 	fetch_pinned "$tool" LICENSE "$OUT/licenses/$tool.txt"
 done
