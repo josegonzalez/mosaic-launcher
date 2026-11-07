@@ -8,6 +8,8 @@ PAK_DIR="$(cd "$(dirname "$0")" && pwd)"
 PAK_NAME="$(basename "$PAK_DIR" .pak)"
 # shellcheck source=pak/bin/common.sh
 . "$PAK_DIR/bin/common.sh"
+# shellcheck source=pak/bin/plugins.sh
+. "$PAK_DIR/bin/plugins.sh"
 
 mkdir -p "$LOGS_PATH" "$STATE_DIR"
 exec >>"$LOGS_PATH/$PAK_NAME.txt" 2>&1
@@ -55,6 +57,9 @@ write_menu() {
 		if in_fallback || plugins_paused; then
 			echo '{"name": "Try again"},'
 		fi
+		if [ -n "$(plugin_dirs)" ]; then
+			echo '{"name": "Plugins"},'
+		fi
 		if is_enabled; then
 			echo '{"name": "Turn off"}'
 		else
@@ -93,6 +98,46 @@ turn_off() {
 	show_message "Launcher is off.\nThe stock launcher is back."
 }
 
+# One row per plugin, "<name>: On" or "<name>: Off". selecting one flips it.
+# The launcher reads the choices the next time it starts, which is when the
+# user leaves this pak.
+plugins_page() {
+	while true; do
+		rows="$WORK_DIR/plugin-rows"
+		: >"$rows"
+		{
+			echo '{"items": ['
+			first=1
+			plugin_dirs | while IFS="$(printf '\t')" read -r dir bundled; do
+				id="$(plugin_field "$dir" id)"
+				name="$(json_text "$(plugin_field "$dir" name)")"
+				[ -n "$id" ] || continue
+				[ -n "$name" ] || name="$id"
+				if plugin_enabled "$id" "$bundled"; then label="$name: On"; else label="$name: Off"; fi
+				printf '%s\t%s\n' "$label" "$id" >>"$rows"
+				[ "$first" = 1 ] || echo ','
+				first=0
+				printf '{"name": "%s"}' "$label"
+			done
+			echo ']}'
+		} >"$WORK_DIR/plugins.json"
+
+		rm -f "$WORK_DIR/selection"
+		if ! minui-list --file "$WORK_DIR/plugins.json" --title "Plugins" \
+			--write-location "$WORK_DIR/selection" --confirm-text "TOGGLE"; then
+			return
+		fi
+
+		picked="$(cat "$WORK_DIR/selection" 2>/dev/null)"
+		id="$(awk -F '\t' -v label="$picked" '$1 == label { print $2; exit }' "$rows")"
+		[ -n "$id" ] || continue
+		case "$picked" in
+			*": On") plugin_set "$id" off ;;
+			*) plugin_set "$id" on ;;
+		esac
+	done
+}
+
 try_again() {
 	rm -f "$STATE_DIR/fallback" "$STATE_DIR/crashes" "$STATE_DIR/plugins_paused" "$STATE_DIR/loading"
 	show_message "Crash guard reset.\nThe launcher and its plugins start when you leave this screen."
@@ -110,5 +155,6 @@ while true; do
 		"Turn on") turn_on ;;
 		"Turn off") turn_off ;;
 		"Try again") try_again ;;
+		"Plugins") plugins_page ;;
 	esac
 done

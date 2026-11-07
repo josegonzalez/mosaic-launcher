@@ -65,7 +65,7 @@ fetch_pinned() {
 }
 
 cp "$ROOT/pak/launch.sh" "$OUT/launch.sh"
-for script in common.sh boot.sh wrapper.sh hook-stub.sh; do
+for script in common.sh plugins.sh boot.sh wrapper.sh hook-stub.sh; do
 	cp "$ROOT/pak/bin/$script" "$OUT/bin/$script"
 done
 chmod +x "$OUT/launch.sh" "$OUT"/bin/*.sh

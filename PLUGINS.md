@@ -78,7 +78,9 @@ Every hook in `NUIPlugin` is optional; leave out what you don't use. The launche
 
 ## Turning plugins on and off
 
-`.userdata/<platform>/launcher/plugins.txt` holds the user's choices:
+On the device, open **Launcher** from Tools and choose **Plugins**. Each plugin shows as On or Off; selecting one flips it, and the change takes effect when you leave the Launcher screen.
+
+Behind that, `.userdata/<platform>/launcher/plugins.txt` holds the user's choices:
 
 ```
 favorites=on
