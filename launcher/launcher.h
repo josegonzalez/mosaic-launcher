@@ -38,6 +38,7 @@
 #include "plugins.h"
 #include "toast.h"
 #include "awake.h"
+#include "power.h"
 #include "pakhooks.h"
 #include "modal.h"
 #include "cfgfile.h"

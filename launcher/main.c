@@ -93,7 +93,7 @@ int main (int argc, char *argv[]) {
 		selected = state.top->selected;
 		total = state.top->entries->count;
 
-		PWR_update(&state.dirty, &show_setting, Plugins_beforeSleep, Plugins_afterResume);
+		Power_update(&state.dirty, &show_setting);
 		Plugins_tick(now);
 		// a plugin asked to power off or reboot (host->power_off)
 		if (state.power_off) {

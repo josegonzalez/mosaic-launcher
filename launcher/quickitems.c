@@ -9,10 +9,9 @@ static int bluetoothOn(void) { return CFG_getBluetooth(); }
 
 static void toggleWifi(void) { WIFI_enable(!WIFI_enabled()); }
 static void toggleBluetooth(void) { BT_enable(!BT_enabled()); }
-static void sleepNow(void) { PWR_sleep(); }
+static void sleepNow(void) { Power_sleep(); }
 void QuickItem_powerOff(int reboot) {
-	Plugins_started(); // powering off before the first frame isn't a crash
-	Plugins_beforePoweroff();
+	Power_beforePoweroff();
 	cleanupImageLoaderPool();  // Stop worker threads before SDL cleanup
 	PWR_powerOff(reboot);
 }
