@@ -10,6 +10,12 @@
 // Tools stay after the consoles. Recently Played and collections keep
 // their own order, though their names still lose the number.
 //
+// A root another plugin replaced, such as all games' or focus mode's,
+// keeps its owner's order, whatever the load order. It's told apart by an
+// entry stock's root never lists (see NumPrefix_replacedRoot): filter sees
+// every entry before the list is sorted, so it notes one there. Names on
+// it still lose the number.
+//
 // The "hide" setting keeps the number in the name when off.
 
 #include <stdio.h>
@@ -22,8 +28,26 @@
 static const NUIHost* host;
 static int hide_number = 1;
 static NumCache numbers;
+static int root_replaced = 0; // the root being listed isn't stock's
+static int root_listed = 1;   // the next root filter starts a new listing
+
+static int isRoot(const char* dir_path) {
+	return dir_path && !strcmp(dir_path, host->sdcard_path);
+}
+
+// Keeps every entry; it only looks at the root's.
+static int filter(const NUIEntry* entry, const char* dir_path) {
+	if (!isRoot(dir_path)) return 1;
+	if (root_listed) {
+		root_replaced = 0;
+		root_listed = 0;
+	}
+	if (NumPrefix_replacedRoot(host->sdcard_path, host->entry_path(entry))) root_replaced = 1;
+	return 1;
+}
 
 static int displayName(const NUIEntry* entry, char* out, size_t size) {
+	root_listed = 1; // filtering is over, for the root too
 	const char* path = host->entry_path(entry);
 	const char* name = host->entry_name(entry);
 	long number;
@@ -49,10 +73,18 @@ static NumKey keyFor(const NUIEntry* entry, int on_root) {
 
 static int sortCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
 	if (NumPrefix_keepsOrder(host->sdcard_path, dir_path)) return 0;
-	int on_root = dir_path && !strcmp(dir_path, host->sdcard_path);
+	int on_root = isRoot(dir_path);
+	if (on_root && root_replaced) return 0; // the owner's order
 	NumKey ka = keyFor(a, on_root);
 	NumKey kb = keyFor(b, on_root);
 	return NumPrefix_compare(&ka, &kb);
+}
+
+// Ends a listing even when it had nothing to name.
+static void listReady(const NUIList* list, const char* dir_path) {
+	(void)list;
+	(void)dir_path;
+	root_listed = 1;
 }
 
 static void quit(void) {
@@ -62,6 +94,8 @@ static void quit(void) {
 static int init(const NUIHost* h) {
 	host = h;
 	NumCache_init(&numbers);
+	root_replaced = 0;
+	root_listed = 1;
 	hide_number = strcmp(host->cfg_get(ID, "hide", "on"), "off") != 0;
 	return 0;
 }
@@ -72,8 +106,10 @@ static const NUIPlugin plugin = {
 	.id = ID,
 	.init = init,
 	.quit = quit,
+	.filter = filter,
 	.display_name = displayName,
 	.sort_compare = sortCompare,
+	.list_ready = listReady,
 };
 
 const NUIPlugin* nextui_plugin_get(const NUIHost* h) {

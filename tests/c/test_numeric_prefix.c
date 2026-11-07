@@ -1,12 +1,15 @@
 // The numeric prefix plugin: its parsing, ordering and cache on their own,
 // then the plugin against a fake host, listing folders the way the
-// launcher does (display names, sort by name, plugin sort).
+// launcher does (filter, display names, sort by name, plugin sort,
+// list_ready). On a replaced root, all games' order follows it in the
+// chain, as when numeric-prefix loads first.
 
 #include <ctype.h>
 #include <stdlib.h>
 #include <strings.h>
 #include "check.h"
 #include "../../plugins/numeric-prefix/numeric_prefix.c"
+#include "../../plugins/all-games/games_model.h"
 
 struct NUIEntry {
 	char path[512];
@@ -121,6 +124,16 @@ static void testGroups(void) {
 	CHECK(NumPrefix_rootGroup(CARD, CARD "/Roms") == NUMPREFIX_AFTER);
 	CHECK(NumPrefix_rootGroup(CARD, CARD "/Romsick/x") == NUMPREFIX_AFTER);
 
+	CHECK(NumPrefix_replacedRoot(CARD, CARD "/Roms"));
+	CHECK(NumPrefix_replacedRoot(CARD, GB "/Tetris.gb"));
+	CHECK(NumPrefix_replacedRoot(CARD, GB "/Sub/Tetris.gb"));
+	CHECK(!NumPrefix_replacedRoot(CARD, GB));
+	CHECK(!NumPrefix_replacedRoot(CARD, CARD "/Recently Played"));
+	CHECK(!NumPrefix_replacedRoot(CARD, CARD "/Collections/Best.txt"));
+	CHECK(!NumPrefix_replacedRoot(CARD, CARD "/Favorites"));
+	CHECK(!NumPrefix_replacedRoot(CARD, CARD "/Romsick/x/y"));
+	CHECK(!NumPrefix_replacedRoot(CARD, NULL));
+
 	CHECK(NumPrefix_keepsOrder(CARD, CARD "/Recently Played"));
 	CHECK(NumPrefix_keepsOrder(CARD, CARD "/Collections/Best.txt"));
 	CHECK(!NumPrefix_keepsOrder(CARD, CARD "/Collections"));
@@ -182,9 +195,26 @@ static int byName(const void* a, const void* b) {
 	return strcasecmp((*(NUIEntry**)a)->name, (*(NUIEntry**)b)->name);
 }
 
-// display names, then (unless the list keeps its order) a sort by name,
-// then a stable sort by the plugin
+// The plugin after numeric-prefix in the chain, or NULL.
+typedef int (*Compare)(const NUIEntry* a, const NUIEntry* b, const char* dir_path);
+static Compare then = NULL;
+
+// all games' sort_compare on its root: folders above games
+static int allGamesCompare(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+	if (strcmp(dir_path, CARD)) return 0;
+	return AG_rootCompare(CARD "/Roms", a->path, b->path);
+}
+
+static int chained(const NUIPlugin* p, const NUIEntry* a, const NUIEntry* b, const char* dir) {
+	int order = p->sort_compare(a, b, dir);
+	if (!order && then) order = then(a, b, dir);
+	return order;
+}
+
+// filter, display names, then (unless the list keeps its order) a sort by
+// name, then a stable sort by the plugins, then list_ready
 static void listing(const NUIPlugin* p, const char* dir, int sort_by_name) {
+	for (int i = 0; p->filter && i < count; i++) CHECK(p->filter(list[i], dir));
 	for (int i = 0; i < count; i++) {
 		char name[128];
 		name[0] = '\0';
@@ -196,12 +226,13 @@ static void listing(const NUIPlugin* p, const char* dir, int sort_by_name) {
 	for (int i = 1; i < count; i++) {
 		NUIEntry* e = list[i];
 		int j = i;
-		while (j > 0 && p->sort_compare(list[j - 1], e, dir) > 0) {
+		while (j > 0 && chained(p, list[j - 1], e, dir) > 0) {
 			list[j] = list[j - 1];
 			j--;
 		}
 		list[j] = e;
 	}
+	if (p->list_ready) p->list_ready(NULL, dir);
 }
 
 static void checkOrder(const char* const* want, int n) {
@@ -272,6 +303,30 @@ static void testRoot(const NUIPlugin* p) {
 	checkOrder(promoted, 4);
 }
 
+// A root a plugin replaced keeps its owner's order: all games' keeps its
+// folders above its games, and focus mode's has no sort of its own.
+static void testReplacedRoot(const NUIPlugin* p) {
+	reset();
+	add(CARD "/Roms", "Systems", NUI_ENTRY_DIR);
+	add(GB "/10) Tetris.gb", "10) Tetris", NUI_ENTRY_ROM);
+	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
+	add(GB "/Alleyway.gb", "Alleyway", NUI_ENTRY_ROM);
+	add(CARD "/Favorites", "Favorites", NUI_ENTRY_DIR);
+	then = allGamesCompare;
+	listing(p, CARD, 1);
+	then = NULL;
+	const char* games[] = { "Favorites", "Systems", "Alleyway", "Kirby", "Tetris" };
+	checkOrder(games, 5);
+
+	reset();
+	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
+	add(GB "/1) Wario.gb", "1) Wario", NUI_ENTRY_ROM);
+	add(CARD "/Roms", "All systems", NUI_ENTRY_DIR);
+	listing(p, CARD, 1);
+	const char* focus[] = { "All systems", "Kirby", "Wario" };
+	checkOrder(focus, 3);
+}
+
 static void testKeptOrder(const NUIPlugin* p) {
 	reset();
 	add(GB "/Zelda.gb", "Zelda", NUI_ENTRY_ROM);
@@ -324,6 +379,8 @@ int main(void) {
 	CHECK(p->init(&fake) == 0);
 	testGames(p);
 	testRoot(p);
+	testReplacedRoot(p);
+	testRoot(p); // stock's root again, after a replaced one
 	testKeptOrder(p);
 	p->quit();
 

@@ -82,6 +82,14 @@ int NumPrefix_rootGroup(const char* sdcard, const char* path) {
 	return NUMPREFIX_AFTER;
 }
 
+int NumPrefix_replacedRoot(const char* sdcard, const char* path) {
+	if (!sdcard || !path) return 0;
+	char roms[512];
+	snprintf(roms, sizeof(roms), "%s/Roms", sdcard);
+	if (!strcmp(path, roms)) return 1;
+	return under(roms, path) && strchr(path + strlen(roms) + 1, '/') != NULL;
+}
+
 int NumPrefix_keepsOrder(const char* sdcard, const char* dir) {
 	if (!sdcard || !dir) return 0;
 	return isNamed(sdcard, dir, "Recently Played") || isCollection(sdcard, dir);

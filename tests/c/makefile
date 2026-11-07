@@ -90,9 +90,9 @@ $(BUILD)/test_hidden: test_hidden.c $(HIDDEN)/hidden.c $(HIDDEN)/hiddenset.c $(H
 
 NUMERIC := ../../plugins/numeric-prefix
 
-$(BUILD)/test_numeric_prefix: test_numeric_prefix.c $(wildcard $(NUMERIC)/*.c $(NUMERIC)/*.h) $(SDK)/nextui_plugin.h check.h
+$(BUILD)/test_numeric_prefix: test_numeric_prefix.c $(wildcard $(NUMERIC)/*.c $(NUMERIC)/*.h) ../../plugins/all-games/games_model.c ../../plugins/all-games/games_model.h $(SDK)/nextui_plugin.h check.h
 	mkdir -p $(BUILD)
-	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) test_numeric_prefix.c $(NUMERIC)/numprefix.c -o $@
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) test_numeric_prefix.c $(NUMERIC)/numprefix.c ../../plugins/all-games/games_model.c -o $@
 
 FOCUS := ../../plugins/focus-mode
 

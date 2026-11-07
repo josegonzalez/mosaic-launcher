@@ -46,6 +46,12 @@ enum {
 };
 int NumPrefix_rootGroup(const char* sdcard, const char* path);
 
+// True for an entry stock's root never lists, so only a plugin that
+// replaced the root put it there: the Roms folder itself, or anything
+// inside a console folder, such as a game. Other plugins' root folders
+// aren't in Roms.
+int NumPrefix_replacedRoot(const char* sdcard, const char* path);
+
 // True for lists that keep their own order: Recently Played and a
 // collection.
 int NumPrefix_keepsOrder(const char* sdcard, const char* dir);
