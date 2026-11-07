@@ -38,6 +38,7 @@ typedef struct LauncherState {
 	int startgame;
 	int animationdirection;
 	int dirty;
+	int reload; // list the open folders again before the next frame's input
 	int previous_row;
 	int previous_depth;
 } LauncherState;

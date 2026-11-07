@@ -240,6 +240,39 @@ Directory* Directory_new(char* path, int selected) {
 	Directory_index(self);
 	return self;
 }
+
+// Lists the directory again, after something on the card changed. The
+// selection follows the selected entry's path, or stays on the same row if
+// that entry is gone, and the visible rows move to keep it in view.
+void Directory_reload(Directory* self) {
+	char* was = NULL;
+	if (self->selected >= 0 && self->selected < self->entries->count) {
+		was = strdup(((Entry*)self->entries->items[self->selected])->path);
+	}
+	EntryArray_free(self->entries);
+	IntArray_free(self->alphas);
+	self->entries = Plugins_virtualDir(self->path);
+	if (!self->entries) self->entries = Listing_source(self->path);
+	self->alphas = IntArray_new();
+	Directory_index(self);
+
+	int count = self->entries->count;
+	int selected = was ? EntryArray_indexOf(self->entries, was) : -1;
+	free(was);
+	if (selected < 0) selected = self->selected < count ? self->selected : count - 1;
+	if (selected < 0) selected = 0;
+	self->selected = selected;
+
+	int rows = MAIN_ROW_COUNT;
+	if (self->start > selected) self->start = selected;
+	if (selected >= self->start + rows) self->start = selected - rows + 1;
+	self->end = self->start + rows;
+	if (self->end > count) {
+		self->end = count;
+		self->start = count > rows ? count - rows : 0;
+	}
+}
+
 void Directory_free(Directory* self) {
 	free(self->path);
 	free(self->name);
@@ -321,6 +354,20 @@ void addRecent(char* path, char* alias) {
 			state.recents->items[i] = tmp;
 		}
 	}
+	saveRecents();
+}
+
+int Recents_remove(int index) {
+	if (!state.recents || index < 0 || index >= state.recents->count) return -1;
+	Recent* recent = state.recents->items[index];
+	Array_remove(state.recents, recent);
+	Recent_free(recent);
+	saveRecents();
+	return 0;
+}
+void Recents_clear(void) {
+	if (!state.recents) return;
+	while (state.recents->count > 0) Recent_free(Array_pop(state.recents));
 	saveRecents();
 }
 
@@ -645,9 +692,16 @@ Array* getQuickToggles(void) {
 }
 
 Array* getRoot(void) {
+	// loads state.recents, which the game switcher and quick menu use even
+	// when a plugin replaces the root
+	int has_recents = hasRecents();
+
+	Array* replaced = Plugins_rootReplace();
+	if (replaced) return replaced;
+
     Array* root = Array_new();
 
-    if (hasRecents() && CFG_getShowRecents())
+    if (has_recents && CFG_getShowRecents())
 		Array_push(root, Entry_new(FAUX_RECENT_PATH, ENTRY_DIR));
 
 	Array *entries = getRoms();

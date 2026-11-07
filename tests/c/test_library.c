@@ -251,6 +251,149 @@ static void test_root_promotes_collections_without_consoles(void) {
 	EntryArray_free(root);
 }
 
+// The whole file, or "" if it can't be read.
+static char file_text[4096];
+static const char* readFile(const char* path) {
+	file_text[0] = '\0';
+	FILE* f = fopen(path, "r");
+	if (!f) return file_text;
+	size_t got = fread(file_text, 1, sizeof(file_text) - 1, f);
+	file_text[got] = '\0';
+	fclose(f);
+	return file_text;
+}
+
+static void test_root_replace_skips_stock_but_loads_recents(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Tetris.gb", "");
+	writeFile(TOOLS_PATH "/Clock.pak/launch.sh", "");
+	writeFile(RECENT_PATH, "/Roms/Game Boy (GB)/Tetris.gb\n");
+
+	Array* replacement = Array_new();
+	Array_push(replacement, Entry_new(SDCARD_PATH "/Focus", ENTRY_DIR));
+	stub_root_replace = replacement;
+	Array* root = getRoot();
+	CHECK(root == replacement);
+	CHECK(root->count == 1);
+	// recents still load for the game switcher
+	CHECK(state.recents->count == 1);
+	EntryArray_free(root);
+
+	// without an owner's list, stock's root again
+	root = getRoot();
+	CHECK(root->count == 3);
+	if (root->count == 3) CHECK_STR(((Entry*)root->items[0])->path, FAUX_RECENT_PATH);
+	EntryArray_free(root);
+}
+
+static void test_recents_remove_and_clear_save(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/A.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/B.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/C.gb", "");
+	writeFile(RECENT_PATH, "/Roms/Game Boy (GB)/A.gb\n/Roms/Game Boy (GB)/B.gb\tBee\n/Roms/Game Boy (GB)/C.gb\n");
+	hasRecents();
+	CHECK(state.recents->count == 3);
+
+	CHECK(Recents_remove(1) == 0);
+	CHECK(state.recents->count == 2);
+	CHECK_STR(readFile(RECENT_PATH), "/Roms/Game Boy (GB)/A.gb\n/Roms/Game Boy (GB)/C.gb\n");
+	CHECK(Recents_remove(2) == -1);
+	CHECK(Recents_remove(-1) == -1);
+	CHECK(state.recents->count == 2);
+
+	Recents_clear();
+	CHECK(state.recents->count == 0);
+	CHECK_STR(readFile(RECENT_PATH), "");
+}
+
+static void addGames(const char* names) {
+	char list[256];
+	snprintf(list, sizeof(list), "%s", names);
+	for (char* name = strtok(list, ","); name; name = strtok(NULL, ",")) {
+		char path[512];
+		snprintf(path, sizeof(path), ROMS_PATH "/Game Boy (GB)/%s.gb", name);
+		writeFile(path, "");
+	}
+}
+
+static void removeGame(const char* name) {
+	char path[512];
+	snprintf(path, sizeof(path), ROMS_PATH "/Game Boy (GB)/%s.gb", name);
+	CHECK(unlink(path) == 0);
+}
+
+static void test_reload_follows_the_selected_entry(void) {
+	resetCard();
+	addEmu("GB");
+	addGames("A,B,C,D");
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 2);
+	dir->start = 0;
+	dir->end = 4;
+	CHECK_STR(at(dir, dir->selected)->name, "C");
+
+	// a new game before it moves it down a row
+	addGames("AA");
+	Directory_reload(dir);
+	CHECK(dir->entries->count == 5);
+	CHECK(dir->selected == 3);
+	CHECK_STR(at(dir, dir->selected)->name, "C");
+	CHECK(dir->start == 0 && dir->end == 5);
+
+	// gone: the same row, now the next game
+	removeGame("C");
+	Directory_reload(dir);
+	CHECK(dir->selected == 3);
+	CHECK_STR(at(dir, dir->selected)->name, "D");
+
+	// gone from the end: the new last row
+	removeGame("D");
+	Directory_reload(dir);
+	CHECK(dir->entries->count == 3);
+	CHECK(dir->selected == 2);
+	CHECK(dir->start == 0 && dir->end == 3);
+
+	removeGame("A");
+	removeGame("AA");
+	removeGame("B");
+	Directory_reload(dir);
+	CHECK(dir->entries->count == 0);
+	CHECK(dir->selected == 0);
+	CHECK(dir->start == 0 && dir->end == 0);
+	Directory_free(dir);
+}
+
+static void test_reload_keeps_the_selection_in_view(void) {
+	resetCard();
+	addEmu("GB");
+	addGames("A,B,C,D,E,F,G,H");
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 7);
+	dir->start = 8 - MAIN_ROW_COUNT;
+	dir->end = 8;
+
+	// fewer rows than fit: everything shows
+	removeGame("H");
+	removeGame("G");
+	removeGame("F");
+	Directory_reload(dir);
+	CHECK(dir->entries->count == 5);
+	CHECK(dir->selected == 4);
+	CHECK(dir->start == 0 && dir->end == 5);
+
+	// more than fit, selection near the top: the window starts at it
+	addGames("A1,A2,A3,A4");
+	dir->selected = 0;
+	dir->start = 0;
+	dir->end = 5;
+	Directory_reload(dir);
+	CHECK(dir->entries->count == 9);
+	CHECK(dir->selected == 0);
+	CHECK(dir->start == 0 && dir->end == MAIN_ROW_COUNT);
+	Directory_free(dir);
+}
+
 int main(void) {
 	state.recents = Array_new();
 	test_root_orders_collections_consoles_tools();
@@ -264,5 +407,9 @@ int main(void) {
 	test_m3u_lists_discs();
 	test_collection_keeps_file_order_without_letter_index();
 	test_collections_folder_lists_collections_as_folders();
+	test_root_replace_skips_stock_but_loads_recents();
+	test_recents_remove_and_clear_save();
+	test_reload_follows_the_selected_entry();
+	test_reload_keeps_the_selection_in_view();
 	CHECK_DONE();
 }

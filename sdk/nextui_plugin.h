@@ -150,6 +150,27 @@ typedef struct NUIHost {
 	// starting from initial; on_done gets the text, or NULL if cancelled.
 	void (*confirm)(const char* message, const char* yes_label, void (*on_yes)(void* data), void* data);
 	void (*keyboard)(const char* title, const char* initial, void (*on_done)(const char* text, void* data), void* data);
+
+	// Opens a game, pak or folder (an enum NUIEntryType) the way selecting
+	// it in the game list would: a game or pak launches, after pre_launch,
+	// and a folder opens, launching its .cue or .m3u if it has one. Returns
+	// 1 when it opened or the launch is queued, 0 when it didn't (a missing
+	// file, a cancelled launch, or called from init, before the lists exist).
+	int (*open_path)(const char* path, int type);
+
+	// Recently played games and paks, newest first, as the game switcher
+	// lists them. recent_path returns the full path, or NULL past the end;
+	// the string stays valid until the next recent_path call. recent_remove
+	// returns 0 on success. Both changes are saved at once.
+	int (*recents_count)(void);
+	const char* (*recent_path)(int index);
+	int (*recent_remove)(int index);
+	void (*recents_clear)(void);
+
+	// Rebuilds the open folders from the card on the next frame, keeping
+	// each selection on the same entry where it can. Call it after changing
+	// something on disk, such as deleting a game or clearing recents.
+	void (*reload_lists)(void);
 } NUIHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -197,6 +218,12 @@ typedef struct NUIPlugin {
 	// The first plugin to answer wins. The image doesn't have to exist; the
 	// launcher falls back as it would for its own path.
 	int (*art_path)(const NUIEntry* entry, int kind, char* out, size_t size);
+
+	// The root slot. A plugin with slots=root in its plugin.txt can return
+	// the whole top-level list (from host->list_new) in place of the stock
+	// one, or NULL to keep stock's. Only the slot's owner is asked, and other
+	// plugins' root_entries aren't added to a replaced root.
+	NUIList* (*root_replace)(void);
 } NUIPlugin;
 
 #define NUI_PLUGIN_ENTRY "nextui_plugin_get"

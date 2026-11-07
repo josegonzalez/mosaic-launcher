@@ -29,6 +29,13 @@ Array* QuickItem_entries(void) {
 
 // plugins.c loads shared objects; listing tests run with no plugins.
 void Plugins_rootEntries(Array* root) { (void)root; }
+// A test sets this to stand in for a root slot owner's list; it's used once.
+Array* stub_root_replace = NULL;
+Array* Plugins_rootReplace(void) {
+	Array* root = stub_root_replace;
+	stub_root_replace = NULL;
+	return root;
+}
 Array* Plugins_virtualDir(const char* path) { (void)path; return NULL; }
 Array* Plugins_filter(Array* entries, const char* dir_path) { (void)dir_path; return entries; }
 int Plugins_displayNames(Array* entries) { (void)entries; return 0; }

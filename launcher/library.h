@@ -52,6 +52,9 @@ void Listing_buildIndex(Directory* self);
 
 void Directory_index(Directory* self);
 Directory* Directory_new(char* path, int selected);
+// Lists it again from the card, keeping the selection on the same entry
+// where it can.
+void Directory_reload(Directory* self);
 void Directory_free(Directory* self);
 void DirectoryArray_pop(Array* self);
 void DirectoryArray_free(Array* self);
@@ -70,6 +73,9 @@ int RecentArray_indexOf(Array* self, char* str);
 void RecentArray_free(Array* self);
 void saveRecents(void);
 void addRecent(char* path, char* alias);
+// Both save at once. Recents_remove returns 0, or -1 for a bad index.
+int Recents_remove(int index);
+void Recents_clear(void);
 
 Entry* entryFromPakName(char* pak_name);
 int hasEmu(char* emu_name);

@@ -317,3 +317,61 @@ void Menu_quit(void) {
 
 	QuickMenu_quit();
 }
+
+// Lists every open folder again. A folder other than the root that this
+// empties is closed, as if the user had backed out of it.
+void Menu_reload(void) {
+	state.reload = 0;
+	if (!state.stack || state.stack->count == 0) return;
+
+	int count = state.stack->count;
+	int emptied[count];
+	for (int i = 0; i < count; i++) {
+		Directory* dir = state.stack->items[i];
+		int had = dir->entries->count;
+		Directory_reload(dir);
+		emptied[i] = had > 0 && dir->entries->count == 0;
+	}
+	while (state.stack->count > 1 && emptied[state.stack->count - 1]) DirectoryArray_pop(state.stack);
+	state.top = state.stack->items[state.stack->count - 1];
+
+	// recents are read again with the root
+	if (state.switcher_selected >= state.recents->count) {
+		state.switcher_selected = state.recents->count > 0 ? state.recents->count - 1 : 0;
+	}
+	if (state.top->entries->count > 0) readyResume(state.top->entries->items[state.top->selected]);
+	state.dirty = 1;
+}
+
+// Opens a path as if its entry had been selected. Returns 1 when it opened
+// or a launch is queued.
+int Entry_openPath(const char* path, int type) {
+	if (!path || !path[0] || !state.top) return 0;
+	if ((type == ENTRY_ROM || type == ENTRY_PAK) && !exists((char*)path)) return 0;
+
+	// openRom and openPak quote the path in place, so leave them room
+	char buffer[1024];
+	snprintf(buffer, sizeof(buffer), "%s", path);
+
+	int opened = 0;
+	if (type == ENTRY_ROM) {
+		Entry* entry = Entry_new(buffer, ENTRY_ROM);
+		state.recent_alias = entry->name; // as Entry_open records it
+		state.startgame = 1;
+		opened = openRom(buffer, NULL);
+		state.recent_alias = NULL;
+		Entry_free(entry);
+	}
+	else if (type == ENTRY_PAK) {
+		state.startgame = 1;
+		opened = openPak(buffer);
+	}
+	else if (type == ENTRY_DIR) {
+		openDirectory(buffer, 1);
+		opened = 1;
+		if (state.top->entries->count > 0) readyResume(state.top->entries->items[state.top->selected]);
+	}
+	if (!opened) state.startgame = 0;
+	state.dirty = 1;
+	return opened;
+}

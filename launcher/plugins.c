@@ -17,6 +17,7 @@ typedef struct LoadedPlugin {
 	const NUIPlugin* plugin;
 	char id[64];
 	Hash* cfg; // loaded on first cfg_get or cfg_set
+	int owns_root; // claims the root slot, so its root_replace is asked
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -264,6 +265,37 @@ static void hostInhibitSleep(const char* plugin_id, int on) {
 	Awake_set(who, on);
 }
 
+static int hostOpenPath(const char* path, int type) {
+	if (type != NUI_ENTRY_ROM && type != NUI_ENTRY_PAK && type != NUI_ENTRY_DIR) return 0;
+	return Entry_openPath(path, type);
+}
+
+static int hostRecentsCount(void) {
+	return state.recents ? state.recents->count : 0;
+}
+static const char* hostRecentPath(int index) {
+	static char path[512];
+	if (!state.recents || index < 0 || index >= state.recents->count) return NULL;
+	Recent* recent = state.recents->items[index];
+	snprintf(path, sizeof(path), "%s%s", SDCARD_PATH, recent->path);
+	return path;
+}
+static int hostRecentRemove(int index) {
+	int result = Recents_remove(index);
+	if (result == 0 && state.switcher_selected >= state.recents->count) {
+		state.switcher_selected = state.recents->count > 0 ? state.recents->count - 1 : 0;
+	}
+	return result;
+}
+static void hostRecentsClear(void) {
+	Recents_clear();
+	state.switcher_selected = 0;
+}
+static void hostReloadLists(void) {
+	// on the next frame, so a hook mid-listing never has its list freed
+	state.reload = 1;
+}
+
 static const NUIHost host = {
 	.size = sizeof(NUIHost),
 	.api_version = NUI_API_VERSION,
@@ -290,6 +322,12 @@ static const NUIHost host = {
 	.inhibit_sleep = hostInhibitSleep,
 	.confirm = Modal_confirm,
 	.keyboard = Modal_keyboard,
+	.open_path = hostOpenPath,
+	.recents_count = hostRecentsCount,
+	.recent_path = hostRecentPath,
+	.recent_remove = hostRecentRemove,
+	.recents_clear = hostRecentsClear,
+	.reload_lists = hostReloadLists,
 };
 
 ///////////////////////////////////////
@@ -327,6 +365,10 @@ static void load(const PluginManifest* m) {
 	p->handle = handle;
 	p->plugin = plugin;
 	snprintf(p->id, sizeof(p->id), "%s", m->id);
+	p->owns_root = csvHas(m->slots, ROOT_SLOT);
+	if (!p->owns_root && Plugin_has(plugin, root_replace) && plugin->root_replace) {
+		LOG_warn("plugins: %s has root_replace but no slots=" ROOT_SLOT ", so it won't be asked\n", m->id);
+	}
 
 	if (Plugin_has(plugin, init) && plugin->init && plugin->init(&host) != 0) {
 		LOG_warn("plugins: %s declined to start\n", m->id);
@@ -468,6 +510,17 @@ int Plugins_bindings(int screen, const Binding** bindings) {
 
 void Plugins_rootEntries(Array* root) {
 	EACH_PLUGIN_WITH(root_entries) p->root_entries((NUIList*)root);
+}
+
+Array* Plugins_rootReplace(void) {
+	for (int i = 0; i < loaded_count; i++) {
+		const NUIPlugin* p = loaded[i].plugin;
+		if (!loaded[i].owns_root) continue;
+		// slot resolution lets only one plugin claim it
+		if (!Plugin_has(p, root_replace) || !p->root_replace) return NULL;
+		return (Array*)p->root_replace();
+	}
+	return NULL;
 }
 
 Array* Plugins_virtualDir(const char* path) {

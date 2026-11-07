@@ -19,5 +19,9 @@ void QuickMenu_init(void);
 void QuickMenu_quit(void);
 void Menu_init(void);
 void Menu_quit(void);
+// Lists the open folders again; main runs it when state.reload is set.
+void Menu_reload(void);
+// Opens a game, pak or folder by path as if it were selected (host->open_path).
+int Entry_openPath(const char* path, int type);
 
 #endif

@@ -20,6 +20,7 @@
 
 #define PLUGIN_STATE_DIR USERDATA_PATH "/launcher"
 #define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
+#define ROOT_SLOT "root" // the exclusive slot root_replace belongs to
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -40,6 +41,10 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 
 // Appends plugins' entries to the root list.
 void Plugins_rootEntries(Array* root);
+
+// The root slot owner's list in place of the stock root, or NULL to build
+// stock's.
+Array* Plugins_rootReplace(void);
 
 // The first plugin list for a path it owns, or NULL.
 Array* Plugins_virtualDir(const char* path);

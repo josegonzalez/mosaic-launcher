@@ -85,6 +85,9 @@ int main (int argc, char *argv[]) {
 
 		PAD_poll();
 
+		// a plugin changed something on the card (host->reload_lists)
+		if (state.reload) Menu_reload();
+
 		selected = state.top->selected;
 		total = state.top->entries->count;
 
