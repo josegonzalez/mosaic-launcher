@@ -77,6 +77,7 @@ static MosaicHost fake = {
 	.cfg_set = fakeCfgSet,
 	.bind_button = fakeBind,
 	.override_button = fakeOverride,
+	.override_repeat = 1,
 };
 
 static void reset(void) {
@@ -143,6 +144,10 @@ static void testParse(void) {
 	CHECK(Remap_parse("Press:favorites.toggle", &b) == REMAP_SET);
 	CHECK(b.trigger == MOSAIC_TRIGGER_PRESS && b.count == 1);
 	CHECK_STR(b.actions[0], "favorites.toggle");
+
+	CHECK(Remap_parse("Repeat: gamelist.prev_letter", &b) == REMAP_SET);
+	CHECK(b.trigger == MOSAIC_TRIGGER_REPEAT && b.count == 1);
+	CHECK_STR(b.actions[0], "gamelist.prev_letter");
 
 	CHECK(Remap_parse("none", &b) == REMAP_SET && b.set && b.count == 0);
 	CHECK(Remap_parse("release:None", &b) == REMAP_SET && b.count == 0 && b.trigger == MOSAIC_TRIGGER_RELEASE);
@@ -222,6 +227,14 @@ static void testCalls(void) {
 	CHECK(c[2].bind && c[2].button == MOSAIC_BUTTON_Y && !strcmp(c[2].action, "random-game.pick"));
 	CHECK(c[3].bind && c[3].button == MOSAIC_BUTTON_Y && !strcmp(c[3].action, "favorites.toggle"));
 
+	// bind_button can't repeat, so a free button that repeats is overridden
+	Remap_presets(&t, 0, 0);
+	Remap_parse("repeat:random-game.pick", &t.buttons[MOSAIC_BUTTON_Y]);
+	Remap_parse("repeat:gamelist.next_letter", &t.buttons[MOSAIC_BUTTON_R1]);
+	CHECK(Remap_calls(&t, c) == 2);
+	CHECK(!c[0].bind && c[0].button == MOSAIC_BUTTON_Y && c[0].trigger == MOSAIC_TRIGGER_REPEAT);
+	CHECK(!c[1].bind && c[1].button == MOSAIC_BUTTON_R1 && c[1].trigger == MOSAIC_TRIGGER_REPEAT);
+
 	// every button full
 	for (int i = 0; i < REMAP_BUTTONS; i++) Remap_parse("a,b,c,d", &t.buttons[i]);
 	CHECK(Remap_calls(&t, c) == REMAP_CALLS_MAX);
@@ -281,6 +294,27 @@ static void testButtons(void) {
 	CHECK(checkCall(&binds[0], MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_RELEASE, "random-game.pick"));
 }
 
+static void testRepeat(void) {
+	reset();
+	setCfg("l1", "repeat:gamelist.prev_letter");
+	setCfg("y", "repeat:gamelist.next_letter");
+	start();
+	CHECK(logs == 0 && bind_count == 0);
+	CHECK(override_count == 2);
+	CHECK(checkCall(&overrides[0], MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_REPEAT, "gamelist.next_letter"));
+	CHECK(checkCall(&overrides[1], MOSAIC_BUTTON_L1, MOSAIC_TRIGGER_REPEAT, "gamelist.prev_letter"));
+
+	// a launcher that can't repeat an override acts once per press, and says so
+	reset();
+	setCfg("l1", "repeat:gamelist.prev_letter");
+	fake.size = offsetof(MosaicHost, override_repeat);
+	start();
+	fake.size = sizeof(MosaicHost);
+	CHECK(logs == 1);
+	CHECK(override_count == 1);
+	CHECK(checkCall(&overrides[0], MOSAIC_BUTTON_L1, MOSAIC_TRIGGER_PRESS, "gamelist.prev_letter"));
+}
+
 static void testRefusals(void) {
 	// another plugin, eg. platform-jump, has L1; the rest still goes in
 	reset();
@@ -321,6 +355,7 @@ int main(void) {
 	testResumeWithA();
 	testResumeOnPress();
 	testButtons();
+	testRepeat();
 	testRefusals();
 	CHECK_DONE();
 }

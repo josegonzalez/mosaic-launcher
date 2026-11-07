@@ -1,13 +1,15 @@
 // Button remap: puts the game list's own actions, or plugins' actions, on
 // the buttons the settings name. Each button's setting is a list of action
 // ids tried in order, the first available one running, optionally after
-// "press:" or "release:", or "none" for nothing. Two presets build on it:
-// Resume with A swaps A and X, and Resume on press makes X act on press.
+// "press:", "release:" or "repeat:" (again while held), or "none" for
+// nothing. Two presets build on it: Resume with A swaps A and X, and
+// Resume on press makes X act on press.
 //
 // A, B, X, L1, R1 and SELECT are the game list's own, so a remap overrides
 // them. Y, L2, R2 and START are free, so a remap binds them alongside other
 // plugins' bindings there, and with two or more actions available the
-// button opens a menu of them. Buttons without a setting are left alone.
+// button opens a menu of them; with "repeat:" it overrides them instead.
+// Buttons without a setting are left alone.
 
 #include <stdio.h>
 #include <string.h>
@@ -54,7 +56,12 @@ static int init(const MosaicHost* h) {
 			SAY("this launcher can't override %s; only Y, L2, R2 and START can be remapped", key);
 			continue;
 		}
-		if (host->override_button(MOSAIC_SCREEN_GAMELIST, c->button, c->trigger, c->action) != 0) {
+		int trigger = c->trigger;
+		if (trigger == MOSAIC_TRIGGER_REPEAT && !MOSAIC_HOST_HAS(host, override_repeat)) {
+			SAY("this launcher can't repeat %s while held; it acts once per press", key);
+			trigger = MOSAIC_TRIGGER_PRESS;
+		}
+		if (host->override_button(MOSAIC_SCREEN_GAMELIST, c->button, trigger, c->action) != 0) {
 			SAY("couldn't put %s on %s: another plugin has the button, or the action isn't registered yet "
 				"(a plugin's action needs button-remap after that plugin in plugins.txt)",
 				c->action ? c->action : "none", key);

@@ -63,6 +63,7 @@ int Remap_parse(const char* value, RemapButton* out) {
 		if (copyId(value, colon, word, sizeof(word)) != 0) return REMAP_BAD;
 		if (!strcasecmp(word, "press")) b.trigger = MOSAIC_TRIGGER_PRESS;
 		else if (!strcasecmp(word, "release")) b.trigger = MOSAIC_TRIGGER_RELEASE;
+		else if (!strcasecmp(word, "repeat")) b.trigger = MOSAIC_TRIGGER_REPEAT;
 		else return REMAP_BAD;
 		value = colon + 1;
 	}
@@ -123,7 +124,9 @@ int Remap_calls(const RemapTable* table, RemapCall* out) {
 		for (int button = 0; button < REMAP_BUTTONS; button++) {
 			const RemapButton* b = &table->buttons[button];
 			if (!b->set || rank >= b->count) continue;
-			out[n++] = (RemapCall){ !Remap_stockOwned(button), button, b->trigger, b->actions[rank] };
+			// bind_button doesn't take repeat, so a free button that repeats is overridden
+			int bind = !Remap_stockOwned(button) && b->trigger != MOSAIC_TRIGGER_REPEAT;
+			out[n++] = (RemapCall){ bind, button, b->trigger, b->actions[rank] };
 		}
 	}
 	return n;

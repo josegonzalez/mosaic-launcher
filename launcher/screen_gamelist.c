@@ -91,14 +91,15 @@ static void openSwitcher(void* data) {
 	state.dirty = 1;
 }
 
-// Stock's own triggers for MENU and SELECT (a tap) and for L1 and R1 (held
-// repeats, unless the other shoulder is down or the setting overlay has it).
+// Stock's own triggers for MENU and SELECT (a tap), and its check for L1
+// and R1, which repeat while held: not while the other shoulder is down or
+// the setting overlay has the button.
 static int tapped(int button) {
 	return button==BTN_MENU ? PAD_tappedMenu(now) : PAD_tappedSelect(now);
 }
 static int shoulderAlone(int button) {
 	int other = button==BTN_L1 ? BTN_R1 : BTN_L1;
-	return PAD_justRepeated(button) && !PAD_isPressed(other) && !PWR_ignoreSettingInput(button, show_setting);
+	return !PAD_isPressed(other) && !PWR_ignoreSettingInput(button, show_setting);
 }
 
 static const Action resumeAction = { "gamelist.resume", "RESUME", canResume, resumeSelected };
@@ -116,8 +117,8 @@ static const Binding screenBindings[] = {
 	{ BTN_SELECT, TRIGGER_RELEASE, "SELECT", &switcherAction, tapped },
 };
 static const Binding letterBindings[] = {
-	{ BTN_L1, TRIGGER_PRESS, "L1", &prevLetterAction, shoulderAlone },
-	{ BTN_R1, TRIGGER_PRESS, "R1", &nextLetterAction, shoulderAlone },
+	{ BTN_L1, TRIGGER_REPEAT, "L1", &prevLetterAction, NULL, shoulderAlone },
+	{ BTN_R1, TRIGGER_REPEAT, "R1", &nextLetterAction, NULL, shoulderAlone },
 };
 static const Binding bindings[] = {
 	{ BTN_RESUME, TRIGGER_RELEASE, "X", &resumeAction },
@@ -156,7 +157,10 @@ static void effective(Effective* e) {
 	e->screen_count = Bindings_drop(screenBindings, SCREEN_BINDINGS, e->overrides, e->override_count, e->screen);
 	e->letter_count = Bindings_drop(letterBindings, LETTER_BINDINGS, e->overrides, e->override_count, e->letters);
 	e->action_count = Bindings_drop(bindings, BINDING_COUNT, e->overrides, e->override_count, e->actions);
+	// a letter jump an override puts back on its shoulder keeps stock's check
+	Binding* overridden = &e->actions[e->action_count];
 	for (int i = 0; i < e->override_count; i++) e->actions[e->action_count++] = e->overrides[i];
+	Bindings_keepChecks(overridden, e->override_count, letterBindings, LETTER_BINDINGS);
 	const Binding* extra;
 	int extra_count = Plugins_bindings(MOSAIC_SCREEN_GAMELIST, &extra);
 	e->shared_count = Bindings_drop(extra, extra_count, e->overrides, e->override_count, e->shared);

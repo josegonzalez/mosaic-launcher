@@ -462,6 +462,7 @@ static const MosaicHost host = {
 	.show_recents = hostShowRecents,
 	.stock_toggle_get = hostStockToggleGet,
 	.stock_toggle_set = hostStockToggleSet,
+	.override_repeat = 1,
 };
 
 ///////////////////////////////////////
@@ -701,7 +702,8 @@ static int hostOverrideButton(int screen, int button, int trigger, const char* a
 		return -1;
 	}
 	const char* id = loaded[initializing].id;
-	if (screen != MOSAIC_SCREEN_GAMELIST || (trigger != MOSAIC_TRIGGER_PRESS && trigger != MOSAIC_TRIGGER_RELEASE)) return -1;
+	if (screen != MOSAIC_SCREEN_GAMELIST || (trigger != MOSAIC_TRIGGER_PRESS && trigger != MOSAIC_TRIGGER_RELEASE
+			&& trigger != MOSAIC_TRIGGER_REPEAT)) return -1;
 	const ButtonInfo* info = buttonInfo(button);
 	if (!info) return -1;
 	const Action* action = NULL;
@@ -712,7 +714,8 @@ static int hostOverrideButton(int screen, int button, int trigger, const char* a
 			return -1;
 		}
 	}
-	int btn_trigger = trigger == MOSAIC_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
+	int btn_trigger = trigger == MOSAIC_TRIGGER_RELEASE ? TRIGGER_RELEASE
+		: trigger == MOSAIC_TRIGGER_REPEAT ? TRIGGER_REPEAT : TRIGGER_PRESS;
 	for (int i = 0; i < overrideCount[screen]; i++) {
 		const Binding* other = &overrideBindings[screen][i];
 		if (other->button != info->btn) continue;
@@ -735,7 +738,8 @@ static int hostOverrideButton(int screen, int button, int trigger, const char* a
 	b->action = action;
 	overrideOwner[screen][at] = initializing;
 	LOG_info("plugins: %s overrides %s %s on the game list with %s\n", id, info->glyph,
-		trigger == MOSAIC_TRIGGER_RELEASE ? "release" : "press", action ? action->id : "nothing");
+		trigger == MOSAIC_TRIGGER_RELEASE ? "release" : trigger == MOSAIC_TRIGGER_REPEAT ? "repeat" : "press",
+		action ? action->id : "nothing");
 	return 0;
 }
 

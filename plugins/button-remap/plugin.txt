@@ -5,7 +5,7 @@ api=1
 setting.resume_with_a=toggle|Resume with A|off
 # X acts on press instead of release
 setting.resume_on_press=toggle|Resume on press|off
-# each button: action ids tried in order, eg. gamelist.resume,gamelist.open, after an optional press: or release:, or none; empty leaves it as it is. b, l1, r1 and select work the same in button-remap.cfg
+# each button: action ids tried in order, eg. gamelist.resume,gamelist.open, after an optional press:, release: or repeat: (again while held), or none; empty leaves it as it is. b, l1, r1 and select work the same in button-remap.cfg
 setting.a=text|A button|
 setting.x=text|X button|
 setting.y=text|Y button|

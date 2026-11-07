@@ -12,8 +12,10 @@
 // last system they wrap around to the first (the "wrap" setting).
 //
 // Everywhere else, and where the setting is off or there's only one
-// system to go to, L1 and R1 jump letters as stock does, but once per
-// press: an override doesn't repeat while held.
+// system to go to, L1 and R1 jump letters as stock does. Both jumps
+// repeat while the shoulder is held, as stock's letter jumps do, except
+// on a launcher too old to repeat an override, where they go once per
+// press.
 //
 // The root's systems are taken from the root list as it's built. When a
 // plugin replaces the root with one that has no systems, they're taken
@@ -207,13 +209,15 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	// the first available action on a button runs, so letters are the
-	// fallback wherever there's no system to jump to
+	// fallback wherever there's no system to jump to. Both go on the same
+	// trigger, so a held shoulder keeps doing one or the other.
+	int trigger = MOSAIC_HOST_HAS(host, override_repeat) ? MOSAIC_TRIGGER_REPEAT : MOSAIC_TRIGGER_PRESS;
 	if (host->register_action("platform-jump.prev", "SYSTEM", canJump, prevSystem, NULL) != 0
 			|| host->register_action("platform-jump.next", "SYSTEM", canJump, nextSystem, NULL) != 0
-			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, MOSAIC_TRIGGER_PRESS, "platform-jump.prev") != 0
-			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, MOSAIC_TRIGGER_PRESS, "gamelist.prev_letter") != 0
-			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_R1, MOSAIC_TRIGGER_PRESS, "platform-jump.next") != 0
-			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_R1, MOSAIC_TRIGGER_PRESS, "gamelist.next_letter") != 0) {
+			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, trigger, "platform-jump.prev") != 0
+			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, trigger, "gamelist.prev_letter") != 0
+			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_R1, trigger, "platform-jump.next") != 0
+			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_R1, trigger, "gamelist.next_letter") != 0) {
 		say("couldn't take L1 and R1, another plugin may have them; not loading");
 		return 1;
 	}

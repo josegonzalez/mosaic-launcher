@@ -5,11 +5,18 @@
 #include "check.h"
 #include "actions.h"
 
+// The buttons, and stock's repeat pace.
+#include "defines.h"
+#include "api.h"
+enum { REPEAT_DELAY = PAD_REPEAT_DELAY, REPEAT_INTERVAL = PAD_REPEAT_INTERVAL };
+
 // The pad, as the tests set it.
 static int pressed_button = -1;
 static int released_button = -1;
+static int repeated_button = -1;
 int PAD_justPressed(int btn) { return btn == pressed_button; }
 int PAD_justReleased(int btn) { return btn == released_button; }
+int PAD_justRepeated(int btn) { return btn == repeated_button; }
 void LOG_note(int level, const char* fmt, ...) { (void)level; (void)fmt; }
 
 static int open_ok = 1, back_ok = 1, resume_ok = 1;
@@ -26,15 +33,14 @@ static const Action resumeAction = { "test.resume", "RESUME", canResume, runResu
 static const Action openAction = { "test.open", "OPEN", canOpen, runOpen };
 static const Action backAction = { "test.back", "BACK", canBack, runBack };
 
-enum { BTN_X = 1, BTN_A = 2, BTN_B = 3, BTN_Y = 4 };
 static const Binding bindings[] = {
 	{ BTN_X, TRIGGER_RELEASE, "X", &resumeAction },
 	{ BTN_A, TRIGGER_PRESS, "A", &openAction },
 	{ BTN_B, TRIGGER_PRESS, "B", &backAction },
 };
 
-static void press(int btn) { pressed_button = btn; released_button = -1; ran = NULL; }
-static void release(int btn) { released_button = btn; pressed_button = -1; ran = NULL; }
+static void press(int btn) { pressed_button = btn; released_button = -1; repeated_button = -1; ran = NULL; }
+static void release(int btn) { released_button = btn; pressed_button = -1; repeated_button = -1; ran = NULL; }
 
 // Plugin actions that can share Y.
 static int fav_ok = 1, random_ok = 1;
@@ -230,6 +236,154 @@ static void test_overrides(void) {
 	CHECK(effective[0].action == &resumeAction && effective[1].action == &openAction && effective[2].action == &backAction);
 }
 
+// A button held down, repeating the way stock's PAD_poll repeats it: on the
+// press, then REPEAT_DELAY later, then every REPEAT_INTERVAL until it's let
+// go. pollAt is one frame at tick.
+static int held_button = -1;
+static unsigned long repeat_at = 0;
+static void hold(int btn, unsigned long tick) {
+	press(btn);
+	repeated_button = btn;
+	held_button = btn;
+	repeat_at = tick + REPEAT_DELAY;
+}
+static void pollAt(unsigned long tick) {
+	pressed_button = released_button = repeated_button = -1;
+	ran = NULL;
+	if (held_button >= 0 && tick >= repeat_at) {
+		repeated_button = held_button;
+		repeat_at += REPEAT_INTERVAL;
+	}
+}
+static void letGo(void) {
+	release(held_button);
+	held_button = -1;
+}
+
+// The letter jumps and a plugin's jump that goes first, as platform jump
+// puts them on L1 and R1.
+static int other_shoulder_down = 0;
+static int jump_ok = 0;
+static int prev_runs = 0, jump_runs = 0;
+static int shoulderAlone(int btn) { (void)btn; return !other_shoulder_down; }
+static int canJump(void* d) { (void)d; return jump_ok; }
+static void runPrev(void* d) { (void)d; ran = "prev"; prev_runs++; }
+static void runNext(void* d) { (void)d; ran = "next"; }
+static void runJump(void* d) { (void)d; ran = "jump"; jump_runs++; }
+static const Action prevAction = { "test.prev_letter", "PREVIOUS", NULL, runPrev };
+static const Action nextAction = { "test.next_letter", "NEXT", NULL, runNext };
+static const Action jumpAction = { "test.jump", "SYSTEM", canJump, runJump };
+static const Binding letters[] = {
+	{ BTN_L1, TRIGGER_REPEAT, "L1", &prevAction, NULL, shoulderAlone },
+	{ BTN_R1, TRIGGER_REPEAT, "R1", &nextAction, NULL, shoulderAlone },
+};
+
+// A repeat binding fires on the press and again at stock's pace while held,
+// and its allows check holds it back while the other shoulder is down.
+static void test_repeat(void) {
+	other_shoulder_down = 0;
+	prev_runs = 0;
+	unsigned long fired_at[16];
+	int fires = 0;
+	hold(BTN_L1, 0);
+	for (unsigned long tick = 0; tick <= 650; tick += 10) {
+		if (tick) pollAt(tick);
+		if (Bindings_dispatch(letters, 2) && fires < 16) fired_at[fires++] = tick;
+	}
+	CHECK(fires == 5);
+	CHECK(fired_at[0] == 0);
+	CHECK(fired_at[1] == REPEAT_DELAY);
+	CHECK(fired_at[2] == REPEAT_DELAY + REPEAT_INTERVAL);
+	CHECK(fired_at[3] == REPEAT_DELAY + 2 * REPEAT_INTERVAL);
+	CHECK(fired_at[4] == REPEAT_DELAY + 3 * REPEAT_INTERVAL);
+	CHECK(prev_runs == 5);
+	letGo();
+	CHECK(Bindings_dispatch(letters, 2) == 0);
+	pollAt(2000);
+	CHECK(Bindings_dispatch(letters, 2) == 0);
+
+	// press and release bindings don't fire on repeats
+	const Binding once[] = {
+		{ BTN_L1, TRIGGER_PRESS, "L1", &prevAction },
+		{ BTN_L1, TRIGGER_RELEASE, "L1", &nextAction },
+	};
+	hold(BTN_L1, 0);
+	CHECK(Bindings_dispatch(once, 2) == 1);
+	CHECK_STR(ran ? ran : "", "prev");
+	pollAt(REPEAT_DELAY);
+	CHECK(repeated_button == BTN_L1);
+	CHECK(Bindings_dispatch(once, 2) == 0);
+	letGo();
+	CHECK(Bindings_dispatch(once, 2) == 1);
+	CHECK_STR(ran ? ran : "", "next");
+
+	// the other shoulder down: nothing, on the press or the repeats, and it
+	// picks up again at the next repeat once that's let go
+	other_shoulder_down = 1;
+	hold(BTN_L1, 0);
+	CHECK(Bindings_dispatch(letters, 2) == 0);
+	pollAt(REPEAT_DELAY);
+	CHECK(Bindings_dispatch(letters, 2) == 0);
+	other_shoulder_down = 0;
+	pollAt(REPEAT_DELAY + 50);
+	CHECK(Bindings_dispatch(letters, 2) == 0);
+	pollAt(REPEAT_DELAY + REPEAT_INTERVAL);
+	CHECK(Bindings_dispatch(letters, 2) == 1);
+	CHECK_STR(ran ? ran : "", "prev");
+	letGo();
+}
+
+// What the game list does with platform jump's overrides: a letter jump put
+// back on its own shoulder keeps the stock check, and the plugin's jump
+// ahead of it, and both repeat, so a held shoulder keeps doing one of them.
+static void test_override_repeat(void) {
+	Binding overrides[] = {
+		{ BTN_L1, TRIGGER_REPEAT, "L1", &jumpAction },
+		{ BTN_L1, TRIGGER_REPEAT, "L1", &prevAction },
+		{ BTN_R1, TRIGGER_REPEAT, "R1", &jumpAction },
+		{ BTN_R1, TRIGGER_REPEAT, "R1", &prevAction }, // a letter jump on the other shoulder
+	};
+	Bindings_keepChecks(overrides, 4, letters, 2);
+	CHECK(overrides[0].allows == NULL);
+	CHECK(overrides[1].allows == shoulderAlone);
+	CHECK(overrides[2].allows == NULL);
+	CHECK(overrides[3].allows == NULL);
+	Bindings_keepChecks(overrides, 4, NULL, 0); // nothing to keep changes nothing
+	CHECK(overrides[1].allows == shoulderAlone);
+
+	Binding effective[2];
+	CHECK(Bindings_drop(letters, 2, overrides, 4, effective) == 0);
+
+	// in a list with systems the plugin's jump runs, on the press and repeats
+	jump_ok = 1;
+	jump_runs = prev_runs = 0;
+	other_shoulder_down = 0;
+	hold(BTN_L1, 0);
+	CHECK(Bindings_dispatch(overrides, 2) == 1);
+	pollAt(REPEAT_DELAY);
+	CHECK(Bindings_dispatch(overrides, 2) == 1);
+	pollAt(REPEAT_DELAY + REPEAT_INTERVAL);
+	CHECK(Bindings_dispatch(overrides, 2) == 1);
+	CHECK(jump_runs == 3 && prev_runs == 0);
+	letGo();
+
+	// elsewhere the letters repeat as stock's do
+	jump_ok = 0;
+	hold(BTN_L1, 0);
+	CHECK(Bindings_dispatch(overrides, 2) == 1);
+	pollAt(REPEAT_DELAY);
+	CHECK(Bindings_dispatch(overrides, 2) == 1);
+	CHECK(prev_runs == 2 && jump_runs == 3);
+
+	// and keep stock's other shoulder check
+	other_shoulder_down = 1;
+	pollAt(REPEAT_DELAY + REPEAT_INTERVAL);
+	CHECK(Bindings_dispatch(overrides, 2) == 0);
+	CHECK(prev_runs == 2);
+	other_shoulder_down = 0;
+	letGo();
+}
+
 int main(void) {
 	// dispatch: the fired, available binding runs
 	press(BTN_A);
@@ -304,6 +458,8 @@ int main(void) {
 	test_shared_buttons();
 	test_fires();
 	test_overrides();
+	test_repeat();
+	test_override_repeat();
 
 	CHECK_DONE();
 }

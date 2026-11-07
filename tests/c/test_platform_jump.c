@@ -204,6 +204,7 @@ static void (*runs[4])(void*);
 static int action_count = 0;
 static char overrides[8][64];
 static int override_buttons[8];
+static int override_triggers[8];
 static int override_count = 0;
 static int refuse_r1 = 0;
 
@@ -217,9 +218,10 @@ static int fakeRegisterAction(const char* id, const char* label, int (*available
 	return 0;
 }
 static int fakeOverrideButton(int screen, int button, int trigger, const char* action_id) {
-	CHECK(screen == MOSAIC_SCREEN_GAMELIST && trigger == MOSAIC_TRIGGER_PRESS);
+	CHECK(screen == MOSAIC_SCREEN_GAMELIST);
 	if (refuse_r1 && button == MOSAIC_BUTTON_R1) return -1;
 	override_buttons[override_count] = button;
+	override_triggers[override_count] = trigger;
 	snprintf(overrides[override_count++], sizeof(overrides[0]), "%s", action_id);
 	return 0;
 }
@@ -243,6 +245,7 @@ static MosaicHost fake = {
 	.selected_index = fakeSelectedIndex,
 	.select_index = fakeSelectIndex,
 	.override_button = fakeOverrideButton,
+	.override_repeat = 1,
 };
 
 static void reset(void) {
@@ -278,17 +281,28 @@ static void testInit(void) {
 	plugin.quit();
 	refuse_r1 = 0;
 
+	// a launcher that can't repeat an override: once per press
+	old = fake;
+	old.size = offsetof(MosaicHost, override_repeat);
+	action_count = override_count = 0;
+	CHECK(plugin.init(&old) == 0);
+	CHECK(override_count == 4);
+	for (int i = 0; i < 4; i++) CHECK(override_triggers[i] == MOSAIC_TRIGGER_PRESS);
+	plugin.quit();
+
 	action_count = override_count = 0;
 	CHECK(plugin.init(&fake) == 0);
 	CHECK(action_count == 2);
 	CHECK_STR(actions[0], "platform-jump.prev");
 	CHECK_STR(actions[1], "platform-jump.next");
-	// letters stay as the fallback on each button
+	// letters stay as the fallback on each button, and all of them repeat
+	// while held, so a held shoulder doesn't switch from one to the other
 	CHECK(override_count == 4);
 	CHECK(override_buttons[0] == MOSAIC_BUTTON_L1 && !strcmp(overrides[0], "platform-jump.prev"));
 	CHECK(override_buttons[1] == MOSAIC_BUTTON_L1 && !strcmp(overrides[1], "gamelist.prev_letter"));
 	CHECK(override_buttons[2] == MOSAIC_BUTTON_R1 && !strcmp(overrides[2], "platform-jump.next"));
 	CHECK(override_buttons[3] == MOSAIC_BUTTON_R1 && !strcmp(overrides[3], "gamelist.next_letter"));
+	for (int i = 0; i < 4; i++) CHECK(override_triggers[i] == MOSAIC_TRIGGER_REPEAT);
 
 	// before any list
 	CHECK(!canJumpNow());

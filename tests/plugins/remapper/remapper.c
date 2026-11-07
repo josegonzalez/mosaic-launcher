@@ -1,9 +1,9 @@
 // A plugin that uses the button override, launch replacement and quick
 // tile rename host calls, logging what each returned.
 //
-// In init it swaps A and X, takes Y away from everyone, and relabels the
-// Games tile. Once the launcher is up it opens the game named by the "rom"
-// setting, and its pre_launch replaces the launch with the "emu" setting's
+// In init it swaps A and X, takes Y away from everyone, puts the letter
+// jump back on L1 with repeat, and relabels the Games tile. Once the
+// launcher is up it opens the game named by the "rom" setting, and its pre_launch replaces the launch with the "emu" setting's
 // program, so the launcher writes that command and quits. On the start
 // after, post_return logs that it ran.
 
@@ -64,6 +64,9 @@ static int init(const MosaicHost* h) {
 		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L2, MOSAIC_TRIGGER_PRESS, "remapper.missing"),
 		host->override_button(MOSAIC_SCREEN_SWITCHER, MOSAIC_BUTTON_L2, MOSAIC_TRIGGER_PRESS, "gamelist.open"),
 		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L2, 7, "gamelist.open"));
+	say("repeat %i %i, bind repeat %i", MOSAIC_HOST_HAS(host, override_repeat),
+		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, MOSAIC_TRIGGER_REPEAT, "gamelist.prev_letter"),
+		host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L2, MOSAIC_TRIGGER_REPEAT, "gamelist.open"));
 	say("replace from init %i", host->replace_launch(host->cfg_get(ID, "emu", ""), NULL, 0));
 	say("rename %i, bottom row %i", host->rename_quick_tile("Games", "Library"), host->rename_quick_tile("Wifi", "Net"));
 	return 0;

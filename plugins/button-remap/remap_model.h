@@ -12,7 +12,7 @@
 
 typedef struct RemapButton {
 	int set;     // 1 when the button is remapped; 0 leaves it as it was
-	int trigger; // MOSAIC_TRIGGER_PRESS or MOSAIC_TRIGGER_RELEASE
+	int trigger; // MOSAIC_TRIGGER_PRESS, MOSAIC_TRIGGER_RELEASE or MOSAIC_TRIGGER_REPEAT
 	int count;   // 0 with set: the button does nothing
 	char actions[REMAP_ACTIONS_MAX][REMAP_ID_LEN]; // tried in order, the first available runs
 } RemapButton;
@@ -36,8 +36,8 @@ enum RemapParse {
 	REMAP_BAD,   // out is left unset
 };
 
-// Parses one button's setting: an optional "press:" or "release:" (press
-// when left out), then action ids separated by commas, eg.
+// Parses one button's setting: an optional "press:", "release:" or
+// "repeat:" (press when left out), then action ids separated by commas, eg.
 // "release:gamelist.resume, gamelist.open", or "none" for nothing. Ids are
 // letters, digits and . _ -. More than REMAP_ACTIONS_MAX ids, or a repeated
 // one, is bad. NULL is unset.
@@ -62,7 +62,8 @@ typedef struct RemapCall {
 // keeps each button's own actions in order and puts every button's first
 // action before any button's second, so the game list's hints land on the
 // button where an action comes first (with resume_with_a, OPEN on X).
-// Free buttons are bound, except "none", which overrides them with nothing.
+// Free buttons are bound, except "none", which overrides them with nothing,
+// and "repeat:", which overrides them since bind_button can't repeat.
 // out holds REMAP_CALLS_MAX. Returns the count.
 int Remap_calls(const RemapTable* table, RemapCall* out);
 

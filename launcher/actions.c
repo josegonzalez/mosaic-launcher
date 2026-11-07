@@ -37,10 +37,15 @@ void Actions_restore(const Action* const* saved, int count) {
 	registered = count;
 }
 
-static int fired(const Binding* binding) {
+static int triggered(const Binding* binding) {
 	if (binding->fires) return binding->fires(binding->button);
 	if (binding->trigger == TRIGGER_RELEASE) return PAD_justReleased(binding->button);
+	if (binding->trigger == TRIGGER_REPEAT) return PAD_justRepeated(binding->button);
 	return PAD_justPressed(binding->button);
+}
+
+static int fired(const Binding* binding) {
+	return triggered(binding) && (!binding->allows || binding->allows(binding->button));
 }
 
 int Action_available(const Action* action) {
@@ -139,4 +144,14 @@ const Binding* Bindings_find(const Binding* bindings, int count, const Action* a
 		if (bindings[i].action == action) return &bindings[i];
 	}
 	return NULL;
+}
+
+void Bindings_keepChecks(Binding* overrides, int count, const Binding* own, int own_count) {
+	for (int i = 0; i < count; i++) {
+		for (int j = 0; j < own_count; j++) {
+			if (own[j].button != overrides[i].button || own[j].action != overrides[i].action) continue;
+			overrides[i].allows = own[j].allows;
+			break;
+		}
+	}
 }

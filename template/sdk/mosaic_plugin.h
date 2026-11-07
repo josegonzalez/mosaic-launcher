@@ -67,6 +67,10 @@ enum MosaicButton {
 enum MosaicTrigger {
 	MOSAIC_TRIGGER_PRESS,
 	MOSAIC_TRIGGER_RELEASE,
+	// On the press and again while held, at stock's pace for the d-pad and
+	// letter jumps. Only override_button takes it, on a launcher with
+	// host->override_repeat.
+	MOSAIC_TRIGGER_REPEAT,
 };
 
 // Images art_path can supply.
@@ -257,7 +261,9 @@ typedef struct MosaicHost {
 	// by another: the first in load order keeps it, and the loader logs
 	// the refusal. Call it from init, where it returns 0, or -1 for an
 	// unknown action, a taken button or a bad argument. For now only
-	// MOSAIC_SCREEN_GAMELIST takes overrides.
+	// MOSAIC_SCREEN_GAMELIST takes overrides. With override_repeat, it
+	// also takes MOSAIC_TRIGGER_REPEAT, and a letter jump put back on its
+	// own shoulder keeps stock's check that the other shoulder is up.
 	int (*override_button)(int screen, int button, int trigger, const char* action_id);
 
 	// Called from pre_launch, sets the command to run instead of the
@@ -311,6 +317,13 @@ typedef struct MosaicHost {
 	// and returns 0, or -1 for a name it doesn't know or another value.
 	int (*stock_toggle_get)(const char* name);
 	int (*stock_toggle_set)(const char* name, int on);
+
+	// 1 when override_button takes MOSAIC_TRIGGER_REPEAT, which runs the
+	// action on the press and again while the button is held, as stock's
+	// L1 and R1 do. bind_button doesn't take it. Check it with
+	// MOSAIC_HOST_HAS(host, override_repeat), and use
+	// MOSAIC_TRIGGER_PRESS without it.
+	int override_repeat;
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use

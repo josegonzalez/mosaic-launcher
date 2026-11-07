@@ -23,14 +23,16 @@ void Action_run(const Action* action);
 enum ActionTrigger {
 	TRIGGER_PRESS,
 	TRIGGER_RELEASE,
+	TRIGGER_REPEAT, // the press, then again while held (PAD_justRepeated)
 };
 
 typedef struct Binding {
 	int button;              // BTN_*
-	int trigger;             // TRIGGER_PRESS or TRIGGER_RELEASE
+	int trigger;             // TRIGGER_PRESS, TRIGGER_RELEASE or TRIGGER_REPEAT
 	const char* glyph;       // the button name GFX_blitButtonGroup draws, eg. "A"
 	const Action* action;
 	int (*fires)(int button); // when set, decides whether it fired instead of trigger
+	int (*allows)(int button); // when set, must also return 1 for it to fire, eg. stock's other shoulder check
 } Binding;
 
 #define ACTIONS_MAX 64
@@ -71,6 +73,11 @@ int Bindings_sharedHint(const Binding* bindings, int count, const char** glyph, 
 // room for count. Returns how many it copied. This is how an override takes
 // a button from a screen's own bindings, whatever their trigger.
 int Bindings_drop(const Binding* bindings, int count, const Binding* taken, int taken_count, Binding* out);
+
+// Gives each of overrides the allows of the binding in own with the same
+// button and action, so an override that puts an action back on its own
+// button keeps the screen's check for it, whatever its trigger.
+void Bindings_keepChecks(Binding* overrides, int count, const Binding* own, int own_count);
 
 // The first binding for action, or NULL.
 const Binding* Bindings_find(const Binding* bindings, int count, const Action* action);

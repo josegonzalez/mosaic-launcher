@@ -33,6 +33,7 @@ Array* QuickItem_entries(void) {
 // actions.c reads the pad; nothing is pressed in these tests.
 int PAD_justPressed(int btn) { (void)btn; return 0; }
 int PAD_justReleased(int btn) { (void)btn; return 0; }
+int PAD_justRepeated(int btn) { (void)btn; return 0; }
 
 // plugins.c loads shared objects; listing tests run with no plugins.
 // A test sets stub_root_entries to stand in for plugins' root_entries.
