@@ -99,12 +99,14 @@ typedef struct HiddenState {
 static void addHidden(const char* part, void* data) {
 	HiddenState* s = data;
 	const char* builtin = Qmp_builtinName(part, 0);
-	const char* name = builtin ? builtin : part;
+	const char* from = builtin ? builtin : part;
+	char name[QMP_NAME_LEN]; // a longer name is cut short
+	copyTrimmed(name, sizeof(name), from, from + strlen(from));
 	for (int i = 0; i < s->count; i++) {
 		if (!strcmp(s->out[i], name)) return;
 	}
 	if (s->count >= s->max) return;
-	snprintf(s->out[s->count], QMP_NAME_LEN, "%s", name);
+	memcpy(s->out[s->count], name, sizeof(name));
 	s->count++;
 }
 

@@ -66,7 +66,7 @@ static void applyLabels(void) {
 	for (int i = 0; i < count; i++) {
 		if (host->rename_quick_tile(labels[i].name, labels[i].label) != 0) {
 			char message[200];
-			snprintf(message, sizeof(message), "couldn't relabel %s", labels[i].name);
+			snprintf(message, sizeof(message), "couldn't relabel %.63s", labels[i].name);
 			say(message);
 		}
 	}
@@ -89,7 +89,7 @@ static void applyHidden(void) {
 	for (int i = 0; i < count; i++) {
 		if (host->hide_quick_tile(names[i], 1) != 0) {
 			char message[200];
-			snprintf(message, sizeof(message), "couldn't hide %s", names[i]);
+			snprintf(message, sizeof(message), "couldn't hide %.63s", names[i]);
 			say(message);
 		}
 	}
