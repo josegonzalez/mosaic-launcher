@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -56,6 +56,10 @@ PAKHOOKS_SOURCES = test_pakhooks.c stubs.c $(LAUNCHER)/pakhooks.c $(LAUNCHER)/co
 $(BUILD)/test_pakhooks: $(PAKHOOKS_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h platform/platform.h
 	mkdir -p $(BUILD)
 	$(CC) $(CARD_CFLAGS) $(PAKHOOKS_SOURCES) -lm -o $@
+
+$(BUILD)/test_kbmodel: test_kbmodel.c $(LAUNCHER)/kbmodel.c $(LAUNCHER)/kbmodel.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) test_kbmodel.c $(LAUNCHER)/kbmodel.c -o $@
 
 # Plugins are tested against a fake host, by including their source.
 $(BUILD)/test_favorites: test_favorites.c ../../plugins/favorites/favorites.c $(SDK)/nextui_plugin.h check.h

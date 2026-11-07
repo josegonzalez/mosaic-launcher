@@ -38,5 +38,6 @@
 #include "toast.h"
 #include "awake.h"
 #include "pakhooks.h"
+#include "modal.h"
 
 #endif

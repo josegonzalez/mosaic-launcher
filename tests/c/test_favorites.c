@@ -25,6 +25,19 @@ static int redraws = 0;
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static char toasted[160];
 static void fakeToast(const char* m) { snprintf(toasted, sizeof(toasted), "%s", m); }
+
+// The dialog: remembers what was asked, and answers when the test says so.
+static char asked[256];
+static void (*answer_yes)(void*) = NULL;
+static void fakeConfirm(const char* message, const char* yes, void (*on_yes)(void*), void* data) {
+	(void)yes; (void)data;
+	snprintf(asked, sizeof(asked), "%s", message);
+	answer_yes = on_yes;
+}
+static void sayYes(void) {
+	if (answer_yes) answer_yes(NULL);
+	answer_yes = NULL;
+}
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
 	(void)id; (void)key;
 	return fallback;
@@ -84,6 +97,7 @@ static const NUIHost fake = {
 	.register_action = fakeRegister,
 	.bind_button = fakeBind,
 	.toast = fakeToast,
+	.confirm = fakeConfirm,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -165,10 +179,21 @@ int main(void) {
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n/Roms/PS/Game/Game.m3u\n");
 	selectEntry(CARD "/Roms/PS/Game/Game (Disc 1).cue", NUI_ENTRY_ROM);
-	action_run(NULL); // same game, so this removes it
+	action_run(NULL); // same game, so this asks to remove it
+	CHECK_STR(asked, "Remove Game from Favorites?"); // the game, not "Disc 1"
+	readText(COLLECTION, saved, sizeof(saved));
+	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n/Roms/PS/Game/Game.m3u\n"); // not until answered
+	sayYes();
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
 	CHECK_STR(toasted, "Removed from Favorites");
+
+	// cancelling the dialog keeps the favorite
+	selectEntry(CARD "/Roms/GB/Tetris.gb", NUI_ENTRY_ROM);
+	action_run(NULL);
+	answer_yes = NULL; // the user chose B
+	readText(COLLECTION, saved, sizeof(saved));
+	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
 
 	// a single-disc folder means its .cue
 	selectEntry(CARD "/Roms/PS/Single", NUI_ENTRY_DIR);
@@ -189,6 +214,7 @@ int main(void) {
 	// toggling an existing favorite removes it, keeping the rest in order
 	selectEntry(CARD "/Roms/PS/Game", NUI_ENTRY_DIR);
 	action_run(NULL);
+	sayYes();
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Tetris.gb\n");
 

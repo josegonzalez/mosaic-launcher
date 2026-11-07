@@ -281,6 +281,8 @@ static const NUIHost host = {
 	.bind_button = hostBindButton,
 	.toast = hostToast,
 	.inhibit_sleep = hostInhibitSleep,
+	.confirm = Modal_confirm,
+	.keyboard = Modal_keyboard,
 };
 
 ///////////////////////////////////////

@@ -103,6 +103,10 @@ if (NUI_HOST_HAS(host, toast)) host->toast("Added to Favorites");
 
 - `toast(message)` shows a short message at the bottom of the screen.
 - `inhibit_sleep(id, on)` holds off auto-sleep until the same plugin releases it.
+- `confirm(message, yes_label, on_yes, data)` asks a yes/no question full screen; `on_yes` runs after it closes, only if the user pressed A.
+- `keyboard(title, initial, on_done, data)` lets the user type text; `on_done` gets the text, or `NULL` if they cancelled with Y. A types the highlighted key, B deletes, X toggles shift, START finishes.
+
+Both dialogs return straight away and call back once they close, so open them from an action (a button press), not from a list hook.
 - `art_path` in `NUIPlugin` lets a plugin pick the thumbnail, folder background or list background for an entry.
 
 ## Without writing C

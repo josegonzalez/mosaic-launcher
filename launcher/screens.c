@@ -21,8 +21,14 @@ void Screens_init(void) {
 	GameList_registerActions();
 }
 
+static const Screen modal = {
+	.handleInput = Modal_handleInput,
+	.render = Modal_render,
+};
+
 const Screen* Screen_get(int id) {
 	switch (id) {
+		case SCREEN_MODAL: return &modal;
 		case SCREEN_QUICKMENU: return &quickmenu;
 		case SCREEN_GAMESWITCHER: return &switcher;
 		default: return &gamelist;

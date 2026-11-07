@@ -275,7 +275,7 @@ int main (int argc, char *argv[]) {
 				setAnimationDraw(0);
 			}
 			SDL_UnlockMutex(animMutex);
-			if (currentScreen != SCREEN_GAMESWITCHER && currentScreen != SCREEN_QUICKMENU) {
+			if (currentScreen != SCREEN_GAMESWITCHER && currentScreen != SCREEN_QUICKMENU && currentScreen != SCREEN_MODAL) {
 				if(is_scrolling && pillanimdone && currentAnimQueueSize < 1) {
 					int ow = GFX_blitHardwareGroup(screen, show_setting);
 					Entry* entry = state.top->entries->items[state.top->selected];

@@ -142,6 +142,14 @@ typedef struct NUIHost {
 	// same plugin calls it with 0. The power button still sleeps the device.
 	// Shell paks can do the same by creating /tmp/stay_awake.
 	void (*inhibit_sleep)(const char* plugin_id, int on);
+
+	// Full-screen dialogs. Each returns at once and calls back after the
+	// dialog closes, so call them from an action, not from a list hook.
+	// confirm shows message with B to cancel and A labelled yes_label;
+	// on_yes runs only if the user chose A. keyboard lets the user type,
+	// starting from initial; on_done gets the text, or NULL if cancelled.
+	void (*confirm)(const char* message, const char* yes_label, void (*on_yes)(void* data), void* data);
+	void (*keyboard)(const char* title, const char* initial, void (*on_done)(const char* text, void* data), void* data);
 } NUIHost;
 
 // True when the launcher's host table has this field, so a plugin can use

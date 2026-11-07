@@ -162,12 +162,8 @@ static int canToggle(void* data) {
 	return favoriteFor(host->selected_entry(), path, sizeof(path));
 }
 
-static void toggle(void* data) {
-	(void)data;
-	char path[MAX_PATH_LEN * 2];
-	if (!favoriteFor(host->selected_entry(), path, sizeof(path))) return;
-	const char* rel = relative(path);
-
+// Adds rel if it isn't a favorite, removes it if it is, and says so.
+static void change(const char* rel) {
 	load();
 	char message[MAX_PATH_LEN + 32];
 	char shown[160];
@@ -194,6 +190,41 @@ static void toggle(void* data) {
 	else snprintf(shown, sizeof(shown), "Couldn't save %s", folder_name);
 	if (NUI_HOST_HAS(host, toast)) host->toast(shown);
 	host->request_redraw();
+}
+
+// The favorite waiting on the removal dialog.
+static char pending[MAX_PATH_LEN];
+
+static void removeConfirmed(void* data) {
+	(void)data;
+	load();
+	if (pending[0] && indexOf(pending) >= 0) change(pending);
+	pending[0] = '\0';
+}
+
+static void toggle(void* data) {
+	(void)data;
+	const NUIEntry* entry = host->selected_entry();
+	char path[MAX_PATH_LEN * 2];
+	if (!favoriteFor(entry, path, sizeof(path))) return;
+	const char* rel = relative(path);
+
+	load();
+	// adding is instant; removing asks first, where the launcher can
+	if (indexOf(rel) >= 0 && NUI_HOST_HAS(host, confirm)) {
+		snprintf(pending, sizeof(pending), "%s", rel);
+		// name the favorite's file, not the entry: a disc entry is just "Disc 1"
+		char name[MAX_PATH_LEN];
+		const char* base = strrchr(rel, '/');
+		snprintf(name, sizeof(name), "%s", base ? base + 1 : rel);
+		char* dot = strrchr(name, '.');
+		if (dot && dot != name) *dot = '\0';
+		char question[256];
+		snprintf(question, sizeof(question), "Remove %.120s from %.60s?", name, folder_name);
+		host->confirm(question, "REMOVE", removeConfirmed, NULL);
+		return;
+	}
+	change(rel);
 }
 
 ///////////////////////////////////////
