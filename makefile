@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop build-% devices pak release test lint drift clean
+.PHONY: all desktop run-desktop build-% devices pak release test smoke lint drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -73,6 +73,10 @@ pak:
 
 test:
 	bats tests
+
+# Starts the desktop build for a few seconds; fails if it exits on its own.
+smoke: desktop
+	./scripts/desktop-smoke.sh build/smoke.log
 
 lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh

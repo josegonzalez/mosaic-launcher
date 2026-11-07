@@ -24,7 +24,8 @@ SDL ?= SDL
 
 TARGET = nextui
 INCDIR = -I. -I$(NEXTUI)/all/common/ -I$(NEXTUI)/$(PLATFORM)/platform/
-SOURCE = $(TARGET).c \
+MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c
+SOURCE = $(MODULES) \
 	$(NEXTUI)/all/common/scaler.c \
 	$(NEXTUI)/all/common/utils.c \
 	$(NEXTUI)/all/common/config.c \

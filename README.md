@@ -58,9 +58,23 @@ make test
 
 The tests run the pak scripts against a fake SD card, with a fake `mount` that copies files the way a bind mount looks from outside.
 
+`make smoke` starts the desktop build for a few seconds and fails if it exits on its own. Its log (`build/smoke.log`) is also handy for comparing startup output before and after a change.
+
 ## Updating NextUI
 
-The launcher in `launcher/` is a copy of upstream's `nextui.c` and has to be ported forward by hand. To see what changed upstream since the pinned tag:
+The launcher in `launcher/` started as upstream's `nextui.c`, split into modules:
+
+| File | What it holds |
+|---|---|
+| `main.c` | startup and the main loop |
+| `state.c` | launcher-wide state shared between modules |
+| `containers.c` | `Array`, `Hash` and `IntArray` |
+| `library.c` | entries, directories, recents, and the lists built from the card |
+| `launch.c` | handing off to games and paks, resume state, FN buttons |
+| `nav.c` | the directory stack, restoring the last position, opening entries |
+| `imgloader.c` | background image, thumbnail and selection pill worker threads |
+
+Upstream changes have to be ported forward by hand. To see what changed upstream since the pinned tag:
 
 ```shell
 make drift                        # pinned tag -> latest tag
