@@ -1,0 +1,7 @@
+id=focus-mode
+name=Focus mode
+api=1
+slots=root
+requires=favorites
+# the root lists only favorites and All systems; the Focus tile on the quick menu flips it too
+setting.on=toggle|Focus on favorites|on
