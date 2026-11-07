@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override test_netplay
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override test_netplay test_power_plus
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -197,6 +197,15 @@ NETPLAY := ../../plugins/netplay
 $(BUILD)/test_netplay: test_netplay.c $(wildcard $(NETPLAY)/*.c $(NETPLAY)/*.h) $(SDK)/mosaic_plugin.h check.h
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_SDCARD_PATH=\"$(BUILD)/netplay-card\" test_netplay.c $(NETPLAY)/netplay_model.c -o $@
+
+# With the wake alarm and stay-awake files repointed into the build folder.
+POWER_PLUS := ../../plugins/power-plus
+
+$(BUILD)/test_power_plus: test_power_plus.c $(wildcard $(POWER_PLUS)/*.c $(POWER_PLUS)/*.h) $(SDK)/mosaic_plugin.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DPP_WAKEALARM_PATH=\"$(BUILD)/pp-wakealarm\" \
+		-DPP_STAY_AWAKE_PATH=\"$(BUILD)/pp-stay-awake\" -DPP_STAY_ALIVE_PATH=\"$(BUILD)/pp-stay-alive\" \
+		test_power_plus.c $(POWER_PLUS)/power_model.c -o $@
 
 clean:
 	rm -rf $(BUILD)

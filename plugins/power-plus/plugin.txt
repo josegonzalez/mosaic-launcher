@@ -1,0 +1,10 @@
+id=power-plus
+name=Power plus
+api=1
+# warns, then powers off cleanly, when the battery runs low
+setting.guard=toggle|Low battery guard|on
+setting.warn_at=choice|Low battery warning at (%)|5|3,5,10,15
+setting.off_at=choice|Low battery power off at (%)|2|1,2,3,5
+# powers off when the device has been asleep this long, by waking it with the RTC's wake alarm
+setting.sleep_off=toggle|Power off after a long sleep|on
+setting.sleep_hours=choice|Hours asleep before powering off|4|1,2,4,8,12,24
