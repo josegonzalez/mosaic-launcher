@@ -143,17 +143,26 @@ void openDirectory(char* path, int auto_launch) {
 		int selected = 0;
 		int start = 0;
 		int end = 0;
+		int restored = 0;
 		if (state.top && state.top->entries->count>0) {
-			if (state.restore_depth==state.stack->count && state.top->selected==state.restore_relative) {
+			// the path too, since a reload or a rebuilt stack can put another folder on the saved row
+			if (state.restore_depth==state.stack->count && state.top->selected==state.restore_relative && exactMatch(path, state.restore_path)) {
 				selected = state.restore_selected;
 				start = state.restore_start;
 				end = state.restore_end;
+				restored = 1;
 			}
 		}
 
 		state.top = Directory_new(path, selected);
 		state.top->start = start;
 		state.top->end = end ? end : ((state.top->entries->count<MAIN_ROW_COUNT) ? state.top->entries->count : MAIN_ROW_COUNT);
+
+		// a folder that lost entries since it closed keeps the selection on its list
+		int count = state.top->entries->count;
+		if (restored && (selected >= count || state.top->end > count)) {
+			Directory_select(state.top, selected < count ? selected : (count > 0 ? count - 1 : 0));
+		}
 
 		Array_push(state.stack, state.top);
 	}
@@ -174,6 +183,7 @@ void closeDirectory(void) {
 	state.restore_selected = state.top->selected;
 	state.restore_start = state.top->start;
 	state.restore_end = state.top->end;
+	snprintf(state.restore_path, sizeof(state.restore_path), "%s", state.top->path);
 	DirectoryArray_pop(state.stack);
 	state.restore_depth = state.stack->count;
 	state.top = state.stack->items[state.stack->count-1];

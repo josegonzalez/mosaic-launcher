@@ -34,6 +34,7 @@ typedef struct LauncherState {
 	int restore_selected;
 	int restore_start;
 	int restore_end;
+	char restore_path[256]; // the folder that closed
 
 	int startgame;
 	int animationdirection;
