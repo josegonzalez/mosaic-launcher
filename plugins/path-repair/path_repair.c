@@ -21,14 +21,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "repair_model.h"
 
 #define ID "path-repair"
 #define PATH_LEN 1024
 #define MAX_LISTED 8
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static int recents_on = 1;     // the "recents" setting
 static int collections_on = 1; // the "collections" setting
 
@@ -287,7 +287,7 @@ static void tick(unsigned long now) {
 	if (listed_count) forget();
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	recents_on = strcmp(host->cfg_get(ID, "recents", "on"), "off") != 0;
 	collections_on = strcmp(host->cfg_get(ID, "collections", "on"), "off") != 0;
@@ -299,9 +299,9 @@ static void quit(void) {
 	forget();
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.quit = quit,
@@ -309,7 +309,7 @@ static const NUIPlugin plugin = {
 	.repair_path = repairPath,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }

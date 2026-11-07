@@ -26,9 +26,9 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	return fallback;
 }
 
-static NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "desktop",
 	.sdcard_path = CARD,
 	.userdata_path = CARD "/.userdata/desktop",
@@ -213,7 +213,7 @@ int main(void) {
 	testKey();
 	testPick();
 	testFixed();
-	CHECK(nextui_plugin_get(&fake) == &plugin);
+	CHECK(mosaic_plugin_get(&fake) == &plugin);
 	CHECK(plugin.repair_path == repairPath);
 	testCollections();
 	testRecents();
