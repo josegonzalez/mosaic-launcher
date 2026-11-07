@@ -190,8 +190,9 @@ static int preLaunch(const MosaicLaunch* launch) {
 		say(message);
 		return MOSAIC_LAUNCH_CONTINUE;
 	}
+	// refused when a plugin earlier in load order already replaced it
 	if (host->replace_launch(program, NULL, 0) != 0) {
-		snprintf(message, sizeof(message), "couldn't launch %s with %s, launching with the default", game, program);
+		snprintf(message, sizeof(message), "couldn't replace the launch of %s with %s, the launcher log says why", game, program);
 		say(message);
 		return MOSAIC_LAUNCH_CONTINUE;
 	}

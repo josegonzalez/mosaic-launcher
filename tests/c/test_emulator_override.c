@@ -475,7 +475,7 @@ static void testPlugin(void) {
 	writeChoices("/Roms/Game Boy (GB)/Tetris.gb\tMGBA\n");
 	refuse_replace = 1;
 	CHECK(launch(p, GB "/Tetris.gb", MOSAIC_ENTRY_ROM, cmd, sizeof(cmd)) == MOSAIC_LAUNCH_CONTINUE);
-	CHECK(strstr(logged, "couldn't launch") != NULL);
+	CHECK(strstr(logged, "couldn't replace the launch") != NULL);
 	refuse_replace = 0;
 	p->quit();
 
