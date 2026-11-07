@@ -2,7 +2,8 @@
 #
 # Loads test plugins into the desktop build and checks what happened:
 # a plugin that loads and uses the host table, one with the wrong API
-# version, one that replaces the root and opens entries, and one that
+# version, one that replaces the root and opens entries, one that sorts
+# and renames a folder and moves the selection, and one that
 # crashes during startup.
 #
 #   tests/plugins/run.sh
@@ -102,6 +103,28 @@ grep -q "plugin rooter: root_replace called" "$WORK/rooter-unslotted.log" && fai
 
 rm -rf "$WORK/plugins/rooter.plugin" "$(dirname "$ROM")" "$STATE/rooter.cfg"
 if [ -f "$WORK/recent.txt.saved" ]; then cp "$WORK/recent.txt.saved" "$RECENTS"; else rm -f "$RECENTS"; fi
+
+# a plugin orders and renames a folder's entries, then reads the list and
+# moves the selection
+build_plugin sorter 'id=sorter\nname=Sorter\napi=1\n'
+run_launcher "$WORK/sorter.log" || fail "the launcher exited early with sorter loaded"
+log="$WORK/sorter.log"
+expect() {
+	grep -qF "plugin sorter: $1" "$log" || fail "sorter didn't log \"$1\""
+}
+expect "current list from init (null)"
+expect "select from init -1"
+expect "set_name outside list_ready -1"
+expect "open folder 1"
+expect "list_ready 5 entries"
+expect "renamed Tetris (gbc) 0"
+expect "renamed Tetris (gb) 0"
+expect "order Pinned,Alpha,Beta,Tetris (gb),Tetris (gbc)"
+expect "selected index 0"
+expect "select 3 0, bad -1 -1"
+expect "selected 3 Tetris (gb)"
+expect "next frame selected 3 Tetris (gb)"
+rm -rf "$WORK/plugins/sorter.plugin"
 
 # the bundled plugins load and start cleanly
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building the bundled plugins"

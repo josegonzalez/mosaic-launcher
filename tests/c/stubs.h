@@ -7,7 +7,10 @@ extern bool stub_show_recents;
 extern bool stub_show_collections;
 extern bool stub_show_tools;
 
-struct Array;
-extern struct Array* stub_root_replace;
+#include "listsort.h"
+
+extern Array* stub_root_replace;
+extern ListSortCompare stub_sort_compare;
+extern int (*stub_list_ready)(Array* entries, const char* dir_path);
 
 #endif

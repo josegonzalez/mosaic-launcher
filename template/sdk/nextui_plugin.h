@@ -171,6 +171,22 @@ typedef struct NUIHost {
 	// each selection on the same entry where it can. Call it after changing
 	// something on disk, such as deleting a game or clearing recents.
 	void (*reload_lists)(void);
+
+	// Renames an entry from inside list_ready. The new name is what the
+	// list draws and what the letter index uses. Returns 0, or -1 when
+	// called anywhere but list_ready.
+	int (*entry_set_name)(NUIEntry* entry, const char* name);
+
+	// The list the user is looking at, read with list_count and list_get,
+	// or NULL before the lists exist. Don't keep it: it's freed when the
+	// user leaves the folder or the lists reload. selected_index returns
+	// the selected row in it, or -1 when it's empty. select_index moves
+	// the selection to a row, scrolling to keep it in view, and returns 0,
+	// or -1 for a row that isn't there. Call them from an action or tick,
+	// not from a list hook, which may be listing another folder.
+	const NUIList* (*current_list)(void);
+	int (*selected_index)(void);
+	int (*select_index)(int index);
 } NUIHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -224,6 +240,24 @@ typedef struct NUIPlugin {
 	// one, or NULL to keep stock's. Only the slot's owner is asked, and other
 	// plugins' root_entries aren't added to a replaced root.
 	NUIList* (*root_replace)(void);
+
+	// Ordering a list. After the launcher sorts a folder its own way, it
+	// sorts it again with every plugin's sort_compare, in load order: for
+	// each pair, the first plugin to return non-zero (negative for a
+	// first, positive for b first) decides, and when none has an opinion
+	// the pair keeps the launcher's order. Return 0 for lists you don't
+	// care about. Recents and collections are passed too, in their own
+	// order.
+	int (*sort_compare)(const NUIEntry* a, const NUIEntry* b, const char* dir_path);
+
+	// Sees a whole list once it's filtered, named and sorted, before it's
+	// shown, so it can rename entries with host->entry_set_name based on
+	// their siblings, such as titles that collide. Plugins run in load
+	// order and each sees the names the last one set. If any name changed,
+	// the list is sorted again by name and then by sort_compare, as for
+	// display_name, except recents and collections, which keep their
+	// order. It can't add, remove or reorder entries.
+	void (*list_ready)(const NUIList* list, const char* dir_path);
 } NUIPlugin;
 
 #define NUI_PLUGIN_ENTRY "nextui_plugin_get"

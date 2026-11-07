@@ -71,7 +71,9 @@ void getUniqueName(Entry* entry, char* out_name) {
 
 ///////////////////////////////////////
 // Listing a directory, in stages: source -> map.txt names -> hide -> sort
-// -> duplicate names -> letter index. Directory_new runs them in order.
+// -> plugin filter -> plugin display names -> plugin sort -> plugin
+// list_ready -> duplicate names -> letter index. Directory_new runs them in
+// order.
 
 // Where a directory's entries come from. Most sources already sort.
 Array* Listing_source(char* path) {
@@ -220,6 +222,13 @@ void Directory_index(Directory* self) {
 	self->entries = Plugins_filter(self->entries, self->path);
 	// recents and collections keep their own order even when renamed
 	if (Plugins_displayNames(self->entries) && !skip_index) EntryArray_sort(self->entries);
+	// plugins' order goes on top of the launcher's, so it comes after any
+	// sort by name
+	Plugins_sort(self->entries, self->path);
+	if (Plugins_listReady(self->entries, self->path) && !skip_index) {
+		EntryArray_sort(self->entries);
+		Plugins_sort(self->entries, self->path);
+	}
 
 	Listing_markDuplicates(self->entries);
 	if (!skip_index) Listing_buildIndex(self);
@@ -261,6 +270,12 @@ void Directory_reload(Directory* self) {
 	free(was);
 	if (selected < 0) selected = self->selected < count ? self->selected : count - 1;
 	if (selected < 0) selected = 0;
+	Directory_select(self, selected);
+}
+
+// Selects a row, moving the visible rows only as far as it takes to show it.
+void Directory_select(Directory* self, int selected) {
+	int count = self->entries->count;
 	self->selected = selected;
 
 	int rows = MAIN_ROW_COUNT;

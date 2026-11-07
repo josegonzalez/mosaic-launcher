@@ -394,6 +394,259 @@ static void test_reload_keeps_the_selection_in_view(void) {
 	Directory_free(dir);
 }
 
+///////////////////////////////////////
+// plugin sort and list_ready
+
+// Names starting with letter first; no opinion on the rest.
+static int pinLetter(const NUIEntry* a, const NUIEntry* b, char letter) {
+	int pa = ((const Entry*)a)->name[0] == letter;
+	int pb = ((const Entry*)b)->name[0] == letter;
+	return pb - pa;
+}
+static int pinC(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+	(void)dir_path;
+	return pinLetter(a, b, 'C');
+}
+static int pinB(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+	(void)dir_path;
+	return pinLetter(a, b, 'B');
+}
+static int reverseNames(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+	(void)dir_path;
+	return strcmp(((const Entry*)b)->name, ((const Entry*)a)->name);
+}
+static int noOpinion(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+	(void)a;
+	(void)b;
+	(void)dir_path;
+	return 0;
+}
+
+// The names in items, comma separated.
+static char names_text[256];
+static const char* names(Array* items) {
+	names_text[0] = '\0';
+	for (int i = 0; i < items->count; i++) {
+		if (i) strcat(names_text, ",");
+		strcat(names_text, ((Entry*)items->items[i])->name);
+	}
+	return names_text;
+}
+
+static Array* namedEntries(const char* list) {
+	Array* items = Array_new();
+	char copy[256];
+	snprintf(copy, sizeof(copy), "%s", list);
+	for (char* name = strtok(copy, ","); name; name = strtok(NULL, ",")) {
+		char path[300];
+		snprintf(path, sizeof(path), "/x/%s", name);
+		Array_push(items, Entry_newNamed(path, ENTRY_ROM, name));
+	}
+	return items;
+}
+
+static void test_sort_chain_first_opinion_wins(void) {
+	Array* items = namedEntries("A,B,C,D,E");
+
+	// no comparators, or none with an opinion: unchanged
+	ListSort_chain(items, NULL, 0, "/x");
+	CHECK_STR(names(items), "A,B,C,D,E");
+	ListSortCompare none[] = { noOpinion };
+	ListSort_chain(items, none, 1, "/x");
+	CHECK_STR(names(items), "A,B,C,D,E");
+
+	// one opinion: the rest keep their order
+	ListSortCompare pin[] = { pinC };
+	ListSort_chain(items, pin, 1, "/x");
+	CHECK_STR(names(items), "C,A,B,D,E");
+
+	// the first comparator decides; a later one only breaks its ties
+	ListSortCompare chain[] = { pinC, pinB, reverseNames };
+	ListSort_chain(items, chain, 3, "/x");
+	CHECK_STR(names(items), "C,B,E,D,A");
+
+	// a plugin without an opinion doesn't stop the next one
+	ListSortCompare skip[] = { noOpinion, pinB };
+	ListSort_chain(items, skip, 2, "/x");
+	CHECK_STR(names(items), "B,C,E,D,A");
+	EntryArray_free(items);
+}
+
+static const char* sorted_dir = NULL;
+static int pinZelda(const NUIEntry* a, const NUIEntry* b, const char* dir_path) {
+	sorted_dir = dir_path;
+	return pinLetter(a, b, 'Z');
+}
+
+static void test_plugin_sort_runs_after_names(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Zelda.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/tetris.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", "");
+	// map.txt renames, and the launcher sorts by name, before plugins sort
+	writeFile(ROMS_PATH "/Game Boy (GB)/map.txt", "Alleyway.gb\tBreakout\n");
+
+	stub_sort_compare = pinZelda;
+	sorted_dir = NULL;
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	stub_sort_compare = NULL;
+	CHECK_STR(names(dir->entries), "Zelda,Breakout,tetris");
+	CHECK(sorted_dir && !strcmp(sorted_dir, ROMS_PATH "/Game Boy (GB)"));
+	// the letter index follows the plugin's order
+	CHECK(dir->alphas->count == 3);
+	if (dir->entries->count == 3) {
+		CHECK(at(dir, 0)->alpha == 0);
+		CHECK(at(dir, 1)->alpha == 1);
+		CHECK(at(dir, 2)->alpha == 2);
+		CHECK(dir->alphas->items[1] == 1);
+	}
+	Directory_free(dir);
+}
+
+static void test_plugin_sort_reorders_collections(void) {
+	resetCard();
+	writeFile(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Breakout.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Zelda.gb", "");
+	writeFile(COLLECTIONS_PATH "/Favorites.txt",
+		"/Roms/Game Boy (GB)/Breakout.gb\n"
+		"/Roms/Game Boy (GB)/Alleyway.gb\n"
+		"/Roms/Game Boy (GB)/Zelda.gb\n");
+
+	// pinned first, the rest in the collection's own order
+	stub_sort_compare = pinZelda;
+	Directory* dir = Directory_new(COLLECTIONS_PATH "/Favorites.txt", 0);
+	stub_sort_compare = NULL;
+	CHECK_STR(names(dir->entries), "Zelda,Breakout,Alleyway");
+	CHECK(dir->alphas->count == 0);
+	Directory_free(dir);
+}
+
+// Gives games that share a title their extension, as a title
+// disambiguation plugin would. Returns 1 if it renamed any.
+static const char* ready_dir = NULL;
+static int addExtensions(Array* entries, const char* dir_path) {
+	ready_dir = dir_path;
+	int renamed = 0;
+	int collides[entries->count];
+	for (int i = 0; i < entries->count; i++) {
+		collides[i] = 0;
+		for (int j = 0; j < entries->count; j++) {
+			if (j != i && !strcmp(((Entry*)entries->items[j])->name, ((Entry*)entries->items[i])->name)) collides[i] = 1;
+		}
+	}
+	for (int i = 0; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		if (!collides[i]) continue;
+		char name[300];
+		snprintf(name, sizeof(name), "%s (%s)", entry->name, strrchr(entry->path, '.') + 1);
+		free(entry->name);
+		entry->name = strdup(name);
+		renamed = 1;
+	}
+	// a name that sorts differently, to show the list is sorted again
+	for (int i = 0; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		if (strcmp(entry->name, "Alleyway")) continue;
+		free(entry->name);
+		entry->name = strdup("Breakout");
+		renamed = 1;
+	}
+	return renamed;
+}
+
+static void test_list_ready_names_are_drawn_and_indexed(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Tetris.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Tetris.gbc", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Zelda.gb", "");
+
+	// stock: the colliding titles show their file names
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	CHECK(dir->entries->count == 4);
+	if (dir->entries->count == 4) {
+		CHECK_STR(at(dir, 1)->name, "Tetris");
+		CHECK(at(dir, 1)->unique && !strcmp(at(dir, 1)->unique, "Tetris.gb"));
+	}
+	Directory_free(dir);
+
+	stub_list_ready = addExtensions;
+	stub_sort_compare = pinZelda;
+	ready_dir = NULL;
+	dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	stub_list_ready = NULL;
+	stub_sort_compare = NULL;
+	CHECK(ready_dir && !strcmp(ready_dir, ROMS_PATH "/Game Boy (GB)"));
+	// sorted again by the new names, then by the plugin
+	CHECK_STR(names(dir->entries), "Zelda,Breakout,Tetris (gb),Tetris (gbc)");
+	if (dir->entries->count == 4) {
+		// no longer duplicates, so the new names are what's drawn
+		CHECK(at(dir, 2)->unique == NULL);
+		CHECK(at(dir, 3)->unique == NULL);
+		// and the letter index uses them
+		CHECK(dir->alphas->count == 3);
+		CHECK(at(dir, 1)->alpha == 1);
+		CHECK(at(dir, 2)->alpha == 2);
+		CHECK(at(dir, 3)->alpha == 2);
+	}
+	Directory_free(dir);
+}
+
+static void test_list_ready_renames_keep_collection_order(void) {
+	resetCard();
+	writeFile(ROMS_PATH "/Game Boy (GB)/Zelda.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", "");
+	writeFile(COLLECTIONS_PATH "/Favorites.txt",
+		"/Roms/Game Boy (GB)/Zelda.gb\n"
+		"/Roms/Game Boy (GB)/Alleyway.gb\n");
+
+	stub_list_ready = addExtensions;
+	Directory* dir = Directory_new(COLLECTIONS_PATH "/Favorites.txt", 0);
+	stub_list_ready = NULL;
+	CHECK_STR(names(dir->entries), "Zelda,Breakout");
+	Directory_free(dir);
+}
+
+///////////////////////////////////////
+// selecting a row
+
+static void test_select_keeps_the_row_in_view(void) {
+	resetCard();
+	addEmu("GB");
+	addGames("A,B,C,D,E,F,G,H,I,J,K,L");
+	int count = 12;
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	CHECK(dir->entries->count == count);
+	dir->start = 0;
+	dir->end = MAIN_ROW_COUNT;
+
+	// already in view: nothing scrolls
+	Directory_select(dir, 1);
+	CHECK(dir->selected == 1);
+	CHECK(dir->start == 0 && dir->end == MAIN_ROW_COUNT);
+
+	// below the window: it scrolls until the row is the last one shown
+	Directory_select(dir, 10);
+	CHECK(dir->selected == 10);
+	CHECK(dir->end == 11 && dir->start == 11 - MAIN_ROW_COUNT);
+
+	// the last row
+	Directory_select(dir, count - 1);
+	CHECK(dir->end == count && dir->start == count - MAIN_ROW_COUNT);
+
+	// above the window: it becomes the first one shown
+	Directory_select(dir, 2);
+	CHECK(dir->selected == 2);
+	CHECK(dir->start == 2 && dir->end == 2 + MAIN_ROW_COUNT);
+
+	Directory_select(dir, 0);
+	CHECK(dir->start == 0 && dir->end == MAIN_ROW_COUNT);
+	Directory_free(dir);
+}
+
 int main(void) {
 	state.recents = Array_new();
 	test_root_orders_collections_consoles_tools();
@@ -411,5 +664,11 @@ int main(void) {
 	test_recents_remove_and_clear_save();
 	test_reload_follows_the_selected_entry();
 	test_reload_keeps_the_selection_in_view();
+	test_sort_chain_first_opinion_wins();
+	test_plugin_sort_runs_after_names();
+	test_plugin_sort_reorders_collections();
+	test_list_ready_names_are_drawn_and_indexed();
+	test_list_ready_renames_keep_collection_order();
+	test_select_keeps_the_row_in_view();
 	CHECK_DONE();
 }

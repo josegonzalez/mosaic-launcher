@@ -93,6 +93,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `modal.c` | the confirm, message and keyboard dialogs |
 | `cfgfile.c` | reading and writing a plugin's `key=value` settings file |
 | `settings.c` | the Launcher pak's screens, shown by `nextui.elf --settings` |
+| `listsort.c` | sorting a list by plugins' chained `sort_compare` hooks |
 
 See [PLUGINS.md](PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build.
 

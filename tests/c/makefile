@@ -33,7 +33,7 @@ $(BUILD)/test_art: test_art.c $(LAUNCHER)/art.c check.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) test_art.c $(LAUNCHER)/art.c -o $@
 
-LIBRARY_SOURCES = test_library.c stubs.c $(LAUNCHER)/library.c $(LAUNCHER)/containers.c \
+LIBRARY_SOURCES = test_library.c stubs.c $(LAUNCHER)/library.c $(LAUNCHER)/listsort.c $(LAUNCHER)/containers.c \
 	$(LAUNCHER)/state.c $(NEXTUI)/all/common/utils.c
 
 $(BUILD)/test_library: $(LIBRARY_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h platform/platform.h
@@ -50,7 +50,7 @@ $(BUILD)/test_pluginset: test_pluginset.c $(LAUNCHER)/pluginset.c $(LAUNCHER)/pl
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) test_pluginset.c $(LAUNCHER)/pluginset.c -o $@
 
-PAKHOOKS_SOURCES = test_pakhooks.c stubs.c $(LAUNCHER)/pakhooks.c $(LAUNCHER)/containers.c \
+PAKHOOKS_SOURCES = test_pakhooks.c stubs.c $(LAUNCHER)/pakhooks.c $(LAUNCHER)/listsort.c $(LAUNCHER)/containers.c \
 	$(LAUNCHER)/state.c $(NEXTUI)/all/common/utils.c
 
 $(BUILD)/test_pakhooks: $(PAKHOOKS_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h platform/platform.h

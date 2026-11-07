@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "containers.h"
+#include "listsort.h"
 #include "stubs.h"
 
 // Root list settings, defaulting to stock's CFG_DEFAULT_* values. Tests
@@ -39,3 +40,12 @@ Array* Plugins_rootReplace(void) {
 Array* Plugins_virtualDir(const char* path) { (void)path; return NULL; }
 Array* Plugins_filter(Array* entries, const char* dir_path) { (void)dir_path; return entries; }
 int Plugins_displayNames(Array* entries) { (void)entries; return 0; }
+// Tests set these to stand in for plugins' sort_compare and list_ready.
+ListSortCompare stub_sort_compare = NULL;
+int (*stub_list_ready)(Array* entries, const char* dir_path) = NULL;
+void Plugins_sort(Array* entries, const char* dir_path) {
+	if (stub_sort_compare) ListSort_chain(entries, &stub_sort_compare, 1, dir_path);
+}
+int Plugins_listReady(Array* entries, const char* dir_path) {
+	return stub_list_ready ? stub_list_ready(entries, dir_path) : 0;
+}

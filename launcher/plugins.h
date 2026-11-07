@@ -55,6 +55,14 @@ Array* Plugins_filter(Array* entries, const char* dir_path);
 // Lets plugins rename entries. Returns 1 if any name changed.
 int Plugins_displayNames(Array* entries);
 
+// Sorts entries by plugins' sort_compare chain, keeping the current order
+// where none has an opinion.
+void Plugins_sort(Array* entries, const char* dir_path);
+
+// Shows plugins the whole list, which they can rename entries in. Returns 1
+// if any name changed.
+int Plugins_listReady(Array* entries, const char* dir_path);
+
 // Asks plugins before a launch. Returns 1 to go ahead, 0 if one cancelled.
 // Going ahead also arranges for post_return on the next start.
 int Plugins_preLaunch(const char* path, int type);

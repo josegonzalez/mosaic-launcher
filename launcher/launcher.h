@@ -41,5 +41,6 @@
 #include "modal.h"
 #include "cfgfile.h"
 #include "settings.h"
+#include "listsort.h"
 
 #endif

@@ -296,6 +296,36 @@ static void hostReloadLists(void) {
 	state.reload = 1;
 }
 
+// Set while list_ready hooks run, the only time entry_set_name works.
+static int listing = 0;
+static int list_renamed = 0;
+
+static int hostEntrySetName(NUIEntry* e, const char* name) {
+	if (!listing || !e || !name || !name[0]) return -1;
+	Entry* entry = (Entry*)e;
+	free(entry->name);
+	entry->name = strdup(name);
+	list_renamed = 1;
+	return 0;
+}
+
+static const NUIList* hostCurrentList(void) {
+	return state.top ? (const NUIList*)state.top->entries : NULL;
+}
+static int hostSelectedIndex(void) {
+	if (!state.top || state.top->entries->count == 0) return -1;
+	return state.top->selected;
+}
+static int hostSelectIndex(int index) {
+	if (!state.top || index < 0 || index >= state.top->entries->count) return -1;
+	Directory_select(state.top, index);
+	// main's copy for this frame, so the game list's input doesn't put it back
+	selected = index;
+	readyResume(state.top->entries->items[index]);
+	state.dirty = 1;
+	return 0;
+}
+
 static const NUIHost host = {
 	.size = sizeof(NUIHost),
 	.api_version = NUI_API_VERSION,
@@ -328,6 +358,10 @@ static const NUIHost host = {
 	.recent_remove = hostRecentRemove,
 	.recents_clear = hostRecentsClear,
 	.reload_lists = hostReloadLists,
+	.entry_set_name = hostEntrySetName,
+	.current_list = hostCurrentList,
+	.selected_index = hostSelectedIndex,
+	.select_index = hostSelectIndex,
 };
 
 ///////////////////////////////////////
@@ -564,6 +598,26 @@ int Plugins_displayNames(Array* entries) {
 			}
 		}
 	}
+	return renamed;
+}
+
+void Plugins_sort(Array* entries, const char* dir_path) {
+	ListSortCompare compares[PLUGIN_MAX];
+	int count = 0;
+	EACH_PLUGIN_WITH(sort_compare) compares[count++] = p->sort_compare;
+	if (count > 0) ListSort_chain(entries, compares, count, dir_path);
+}
+
+int Plugins_listReady(Array* entries, const char* dir_path) {
+	// a hook that lists another folder (it shouldn't) gets its own flags
+	int was_listing = listing;
+	int was_renamed = list_renamed;
+	listing = 1;
+	list_renamed = 0;
+	EACH_PLUGIN_WITH(list_ready) p->list_ready((const NUIList*)entries, dir_path);
+	int renamed = list_renamed;
+	listing = was_listing;
+	list_renamed = was_renamed;
 	return renamed;
 }
 

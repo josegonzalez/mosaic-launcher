@@ -55,6 +55,8 @@ Directory* Directory_new(char* path, int selected);
 // Lists it again from the card, keeping the selection on the same entry
 // where it can.
 void Directory_reload(Directory* self);
+// Selects a row, scrolling the visible rows to keep it in view.
+void Directory_select(Directory* self, int selected);
 void Directory_free(Directory* self);
 void DirectoryArray_pop(Array* self);
 void DirectoryArray_free(Array* self);
