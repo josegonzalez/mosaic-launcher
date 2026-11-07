@@ -21,6 +21,29 @@ void QuickMenu_enter(void) {
 	qm_row = 0;
 	qm_shift = 0;
 	qm_slot = 0;
+	// plugins can hide every top tile
+	if (state.quick->count == 0 && state.quickActions->count > 0) qm_row = 1;
+}
+
+void QuickMenu_refit(void) {
+	qm_slots = QUICK_SWITCHER_COUNT > state.quick->count ? state.quick->count : QUICK_SWITCHER_COUNT;
+	if (qm_row == 0 && state.quick->count == 0 && state.quickActions->count > 0) qm_row = 1;
+	if (qm_row == 1 && state.quickActions->count == 0) qm_row = 0;
+	int count = qm_row == 0 ? state.quick->count : state.quickActions->count;
+	if (qm_col >= count) qm_col = count > 0 ? count - 1 : 0;
+	if (qm_row == 0) {
+		// keep the scrolled top row's window around the cursor
+		if (qm_shift > count - qm_slots) qm_shift = MAX(0, count - qm_slots);
+		if (qm_col < qm_shift) qm_shift = qm_col;
+		if (qm_col >= qm_shift + qm_slots) qm_shift = qm_col - qm_slots + 1;
+		qm_slot = qm_col - qm_shift;
+	}
+}
+
+// The selected tile, or NULL when its row is empty.
+static Entry* selectedTile(void) {
+	Array* row = qm_row == 0 ? state.quick : state.quickActions;
+	return qm_col < row->count ? row->items[qm_col] : NULL;
 }
 
 void QuickMenu_handleInput(void) {
@@ -31,8 +54,10 @@ void QuickMenu_handleInput(void) {
 		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
 		state.dirty = 1;
 	}
-	else if (PAD_justReleased(BTN_A)) {
-		Entry *selected = qm_row == 0 ? state.quick->items[qm_col] : state.quickActions->items[qm_col];
+	else if (PAD_justReleased(BTN_A) && selectedTile()) {
+		Entry *selected = selectedTile();
+		Directory* was_top = state.top;
+		int was_depth = state.stack->count;
 		if(selected->type != ENTRY_DIP) {
 			currentScreen = SCREEN_GAMELIST;
 			total = state.top->entries->count;
@@ -47,10 +72,16 @@ void QuickMenu_handleInput(void) {
 			state.restore_end = 0;
 		}
 		Entry_open(selected);
+		// a plugin tile that opened a folder shows it; stock's toggles never do
+		if (selected->type == ENTRY_DIP && currentScreen == SCREEN_QUICKMENU
+				&& (state.top != was_top || state.stack->count != was_depth)) {
+			currentScreen = SCREEN_GAMELIST;
+			folderbgchanged = 1;
+		}
 		if (state.top->entries->count > 0) readyResume(state.top->entries->items[state.top->selected]);
 		state.dirty = 1;
 	}
-	else if (PAD_justPressed(BTN_RIGHT)) {
+	else if (PAD_justPressed(BTN_RIGHT) && qm_total > 0) {
 		if(qm_row == 0 && qm_total > qm_slots) {
 			qm_col++;
 			if(qm_col >= qm_total) {
@@ -74,7 +105,7 @@ void QuickMenu_handleInput(void) {
 		}
 		state.dirty = 1;
 	}
-	else if (PAD_justPressed(BTN_LEFT)) {
+	else if (PAD_justPressed(BTN_LEFT) && qm_total > 0) {
 		if(qm_row == 0  && qm_total > qm_slots) {
 			qm_col -= 1;
 			if(qm_col < 0) {
@@ -99,14 +130,14 @@ void QuickMenu_handleInput(void) {
 		state.dirty = 1;
 	}
 	else if(PAD_justPressed(BTN_DOWN)) {
-		if(qm_row == 0) {
+		if(qm_row == 0 && state.quickActions->count > 0) {
 			qm_row = 1;
 			qm_col = 0;
 			state.dirty = 1;
 		}
 	}
 	else if(PAD_justPressed(BTN_UP)) {
-		if(qm_row == 1) {
+		if(qm_row == 1 && state.quick->count > 0) {
 			qm_row = 0;
 			qm_col = qm_slot + qm_shift;
 			state.dirty = 1;
@@ -117,13 +148,14 @@ void QuickMenu_handleInput(void) {
 // Picks and starts loading the selected tile's background. Draws nothing;
 // the loaded image is drawn by main()'s background flush.
 void QuickMenu_update(void) {
-	Entry *current = qm_row == 0 ? state.quick->items[qm_col] : state.quickActions->items[qm_col];
+	Entry *current = selectedTile();
+	if (!current) return;
 	char newBgPath[MAX_PATH];
 	char fallbackBgPath[MAX_PATH];
 
 	char bgSubject[MAX_PATH];
 	// wifi or wifi_off, bluetooth or bluetooth_off, based on state
-	snprintf(bgSubject, sizeof(bgSubject), "%s%s", current->name, QuickItem_isOff(current->name) ? "_off" : "");
+	snprintf(bgSubject, sizeof(bgSubject), "%s%s", current->name, QuickItem_isOff(current) ? "_off" : "");
 	resolveArt(ART_QUICK_BG, bgSubject, newBgPath, sizeof(newBgPath));
 	resolveArt(ART_QUICK_FALLBACK, NULL, fallbackBgPath, sizeof(fallbackBgPath));
 
@@ -135,6 +167,35 @@ void QuickMenu_update(void) {
 		strncpy(folderBgPath, newBgPath, sizeof(folderBgPath) - 1);
 		startLoadFolderBackground(newBgPath, onBackgroundLoaded, NULL);
 	}
+}
+
+// A plugin tile's PNG for its on/off state, or "" for none.
+static const char* tileIcon(const QuickTile* tile) {
+	const char* icon = QuickTile_isOff(tile) && tile->icon_off ? tile->icon_off : tile->icon;
+	return icon ? icon : "";
+}
+
+// A plugin tile on the bottom row: its PNG centered on the pill, or its
+// label when it has none.
+static void blitTileIcon(const QuickTile* tile, Entry* item, SDL_Rect rect, uint32_t icon_color, SDL_Color text_color) {
+	const char* path = tileIcon(tile);
+	SDL_Surface* bmp = path[0] ? IMG_Load(path) : NULL;
+	if (bmp) {
+		SDL_Surface* converted = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);
+		if (converted) {
+			SDL_FreeSurface(bmp);
+			bmp = converted;
+		}
+		SDL_Rect dst = { rect.x + (rect.w - bmp->w) / 2, rect.y + (rect.h - bmp->h) / 2, 0, 0 };
+		GFX_blitSurfaceColor(bmp, NULL, screen, &dst, icon_color);
+		SDL_FreeSurface(bmp);
+		return;
+	}
+	char label[64];
+	int w = GFX_truncateText(font.tiny, TR(item->name), label, rect.w, 0);
+	int h = TTF_FontHeight(font.tiny);
+	SDL_Rect text_rect = { rect.x + (rect.w - w) / 2, rect.y + (rect.h - h) / 2, w, h };
+	GFX_blitText(font.tiny, label, SCALE1(FONT_TINY), text_color, screen, &text_rect);
 }
 
 void QuickMenu_render(void) {
@@ -196,8 +257,10 @@ void QuickMenu_render(void) {
 			GFX_blitRectColor(ASSET_STATE_BG, screen, &item_rect, item_color);
 
 			char icon_path[MAX_PATH];
-			resolveArt(ART_QUICK_ICON, item->name, icon_path, sizeof(icon_path));
-			SDL_Surface* bmp = IMG_Load(icon_path);
+			const QuickTile* tile = QuickTiles_forEntry(item);
+			if (tile) snprintf(icon_path, sizeof(icon_path), "%s", tileIcon(tile));
+			else resolveArt(ART_QUICK_ICON, item->name, icon_path, sizeof(icon_path));
+			SDL_Surface* bmp = icon_path[0] ? IMG_Load(icon_path) : NULL;
 			if(bmp) {
 				SDL_Surface* converted = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);
 				if (converted) {
@@ -242,6 +305,13 @@ void QuickMenu_render(void) {
 			}
 
 			GFX_blitPillColor(ASSET_WHITE_PILL, screen, &item_rect, item_color, RGB_WHITE);
+
+			const QuickTile* tile = QuickTiles_forEntry(item);
+			if (tile) {
+				blitTileIcon(tile, item, item_rect, icon_color, text_color);
+				ox += item_rect.w + SCALE1(MENU_TOGGLE_MARGIN);
+				continue;
+			}
 
 			int asset = QuickItem_asset(item->name);
 

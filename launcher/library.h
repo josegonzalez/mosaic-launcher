@@ -77,6 +77,9 @@ void saveRecents(void);
 void addRecent(char* path, char* alias);
 // Both save at once. Recents_remove returns 0, or -1 for a bad index.
 int Recents_remove(int index);
+// Points a recent at a full path on the card, keeping its place and alias.
+// Returns 0, or -1 for a bad index, a path off the card or one already listed.
+int Recents_set(int index, const char* path);
 void Recents_clear(void);
 
 Entry* entryFromPakName(char* pak_name);

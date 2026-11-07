@@ -28,6 +28,7 @@ void GameList_registerActions(void);
 
 void QuickMenu_setup(void); // once, after Menu_init
 void QuickMenu_enter(void); // puts the cursor back on the first tile
+void QuickMenu_refit(void); // keeps the cursor on a tile after the rows change
 void QuickMenu_handleInput(void);
 void QuickMenu_update(void);
 void QuickMenu_render(void);

@@ -63,3 +63,49 @@ int Bindings_hints(const Binding* const* bindings, int count, char** pairs) {
 	pairs[hints * 2] = NULL;
 	return hints;
 }
+
+int Bindings_shared(const Binding* bindings, int count, int button, int trigger, const Action** out, int max) {
+	int n = 0;
+	for (int i = 0; i < count; i++) {
+		const Binding* binding = &bindings[i];
+		if (binding->button != button || binding->trigger != trigger) continue;
+		if (!Action_available(binding->action)) continue;
+		int seen = 0;
+		for (int j = 0; j < i; j++) {
+			if (bindings[j].action == binding->action && bindings[j].button == button && bindings[j].trigger == trigger) seen = 1;
+		}
+		if (seen) continue;
+		if (n < max) out[n] = binding->action;
+		n++;
+	}
+	return n;
+}
+
+#define SHARED_MAX 16
+
+int Bindings_dispatchShared(const Binding* bindings, int count, void (*menu)(const Action** actions, int n)) {
+	for (int i = 0; i < count; i++) {
+		const Binding* binding = &bindings[i];
+		if (!fired(binding) || !Action_available(binding->action)) continue;
+		const Action* actions[SHARED_MAX];
+		int n = Bindings_shared(bindings, count, binding->button, binding->trigger, actions, SHARED_MAX);
+		if (n > SHARED_MAX) n = SHARED_MAX;
+		if (n == 1 || !menu) Action_run(actions[0]);
+		else menu(actions, n);
+		return 1;
+	}
+	return 0;
+}
+
+int Bindings_sharedHint(const Binding* bindings, int count, const char** glyph, const char** label) {
+	for (int i = 0; i < count; i++) {
+		const Binding* binding = &bindings[i];
+		if (!Action_available(binding->action)) continue;
+		const Action* first;
+		int n = Bindings_shared(bindings, count, binding->button, binding->trigger, &first, 1);
+		*glyph = binding->glyph;
+		*label = n > 1 ? "MORE" : binding->action->label;
+		return 1;
+	}
+	return 0;
+}

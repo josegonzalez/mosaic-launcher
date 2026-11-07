@@ -309,6 +309,171 @@ static void test_recents_remove_and_clear_save(void) {
 	CHECK_STR(readFile(RECENT_PATH), "");
 }
 
+static void addFocusEntry(Array* root) {
+	Array_push(root, Entry_new(SDCARD_PATH "/Added", ENTRY_DIR));
+}
+
+static void test_root_replace_adds_entries_only_when_asked(void) {
+	resetCard();
+	stub_root_entries = addFocusEntry;
+
+	// focus mode style: the owner's list alone
+	Array* replacement = Array_new();
+	Array_push(replacement, Entry_new(SDCARD_PATH "/Focus", ENTRY_DIR));
+	stub_root_replace = replacement;
+	stub_root_with_entries = 0;
+	Array* root = getRoot();
+	CHECK(root->count == 1);
+	EntryArray_free(root);
+
+	// all games style: plugins' entries follow the owner's
+	replacement = Array_new();
+	Array_push(replacement, Entry_new(SDCARD_PATH "/All", ENTRY_DIR));
+	stub_root_replace = replacement;
+	stub_root_with_entries = 1;
+	root = getRoot();
+	CHECK(root->count == 2);
+	if (root->count == 2) {
+		CHECK_STR(((Entry*)root->items[0])->path, SDCARD_PATH "/All");
+		CHECK_STR(((Entry*)root->items[1])->path, SDCARD_PATH "/Added");
+	}
+	EntryArray_free(root);
+
+	stub_root_entries = NULL;
+	stub_root_with_entries = 0;
+}
+
+static void test_recents_set_rewrites_a_path(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/A.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/B.gb", "");
+	writeFile(RECENT_PATH, "/Roms/Game Boy (GB)/A.gb\tAy\n/Roms/Game Boy (GB)/B.gb\n");
+	hasRecents();
+	CHECK(state.recents->count == 2);
+
+	// keeps its place and alias
+	CHECK(Recents_set(0, ROMS_PATH "/Game Boy (GB)/A2.gb") == 0);
+	CHECK_STR(readFile(RECENT_PATH), "/Roms/Game Boy (GB)/A2.gb\tAy\n/Roms/Game Boy (GB)/B.gb\n");
+	// setting the same path again is fine; another recent's path isn't
+	CHECK(Recents_set(0, ROMS_PATH "/Game Boy (GB)/A2.gb") == 0);
+	CHECK(Recents_set(0, ROMS_PATH "/Game Boy (GB)/B.gb") == -1);
+	CHECK(Recents_set(2, ROMS_PATH "/Game Boy (GB)/C.gb") == -1);
+	CHECK(Recents_set(-1, ROMS_PATH "/Game Boy (GB)/C.gb") == -1);
+	CHECK(Recents_set(1, "/elsewhere/C.gb") == -1);
+	CHECK(Recents_set(1, NULL) == -1);
+	CHECK_STR(readFile(RECENT_PATH), "/Roms/Game Boy (GB)/A2.gb\tAy\n/Roms/Game Boy (GB)/B.gb\n");
+}
+
+// Plugin tiles' actions, as a plugin registers them.
+static int tile_ok = 1, light_on = 1;
+static int tileAvailable(void* d) { (void)d; return tile_ok; }
+static int lightIsOn(void* d) { (void)d; return light_on; }
+static void tileRun(void* d) { (void)d; }
+static const Action tileAction = { "test.tile", "Tile", tileAvailable, tileRun };
+static const Action lightAction = { "test.light", "Light", NULL, tileRun };
+
+static Array* twoToggles(void) {
+	Array* entries = Array_new();
+	Array_push(entries, Entry_new("Wifi", ENTRY_DIP));
+	Array_push(entries, Entry_new("Reboot", ENTRY_DIP));
+	return entries;
+}
+
+static void rowNames(Array* entries, char* out, size_t size) {
+	out[0] = '\0';
+	for (int i = 0; i < entries->count; i++) {
+		size_t len = strlen(out);
+		snprintf(out + len, size - len, "%s%s", i ? "," : "", ((Entry*)entries->items[i])->name);
+	}
+}
+
+static void test_quick_tiles_hide_and_add(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/A.gb", "");
+	writeFile(RECENT_PATH, "/Roms/Game Boy (GB)/A.gb\n");
+	writeFile(TOOLS_PATH "/Clock.pak/launch.sh", "");
+	hasRecents();
+	stub_quick_items = twoToggles;
+	char got[256];
+
+	// no plugin tiles: stock's rows
+	Array* top = getQuickEntries();
+	rowNames(top, got, sizeof(got));
+	CHECK_STR(got, "Recents,Games,Tools");
+	EntryArray_free(top);
+	Array* bottom = getQuickToggles();
+	rowNames(bottom, got, sizeof(got));
+	CHECK_STR(got, "Wifi,Reboot");
+	EntryArray_free(bottom);
+
+	// unknown actions and rows are refused
+	Actions_register(&tileAction);
+	Actions_register(&lightAction);
+	CHECK(QuickTiles_add("test.missing", QUICK_ROW_TOP, NULL, NULL, NULL) == -1);
+	CHECK(QuickTiles_add("test.tile", 7, NULL, NULL, NULL) == -1);
+	CHECK(QuickTiles_hide("", 1) == -1);
+	CHECK(!QuickTiles_any());
+
+	// plugin tiles go after the built-ins; hidden built-ins go away
+	CHECK(QuickTiles_add("test.tile", QUICK_ROW_TOP, "/icon.png", NULL, NULL) == 0);
+	CHECK(QuickTiles_add("test.light", QUICK_ROW_BOTTOM, "/on.png", "/off.png", lightIsOn) == 0);
+	CHECK(QuickTiles_hide("Games", 1) == 0);
+	CHECK(QuickTiles_hide("Reboot", 1) == 0);
+	CHECK(QuickTiles_hide("Reboot", 1) == 0); // twice is once
+	top = getQuickEntries();
+	rowNames(top, got, sizeof(got));
+	CHECK_STR(got, "Recents,Tools,Tile");
+	if (top->count == 3) {
+		Entry* tile = top->items[2];
+		CHECK_STR(tile->path, "action:test.tile");
+		CHECK(tile->type == ENTRY_DIP);
+		const QuickTile* t = QuickTiles_forEntry(tile);
+		CHECK(t && t->action == &tileAction && t->icon && !strcmp(t->icon, "/icon.png"));
+		CHECK(!QuickTile_isOff(t));
+		CHECK(QuickTiles_forEntry(top->items[0]) == NULL);
+	}
+	EntryArray_free(top);
+	bottom = getQuickToggles();
+	rowNames(bottom, got, sizeof(got));
+	CHECK_STR(got, "Wifi,Light");
+	if (bottom->count == 2) {
+		const QuickTile* t = QuickTiles_forEntry(bottom->items[1]);
+		CHECK(t && !QuickTile_isOff(t));
+		light_on = 0;
+		CHECK(QuickTile_isOff(t));
+		light_on = 1;
+	}
+	EntryArray_free(bottom);
+
+	// a tile shows only while its action is available, and hides by action id
+	tile_ok = 0;
+	top = getQuickEntries();
+	rowNames(top, got, sizeof(got));
+	CHECK_STR(got, "Recents,Tools");
+	EntryArray_free(top);
+	tile_ok = 1;
+	CHECK(QuickTiles_hide("test.tile", 1) == 0);
+	CHECK(QuickTiles_hide("Games", 0) == 0);
+	top = getQuickEntries();
+	rowNames(top, got, sizeof(got));
+	CHECK_STR(got, "Recents,Games,Tools");
+	EntryArray_free(top);
+
+	// with recents cleared, the rebuilt row has no Recents tile
+	Recents_clear();
+	CHECK(QuickTiles_hide("test.tile", 0) == 0);
+	top = getQuickEntries();
+	rowNames(top, got, sizeof(got));
+	CHECK_STR(got, "Games,Tools,Tile");
+	EntryArray_free(top);
+
+	QuickTiles_reset();
+	CHECK(!QuickTiles_any());
+	stub_quick_items = NULL;
+}
+
 static void addGames(const char* names) {
 	char list[256];
 	snprintf(list, sizeof(list), "%s", names);
@@ -662,6 +827,9 @@ int main(void) {
 	test_collections_folder_lists_collections_as_folders();
 	test_root_replace_skips_stock_but_loads_recents();
 	test_recents_remove_and_clear_save();
+	test_root_replace_adds_entries_only_when_asked();
+	test_recents_set_rewrites_a_path();
+	test_quick_tiles_hide_and_add();
 	test_reload_follows_the_selected_entry();
 	test_reload_keeps_the_selection_in_view();
 	test_sort_chain_first_opinion_wins();

@@ -39,6 +39,7 @@ typedef struct LauncherState {
 	int animationdirection;
 	int dirty;
 	int reload; // list the open folders again before the next frame's input
+	int rebuild_quick; // build the quick menu's tiles again before the next frame's input
 	int previous_row;
 	int previous_depth;
 } LauncherState;

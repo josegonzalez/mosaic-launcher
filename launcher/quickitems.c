@@ -65,12 +65,19 @@ int QuickItem_asset(const char* name) {
 	return item->asset;
 }
 
-int QuickItem_isOff(const char* name) {
-	const QuickItem* item = QuickItem_find(name);
+int QuickItem_isOff(const Entry* entry) {
+	const QuickTile* tile = QuickTiles_forEntry(entry);
+	if (tile) return QuickTile_isOff(tile);
+	const QuickItem* item = QuickItem_find(entry->name);
 	return item && item->isOn && !item->isOn();
 }
 
-void QuickItem_activate(const char* name) {
-	const QuickItem* item = QuickItem_find(name);
+void QuickItem_activate(const Entry* entry) {
+	const QuickTile* tile = QuickTiles_forEntry(entry);
+	if (tile) {
+		if (Action_available(tile->action)) Action_run(tile->action);
+		return;
+	}
+	const QuickItem* item = QuickItem_find(entry->name);
 	if (item && item->kind == QUICK_TOGGLE && item->activate) item->activate();
 }

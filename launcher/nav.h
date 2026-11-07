@@ -17,6 +17,9 @@ void saveLast(char* path);
 void loadLast(void); // call after loading root directory
 void QuickMenu_init(void);
 void QuickMenu_quit(void);
+// Builds the quick menu's tiles again; main runs it when state.rebuild_quick
+// is set, and Menu_reload does too.
+void QuickMenu_rebuild(void);
 void Menu_init(void);
 void Menu_quit(void);
 // Lists the open folders again; main runs it when state.reload is set.

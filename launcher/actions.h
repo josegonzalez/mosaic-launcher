@@ -44,6 +44,21 @@ int Bindings_dispatch(const Binding* bindings, int count);
 // room for 2 * count + 1 entries. Returns the number of hints.
 int Bindings_hints(const Binding* const* bindings, int count, char** pairs);
 
+// Bindings that can share a button, like plugins' on the game list. When
+// one fires, the available actions bound to its button and trigger decide:
+// one runs straight away, and two or more go to menu to pick from (in
+// binding order, each action once). Returns 1 if one ran or the menu opened.
+int Bindings_dispatchShared(const Binding* bindings, int count, void (*menu)(const Action** actions, int n));
+
+// The available actions bound to button and trigger, in binding order and
+// each once. Fills up to max of them into out and returns how many there are.
+int Bindings_shared(const Binding* bindings, int count, int button, int trigger, const Action** out, int max);
+
+// The hint for the first binding whose action is available: its glyph, and
+// its action's label, or "MORE" when other available actions share the
+// button and it opens a menu. Returns 0 when nothing is available.
+int Bindings_sharedHint(const Binding* bindings, int count, const char** glyph, const char** label);
+
 #define FN_ACTION_ACTION_PREFIX "action:"
 
 #endif

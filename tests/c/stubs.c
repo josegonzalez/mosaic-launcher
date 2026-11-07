@@ -23,18 +23,31 @@ void LOG_note(int level, const char* fmt, ...) {
 	(void)fmt;
 }
 
-// quickitems.c reaches into platform code (Wi-Fi, Bluetooth, power).
+// quickitems.c reaches into platform code (Wi-Fi, Bluetooth, power). A test
+// sets stub_quick_items to stand in for its bottom row.
+Array* (*stub_quick_items)(void) = NULL;
 Array* QuickItem_entries(void) {
-	return Array_new();
+	return stub_quick_items ? stub_quick_items() : Array_new();
 }
 
+// actions.c reads the pad; nothing is pressed in these tests.
+int PAD_justPressed(int btn) { (void)btn; return 0; }
+int PAD_justReleased(int btn) { (void)btn; return 0; }
+
 // plugins.c loads shared objects; listing tests run with no plugins.
-void Plugins_rootEntries(Array* root) { (void)root; }
-// A test sets this to stand in for a root slot owner's list; it's used once.
+// A test sets stub_root_entries to stand in for plugins' root_entries.
+void (*stub_root_entries)(Array* root) = NULL;
+void Plugins_rootEntries(Array* root) {
+	if (stub_root_entries) stub_root_entries(root);
+}
+// A test sets these to stand in for a root slot owner's list and its
+// root_with_entries; the list is used once.
 Array* stub_root_replace = NULL;
-Array* Plugins_rootReplace(void) {
+int stub_root_with_entries = 0;
+Array* Plugins_rootReplace(int* with_entries) {
 	Array* root = stub_root_replace;
 	stub_root_replace = NULL;
+	*with_entries = root ? stub_root_with_entries : 0;
 	return root;
 }
 Array* Plugins_virtualDir(const char* path) { (void)path; return NULL; }

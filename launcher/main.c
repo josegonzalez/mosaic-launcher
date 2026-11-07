@@ -87,6 +87,8 @@ int main (int argc, char *argv[]) {
 
 		// a plugin changed something on the card (host->reload_lists)
 		if (state.reload) Menu_reload();
+		// a plugin added or hid a quick menu tile
+		if (state.rebuild_quick) QuickMenu_rebuild();
 
 		selected = state.top->selected;
 		total = state.top->entries->count;

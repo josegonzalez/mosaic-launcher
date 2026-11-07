@@ -43,8 +43,9 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 void Plugins_rootEntries(Array* root);
 
 // The root slot owner's list in place of the stock root, or NULL to build
-// stock's.
-Array* Plugins_rootReplace(void);
+// stock's. Sets *with_entries when the owner wants plugins' root_entries
+// added to it.
+Array* Plugins_rootReplace(int* with_entries);
 
 // The first plugin list for a path it owns, or NULL.
 Array* Plugins_virtualDir(const char* path);

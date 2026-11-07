@@ -1,7 +1,7 @@
 #include "launcher.h"
 #include "kbmodel.h"
 
-enum { MODAL_NONE, MODAL_CONFIRM, MODAL_MESSAGE, MODAL_KEYBOARD };
+enum { MODAL_NONE, MODAL_CONFIRM, MODAL_MESSAGE, MODAL_KEYBOARD, MODAL_CHOICE };
 
 static int kind = MODAL_NONE;
 static int return_to = SCREEN_GAMELIST;
@@ -10,8 +10,13 @@ static char yes_label[32];
 static char title[64];
 static void (*confirm_yes)(void* data);
 static void (*keyboard_done)(const char* text, void* data);
+static void (*choice_pick)(int index, void* data);
 static void* callback_data;
 static KbModel kb;
+static char* choices[MODAL_CHOICES_MAX];
+static int choice_count = 0;
+static int choice_selected = 0;
+static int choice_start = 0; // first visible row
 
 static void openModal(int what) {
 	if (kind == MODAL_NONE) return_to = currentScreen;
@@ -48,6 +53,26 @@ void Modal_keyboard(const char* heading, const char* initial, void (*on_done)(co
 	keyboard_done = on_done;
 	callback_data = data;
 	openModal(MODAL_KEYBOARD);
+}
+
+static void freeChoices(void) {
+	for (int i = 0; i < choice_count; i++) free(choices[i]);
+	choice_count = 0;
+}
+
+int Modal_choose(const char* heading, const char* const* list, int count, int selected,
+		void (*on_pick)(int index, void* data), void* data) {
+	if (!list || count < 1 || count > MODAL_CHOICES_MAX) return -1;
+	// a choice list opened from another one's callback replaces it
+	freeChoices();
+	for (int i = 0; i < count; i++) choices[choice_count++] = strdup(list[i] ? list[i] : "");
+	snprintf(title, sizeof(title), "%s", heading ? heading : "");
+	choice_selected = selected >= 0 && selected < count ? selected : 0;
+	choice_start = 0;
+	choice_pick = on_pick;
+	callback_data = data;
+	openModal(MODAL_CHOICE);
+	return 0;
 }
 
 ///////////////////////////////////////
@@ -104,8 +129,29 @@ static void keyboardInput(void) {
 	if (changed) state.dirty = 1;
 }
 
+static void choiceFinish(int index) {
+	void (*cb)(int, void*) = choice_pick;
+	void* data = callback_data;
+	closeModal();
+	if (cb) cb(index, data);
+}
+
+static void choiceInput(void) {
+	if (PAD_justRepeated(BTN_UP)) {
+		choice_selected = (choice_selected - 1 + choice_count) % choice_count;
+		state.dirty = 1;
+	}
+	else if (PAD_justRepeated(BTN_DOWN)) {
+		choice_selected = (choice_selected + 1) % choice_count;
+		state.dirty = 1;
+	}
+	else if (PAD_justPressed(BTN_A)) choiceFinish(choice_selected);
+	else if (PAD_justPressed(BTN_B)) choiceFinish(-1);
+}
+
 void Modal_handleInput(void) {
 	if (kind == MODAL_CONFIRM) confirmInput();
+	else if (kind == MODAL_CHOICE) choiceInput();
 	else if (kind == MODAL_MESSAGE) messageInput();
 	else if (kind == MODAL_KEYBOARD) keyboardInput();
 	else closeModal(); // nothing to show; shouldn't happen
@@ -188,9 +234,50 @@ static void keyboardRender(void) {
 	GFX_blitButtonGroup((char*[]){ "B", TR("DELETE"), "START", TR("DONE"), NULL }, 1, screen, 1);
 }
 
+static void blitRowText(TTF_Font* f, const char* text, SDL_Color color, int x, int y, int max_w) {
+	if (!text[0] || max_w <= 0) return;
+	SDL_Surface* s = TTF_RenderUTF8_Blended(f, text, color);
+	if (!s) return;
+	SDL_Rect src = { 0, 0, MIN(s->w, max_w), s->h };
+	SDL_Rect dst = { x, y + ((SCALE1(PILL_SIZE) - s->h + 1) >> 1) };
+	SDL_BlitSurface(s, &src, screen, &dst);
+	SDL_FreeSurface(s);
+}
+
+// The title beside the battery and clock, then a row per choice with the
+// selected one on a pill, as settings.c draws the Launcher pak's menus.
+static void choiceRender(void) {
+	SDL_Color normal = uintToColour(THEME_COLOR4_255);
+	SDL_Color picked = uintToColour(THEME_COLOR5_255);
+	int left = SCALE1(BUTTON_MARGIN);
+	int width = screen->w - SCALE1(BUTTON_MARGIN * 2);
+	int pad = SCALE1(BUTTON_PADDING);
+
+	char shown[256];
+	GFX_truncateText(font.large, title, shown, screen->w - SCALE1(PADDING * 2) - ow, pad * 2);
+	blitRowText(font.large, shown, normal, left + pad, SCALE1(PADDING), screen->w);
+
+	int visible = MAIN_ROW_COUNT - 1;
+	if (choice_selected < choice_start) choice_start = choice_selected;
+	if (choice_selected >= choice_start + visible) choice_start = choice_selected - visible + 1;
+
+	for (int i = choice_start, j = 1; i < choice_count && j <= visible; i++, j++) {
+		int y = SCALE1(PADDING + j * PILL_SIZE);
+		char label[256];
+		int label_w = GFX_truncateText(font.large, choices[i], label, width, pad * 2);
+		int selected = i == choice_selected;
+		if (selected) GFX_blitPillDark(ASSET_WHITE_PILL, screen, &(SDL_Rect){ left, y, label_w, SCALE1(PILL_SIZE) });
+		blitRowText(font.large, label, selected ? picked : normal, left + pad, y, label_w - pad * 2);
+	}
+
+	if (show_setting) GFX_blitHardwareHints(screen, show_setting);
+	GFX_blitButtonGroup((char*[]){ "B", TR("BACK"), "A", TR("SELECT"), NULL }, 1, screen, 1);
+}
+
 void Modal_render(void) {
 	GFX_clearLayers(LAYER_ALL);
-	if (kind == MODAL_CONFIRM) confirmRender();
+	if (kind == MODAL_CHOICE) choiceRender();
+	else if (kind == MODAL_CONFIRM) confirmRender();
 	else if (kind == MODAL_MESSAGE) messageRender();
 	else if (kind == MODAL_KEYBOARD) keyboardRender();
 	lastScreen = SCREEN_MODAL;

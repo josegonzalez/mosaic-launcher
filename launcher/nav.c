@@ -184,7 +184,7 @@ void toggleQuick(Entry* self)
 	if(!self)
 		return;
 
-	QuickItem_activate(self->name);
+	QuickItem_activate(self);
 }
 
 void Entry_open(Entry* self) {
@@ -293,13 +293,35 @@ void loadLast(void) { // call after loading root directory
 		readyResume(selected_entry);
 	}
 }
+static void logRow(const char* which, Array* entries) {
+	char names[512] = "";
+	for (int i = 0; i < entries->count; i++) {
+		size_t len = strlen(names);
+		snprintf(names + len, sizeof(names) - len, "%s%s", i ? "," : "", ((Entry*)entries->items[i])->name);
+	}
+	LOG_info("quick menu: %s row %s\n", which, names);
+}
 void QuickMenu_init(void) {
+	state.rebuild_quick = 0;
 	state.quick = getQuickEntries();
 	state.quickActions = getQuickToggles();
+	// only once plugins have changed the tiles, so stock's log is unchanged
+	if (QuickTiles_any()) {
+		logRow("top", state.quick);
+		logRow("bottom", state.quickActions);
+	}
 }
 void QuickMenu_quit(void) {
 	EntryArray_free(state.quick);
 	EntryArray_free(state.quickActions);
+}
+void QuickMenu_rebuild(void) {
+	state.rebuild_quick = 0;
+	if (!state.quick) return; // not built yet; Menu_init will
+	QuickMenu_quit();
+	QuickMenu_init();
+	QuickMenu_refit();
+	state.dirty = 1;
 }
 
 void Menu_init(void) {
@@ -340,6 +362,8 @@ void Menu_reload(void) {
 		state.switcher_selected = state.recents->count > 0 ? state.recents->count - 1 : 0;
 	}
 	if (state.top->entries->count > 0) readyResume(state.top->entries->items[state.top->selected]);
+	// eg. so clearing recents drops the Recents tile
+	QuickMenu_rebuild();
 	state.dirty = 1;
 }
 

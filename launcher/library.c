@@ -14,6 +14,7 @@ Entry* Entry_new(char* path, int type) {
 
 Entry* Entry_newNamed(char* path, int type, char* displayName) {
 	Entry *self = Entry_new(path, type);
+	free(self->name);
 	self->name = strdup(displayName);
 	return self;
 }
@@ -380,6 +381,20 @@ int Recents_remove(int index) {
 	saveRecents();
 	return 0;
 }
+int Recents_set(int index, const char* path) {
+	if (!state.recents || index < 0 || index >= state.recents->count || !path) return -1;
+	size_t len = strlen(SDCARD_PATH);
+	if (strncmp(path, SDCARD_PATH, len) != 0 || path[len] != '/' || strlen(path) >= 256) return -1;
+	const char* rel = path + len; // card-relative, as recent.txt holds it
+	int at = RecentArray_indexOf(state.recents, (char*)rel);
+	if (at == index) return 0;
+	if (at >= 0) return -1;
+	Recent* old = state.recents->items[index];
+	state.recents->items[index] = Recent_new((char*)rel, old->alias);
+	Recent_free(old);
+	saveRecents();
+	return 0;
+}
 void Recents_clear(void) {
 	if (!state.recents) return;
 	while (state.recents->count > 0) Recent_free(Array_pop(state.recents));
@@ -699,11 +714,14 @@ Array* getQuickEntries(void) {
         Array_push(entries, Entry_new(tools_path, ENTRY_DIR));
     }
 
+	QuickTiles_apply(entries, QUICK_ROW_TOP);
 	return entries;
 }
 
 Array* getQuickToggles(void) {
-	return QuickItem_entries();
+	Array* entries = QuickItem_entries();
+	QuickTiles_apply(entries, QUICK_ROW_BOTTOM);
+	return entries;
 }
 
 Array* getRoot(void) {
@@ -711,8 +729,13 @@ Array* getRoot(void) {
 	// when a plugin replaces the root
 	int has_recents = hasRecents();
 
-	Array* replaced = Plugins_rootReplace();
-	if (replaced) return replaced;
+	int with_entries = 0;
+	Array* replaced = Plugins_rootReplace(&with_entries);
+	if (replaced) {
+		// only when the slot's owner asks for them
+		if (with_entries) Plugins_rootEntries(replaced);
+		return replaced;
+	}
 
     Array* root = Array_new();
 

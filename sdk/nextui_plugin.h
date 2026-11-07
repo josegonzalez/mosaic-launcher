@@ -76,6 +76,12 @@ enum NUIArtKind {
 	NUI_ART_LIST_BG,   // the background while a game in a folder is selected
 };
 
+// The quick menu's rows a plugin tile can go in.
+enum NUIQuickRow {
+	NUI_QUICK_TOP,    // the large labelled tiles: Recents, Games, Tools
+	NUI_QUICK_BOTTOM, // the small icons: Settings, Wifi, Sleep, Power off
+};
+
 // What pre_launch decides.
 enum NUILaunchResult {
 	NUI_LAUNCH_CONTINUE,
@@ -187,6 +193,34 @@ typedef struct NUIHost {
 	const NUIList* (*current_list)(void);
 	int (*selected_index)(void);
 	int (*select_index)(int index);
+
+	// Quick menu tiles. quick_tile puts a registered action on the quick
+	// menu as a tile in row (an enum NUIQuickRow), after the built-in ones:
+	// its label is the action's, A runs it, and it shows only while the
+	// action is available. icon is a PNG to draw on it, or NULL. With
+	// is_on, the tile has an on/off state (called with the action's data),
+	// and icon_off, when given, is drawn while it's off. hide_quick_tile
+	// hides a built-in tile by name (Recents, Collections, Games, Tools,
+	// Settings, Pak Store, Wifi, Bluetooth, Sleep, Reboot, Poweroff) or a
+	// plugin tile by its action id while hidden is 1, and shows it again
+	// with 0. The tiles are built at start and again when the lists
+	// reload, which is also when available is checked. Both return 0, or
+	// -1 for an unknown action or a bad argument.
+	int (*quick_tile)(const char* action_id, int row, const char* icon, const char* icon_off, int (*is_on)(void* data));
+	int (*hide_quick_tile)(const char* name, int hidden);
+
+	// A full-screen list of choices, drawn like the Launcher pak's menus.
+	// Returns at once, then calls on_pick with the index the user chose
+	// with A, or -1 if they backed out with B. selected is the row the
+	// cursor starts on. The strings are copied. Returns 0, or -1 for no
+	// choices or more than 64. Call it from an action, like confirm.
+	int (*choose)(const char* title, const char* const* choices, int count, int selected,
+		void (*on_pick)(int index, void* data), void* data);
+
+	// Points a recent at a new full path on the card, eg. after a game was
+	// renamed, keeping its place and its name. Saved at once. Returns 0, or
+	// -1 for a bad index, a path off the card, or a path already in recents.
+	int (*recent_set)(int index, const char* path);
 } NUIHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -237,8 +271,9 @@ typedef struct NUIPlugin {
 
 	// The root slot. A plugin with slots=root in its plugin.txt can return
 	// the whole top-level list (from host->list_new) in place of the stock
-	// one, or NULL to keep stock's. Only the slot's owner is asked, and other
-	// plugins' root_entries aren't added to a replaced root.
+	// one, or NULL to keep stock's. Only the slot's owner is asked. Other
+	// plugins' root_entries are added to a replaced root only when the
+	// owner sets root_with_entries.
 	NUIList* (*root_replace)(void);
 
 	// Ordering a list. After the launcher sorts a folder its own way, it
@@ -258,6 +293,12 @@ typedef struct NUIPlugin {
 	// display_name, except recents and collections, which keep their
 	// order. It can't add, remove or reorder entries.
 	void (*list_ready)(const NUIList* list, const char* dir_path);
+
+	// With root_replace: 1 runs plugins' root_entries on the replaced root,
+	// in load order and after the entries root_replace returned, as for
+	// the stock root (the owner's own root_entries too, if it has one); 0,
+	// the default and what older plugins get, leaves them out.
+	int root_with_entries;
 } NUIPlugin;
 
 #define NUI_PLUGIN_ENTRY "nextui_plugin_get"

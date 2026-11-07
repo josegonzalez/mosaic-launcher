@@ -59,6 +59,32 @@ static const Binding bindings[] = {
 // The right-hand hint group, in display order.
 static const Binding* const navigationHints[] = { &bindings[2], &bindings[1] };
 
+// The actions a shared button offers, kept until the user picks one.
+#define ENTRY_MENU_MAX 16
+static const Action* menu_actions[ENTRY_MENU_MAX];
+static int menu_count = 0;
+
+static void menuPicked(int index, void* data) {
+	(void)data;
+	if (index < 0 || index >= menu_count) return;
+	const Action* action = menu_actions[index];
+	// it may have stopped being available while the menu was open
+	if (Action_available(action)) Action_run(action);
+}
+
+// Two or more available actions share the pressed button: list them for the
+// selected entry and run the one the user picks.
+static void openEntryMenu(const Action** actions, int n) {
+	const char* labels[ENTRY_MENU_MAX];
+	menu_count = n < ENTRY_MENU_MAX ? n : ENTRY_MENU_MAX;
+	for (int i = 0; i < menu_count; i++) {
+		menu_actions[i] = actions[i];
+		labels[i] = TR(actions[i]->label);
+	}
+	Entry* entry = total > 0 ? state.top->entries->items[state.top->selected] : NULL;
+	Modal_choose(entry ? entry->name : "", labels, menu_count, 0, menuPicked, NULL);
+}
+
 void GameList_registerActions(void) {
 	for (int i = 0; i < BINDING_COUNT; i++) Actions_register(bindings[i].action);
 }
@@ -182,7 +208,7 @@ void GameList_handleInput(void) {
 		// plugins' bindings rank after the game list's own
 		const Binding* extra;
 		int extra_count = Plugins_bindings(NUI_SCREEN_GAMELIST, &extra);
-		Bindings_dispatch(extra, extra_count);
+		Bindings_dispatchShared(extra, extra_count, openEntryMenu);
 	}
 }
 
@@ -256,14 +282,24 @@ void GameList_update(void) {
 }
 
 void GameList_render(void) {
-	// buttons
+	// buttons. The left group's second hint is the first plugin button with
+	// an available action, or MORE when it opens a menu; stock has none.
+	const Binding* extra;
+	int extra_count = Plugins_bindings(NUI_SCREEN_GAMELIST, &extra);
+	const char* extra_glyph = NULL;
+	const char* extra_label = NULL;
+	if (!Bindings_sharedHint(extra, extra_count, &extra_glyph, &extra_label)) extra_glyph = NULL;
+	char* extra_label_tr = extra_glyph ? TR(extra_label) : NULL;
+
 	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
 	// Stock shows the resume hint whenever resume state is set, even in an
 	// empty folder where the action can't run, so this keeps its own check.
-	else if (state.can_resume) GFX_blitButtonGroup((char*[]){ (char*)bindings[0].glyph,TR(resumeAction.label),  NULL }, 0, screen, 0);
+	else if (state.can_resume) GFX_blitButtonGroup((char*[]){ (char*)bindings[0].glyph,TR(resumeAction.label),
+		(char*)extra_glyph, extra_label_tr, NULL }, 0, screen, 0);
 	else GFX_blitButtonGroup((char*[]){
 		BTN_SLEEP==BTN_POWER?"POWER":"MENU",
 		TR(BTN_SLEEP==BTN_POWER||state.simple_mode?"SLEEP":"INFO"),
+		(char*)extra_glyph, extra_label_tr,
 		NULL }, 0, screen, 0);
 
 	// back and open, whichever are available; the last one is primary

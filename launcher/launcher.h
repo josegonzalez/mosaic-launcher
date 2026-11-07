@@ -31,6 +31,7 @@
 #include "screens.h"
 #include "art.h"
 #include "quickitems.h"
+#include "quicktiles.h"
 #include "tr.h"
 #include "actions.h"
 #include "transitions.h"

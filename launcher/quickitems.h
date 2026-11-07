@@ -6,6 +6,7 @@
 // icons, the on/off art, and what activating one does) reads this table.
 
 #include "containers.h"
+#include "library.h"
 
 enum QuickItemKind {
 	QUICK_PAK,    // opens a Tools or Emus pak of this name, if it's installed
@@ -28,14 +29,15 @@ const QuickItem* QuickItem_find(const char* name);
 Array* QuickItem_entries(void);
 
 // Icon to draw for an item; ASSET_WIFI_OFF for names not in the table,
-// as stock did.
+// as stock did. Plugin tiles draw their own PNG instead (quicktiles.h).
 int QuickItem_asset(const char* name);
 
-// True when the item has an on/off state and is off, for picking
-// quick_<name>_off.png.
-int QuickItem_isOff(const char* name);
+// True when the item, or a plugin tile, has an on/off state and is off,
+// for picking quick_<name>_off.png.
+int QuickItem_isOff(const Entry* entry);
 
-// Runs a toggle's action. Does nothing for paks or unknown names.
-void QuickItem_activate(const char* name);
+// Runs a toggle's action, or a plugin tile's. Does nothing for paks or
+// unknown names.
+void QuickItem_activate(const Entry* entry);
 
 #endif

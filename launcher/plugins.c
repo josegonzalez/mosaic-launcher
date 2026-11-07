@@ -326,6 +326,27 @@ static int hostSelectIndex(int index) {
 	return 0;
 }
 
+static int hostQuickTile(const char* action_id, int row, const char* icon, const char* icon_off, int (*is_on)(void* data)) {
+	int quick_row;
+	if (row == NUI_QUICK_TOP) quick_row = QUICK_ROW_TOP;
+	else if (row == NUI_QUICK_BOTTOM) quick_row = QUICK_ROW_BOTTOM;
+	else return -1;
+	if (QuickTiles_add(action_id, quick_row, icon, icon_off, is_on) != 0) {
+		LOG_warn("plugins: can't add a quick menu tile for %s\n", action_id ? action_id : "(null)");
+		return -1;
+	}
+	state.rebuild_quick = 1;
+	return 0;
+}
+static int hostHideQuickTile(const char* name, int hidden) {
+	if (QuickTiles_hide(name, hidden) != 0) return -1;
+	state.rebuild_quick = 1;
+	return 0;
+}
+static int hostRecentSet(int index, const char* path) {
+	return Recents_set(index, path);
+}
+
 static const NUIHost host = {
 	.size = sizeof(NUIHost),
 	.api_version = NUI_API_VERSION,
@@ -362,6 +383,10 @@ static const NUIHost host = {
 	.current_list = hostCurrentList,
 	.selected_index = hostSelectedIndex,
 	.select_index = hostSelectIndex,
+	.quick_tile = hostQuickTile,
+	.hide_quick_tile = hostHideQuickTile,
+	.choose = Modal_choose,
+	.recent_set = hostRecentSet,
 };
 
 ///////////////////////////////////////
@@ -526,6 +551,13 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 	b->trigger = trigger == NUI_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
 	b->glyph = info->glyph;
 	b->action = action;
+
+	int sharing = 0;
+	for (int i = 0; i < pluginBindingCount[screen]; i++) {
+		const Binding* other = &pluginBindings[screen][i];
+		if (other->button == b->button && other->trigger == b->trigger && other->action != action) sharing++;
+	}
+	if (sharing) LOG_info("plugins: %s on the game list is shared by %i actions; with more than one available it opens a menu\n", info->glyph, sharing + 1);
 	return 0;
 }
 
@@ -546,13 +578,16 @@ void Plugins_rootEntries(Array* root) {
 	EACH_PLUGIN_WITH(root_entries) p->root_entries((NUIList*)root);
 }
 
-Array* Plugins_rootReplace(void) {
+Array* Plugins_rootReplace(int* with_entries) {
+	*with_entries = 0;
 	for (int i = 0; i < loaded_count; i++) {
 		const NUIPlugin* p = loaded[i].plugin;
 		if (!loaded[i].owns_root) continue;
 		// slot resolution lets only one plugin claim it
 		if (!Plugin_has(p, root_replace) || !p->root_replace) return NULL;
-		return (Array*)p->root_replace();
+		Array* root = (Array*)p->root_replace();
+		if (root && Plugin_has(p, root_with_entries)) *with_entries = p->root_with_entries;
+		return root;
 	}
 	return NULL;
 }

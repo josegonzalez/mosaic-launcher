@@ -34,7 +34,7 @@ $(BUILD)/test_art: test_art.c $(LAUNCHER)/art.c check.h
 	$(CC) $(CFLAGS) test_art.c $(LAUNCHER)/art.c -o $@
 
 LIBRARY_SOURCES = test_library.c stubs.c $(LAUNCHER)/library.c $(LAUNCHER)/listsort.c $(LAUNCHER)/containers.c \
-	$(LAUNCHER)/state.c $(NEXTUI)/all/common/utils.c
+	$(LAUNCHER)/state.c $(LAUNCHER)/quicktiles.c $(LAUNCHER)/actions.c $(LAUNCHER)/tr.c $(NEXTUI)/all/common/utils.c
 
 $(BUILD)/test_library: $(LIBRARY_SOURCES) $(wildcard $(LAUNCHER)/*.h) check.h platform/platform.h
 	mkdir -p $(BUILD)
