@@ -312,11 +312,12 @@ static void testReplacedRoot(const NUIPlugin* p) {
 	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
 	add(GB "/Alleyway.gb", "Alleyway", NUI_ENTRY_ROM);
 	add(CARD "/Favorites", "Favorites", NUI_ENTRY_DIR);
+	add(CARD "/Random game", "Random game", NUI_ENTRY_DIR);
 	then = allGamesCompare;
 	listing(p, CARD, 1);
 	then = NULL;
-	const char* games[] = { "Favorites", "Systems", "Alleyway", "Kirby", "Tetris" };
-	checkOrder(games, 5);
+	const char* games[] = { "Favorites", "Random game", "Systems", "Alleyway", "Kirby", "Tetris" };
+	checkOrder(games, 6);
 
 	reset();
 	add(GB "/2) Kirby.gb", "2) Kirby", NUI_ENTRY_ROM);
