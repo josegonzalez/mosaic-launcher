@@ -1,3 +1,5 @@
 id=favorites
 name=Favorites
 api=1
+# the collection in Collections/ that holds favorites, and the folder's name on the root
+setting.collection=text|Collection|Favorites

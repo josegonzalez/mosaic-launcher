@@ -46,6 +46,51 @@ plugin_set() {
 	fi
 }
 
+# Prints "<key><TAB><type><TAB><label><TAB><default><TAB><options>" for each
+# setting a plugin declares in plugin.txt:
+#
+#   setting.<key>=<type>|<label>|<default>[|<option>,<option>,...]
+#
+# where type is toggle (on/off), choice (one of the options) or text.
+plugin_settings() {
+	sed -n 's/^[[:space:]]*setting\.\([A-Za-z0-9_]*\)[[:space:]]*=[[:space:]]*\(.*\)$/\1|\2/p' "$1/plugin.txt" |
+		tr -d '\r' | awk -F '|' 'NF >= 4 { printf "%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5 }'
+}
+
+# The plugin's settings file, which the launcher's cfg_get reads.
+plugin_cfg_path() {
+	echo "$STATE_DIR/$1.cfg"
+}
+
+# plugin_cfg_get <id> <key> <default>
+plugin_cfg_get() {
+	cfg="$(plugin_cfg_path "$1")"
+	value=""
+	found=0
+	if [ -f "$cfg" ]; then
+		line="$(grep "^$2=" "$cfg" | tail -n 1)"
+		if [ -n "$line" ]; then
+			value="${line#*=}"
+			found=1
+		fi
+	fi
+	if [ "$found" = 1 ]; then printf '%s' "$value"; else printf '%s' "$3"; fi
+}
+
+# plugin_cfg_set <id> <key> <value>. Values can't hold newlines.
+plugin_cfg_set() {
+	mkdir -p "$STATE_DIR"
+	cfg="$(plugin_cfg_path "$1")"
+	value="$(printf '%s' "$3" | tr -d '\r\n')"
+	if [ -f "$cfg" ]; then
+		grep -v "^$2=" "$cfg" >"$cfg.tmp" || true
+	else
+		: >"$cfg.tmp"
+	fi
+	printf '%s=%s\n' "$2" "$value" >>"$cfg.tmp"
+	mv "$cfg.tmp" "$cfg"
+}
+
 # Safe to put inside a JSON string.
 json_text() {
 	# drops double quotes and backslashes

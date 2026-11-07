@@ -47,7 +47,7 @@ fetch_pinned() {
 	fi
 	fp_cached="$CACHE/$fp_tool-$fp_platform-$fp_want"
 	if [ ! -f "$fp_cached" ]; then
-		fp_version="$(tool_version "$fp_tool" "$(lock_value presenter_version)" "$(lock_value list_version)")"
+		fp_version="$(tool_version "$fp_tool")"
 		if [ "$fp_platform" = "LICENSE" ]; then
 			fetch_license "$fp_tool" "$fp_version" "$fp_cached.part"
 		else
@@ -78,7 +78,7 @@ for platform in "$@"; do
 	fi
 	mkdir -p "$OUT/bin/$platform"
 	cp "$elf" "$OUT/bin/$platform/nextui.elf"
-	for tool in minui-presenter minui-list; do
+	for tool in $TOOLS; do
 		fetch_pinned "$tool" "$platform" "$OUT/bin/$platform/$tool"
 	done
 	chmod +x "$OUT/bin/$platform"/*
@@ -95,7 +95,7 @@ fi
 
 cp "$ROOT/LICENSE" "$OUT/licenses/nextui-launcher.txt"
 cp "$ROOT/sdk/LICENSE" "$OUT/licenses/nextui-launcher-sdk.txt"
-for tool in minui-presenter minui-list; do
+for tool in $TOOLS; do
 	fetch_pinned "$tool" LICENSE "$OUT/licenses/$tool.txt"
 done
 

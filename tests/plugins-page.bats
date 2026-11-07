@@ -49,6 +49,37 @@ setup() {
 	[ "$(cat "$PLUGIN_CHOICES")" = "$(printf 'grid=off\nfavorites=on')" ]
 }
 
+@test "lists the settings a plugin declares" {
+	printf 'id=favorites\nsetting.collection=text|Collection|Favorites\r\nsetting.order=choice|Order|newest|newest,oldest\nsetting.broken=text\n' \
+		>"$PAK/plugins/favorites.plugin/plugin.txt"
+	run plugin_settings "$PAK/plugins/favorites.plugin"
+	[ "$status" -eq 0 ]
+	[ "${#lines[@]}" -eq 2 ]
+	[ "${lines[0]}" = "$(printf 'collection\ttext\tCollection\tFavorites\t')" ]
+	[ "${lines[1]}" = "$(printf 'order\tchoice\tOrder\tnewest\tnewest,oldest')" ]
+}
+
+@test "plugins without settings list none" {
+	[ -z "$(plugin_settings "$SDCARD_PATH/Tools/$PLATFORM/Grid.pak")" ]
+}
+
+@test "settings fall back to their default until set" {
+	[ "$(plugin_cfg_get favorites collection Favorites)" = "Favorites" ]
+	plugin_cfg_set favorites collection "My Games"
+	[ "$(plugin_cfg_get favorites collection Favorites)" = "My Games" ]
+}
+
+@test "setting a value replaces it and keeps the plugin's other settings" {
+	printf 'started=yes\ncollection=Old\n' >"$(plugin_cfg_path favorites)"
+	plugin_cfg_set favorites collection "New = Better"
+	[ "$(cat "$(plugin_cfg_path favorites)")" = "$(printf 'started=yes\ncollection=New = Better')" ]
+}
+
+@test "an empty value counts as set" {
+	plugin_cfg_set favorites collection ""
+	[ "$(plugin_cfg_get favorites collection Favorites)" = "" ]
+}
+
 @test "names can't break the menu's JSON" {
 	[ "$(json_text 'Say "hi" \ there')" = "Say hi  there" ]
 }

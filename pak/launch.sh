@@ -98,43 +98,112 @@ turn_off() {
 	show_message "Launcher is off.\nThe stock launcher is back."
 }
 
-# One row per plugin, "<name>: On" or "<name>: Off". selecting one flips it.
-# The launcher reads the choices the next time it starts, which is when the
-# user leaves this pak.
+# Writes a minui-list JSON file from "<label><TAB>..." rows, one item each.
+rows_to_json() {
+	{
+		echo '{"items": ['
+		first=1
+		while IFS="$(printf '\t')" read -r label _; do
+			[ "$first" = 1 ] || echo ','
+			first=0
+			printf '{"name": "%s"}' "$label"
+		done <"$1"
+		echo ']}'
+	} >"$2"
+}
+
+# Shows rows and prints the picked row's other fields, or nothing on cancel.
+pick_row() {
+	rows_to_json "$1" "$WORK_DIR/pick.json"
+	rm -f "$WORK_DIR/selection"
+	if ! minui-list --file "$WORK_DIR/pick.json" --title "$2" \
+		--write-location "$WORK_DIR/selection" --confirm-text "${3:-SELECT}"; then
+		return 0
+	fi
+	picked="$(cat "$WORK_DIR/selection" 2>/dev/null)"
+	awk -F '\t' -v label="$picked" '$1 == label { sub(/^[^\t]*\t/, ""); print; exit }' "$1"
+}
+
+# One plugin's page: whether it's on, then each setting it declares.
+# plugin_page <dir> <bundled>
+plugin_page() {
+	id="$(plugin_field "$1" id)"
+	name="$(json_text "$(plugin_field "$1" name)")"
+	[ -n "$name" ] || name="$id"
+	while true; do
+		rows="$WORK_DIR/plugin-page-rows"
+		if plugin_enabled "$id" "$2"; then
+			printf 'Status: On\tstatus\n' >"$rows"
+		else
+			printf 'Status: Off\tstatus\n' >"$rows"
+		fi
+		plugin_settings "$1" | while IFS="$(printf '\t')" read -r key type label default options; do
+			value="$(json_text "$(plugin_cfg_get "$id" "$key" "$default")")"
+			printf '%s: %s\tsetting\t%s\t%s\t%s\t%s\n' "$(json_text "$label")" "$value" "$key" "$type" "$default" "$options" >>"$rows"
+		done
+
+		picked="$(pick_row "$rows" "$name" "CHANGE")"
+		[ -n "$picked" ] || return
+		kind="$(printf '%s' "$picked" | cut -f1)"
+		if [ "$kind" = status ]; then
+			if plugin_enabled "$id" "$2"; then plugin_set "$id" off; else plugin_set "$id" on; fi
+			continue
+		fi
+
+		key="$(printf '%s' "$picked" | cut -f2)"
+		type="$(printf '%s' "$picked" | cut -f3)"
+		default="$(printf '%s' "$picked" | cut -f4)"
+		options="$(printf '%s' "$picked" | cut -f5)"
+		current="$(plugin_cfg_get "$id" "$key" "$default")"
+		case "$type" in
+			toggle)
+				if [ "$current" = on ]; then plugin_cfg_set "$id" "$key" off; else plugin_cfg_set "$id" "$key" on; fi
+				;;
+			choice)
+				choices="$WORK_DIR/plugin-choices"
+				printf '%s\n' "$options" | tr ',' '\n' | awk 'NF { printf "%s\t%s\n", $0, $0 }' >"$choices"
+				chosen="$(pick_row "$choices" "$name")"
+				[ -n "$chosen" ] && plugin_cfg_set "$id" "$key" "$chosen"
+				;;
+			text)
+				rm -f "$WORK_DIR/typed"
+				if minui-keyboard --title "$name" --initial-value "$current" --write-location "$WORK_DIR/typed"; then
+					plugin_cfg_set "$id" "$key" "$(cat "$WORK_DIR/typed" 2>/dev/null)"
+				fi
+				;;
+		esac
+	done
+}
+
+# One row per plugin, "<name>: On" or "<name>: Off". Selecting one opens its
+# page if it has settings, otherwise flips it. The launcher reads the choices
+# the next time it starts, which is when the user leaves this pak.
 plugins_page() {
 	while true; do
 		rows="$WORK_DIR/plugin-rows"
 		: >"$rows"
-		{
-			echo '{"items": ['
-			first=1
-			plugin_dirs | while IFS="$(printf '\t')" read -r dir bundled; do
-				id="$(plugin_field "$dir" id)"
-				name="$(json_text "$(plugin_field "$dir" name)")"
-				[ -n "$id" ] || continue
-				[ -n "$name" ] || name="$id"
-				if plugin_enabled "$id" "$bundled"; then label="$name: On"; else label="$name: Off"; fi
-				printf '%s\t%s\n' "$label" "$id" >>"$rows"
-				[ "$first" = 1 ] || echo ','
-				first=0
-				printf '{"name": "%s"}' "$label"
-			done
-			echo ']}'
-		} >"$WORK_DIR/plugins.json"
+		plugin_dirs | while IFS="$(printf '\t')" read -r dir bundled; do
+			id="$(plugin_field "$dir" id)"
+			name="$(json_text "$(plugin_field "$dir" name)")"
+			[ -n "$id" ] || continue
+			[ -n "$name" ] || name="$id"
+			if plugin_enabled "$id" "$bundled"; then state="On"; else state="Off"; fi
+			printf '%s: %s\t%s\t%s\t%s\n' "$name" "$state" "$dir" "$bundled" "$id" >>"$rows"
+		done
+		[ -s "$rows" ] || return
 
-		rm -f "$WORK_DIR/selection"
-		if ! minui-list --file "$WORK_DIR/plugins.json" --title "Plugins" \
-			--write-location "$WORK_DIR/selection" --confirm-text "TOGGLE"; then
-			return
+		picked="$(pick_row "$rows" "Plugins")"
+		[ -n "$picked" ] || return
+		dir="$(printf '%s' "$picked" | cut -f1)"
+		bundled="$(printf '%s' "$picked" | cut -f2)"
+		id="$(printf '%s' "$picked" | cut -f3)"
+		if [ -n "$(plugin_settings "$dir")" ]; then
+			plugin_page "$dir" "$bundled"
+		elif plugin_enabled "$id" "$bundled"; then
+			plugin_set "$id" off
+		else
+			plugin_set "$id" on
 		fi
-
-		picked="$(cat "$WORK_DIR/selection" 2>/dev/null)"
-		id="$(awk -F '\t' -v label="$picked" '$1 == label { print $2; exit }' "$rows")"
-		[ -n "$id" ] || continue
-		case "$picked" in
-			*": On") plugin_set "$id" off ;;
-			*) plugin_set "$id" on ;;
-		esac
 	done
 }
 

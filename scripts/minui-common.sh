@@ -30,11 +30,19 @@ lock_flavour() {
 	awk -v tool="$1" -v platform="$2" '$1 == "sha256" && $2 == tool && $3 == platform { print $4 }' "$LOCK"
 }
 
-tool_version() {
+# Every tool the pak bundles, and the lock key holding each one's version.
+TOOLS="minui-presenter minui-list minui-keyboard"
+
+tool_lock_key() {
 	case "$1" in
-		minui-presenter) echo "$2" ;;
-		*) echo "$3" ;;
+		minui-presenter) echo presenter_version ;;
+		minui-list) echo list_version ;;
+		minui-keyboard) echo keyboard_version ;;
 	esac
+}
+
+tool_version() {
+	lock_value "$(tool_lock_key "$1")"
 }
 
 # POSIX sh has no local variables, so each helper prefixes its own to avoid
