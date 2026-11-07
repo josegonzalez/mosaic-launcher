@@ -36,6 +36,11 @@ run_launcher() {
 	NEXTUI_LAUNCHER_PLUGIN_PATH="$WORK/plugins" "$ROOT/scripts/desktop-smoke.sh" "$1" 3 >/dev/null 2>&1
 }
 
+# expect <line>: plugin $plugin logged line in $log
+expect() {
+	grep -qF "plugin $plugin: $1" "$log" || fail "$plugin didn't log \"$1\""
+}
+
 rm -rf "$WORK" "$STATE"
 build_plugin hello 'id=hello\nname=Hello\napi=1\n'
 
@@ -75,10 +80,8 @@ echo "/Roms/.rooter-test/Game.gb" >"$RECENTS"
 echo "rom=$ROM" >"$STATE/rooter.cfg"
 build_plugin rooter 'id=rooter\nname=Rooter\napi=1\nslots=root\n'
 run_launcher "$WORK/rooter.log" || fail "the launcher exited early with rooter loaded"
+plugin=rooter
 log="$WORK/rooter.log"
-expect() {
-	grep -qF "plugin rooter: $1" "$log" || fail "rooter didn't log \"$1\""
-}
 expect "open from init 0"
 expect "root_replace called"
 expect "selected $CARD/Rooter"
@@ -108,10 +111,8 @@ if [ -f "$WORK/recent.txt.saved" ]; then cp "$WORK/recent.txt.saved" "$RECENTS";
 # moves the selection
 build_plugin sorter 'id=sorter\nname=Sorter\napi=1\n'
 run_launcher "$WORK/sorter.log" || fail "the launcher exited early with sorter loaded"
+plugin=sorter
 log="$WORK/sorter.log"
-expect() {
-	grep -qF "plugin sorter: $1" "$log" || fail "sorter didn't log \"$1\""
-}
 expect "current list from init (null)"
 expect "select from init -1"
 expect "set_name outside list_ready -1"
