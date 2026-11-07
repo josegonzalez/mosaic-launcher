@@ -1,5 +1,5 @@
 #!/bin/sh
-# Shared by boot.sh and launch.sh. Expects PAK_DIR to be set, plus the
+# Shared by boot.sh, manage.sh and launch.sh. Expects PAK_DIR to be set, plus the
 # environment MinUI.pak/launch.sh exports (SDCARD_PATH, SYSTEM_PATH,
 # USERDATA_PATH, PLATFORM).
 # shellcheck disable=SC2034 # sourced; the callers use these

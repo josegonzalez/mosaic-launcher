@@ -16,8 +16,10 @@
 #include <stddef.h>
 #include "actions.h"
 #include "nextui_plugin.h"
+#include "pluginset.h"
 
 #define PLUGIN_STATE_DIR USERDATA_PATH "/launcher"
+#define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -70,6 +72,17 @@ void Plugins_init(void);
 void Plugins_started(void);
 
 void Plugins_quit(void);
+
+// Every plugin found, loading or not, without loading any. The settings
+// screens use this to list them.
+int Plugins_discover(const PluginManifest** out);
+
+// Launcher.pak's directory, from where this binary runs, or
+// NEXTUI_LAUNCHER_PAK_DIR when set. Returns 0 if it can't tell.
+int Plugins_pakDir(char* out, size_t size);
+
+// Creates PLUGIN_STATE_DIR, and its parents, if they're missing.
+void Plugins_ensureStateDir(void);
 
 // How many plugins loaded.
 int Plugins_count(void);

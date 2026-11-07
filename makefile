@@ -90,9 +90,15 @@ test:
 	bats tests
 	$(MAKE) -C tests/c
 
-# Starts the desktop build for a few seconds; fails if it exits on its own.
+# Starts the desktop build for a few seconds, then the Launcher pak's
+# settings screens; fails if either exits on its own.
+FAKE_CARD = /var/tmp/nextui/sdcard
 smoke: desktop
 	./scripts/desktop-smoke.sh build/smoke.log
+	SDCARD_PATH=$(FAKE_CARD) USERDATA_PATH=$(FAKE_CARD)/.userdata/desktop SYSTEM_PATH=$(FAKE_CARD)/.system/desktop \
+		PLATFORM=desktop NEXTUI_LAUNCHER_PAK_DIR=$(CURDIR)/pak NEXTUI_LAUNCHER_RUN_DIR=$(CURDIR)/build/run \
+		NEXTUI_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/plugins \
+		./scripts/desktop-smoke.sh build/smoke-settings.log 4 --settings
 
 # Loads test plugins (one good, one crashing) into the desktop build.
 test-plugins: desktop

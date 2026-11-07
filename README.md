@@ -58,7 +58,7 @@ make test
 
 The bats tests run the pak scripts against a fake SD card, with a fake `mount` that copies files the way a bind mount looks from outside. The C tests in `tests/c/` cover launcher code that doesn't need a display; they compile against the desktop platform headers, so they need SDL2's headers (`brew install sdl2`, or `libsdl2-dev`) but never open a window.
 
-`make smoke` starts the desktop build for a few seconds and fails if it exits on its own. Its log (`build/smoke.log`) is also handy for comparing startup output before and after a change.
+`make smoke` starts the desktop build for a few seconds, then its settings screens, and fails if either exits on its own. Its logs (`build/smoke.log` and `build/smoke-settings.log`) are also handy for comparing startup output before and after a change.
 
 ## Updating NextUI
 
@@ -84,6 +84,13 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `transitions.c` | the folder slide and the game switcher's entrance animations |
 | `pluginset.c` | which discovered plugins load, and in what order |
 | `plugins.c` | finding and loading plugins, the host table they call, and the crash guard |
+| `toast.c` | short messages shown over the current screen |
+| `awake.c` | stay-awake files and plugin requests that keep the device from sleeping |
+| `pakhooks.c` | `pre-launch.sh` scripts next to a pak's `launch.sh` |
+| `kbmodel.c` | the on-screen keyboard's layout and typing, apart from drawing |
+| `modal.c` | the confirm, message and keyboard dialogs |
+| `cfgfile.c` | reading and writing a plugin's `key=value` settings file |
+| `settings.c` | the Launcher pak's screens, shown by `nextui.elf --settings` |
 
 See [PLUGINS.md](PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build.
 
@@ -98,9 +105,9 @@ make drift FROM=v6.15.0 TO=v6.16.0
 
 Then check out the new tag in `vendor/NextUI`, port the launcher changes, and rebuild. `supported-versions.txt` follows the submodule automatically.
 
-## Bundled tools
+## The Launcher screen
 
-The Launcher screen uses [minui-list](https://github.com/josegonzalez/minui-list) and [minui-presenter](https://github.com/josegonzalez/minui-presenter). `pak/minui.lock` pins their versions and the SHA-256 of every file, and packaging refuses anything that doesn't match. Run `./scripts/pin-minui.sh <presenter version> <list version>` to upgrade.
+The Launcher pak's screens are drawn by the launcher binary itself: `launch.sh` runs `nextui.elf --settings`, or `--settings plugins` to open the plugin list, so they look and move like the game list. Anything that mounts, unmounts or edits the boot hook goes through `bin/manage.sh` (`turn-on`, `turn-off`, `try-again`, `status`), which also works over SSH.
 
 ## License
 

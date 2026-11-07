@@ -1,7 +1,7 @@
 #include "launcher.h"
 #include "kbmodel.h"
 
-enum { MODAL_NONE, MODAL_CONFIRM, MODAL_KEYBOARD };
+enum { MODAL_NONE, MODAL_CONFIRM, MODAL_MESSAGE, MODAL_KEYBOARD };
 
 static int kind = MODAL_NONE;
 static int return_to = SCREEN_GAMELIST;
@@ -35,6 +35,13 @@ void Modal_confirm(const char* text, const char* yes, void (*on_yes)(void* data)
 	openModal(MODAL_CONFIRM);
 }
 
+void Modal_message(const char* text) {
+	snprintf(message, sizeof(message), "%s", text ? text : "");
+	confirm_yes = NULL;
+	callback_data = NULL;
+	openModal(MODAL_MESSAGE);
+}
+
 void Modal_keyboard(const char* heading, const char* initial, void (*on_done)(const char* text, void* data), void* data) {
 	snprintf(title, sizeof(title), "%s", heading ? heading : "");
 	Kb_reset(&kb, initial);
@@ -56,6 +63,10 @@ static void confirmInput(void) {
 	else if (PAD_justPressed(BTN_B)) {
 		closeModal();
 	}
+}
+
+static void messageInput(void) {
+	if (PAD_justPressed(BTN_A) || PAD_justPressed(BTN_B)) closeModal();
 }
 
 static void keyboardFinish(int done) {
@@ -95,6 +106,7 @@ static void keyboardInput(void) {
 
 void Modal_handleInput(void) {
 	if (kind == MODAL_CONFIRM) confirmInput();
+	else if (kind == MODAL_MESSAGE) messageInput();
 	else if (kind == MODAL_KEYBOARD) keyboardInput();
 	else closeModal(); // nothing to show; shouldn't happen
 }
@@ -113,6 +125,12 @@ static void confirmRender(void) {
 	SDL_Rect area = { 0, 0, screen->w, screen->h - SCALE1(PADDING + PILL_SIZE) };
 	GFX_blitMessage(font.large, message, screen, &area);
 	GFX_blitButtonGroup((char*[]){ "B", TR("CANCEL"), "A", TR(yes_label), NULL }, 1, screen, 1);
+}
+
+static void messageRender(void) {
+	SDL_Rect area = { 0, 0, screen->w, screen->h - SCALE1(PADDING + PILL_SIZE) };
+	GFX_blitMessage(font.large, message, screen, &area);
+	GFX_blitButtonGroup((char*[]){ "A", TR("OK"), NULL }, 0, screen, 1);
 }
 
 static const char* specialLabel(int key) {
@@ -173,6 +191,7 @@ static void keyboardRender(void) {
 void Modal_render(void) {
 	GFX_clearLayers(LAYER_ALL);
 	if (kind == MODAL_CONFIRM) confirmRender();
+	else if (kind == MODAL_MESSAGE) messageRender();
 	else if (kind == MODAL_KEYBOARD) keyboardRender();
 	lastScreen = SCREEN_MODAL;
 }

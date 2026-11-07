@@ -11,7 +11,6 @@
 #define LAUNCHED_MARKER "/tmp/nextui-launcher-launched" // a launch went ahead; post_return is due
 #define LOADING_MARKER PLUGIN_STATE_DIR "/loading"
 #define PAUSED_MARKER PLUGIN_STATE_DIR "/plugins_paused"
-#define CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
 
 typedef struct LoadedPlugin {
 	void* handle;
@@ -46,7 +45,7 @@ static char* readText(const char* path) {
 }
 
 // mkdir -p, since a fresh card may not have .userdata/<platform> yet.
-static void ensureStateDir(void) {
+void Plugins_ensureStateDir(void) {
 	char path[512];
 	snprintf(path, sizeof(path), "%s", PLUGIN_STATE_DIR);
 	for (char* p = path + 1; *p; p++) {
@@ -91,8 +90,13 @@ static void scan(const char* parent, const char* suffix, int bundled) {
 	closedir(dh);
 }
 
-// Launcher.pak, from where this binary runs: <pak>/bin/<platform>/nextui.elf
-static int pakDir(char* out, size_t size) {
+int Plugins_pakDir(char* out, size_t size) {
+	const char* override = getenv("NEXTUI_LAUNCHER_PAK_DIR");
+	if (override && override[0]) {
+		snprintf(out, size, "%s", override);
+		return 1;
+	}
+	// <pak>/bin/<platform>/nextui.elf
 	char exe[512];
 	ssize_t len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
 	if (len <= 0) return 0;
@@ -107,6 +111,9 @@ static int pakDir(char* out, size_t size) {
 }
 
 static void discover(void) {
+	static int done = 0;
+	if (done) return;
+	done = 1;
 	const char* override = getenv("NEXTUI_LAUNCHER_PLUGIN_PATH");
 	if (override && override[0]) {
 		char dirs[1024];
@@ -117,7 +124,7 @@ static void discover(void) {
 	}
 	else {
 		char pak[512];
-		if (pakDir(pak, sizeof(pak))) {
+		if (Plugins_pakDir(pak, sizeof(pak))) {
 			char bundled[600];
 			snprintf(bundled, sizeof(bundled), "%s/plugins", pak);
 			scan(bundled, ".plugin", 1);
@@ -188,7 +195,7 @@ static void hostCfgSet(const char* plugin_id, const char* key, const char* value
 	}
 	Hash_set(cfg, (char*)key, (char*)value);
 save:
-	ensureStateDir();
+	Plugins_ensureStateDir();
 	char path[512];
 	cfgPath(plugin_id, path, sizeof(path));
 	FILE* f = fopen(path, "w");
@@ -340,7 +347,7 @@ void Plugins_init(void) {
 		// The last start died before its first frame with plugins loaded.
 		LOG_warn("plugins: the launcher crashed while starting with plugins, pausing them\n");
 		unlink(LOADING_MARKER);
-		ensureStateDir();
+		Plugins_ensureStateDir();
 		putFile(PAUSED_MARKER, "");
 		return;
 	}
@@ -348,12 +355,12 @@ void Plugins_init(void) {
 	discover();
 	if (manifest_count == 0) return;
 
-	char* choices = readText(CHOICES_PATH);
+	char* choices = readText(PLUGIN_CHOICES_PATH);
 	static PluginDecision decisions[PLUGIN_MAX];
 	int n = PluginSet_resolve(manifests, manifest_count, choices, decisions);
 	free(choices);
 
-	ensureStateDir();
+	Plugins_ensureStateDir();
 	putFile(LOADING_MARKER, "");
 	sync();
 
@@ -384,6 +391,12 @@ void Plugins_quit(void) {
 		dlclose(p->handle);
 	}
 	loaded_count = 0;
+}
+
+int Plugins_discover(const PluginManifest** out) {
+	discover();
+	*out = manifests;
+	return manifest_count;
 }
 
 int Plugins_count(void) {

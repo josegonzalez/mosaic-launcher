@@ -59,8 +59,42 @@ static void eachLine(const char* text, void (*fn)(const char* key, const char* v
 	}
 }
 
+// setting.<key>=<type>|<label>|<default>[|<options>]
+static void manifestSetting(PluginManifest* m, const char* key, const char* value) {
+	if (m->setting_count >= PLUGIN_SETTINGS_MAX || !key[0]) return;
+	char fields[512];
+	copyField(fields, sizeof(fields), value);
+	char* parts[4] = { NULL, NULL, NULL, NULL };
+	int n = 0;
+	char* p = fields;
+	while (n < 4) {
+		parts[n++] = p;
+		char* bar = strchr(p, '|');
+		if (!bar) break;
+		*bar = '\0';
+		p = bar + 1;
+	}
+	if (n < 3) return; // type, label and default are required
+
+	PluginSetting* s = &m->settings[m->setting_count];
+	if (!strcmp(parts[0], "toggle")) s->type = SETTING_TOGGLE;
+	else if (!strcmp(parts[0], "choice")) s->type = SETTING_CHOICE;
+	else if (!strcmp(parts[0], "text")) s->type = SETTING_TEXT;
+	else return;
+	copyField(s->key, sizeof(s->key), key);
+	copyField(s->label, sizeof(s->label), parts[1]);
+	copyField(s->fallback, sizeof(s->fallback), parts[2]);
+	copyField(s->options, sizeof(s->options), parts[3] ? parts[3] : "");
+	if (s->type == SETTING_CHOICE && !s->options[0]) return; // nothing to choose from
+	m->setting_count++;
+}
+
 static void manifestField(const char* key, const char* value, void* data) {
 	PluginManifest* m = data;
+	if (!strncmp(key, "setting.", 8)) {
+		manifestSetting(m, key + 8, value);
+		return;
+	}
 	if (!strcmp(key, "id")) copyField(m->id, sizeof(m->id), value);
 	else if (!strcmp(key, "name")) copyField(m->name, sizeof(m->name), value);
 	else if (!strcmp(key, "api")) m->api = atoi(value);
@@ -143,6 +177,50 @@ static PluginDecision* findLoading(PluginDecision* out, int count, const char* i
 		if (out[i].load && !strcmp(out[i].manifest->id, id)) return &out[i];
 	}
 	return NULL;
+}
+
+int PluginSet_isOn(const char* choices, const PluginManifest* m) {
+	static Choices c;
+	memset(&c, 0, sizeof(c));
+	eachLine(choices, choiceLine, &c);
+	int choice = choiceFor(&c, m->id);
+	return choice == -1 ? !m->bundled : choice;
+}
+
+char* PluginSet_setChoice(const char* choices, const char* id, int on) {
+	size_t room = (choices ? strlen(choices) : 0) + strlen(id) + 8;
+	char* out = malloc(room);
+	out[0] = '\0';
+	int replaced = 0;
+
+	const char* p = choices ? choices : "";
+	while (*p) {
+		const char* end = strchr(p, '\n');
+		size_t len = end ? (size_t)(end - p) : strlen(p);
+		char line[512];
+		size_t copy = len < sizeof(line) - 1 ? len : sizeof(line) - 1;
+		memcpy(line, p, copy);
+		line[copy] = '\0';
+		p += len + (end ? 1 : 0);
+
+		char key[sizeof(line)];
+		copyField(key, sizeof(key), line);
+		char* eq = strchr(key, '=');
+		if (eq) *eq = '\0';
+		trim(key);
+		if (eq && !strcmp(key, id)) {
+			if (replaced) continue; // drop later duplicates; the first keeps its place
+			snprintf(line, sizeof(line), "%s=%s", id, on ? "on" : "off");
+			replaced = 1;
+		}
+		strcat(out, line);
+		strcat(out, "\n");
+	}
+	if (!replaced) {
+		strcat(out, id);
+		strcat(out, on ? "=on\n" : "=off\n");
+	}
+	return out;
 }
 
 int PluginSet_resolve(const PluginManifest* manifests, int count, const char* choices, PluginDecision* out) {

@@ -5,6 +5,9 @@ int main (int argc, char *argv[]) {
 	// unsigned long main_begin = SDL_GetTicks();
 	// unsigned long first_draw = 0;
 
+	// the Launcher pak's screens: nextui.elf --settings [plugins]
+	if (argc > 1 && !strcmp(argv[1], "--settings")) return Settings_main(argc - 2, argv + 2);
+
 	if (autoResume()) return 0; // nothing to do
 
 	state.simple_mode = exists(SIMPLE_MODE_PATH);

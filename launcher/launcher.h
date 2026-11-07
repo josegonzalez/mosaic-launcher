@@ -39,5 +39,7 @@
 #include "awake.h"
 #include "pakhooks.h"
 #include "modal.h"
+#include "cfgfile.h"
+#include "settings.h"
 
 #endif
