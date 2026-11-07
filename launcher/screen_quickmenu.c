@@ -279,9 +279,11 @@ void QuickMenu_render(void) {
 			}
 
 			int w, h;
-			GFX_sizeText(font.tiny, TR(item->name), SCALE1(FONT_TINY), &w, &h);
+			const char* label = QuickTiles_label(item);
+			char* text = label == item->name ? TR(item->name) : (char*)label;
+			GFX_sizeText(font.tiny, text, SCALE1(FONT_TINY), &w, &h);
 			SDL_Rect text_rect = {item_rect.x + (item_size - w) / 2, item_rect.y + item_size - h - SCALE1(BUTTON_MARGIN), w, h};
-			GFX_blitText(font.tiny, TR(item->name), SCALE1(FONT_TINY), text_color, screen, &text_rect);
+			GFX_blitText(font.tiny, text, SCALE1(FONT_TINY), text_color, screen, &text_rect);
 
 			ox += item_rect.w + SCALE1(MENU_ITEM_MARGIN);
 		}

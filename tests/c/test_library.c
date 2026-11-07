@@ -474,6 +474,49 @@ static void test_quick_tiles_hide_and_add(void) {
 	stub_quick_items = NULL;
 }
 
+static void test_quick_tiles_rename(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/A.gb", "");
+	writeFile(RECENT_PATH, "/Roms/Game Boy (GB)/A.gb\n");
+	writeFile(TOOLS_PATH "/Clock.pak/launch.sh", "");
+	hasRecents();
+
+	// only the top row's built-ins take a label
+	CHECK(QuickTiles_rename("Wifi", "Net") == -1);
+	CHECK(QuickTiles_rename("test.tile", "Other") == -1);
+	CHECK(QuickTiles_rename(NULL, "Other") == -1);
+	CHECK(!QuickTiles_any());
+
+	CHECK(QuickTiles_rename("Games", "Library") == 0);
+	CHECK(QuickTiles_rename("Tools", "Apps") == 0);
+	CHECK(QuickTiles_any());
+	Actions_register(&tileAction);
+	CHECK(QuickTiles_add("test.tile", QUICK_ROW_TOP, NULL, NULL, NULL) == 0);
+	CHECK(QuickTiles_hide("Tools", 1) == 0);
+	Array* top = getQuickEntries();
+	char got[256];
+	rowNames(top, got, sizeof(got));
+	// names stay the built-in ones, so hiding and art still match them
+	CHECK_STR(got, "Recents,Games,Tile");
+	if (top->count == 3) {
+		CHECK_STR(QuickTiles_label(top->items[0]), "Recents");
+		CHECK_STR(QuickTiles_label(top->items[1]), "Library");
+		CHECK_STR(QuickTiles_label(top->items[2]), "Tile");
+	}
+	EntryArray_free(top);
+
+	// NULL or "" puts the built-in label back
+	CHECK(QuickTiles_rename("Games", "") == 0);
+	CHECK(QuickTiles_rename("Tools", NULL) == 0);
+	top = getQuickEntries();
+	if (top->count >= 2) CHECK_STR(QuickTiles_label(top->items[1]), "Games");
+	EntryArray_free(top);
+
+	QuickTiles_reset();
+	CHECK(!QuickTiles_any());
+}
+
 static void addGames(const char* names) {
 	char list[256];
 	snprintf(list, sizeof(list), "%s", names);
@@ -830,6 +873,7 @@ int main(void) {
 	test_root_replace_adds_entries_only_when_asked();
 	test_recents_set_rewrites_a_path();
 	test_quick_tiles_hide_and_add();
+	test_quick_tiles_rename();
 	test_reload_follows_the_selected_entry();
 	test_reload_keeps_the_selection_in_view();
 	test_sort_chain_first_opinion_wins();

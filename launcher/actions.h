@@ -30,6 +30,7 @@ typedef struct Binding {
 	int trigger;             // TRIGGER_PRESS or TRIGGER_RELEASE
 	const char* glyph;       // the button name GFX_blitButtonGroup draws, eg. "A"
 	const Action* action;
+	int (*fires)(int button); // when set, decides whether it fired instead of trigger
 } Binding;
 
 void Actions_register(const Action* action);
@@ -58,6 +59,14 @@ int Bindings_shared(const Binding* bindings, int count, int button, int trigger,
 // its action's label, or "MORE" when other available actions share the
 // button and it opens a menu. Returns 0 when nothing is available.
 int Bindings_sharedHint(const Binding* bindings, int count, const char** glyph, const char** label);
+
+// Copies the bindings whose button none of taken uses into out, which needs
+// room for count. Returns how many it copied. This is how an override takes
+// a button from a screen's own bindings, whatever their trigger.
+int Bindings_drop(const Binding* bindings, int count, const Binding* taken, int taken_count, Binding* out);
+
+// The first binding for action, or NULL.
+const Binding* Bindings_find(const Binding* bindings, int count, const Action* action);
 
 #define FN_ACTION_ACTION_PREFIX "action:"
 

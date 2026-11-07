@@ -120,6 +120,116 @@ static void test_shared_buttons(void) {
 	CHECK(Bindings_sharedHint(shared, 0, &glyph, &label) == 0);
 }
 
+// A binding's own fires check replaces its trigger.
+static int tap_button = -1;
+static int tapped(int btn) { return btn == tap_button; }
+
+static void test_fires(void) {
+	back_ok = 1;
+	const Binding tap[] = { { BTN_B, TRIGGER_PRESS, "B", &backAction, tapped } };
+	press(BTN_B);
+	tap_button = -1;
+	CHECK(Bindings_dispatch(tap, 1) == 0);
+	tap_button = BTN_B;
+	CHECK(Bindings_dispatch(tap, 1) == 1);
+	CHECK_STR(ran ? ran : "", "back");
+	tap_button = -1;
+}
+
+// What the game list does with plugins' overrides: drop its own bindings on
+// the overridden buttons, put the overrides after the rest, and find each
+// action's hint on its new button.
+static void test_overrides(void) {
+	open_ok = back_ok = resume_ok = 1;
+	// A and X swapped, resume on press
+	const Binding swap[] = {
+		{ BTN_A, TRIGGER_PRESS, "A", &resumeAction },
+		{ BTN_X, TRIGGER_PRESS, "X", &openAction },
+	};
+	Binding effective[3 + 2];
+	int n = Bindings_drop(bindings, 3, swap, 2, effective);
+	CHECK(n == 1);
+	CHECK(effective[0].action == &backAction);
+	effective[n++] = swap[0];
+	effective[n++] = swap[1];
+
+	press(BTN_A);
+	CHECK(Bindings_dispatch(effective, n) == 1);
+	CHECK_STR(ran ? ran : "", "resume");
+	press(BTN_X);
+	CHECK(Bindings_dispatch(effective, n) == 1);
+	CHECK_STR(ran ? ran : "", "open");
+	// X's release no longer resumes: the override took the whole button
+	release(BTN_X);
+	CHECK(Bindings_dispatch(effective, n) == 0);
+	press(BTN_B);
+	CHECK(Bindings_dispatch(effective, n) == 1);
+	CHECK_STR(ran ? ran : "", "back");
+
+	// the hints follow the actions to their buttons
+	const Binding* resume = Bindings_find(effective, n, &resumeAction);
+	const Binding* open = Bindings_find(effective, n, &openAction);
+	const Binding* back = Bindings_find(effective, n, &backAction);
+	CHECK(resume && !strcmp(resume->glyph, "A"));
+	CHECK(open && !strcmp(open->glyph, "X"));
+	CHECK(back && !strcmp(back->glyph, "B"));
+	const Binding* order[] = { back, open };
+	char* pairs[5];
+	CHECK(Bindings_hints(order, 2, pairs) == 2);
+	CHECK_STR(pairs[0], "B"); CHECK_STR(pairs[2], "X"); CHECK_STR(pairs[3], "OPEN");
+	CHECK(Bindings_find(effective, n, &favAction) == NULL);
+	CHECK(Bindings_find(effective, n, NULL) == NULL);
+
+	// several overrides on one trigger: the first available runs, so A can
+	// resume when it can and open otherwise
+	const Binding resumeOrOpen[] = {
+		{ BTN_A, TRIGGER_PRESS, "A", &resumeAction },
+		{ BTN_A, TRIGGER_PRESS, "A", &openAction },
+	};
+	n = Bindings_drop(bindings, 3, resumeOrOpen, 2, effective);
+	CHECK(n == 2); // X resume and B back
+	effective[n++] = resumeOrOpen[0];
+	effective[n++] = resumeOrOpen[1];
+	resume_ok = 0;
+	press(BTN_A);
+	CHECK(Bindings_dispatch(effective, n) == 1);
+	CHECK_STR(ran ? ran : "", "open");
+	resume_ok = 1;
+	press(BTN_A);
+	CHECK(Bindings_dispatch(effective, n) == 1);
+	CHECK_STR(ran ? ran : "", "resume");
+
+	// an override with no action leaves its button doing nothing
+	const Binding nothing[] = { { BTN_B, TRIGGER_PRESS, "B", NULL } };
+	n = Bindings_drop(bindings, 3, nothing, 1, effective);
+	effective[n++] = nothing[0];
+	press(BTN_B);
+	CHECK(Bindings_dispatch(effective, n) == 0);
+	CHECK(Bindings_find(effective, n, &backAction) == NULL);
+
+	// plugins' shared bindings on an overridden button are dropped too,
+	// and the rest still share
+	const Binding shared[] = {
+		{ BTN_Y, TRIGGER_PRESS, "Y", &favAction },
+		{ BTN_Y, TRIGGER_PRESS, "Y", &randomAction },
+		{ BTN_A, TRIGGER_RELEASE, "A", &deleteAction },
+	};
+	Binding kept[3];
+	n = Bindings_drop(shared, 3, swap, 2, kept);
+	CHECK(n == 2);
+	press(BTN_Y);
+	menu_count = 0;
+	CHECK(Bindings_dispatchShared(kept, n, menu) == 1);
+	CHECK(menu_count == 2);
+	release(BTN_A);
+	CHECK(Bindings_dispatchShared(kept, n, menu) == 0);
+
+	// no overrides: everything is kept, in order
+	n = Bindings_drop(bindings, 3, NULL, 0, effective);
+	CHECK(n == 3);
+	CHECK(effective[0].action == &resumeAction && effective[1].action == &openAction && effective[2].action == &backAction);
+}
+
 int main(void) {
 	// dispatch: the fired, available binding runs
 	press(BTN_A);
@@ -173,6 +283,8 @@ int main(void) {
 	CHECK(Actions_find("test.open") == &replacement);
 
 	test_shared_buttons();
+	test_fires();
+	test_overrides();
 
 	CHECK_DONE();
 }

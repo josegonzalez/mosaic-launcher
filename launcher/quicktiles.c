@@ -8,6 +8,11 @@ static int tile_count = 0;
 static char* hidden[MAX_HIDDEN];
 static int hidden_count = 0;
 
+// The top row's built-in tiles, and the labels plugins gave them.
+static const char* const renamable[] = { "Recents", "Collections", "Games", "Tools" };
+#define RENAMABLE_COUNT (int)(sizeof(renamable) / sizeof(renamable[0]))
+static char* labels[RENAMABLE_COUNT];
+
 static char* copy(const char* s) {
 	return s && s[0] ? strdup(s) : NULL;
 }
@@ -56,8 +61,33 @@ int QuickTiles_hide(const char* name, int hide) {
 	return 0;
 }
 
+static int renamableAt(const char* name) {
+	for (int i = 0; name && i < RENAMABLE_COUNT; i++) {
+		if (!strcmp(renamable[i], name)) return i;
+	}
+	return -1;
+}
+
+int QuickTiles_rename(const char* name, const char* label) {
+	int at = renamableAt(name);
+	if (at < 0) return -1;
+	free(labels[at]);
+	labels[at] = copy(label);
+	return 0;
+}
+
+const char* QuickTiles_label(const Entry* entry) {
+	// plugin tiles are named by their action's label already
+	int at = QuickTiles_forEntry(entry) ? -1 : renamableAt(entry->name);
+	return at >= 0 && labels[at] ? labels[at] : entry->name;
+}
+
 int QuickTiles_any(void) {
-	return tile_count > 0 || hidden_count > 0;
+	if (tile_count > 0 || hidden_count > 0) return 1;
+	for (int i = 0; i < RENAMABLE_COUNT; i++) {
+		if (labels[i]) return 1;
+	}
+	return 0;
 }
 
 const QuickTile* QuickTiles_forEntry(const Entry* entry) {
@@ -98,4 +128,8 @@ void QuickTiles_reset(void) {
 	tile_count = 0;
 	for (int i = 0; i < hidden_count; i++) free(hidden[i]);
 	hidden_count = 0;
+	for (int i = 0; i < RENAMABLE_COUNT; i++) {
+		free(labels[i]);
+		labels[i] = NULL;
+	}
 }

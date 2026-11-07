@@ -81,7 +81,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `screen_quickmenu.c` | quick menu input and rendering |
 | `art.c` | where each kind of image (thumbnails, backgrounds, quick menu art) is looked up |
 | `quickitems.c` | the quick menu's pak shortcuts and toggles: which appear, their icons, and what they do |
-| `quicktiles.c` | plugins' quick menu tiles, and the tiles plugins hide |
+| `quicktiles.c` | plugins' quick menu tiles, and the tiles plugins hide or relabel |
 | `tr.c` | `TR()`, which every piece of fixed UI text passes through where it's drawn |
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
 | `transitions.c` | the folder slide and the game switcher's entrance animations |
@@ -95,6 +95,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `cfgfile.c` | reading and writing a plugin's `key=value` settings file |
 | `settings.c` | the Launcher pak's screens, shown by `nextui.elf --settings` |
 | `listsort.c` | sorting a list by plugins' chained `sort_compare` hooks |
+| `launchcmd.c` | checking and quoting the command a plugin replaces a launch with |
 
 See [PLUGINS.md](PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build.
 

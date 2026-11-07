@@ -44,20 +44,123 @@ static void goBack(void* data) {
 	if (total>0) readyResume(state.top->entries->items[state.top->selected]);
 }
 
+// The previous or next letter in the letter index, as L1 and R1 jump.
+static int canJump(void* data) {
+	(void)data;
+	return total>0;
+}
+static void jumpTo(int i) {
+	if (i<0 || i>=state.top->alphas->count) return;
+	selected = state.top->alphas->items[i];
+	if (total>MAIN_ROW_COUNT) {
+		state.top->start = selected;
+		state.top->end = state.top->start + MAIN_ROW_COUNT;
+		if (state.top->end>total) state.top->end = total;
+		state.top->start = state.top->end - MAIN_ROW_COUNT;
+	}
+	// from an override, this runs after the frame's own selection update
+	if (selected!=state.top->selected) {
+		state.top->selected = selected;
+		state.dirty = 1;
+		readyResume(state.top->entries->items[selected]);
+	}
+}
+static void prevLetter(void* data) {
+	(void)data;
+	Entry* entry = state.top->entries->items[selected];
+	jumpTo(entry->alpha-1);
+}
+static void nextLetter(void* data) {
+	(void)data;
+	Entry* entry = state.top->entries->items[selected];
+	jumpTo(entry->alpha+1);
+}
+
+static void openQuickMenu(void* data) {
+	(void)data;
+	currentScreen = SCREEN_QUICKMENU;
+	QuickMenu_enter();
+	state.dirty = 1;
+	folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
+	if (!HAS_POWER_BUTTON && !state.simple_mode) PWR_enableSleep();
+}
+static void openSwitcher(void* data) {
+	(void)data;
+	currentScreen = SCREEN_GAMESWITCHER;
+	state.switcher_selected = 0;
+	state.dirty = 1;
+}
+
+// Stock's own triggers for MENU and SELECT (a tap) and for L1 and R1 (held
+// repeats, unless the other shoulder is down or the setting overlay has it).
+static int tapped(int button) {
+	return button==BTN_MENU ? PAD_tappedMenu(now) : PAD_tappedSelect(now);
+}
+static int shoulderAlone(int button) {
+	int other = button==BTN_L1 ? BTN_R1 : BTN_L1;
+	return PAD_justRepeated(button) && !PAD_isPressed(other) && !PWR_ignoreSettingInput(button, show_setting);
+}
+
 static const Action resumeAction = { "gamelist.resume", "RESUME", canResume, resumeSelected };
 static const Action openAction = { "gamelist.open", "OPEN", canOpen, openSelected };
 static const Action backAction = { "gamelist.back", "BACK", canGoBack, goBack };
+static const Action prevLetterAction = { "gamelist.prev_letter", "PREVIOUS", canJump, prevLetter };
+static const Action nextLetterAction = { "gamelist.next_letter", "NEXT", canJump, nextLetter };
+static const Action switcherAction = { "gamelist.switcher", "SWITCHER", NULL, openSwitcher };
+static const Action quickMenuAction = { "gamelist.quick_menu", "MENU", NULL, openQuickMenu };
 
-// In priority order: the first that fires and is available wins.
+// The game list's own bindings, in the three places stock checked them. In
+// each group, the first that fires and is available wins.
+static const Binding screenBindings[] = {
+	{ BTN_MENU, TRIGGER_RELEASE, "MENU", &quickMenuAction, tapped },
+	{ BTN_SELECT, TRIGGER_RELEASE, "SELECT", &switcherAction, tapped },
+};
+static const Binding letterBindings[] = {
+	{ BTN_L1, TRIGGER_PRESS, "L1", &prevLetterAction, shoulderAlone },
+	{ BTN_R1, TRIGGER_PRESS, "R1", &nextLetterAction, shoulderAlone },
+};
 static const Binding bindings[] = {
 	{ BTN_RESUME, TRIGGER_RELEASE, "X", &resumeAction },
 	{ BTN_A, TRIGGER_PRESS, "A", &openAction },
 	{ BTN_B, TRIGGER_PRESS, "B", &backAction },
 };
-#define BINDING_COUNT (int)(sizeof(bindings) / sizeof(bindings[0]))
+#define COUNT(a) (int)(sizeof(a) / sizeof(a[0]))
+#define SCREEN_BINDINGS COUNT(screenBindings)
+#define LETTER_BINDINGS COUNT(letterBindings)
+#define BINDING_COUNT COUNT(bindings)
 
-// The right-hand hint group, in display order.
-static const Binding* const navigationHints[] = { &bindings[2], &bindings[1] };
+static int isOwnAction(const Action* action) {
+	return action==&resumeAction || action==&openAction || action==&backAction || action==&prevLetterAction
+		|| action==&nextLetterAction || action==&switcherAction || action==&quickMenuAction;
+}
+
+// The bindings in effect: the game list's own, less the buttons plugins
+// override, with the overrides after its actions, and plugins' shared
+// bindings, less the overridden buttons too. With no overrides, this is the
+// game list's own bindings and plugins' as they were bound.
+typedef struct Effective {
+	Binding screen[SCREEN_BINDINGS];
+	int screen_count;
+	Binding letters[LETTER_BINDINGS];
+	int letter_count;
+	Binding actions[BINDING_COUNT + PLUGIN_OVERRIDE_MAX];
+	int action_count;
+	Binding shared[PLUGIN_BINDING_MAX];
+	int shared_count;
+	const Binding* overrides;
+	int override_count;
+} Effective;
+
+static void effective(Effective* e) {
+	e->override_count = Plugins_overrides(NUI_SCREEN_GAMELIST, &e->overrides);
+	e->screen_count = Bindings_drop(screenBindings, SCREEN_BINDINGS, e->overrides, e->override_count, e->screen);
+	e->letter_count = Bindings_drop(letterBindings, LETTER_BINDINGS, e->overrides, e->override_count, e->letters);
+	e->action_count = Bindings_drop(bindings, BINDING_COUNT, e->overrides, e->override_count, e->actions);
+	for (int i = 0; i < e->override_count; i++) e->actions[e->action_count++] = e->overrides[i];
+	const Binding* extra;
+	int extra_count = Plugins_bindings(NUI_SCREEN_GAMELIST, &extra);
+	e->shared_count = Bindings_drop(extra, extra_count, e->overrides, e->override_count, e->shared);
+}
 
 // The actions a shared button offers, kept until the user picks one.
 #define ENTRY_MENU_MAX 16
@@ -86,21 +189,17 @@ static void openEntryMenu(const Action** actions, int n) {
 }
 
 void GameList_registerActions(void) {
+	for (int i = 0; i < SCREEN_BINDINGS; i++) Actions_register(screenBindings[i].action);
 	for (int i = 0; i < BINDING_COUNT; i++) Actions_register(bindings[i].action);
+	for (int i = 0; i < LETTER_BINDINGS; i++) Actions_register(letterBindings[i].action);
 }
 
 void GameList_handleInput(void) {
-	if (PAD_tappedMenu(now)) {
-		currentScreen = SCREEN_QUICKMENU;
-		QuickMenu_enter();
-		state.dirty = 1;
-		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
-		if (!HAS_POWER_BUTTON && !state.simple_mode) PWR_enableSleep();
-	}
-	else if (PAD_tappedSelect(now)) {
-		currentScreen = SCREEN_GAMESWITCHER;
-		state.switcher_selected = 0;
-		state.dirty = 1;
+	Effective e;
+	effective(&e);
+
+	if (Bindings_dispatch(e.screen, e.screen_count)) {
+		// the quick menu or the game switcher
 	}
 	else if (total>0) {
 		if (PAD_justRepeated(BTN_UP)) {
@@ -167,32 +266,8 @@ void GameList_handleInput(void) {
 		}
 	}
 
-	if (PAD_justRepeated(BTN_L1) && !PAD_isPressed(BTN_R1) && !PWR_ignoreSettingInput(BTN_L1, show_setting)) { // previous alpha
-		Entry* entry = state.top->entries->items[selected];
-		int i = entry->alpha-1;
-		if (i>=0) {
-			selected = state.top->alphas->items[i];
-			if (total>MAIN_ROW_COUNT) {
-				state.top->start = selected;
-				state.top->end = state.top->start + MAIN_ROW_COUNT;
-				if (state.top->end>total) state.top->end = total;
-				state.top->start = state.top->end - MAIN_ROW_COUNT;
-			}
-		}
-	}
-	else if (PAD_justRepeated(BTN_R1) && !PAD_isPressed(BTN_L1) && !PWR_ignoreSettingInput(BTN_R1, show_setting)) { // next alpha
-		Entry* entry = state.top->entries->items[selected];
-		int i = entry->alpha+1;
-		if (i<state.top->alphas->count) {
-			selected = state.top->alphas->items[i];
-			if (total>MAIN_ROW_COUNT) {
-				state.top->start = selected;
-				state.top->end = state.top->start + MAIN_ROW_COUNT;
-				if (state.top->end>total) state.top->end = total;
-				state.top->start = state.top->end - MAIN_ROW_COUNT;
-			}
-		}
-	}
+	// previous or next letter
+	Bindings_dispatch(e.letters, e.letter_count);
 
 	if (selected!=state.top->selected) {
 		state.top->selected = selected;
@@ -204,12 +279,9 @@ void GameList_handleInput(void) {
 	if (state.dirty && total>0)
 		readyResume(entry);
 
-	if (!Bindings_dispatch(bindings, BINDING_COUNT)) {
-		// plugins' bindings rank after the game list's own
-		const Binding* extra;
-		int extra_count = Plugins_bindings(NUI_SCREEN_GAMELIST, &extra);
-		Bindings_dispatchShared(extra, extra_count, openEntryMenu);
-	}
+	// plugins' bindings rank after the game list's own and the overrides
+	if (!Bindings_dispatch(e.actions, e.action_count))
+		Bindings_dispatchShared(e.shared, e.shared_count, openEntryMenu);
 }
 
 // Decides what the next render draws: whether names show, which background
@@ -282,19 +354,32 @@ void GameList_update(void) {
 }
 
 void GameList_render(void) {
+	Effective e;
+	effective(&e);
+
 	// buttons. The left group's second hint is the first plugin button with
 	// an available action, or MORE when it opens a menu; stock has none.
-	const Binding* extra;
-	int extra_count = Plugins_bindings(NUI_SCREEN_GAMELIST, &extra);
 	const char* extra_glyph = NULL;
 	const char* extra_label = NULL;
-	if (!Bindings_sharedHint(extra, extra_count, &extra_glyph, &extra_label)) extra_glyph = NULL;
+	if (!Bindings_sharedHint(e.shared, e.shared_count, &extra_glyph, &extra_label)) {
+		extra_glyph = NULL;
+		// or an override that put a plugin's action on a button
+		for (int i = 0; i < e.override_count && !extra_glyph; i++) {
+			const Binding* b = &e.overrides[i];
+			if (isOwnAction(b->action) || !Action_available(b->action)) continue;
+			extra_glyph = b->glyph;
+			extra_label = b->action->label;
+		}
+	}
 	char* extra_label_tr = extra_glyph ? TR(extra_label) : NULL;
+
+	// the game list's hints are on whichever buttons their actions are on
+	const Binding* resume = Bindings_find(e.actions, e.action_count, &resumeAction);
 
 	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
 	// Stock shows the resume hint whenever resume state is set, even in an
 	// empty folder where the action can't run, so this keeps its own check.
-	else if (state.can_resume) GFX_blitButtonGroup((char*[]){ (char*)bindings[0].glyph,TR(resumeAction.label),
+	else if (state.can_resume && resume) GFX_blitButtonGroup((char*[]){ (char*)resume->glyph,TR(resumeAction.label),
 		(char*)extra_glyph, extra_label_tr, NULL }, 0, screen, 0);
 	else GFX_blitButtonGroup((char*[]){
 		BTN_SLEEP==BTN_POWER?"POWER":"MENU",
@@ -303,8 +388,14 @@ void GameList_render(void) {
 		NULL }, 0, screen, 0);
 
 	// back and open, whichever are available; the last one is primary
+	const Binding* navigationHints[2];
+	int navigation_count = 0;
+	const Binding* back = Bindings_find(e.actions, e.action_count, &backAction);
+	const Binding* opener = Bindings_find(e.actions, e.action_count, &openAction);
+	if (back) navigationHints[navigation_count++] = back;
+	if (opener) navigationHints[navigation_count++] = opener;
 	char* hints[5];
-	int hint_count = Bindings_hints(navigationHints, 2, hints);
+	int hint_count = Bindings_hints(navigationHints, navigation_count, hints);
 	if (hint_count > 0) GFX_blitButtonGroup(hints, hint_count - 1, screen, 1);
 
 	// list

@@ -82,10 +82,13 @@ enum NUIQuickRow {
 	NUI_QUICK_BOTTOM, // the small icons: Settings, Wifi, Sleep, Power off
 };
 
-// What pre_launch decides.
+// What pre_launch decides. NUI_LAUNCH_REPLACE runs the command set with
+// host->replace_launch in place of the launch; a launcher older than that
+// field launches as usual.
 enum NUILaunchResult {
 	NUI_LAUNCH_CONTINUE,
 	NUI_LAUNCH_CANCEL,
+	NUI_LAUNCH_REPLACE,
 };
 
 typedef struct NUILaunch {
@@ -221,6 +224,50 @@ typedef struct NUIHost {
 	// renamed, keeping its place and its name. Saved at once. Returns 0, or
 	// -1 for a bad index, a path off the card, or a path already in recents.
 	int (*recent_set)(int index, const char* path);
+
+	// Puts an action on a game list button in place of what the game list
+	// does with it. The action is one from register_action or one of the
+	// game list's own:
+	//
+	//   gamelist.open         A, press: open the selected folder, game or pak
+	//   gamelist.back         B, press: back out of the folder
+	//   gamelist.resume       X, release: resume the selected game
+	//   gamelist.prev_letter  L1, held repeats: jump to the previous letter
+	//   gamelist.next_letter  R1, held repeats: jump to the next letter
+	//   gamelist.switcher     SELECT, tap: open the game switcher
+	//   gamelist.quick_menu   MENU, tap: open the quick menu
+	//
+	// The override takes the whole button: the game list's own bindings on
+	// it and plugins' bind_button ones stop running, whatever their trigger,
+	// and a NULL action_id leaves it doing nothing. The game list's hints
+	// follow its actions to their new buttons, so swapping A and X swaps
+	// their hints too. A plugin can override a button more than once, for
+	// press and release or for several actions on one trigger, where the
+	// first available one runs. A button overridden by one plugin can't be
+	// by another: the first in load order keeps it, and the loader logs
+	// the refusal. Call it from init, where it returns 0, or -1 for an
+	// unknown action, a taken button or a bad argument. For now only
+	// NUI_SCREEN_GAMELIST takes overrides.
+	int (*override_button)(int screen, int button, int trigger, const char* action_id);
+
+	// Called from pre_launch, sets the command to run instead of the
+	// launch, then pre_launch returns NUI_LAUNCH_REPLACE. program is a file
+	// on the card, such as another emulator pak's launch.sh or minarch.elf;
+	// args (up to 8, each under 256 bytes, no newlines) follow it. For a
+	// game, the path the launcher would have launched comes last, after it
+	// picks the disc to resume; for a pak nothing is added. Everything is single-quoted, the way the
+	// launcher quotes its own commands. Recents, resume and play time are
+	// kept as for any launch. When two plugins replace a launch the first in
+	// load order wins, and the second's call returns -1. Returns 0, or -1
+	// outside pre_launch, for a program that isn't a file on the card, or
+	// for arguments that don't fit.
+	int (*replace_launch)(const char* program, const char* const* args, int count);
+
+	// Relabels a built-in quick menu tile in the top row (Recents,
+	// Collections, Games or Tools), or restores its own label with NULL or
+	// "". Hiding and art still go by the built-in name. Returns 0, or -1
+	// for any other name.
+	int (*rename_quick_tile)(const char* name, const char* label);
 } NUIHost;
 
 // True when the launcher's host table has this field, so a plugin can use

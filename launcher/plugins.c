@@ -22,6 +22,10 @@ typedef struct LoadedPlugin {
 
 static LoadedPlugin loaded[PLUGIN_MAX];
 static int loaded_count = 0;
+static int initializing = -1; // the loaded plugin whose init is running
+static int launching = -1;    // the loaded plugin whose pre_launch is running
+
+static void dropOverrides(int owner);
 static PluginManifest manifests[PLUGIN_MAX];
 static int manifest_count = 0;
 
@@ -347,6 +351,18 @@ static int hostRecentSet(int index, const char* path) {
 	return Recents_set(index, path);
 }
 
+static int hostOverrideButton(int screen, int button, int trigger, const char* action_id);
+static int hostReplaceLaunch(const char* program, const char* const* args, int count);
+
+static int hostRenameQuickTile(const char* name, const char* label) {
+	if (QuickTiles_rename(name, label) != 0) {
+		LOG_warn("plugins: can't rename the quick menu tile %s\n", name ? name : "(null)");
+		return -1;
+	}
+	state.rebuild_quick = 1;
+	return 0;
+}
+
 static const NUIHost host = {
 	.size = sizeof(NUIHost),
 	.api_version = NUI_API_VERSION,
@@ -387,6 +403,9 @@ static const NUIHost host = {
 	.hide_quick_tile = hostHideQuickTile,
 	.choose = Modal_choose,
 	.recent_set = hostRecentSet,
+	.override_button = hostOverrideButton,
+	.replace_launch = hostReplaceLaunch,
+	.rename_quick_tile = hostRenameQuickTile,
 };
 
 ///////////////////////////////////////
@@ -429,8 +448,12 @@ static void load(const PluginManifest* m) {
 		LOG_warn("plugins: %s has root_replace but no slots=" ROOT_SLOT ", so it won't be asked\n", m->id);
 	}
 
-	if (Plugin_has(plugin, init) && plugin->init && plugin->init(&host) != 0) {
+	initializing = loaded_count - 1;
+	int declined = Plugin_has(plugin, init) && plugin->init && plugin->init(&host) != 0;
+	initializing = -1;
+	if (declined) {
 		LOG_warn("plugins: %s declined to start\n", m->id);
+		dropOverrides(loaded_count - 1);
 		if (p->cfg) Hash_free(p->cfg);
 		dlclose(handle);
 		loaded_count--;
@@ -438,6 +461,8 @@ static void load(const PluginManifest* m) {
 	}
 	LOG_info("plugins: loaded %s\n", m->id);
 }
+
+static void logOverridden(void);
 
 void Plugins_init(void) {
 	if (exists(PAUSED_MARKER)) {
@@ -470,6 +495,7 @@ void Plugins_init(void) {
 		else LOG_info("plugins: not loading %s: %s\n", decisions[i].manifest->id, decisions[i].reason);
 	}
 	if (loaded_count == 0) unlink(LOADING_MARKER);
+	logOverridden();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
@@ -508,9 +534,11 @@ int Plugins_count(void) {
 // button bindings
 
 #define SCREEN_COUNT 3
-#define MAX_PLUGIN_BINDINGS 16
-static Binding pluginBindings[SCREEN_COUNT][MAX_PLUGIN_BINDINGS];
+static Binding pluginBindings[SCREEN_COUNT][PLUGIN_BINDING_MAX];
 static int pluginBindingCount[SCREEN_COUNT];
+static Binding overrideBindings[SCREEN_COUNT][PLUGIN_OVERRIDE_MAX];
+static int overrideOwner[SCREEN_COUNT][PLUGIN_OVERRIDE_MAX]; // index in loaded
+static int overrideCount[SCREEN_COUNT];
 
 typedef struct ButtonInfo {
 	int nui;
@@ -531,6 +559,13 @@ static const ButtonInfo buttons[] = {
 	{ NUI_BUTTON_SELECT, BTN_SELECT, "SELECT" },
 };
 
+static const ButtonInfo* buttonInfo(int button) {
+	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
+		if (buttons[i].nui == button) return &buttons[i];
+	}
+	return NULL;
+}
+
 int Plugins_bindButton(int screen, int button, int trigger, const char* action_id) {
 	// only the game list dispatches through bindings so far
 	if (screen != NUI_SCREEN_GAMELIST) return -1;
@@ -540,11 +575,8 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 		LOG_warn("plugins: can't bind unknown action %s\n", action_id ? action_id : "(null)");
 		return -1;
 	}
-	const ButtonInfo* info = NULL;
-	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
-		if (buttons[i].nui == button) info = &buttons[i];
-	}
-	if (!info || pluginBindingCount[screen] >= MAX_PLUGIN_BINDINGS) return -1;
+	const ButtonInfo* info = buttonInfo(button);
+	if (!info || pluginBindingCount[screen] >= PLUGIN_BINDING_MAX) return -1;
 
 	Binding* b = &pluginBindings[screen][pluginBindingCount[screen]++];
 	b->button = info->btn;
@@ -565,6 +597,88 @@ int Plugins_bindings(int screen, const Binding** bindings) {
 	if (screen < 0 || screen >= SCREEN_COUNT) return 0;
 	*bindings = pluginBindings[screen];
 	return pluginBindingCount[screen];
+}
+
+// Overrides are made from init, so the loader knows which plugin made each
+// and can settle two plugins wanting the same button: the first in load
+// order keeps it.
+static int hostOverrideButton(int screen, int button, int trigger, const char* action_id) {
+	if (initializing < 0) {
+		LOG_warn("plugins: override_button only works from init\n");
+		return -1;
+	}
+	const char* id = loaded[initializing].id;
+	if (screen != NUI_SCREEN_GAMELIST || (trigger != NUI_TRIGGER_PRESS && trigger != NUI_TRIGGER_RELEASE)) return -1;
+	const ButtonInfo* info = buttonInfo(button);
+	if (!info) return -1;
+	const Action* action = NULL;
+	if (action_id) {
+		action = Actions_find(action_id);
+		if (!action) {
+			LOG_warn("plugins: %s can't override %s with unknown action %s\n", id, info->glyph, action_id);
+			return -1;
+		}
+	}
+	int btn_trigger = trigger == NUI_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
+	for (int i = 0; i < overrideCount[screen]; i++) {
+		const Binding* other = &overrideBindings[screen][i];
+		if (other->button != info->btn) continue;
+		int owner = overrideOwner[screen][i];
+		if (owner != initializing) {
+			LOG_warn("plugins: %s can't override %s on the game list, %s already has it (the first in load order wins)\n",
+				id, info->glyph, loaded[owner].id);
+			return -1;
+		}
+		if (other->trigger == btn_trigger && other->action == action) return 0; // already there
+	}
+	if (overrideCount[screen] >= PLUGIN_OVERRIDE_MAX) return -1;
+
+	int at = overrideCount[screen]++;
+	Binding* b = &overrideBindings[screen][at];
+	memset(b, 0, sizeof(*b));
+	b->button = info->btn;
+	b->trigger = btn_trigger;
+	b->glyph = info->glyph;
+	b->action = action;
+	overrideOwner[screen][at] = initializing;
+	LOG_info("plugins: %s overrides %s %s on the game list with %s\n", id, info->glyph,
+		trigger == NUI_TRIGGER_RELEASE ? "release" : "press", action ? action->id : "nothing");
+	return 0;
+}
+
+// A plugin that declined to start takes its overrides with it.
+static void dropOverrides(int owner) {
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) {
+		int kept = 0;
+		for (int i = 0; i < overrideCount[screen]; i++) {
+			if (overrideOwner[screen][i] == owner) continue;
+			overrideBindings[screen][kept] = overrideBindings[screen][i];
+			overrideOwner[screen][kept] = overrideOwner[screen][i];
+			kept++;
+		}
+		overrideCount[screen] = kept;
+	}
+}
+
+// Plugin bindings an override took the button from never run; say so once.
+static void logOverridden(void) {
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) {
+		for (int i = 0; i < pluginBindingCount[screen]; i++) {
+			const Binding* b = &pluginBindings[screen][i];
+			for (int j = 0; j < overrideCount[screen]; j++) {
+				if (overrideBindings[screen][j].button != b->button) continue;
+				LOG_info("plugins: %s overrides %s, so %s bound to it doesn't run\n",
+					loaded[overrideOwner[screen][j]].id, b->glyph, b->action->id);
+				break;
+			}
+		}
+	}
+}
+
+int Plugins_overrides(int screen, const Binding** bindings) {
+	if (screen < 0 || screen >= SCREEN_COUNT) return 0;
+	*bindings = overrideBindings[screen];
+	return overrideCount[screen];
 }
 
 ///////////////////////////////////////
@@ -656,19 +770,66 @@ int Plugins_listReady(Array* entries, const char* dir_path) {
 	return renamed;
 }
 
+// The replacement for the launch in progress: the one pre_launch kept, and
+// the one the running pre_launch asked for, kept if it returns REPLACE.
+static LaunchCmd replacement;
+static int replacer = -1;
+static LaunchCmd pending;
+static int pending_set = 0;
+
+static int hostReplaceLaunch(const char* program, const char* const* args, int count) {
+	if (launching < 0) {
+		LOG_warn("plugins: replace_launch only works from pre_launch\n");
+		return -1;
+	}
+	const char* id = loaded[launching].id;
+	if (replacer >= 0) {
+		LOG_warn("plugins: %s can't replace the launch, %s already did (the first in load order wins)\n", id, loaded[replacer].id);
+		return -1;
+	}
+	if (LaunchCmd_set(&pending, SDCARD_PATH, program, args, count) != 0) {
+		LOG_warn("plugins: %s can't replace the launch with %s: it isn't a file on the card, or its arguments don't fit\n",
+			id, program ? program : "(null)");
+		return -1;
+	}
+	pending_set = 1;
+	return 0;
+}
+
 int Plugins_preLaunch(const char* path, int type) {
+	replacer = -1;
 	// paks' own pre-launch.sh scripts first; they don't need plugins on
 	if (!PakHooks_preLaunch(path, type)) return 0;
 
 	NUILaunch launch = { .path = path, .type = type };
-	EACH_PLUGIN_WITH(pre_launch) {
-		if (p->pre_launch(&launch) == NUI_LAUNCH_CANCEL) {
+	for (int i = 0; i < loaded_count; i++) {
+		const NUIPlugin* p = loaded[i].plugin;
+		if (!Plugin_has(p, pre_launch) || !p->pre_launch) continue;
+		launching = i;
+		pending_set = 0;
+		int result = p->pre_launch(&launch);
+		launching = -1;
+		if (result == NUI_LAUNCH_CANCEL) {
 			LOG_info("plugins: launch of %s cancelled by a plugin\n", path);
+			replacer = -1;
 			return 0;
 		}
+		if (result != NUI_LAUNCH_REPLACE) continue;
+		if (!pending_set) {
+			LOG_warn("plugins: %s returned NUI_LAUNCH_REPLACE without a replace_launch command, ignoring it\n", loaded[i].id);
+			continue;
+		}
+		replacement = pending;
+		replacer = i;
+		LOG_info("plugins: %s replaced the launch of %s with %s\n", loaded[i].id, path, replacement.program);
 	}
+	pending_set = 0;
 	if (loaded_count > 0) putFile(LAUNCHED_MARKER, "");
 	return 1;
+}
+
+const LaunchCmd* Plugins_launchReplacement(void) {
+	return replacer >= 0 ? &replacement : NULL;
 }
 
 int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {

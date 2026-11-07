@@ -28,6 +28,7 @@ const Action* Actions_find(const char* id) {
 }
 
 static int fired(const Binding* binding) {
+	if (binding->fires) return binding->fires(binding->button);
 	if (binding->trigger == TRIGGER_RELEASE) return PAD_justReleased(binding->button);
 	return PAD_justPressed(binding->button);
 }
@@ -108,4 +109,24 @@ int Bindings_sharedHint(const Binding* bindings, int count, const char** glyph, 
 		return 1;
 	}
 	return 0;
+}
+
+int Bindings_drop(const Binding* bindings, int count, const Binding* taken, int taken_count, Binding* out) {
+	int kept = 0;
+	for (int i = 0; i < count; i++) {
+		int dropped = 0;
+		for (int j = 0; j < taken_count && !dropped; j++) {
+			if (taken[j].button == bindings[i].button) dropped = 1;
+		}
+		if (!dropped) out[kept++] = bindings[i];
+	}
+	return kept;
+}
+
+const Binding* Bindings_find(const Binding* bindings, int count, const Action* action) {
+	if (!action) return NULL;
+	for (int i = 0; i < count; i++) {
+		if (bindings[i].action == action) return &bindings[i];
+	}
+	return NULL;
 }

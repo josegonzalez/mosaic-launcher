@@ -17,6 +17,7 @@
 #include "actions.h"
 #include "nextui_plugin.h"
 #include "pluginset.h"
+#include "launchcmd.h"
 
 #define PLUGIN_STATE_DIR USERDATA_PATH "/launcher"
 #define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
@@ -34,6 +35,15 @@ const NUIPlugin* Plugins_at(int i);
 // screen's own. Returns how many, and points *bindings at them.
 int Plugins_bindings(int screen, const Binding** bindings);
 int Plugins_bindButton(int screen, int button, int trigger, const char* action_id);
+
+#define PLUGIN_BINDING_MAX 16
+#define PLUGIN_OVERRIDE_MAX 16
+
+// Bindings plugins put on a screen's buttons in place of the screen's own
+// (override_button). Each takes its button from the screen's own bindings
+// and from plugins' bind_button ones. One with a NULL action leaves the
+// button doing nothing. Returns how many, and points *bindings at them.
+int Plugins_overrides(int screen, const Binding** bindings);
 
 ///////////////////////////////////////
 // Hooks, called from the launcher. Each runs every loaded plugin's hook in
@@ -67,6 +77,10 @@ int Plugins_listReady(Array* entries, const char* dir_path);
 // Asks plugins before a launch. Returns 1 to go ahead, 0 if one cancelled.
 // Going ahead also arranges for post_return on the next start.
 int Plugins_preLaunch(const char* path, int type);
+
+// The command a plugin's pre_launch replaced the last launch with, or NULL
+// to launch as stock does.
+const LaunchCmd* Plugins_launchReplacement(void);
 
 // The first plugin's image for an entry, for ART_THUMBNAIL, ART_FOLDER_BG or
 // ART_LIST_BG (see art.h). Returns 1 if a plugin answered.

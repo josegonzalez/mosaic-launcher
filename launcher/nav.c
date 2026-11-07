@@ -297,7 +297,10 @@ static void logRow(const char* which, Array* entries) {
 	char names[512] = "";
 	for (int i = 0; i < entries->count; i++) {
 		size_t len = strlen(names);
-		snprintf(names + len, sizeof(names) - len, "%s%s", i ? "," : "", ((Entry*)entries->items[i])->name);
+		Entry* entry = entries->items[i];
+		const char* label = QuickTiles_label(entry);
+		if (label == entry->name) snprintf(names + len, sizeof(names) - len, "%s%s", i ? "," : "", entry->name);
+		else snprintf(names + len, sizeof(names) - len, "%s%s (%s)", i ? "," : "", entry->name, label);
 	}
 	LOG_info("quick menu: %s row %s\n", which, names);
 }

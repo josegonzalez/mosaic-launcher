@@ -127,6 +127,21 @@ int autoResume(void) {
 	return 1;
 }
 
+// Queues the command a plugin's pre_launch replaced this launch with, if
+// one did. target is the game's path, or NULL for a pak. Returns 0 to queue
+// stock's command instead.
+static int queueReplacement(const char* target) {
+	const LaunchCmd* replacement = Plugins_launchReplacement();
+	if (!replacement) return 0;
+	char cmd[LAUNCH_CMD_SIZE];
+	if (LaunchCmd_format(replacement, target, cmd, sizeof(cmd)) != 0) {
+		LOG_warn("plugins: the command replacing this launch is too long, launching as before\n");
+		return 0;
+	}
+	queueNext(cmd);
+	return 1;
+}
+
 int openPak(char* path) {
 	if (!Plugins_preLaunch(path, ENTRY_PAK)) return 0;
 
@@ -136,6 +151,7 @@ int openPak(char* path) {
 	// 	addRecent(path);
 	// }
 	saveLast(path);
+	if (queueReplacement(NULL)) return 1;
 
 	char cmd[256];
 	sprintf(cmd, "'%s/launch.sh'", escapeSingleQuotes(path));
@@ -180,6 +196,7 @@ int runFnAction(int index) {
 		Entry* entry = state.top->entries->items[state.top->selected];
 		saveLast(entry->path);
 	}
+	if (queueReplacement(NULL)) return 1;
 
 	char cmd[256];
 	// NOTE: escapeSingleQuotes() modifies pak_path in place
@@ -248,9 +265,12 @@ int openRom(char* path, char* last) {
 	// so we need to save the path before we call that
 	addRecent(recent_path, state.recent_alias); // yiiikes
 	saveLast(last==NULL ? sd_path : last);
+	char target[256]; // before escapeSingleQuotes rewrites sd_path
+	strcpy(target, sd_path);
 	char act[256];
 	sprintf(act, "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));
 	system(act);
+	if (queueReplacement(target)) return 1;
 	char cmd[256];
 	// dont escape sd_path again because it was already escaped for gametimectl and function modifies input str aswell
 	sprintf(cmd, "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
