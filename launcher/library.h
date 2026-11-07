@@ -41,6 +41,15 @@ typedef struct Directory {
 
 int getIndexChar(char* str);
 void getUniqueName(Entry* entry, char* out_name);
+
+// Listing a directory, in stages. Directory_new runs them in this order.
+Array* Listing_source(char* path);
+Hash* Listing_loadMap(char* path);
+void Listing_applyMap(Array* entries, Hash* map, int* renamed, int* hid_any);
+Array* Listing_filterHidden(Array* entries);
+void Listing_markDuplicates(Array* entries);
+void Listing_buildIndex(Directory* self);
+
 void Directory_index(Directory* self);
 Directory* Directory_new(char* path, int selected);
 void Directory_free(Directory* self);

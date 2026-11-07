@@ -69,115 +69,156 @@ void getUniqueName(Entry* entry, char* out_name) {
 	strcpy(tmp, ")");
 }
 
+///////////////////////////////////////
+// Listing a directory, in stages: source -> map.txt names -> hide -> sort
+// -> duplicate names -> letter index. Directory_new runs them in order.
+
+// Where a directory's entries come from. Most sources already sort.
+Array* Listing_source(char* path) {
+	if (exactMatch(path, SDCARD_PATH)) {
+		return getRoot();
+	}
+	else if (exactMatch(path, FAUX_RECENT_PATH)) {
+		return getRecents();
+	}
+	else if (exactMatch(path, ROMS_PATH)) {
+		return getRoms();
+	}
+	else if (!exactMatch(path, COLLECTIONS_PATH) && prefixMatch(COLLECTIONS_PATH, path) && suffixMatch(".txt", path)) {
+		return getCollection(path);
+	}
+	else if (suffixMatch(".m3u", path)) {
+		return getDiscs(path);
+	}
+	return getEntries(path);
+}
+
+// The file name -> display name map for a directory, or NULL. Collections
+// share one map.txt at the top of the collections folder.
+Hash* Listing_loadMap(char* path) {
+	int is_collection = prefixMatch(COLLECTIONS_PATH, path);
+	char map_path[256];
+	sprintf(map_path, "%s/map.txt", is_collection ? COLLECTIONS_PATH : path);
+	if (!exists(map_path)) return NULL;
+
+	FILE* file = fopen(map_path, "r");
+	if (!file) return NULL;
+
+	Hash* map = Hash_new();
+	char line[256];
+	while (fgets(line, 256, file) != NULL) {
+		normalizeNewline(line);
+		trimTrailingNewlines(line);
+		if (strlen(line) == 0) continue; // skip empty lines
+
+		char* tmp = strchr(line, '\t');
+		if (tmp) {
+			tmp[0] = '\0';
+			char* key = line;
+			char* value = tmp + 1;
+			Hash_set(map, key, strdup(value)); // Ensure strdup to store value properly
+		}
+	}
+	fclose(file);
+	return map;
+}
+
+// Renames entries the map knows about. Sets *renamed when any name changed
+// and *hid_any when a new name is hidden (eg. starts with a dot).
+void Listing_applyMap(Array* entries, Hash* map, int* renamed, int* hid_any) {
+	*renamed = 0;
+	*hid_any = 0;
+	for (int i = 0; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		char* filename = strrchr(entry->path, '/') + 1;
+		char* alias = Hash_get(map, filename);
+		if (alias) {
+			free(entry->name);  // Free before overwriting
+			entry->name = strdup(alias);
+			*renamed = 1;
+			if (!*hid_any && hide(entry->name)) *hid_any = 1;
+		}
+	}
+}
+
+// Drops entries whose display name is hidden. Takes ownership of entries.
+Array* Listing_filterHidden(Array* entries) {
+	Array* kept = Array_new();
+	for (int i = 0; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		if (hide(entry->name)) {
+			Entry_free(entry); // Ensure Entry_free handles all memory cleanup
+		} else {
+			Array_push(kept, entry);
+		}
+	}
+	Array_free(entries);
+	return kept;
+}
+
+// Neighbours with the same display name get a unique name: their file
+// names, or the name plus emulator tag when the file names match too
+// (the same game in two collated console folders).
+void Listing_markDuplicates(Array* entries) {
+	Entry* prior = NULL;
+	for (int i = 0; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		if (prior != NULL && exactMatch(prior->name, entry->name)) {
+			free(prior->unique);
+			free(entry->unique);
+			prior->unique = NULL;
+			entry->unique = NULL;
+
+			char* prior_filename = strrchr(prior->path, '/') + 1;
+			char* entry_filename = strrchr(entry->path, '/') + 1;
+			if (exactMatch(prior_filename, entry_filename)) {
+				char prior_unique[256];
+				char entry_unique[256];
+				getUniqueName(prior, prior_unique);
+				getUniqueName(entry, entry_unique);
+
+				prior->unique = strdup(prior_unique);
+				entry->unique = strdup(entry_unique);
+			} else {
+				prior->unique = strdup(prior_filename);
+				entry->unique = strdup(entry_filename);
+			}
+		}
+		prior = entry;
+	}
+}
+
+// One letter group per run of entries sharing a first letter, for L1/R1.
+void Listing_buildIndex(Directory* self) {
+	int alpha = -1;
+	int index = 0;
+	for (int i = 0; i < self->entries->count; i++) {
+		Entry* entry = self->entries->items[i];
+		int a = getIndexChar(entry->name);
+		if (a != alpha) {
+			index = self->alphas->count;
+			IntArray_push(self->alphas, i);
+			alpha = a;
+		}
+		entry->alpha = index;
+	}
+}
+
 void Directory_index(Directory* self) {
-    int is_collection = prefixMatch(COLLECTIONS_PATH, self->path);
-    int skip_index = exactMatch(FAUX_RECENT_PATH, self->path) || is_collection; // not alphabetized
+	int is_collection = prefixMatch(COLLECTIONS_PATH, self->path);
+	int skip_index = exactMatch(FAUX_RECENT_PATH, self->path) || is_collection; // not alphabetized
 
-    Hash* map = NULL;
-    char map_path[256];
-    sprintf(map_path, "%s/map.txt", is_collection ? COLLECTIONS_PATH : self->path);
+	Hash* map = Listing_loadMap(self->path);
+	if (map) {
+		int renamed, hid_any;
+		Listing_applyMap(self->entries, map, &renamed, &hid_any);
+		if (hid_any) self->entries = Listing_filterHidden(self->entries);
+		if (renamed) EntryArray_sort(self->entries);
+		Hash_free(map);
+	}
 
-    if (exists(map_path)) {
-        FILE* file = fopen(map_path, "r");
-        if (file) {
-            map = Hash_new();
-            char line[256];
-            while (fgets(line, 256, file) != NULL) {
-                normalizeNewline(line);
-                trimTrailingNewlines(line);
-                if (strlen(line) == 0) continue; // skip empty lines
-
-                char* tmp = strchr(line, '\t');
-                if (tmp) {
-                    tmp[0] = '\0';
-                    char* key = line;
-                    char* value = tmp + 1;
-                    Hash_set(map, key, strdup(value)); // Ensure strdup to store value properly
-                }
-            }
-            fclose(file);
-
-            int resort = 0;
-            int filter = 0;
-            for (int i = 0; i < self->entries->count; i++) {
-                Entry* entry = self->entries->items[i];
-                char* filename = strrchr(entry->path, '/') + 1;
-                char* alias = Hash_get(map, filename);
-                if (alias) {
-                    free(entry->name);  // Free before overwriting
-                    entry->name = strdup(alias);
-                    resort = 1;
-                    if (!filter && hide(entry->name)) filter = 1;
-                }
-            }
-
-            if (filter) {
-                Array* entries = Array_new();
-                for (int i = 0; i < self->entries->count; i++) {
-                    Entry* entry = self->entries->items[i];
-                    if (hide(entry->name)) {
-                        Entry_free(entry); // Ensure Entry_free handles all memory cleanup
-                    } else {
-                        Array_push(entries, entry);
-                    }
-                }
-                Array_free(self->entries);
-                self->entries = entries;
-            }
-            if (resort) EntryArray_sort(self->entries);
-        }
-    }
-
-    Entry* prior = NULL;
-    int alpha = -1;
-    int index = 0;
-    for (int i = 0; i < self->entries->count; i++) {
-        Entry* entry = self->entries->items[i];
-        if (map) {
-            char* filename = strrchr(entry->path, '/') + 1;
-            char* alias = Hash_get(map, filename);
-            if (alias) {
-                free(entry->name);  // Free before overwriting
-                entry->name = strdup(alias);
-            }
-        }
-
-        if (prior != NULL && exactMatch(prior->name, entry->name)) {
-            free(prior->unique);
-            free(entry->unique);
-            prior->unique = NULL;
-            entry->unique = NULL;
-
-            char* prior_filename = strrchr(prior->path, '/') + 1;
-            char* entry_filename = strrchr(entry->path, '/') + 1;
-            if (exactMatch(prior_filename, entry_filename)) {
-                char prior_unique[256];
-                char entry_unique[256];
-                getUniqueName(prior, prior_unique);
-                getUniqueName(entry, entry_unique);
-
-                prior->unique = strdup(prior_unique);
-                entry->unique = strdup(entry_unique);
-            } else {
-                prior->unique = strdup(prior_filename);
-                entry->unique = strdup(entry_filename);
-            }
-        }
-
-        if (!skip_index) {
-            int a = getIndexChar(entry->name);
-            if (a != alpha) {
-                index = self->alphas->count;
-                IntArray_push(self->alphas, i);
-                alpha = a;
-            }
-            entry->alpha = index;
-        }
-
-        prior = entry;
-    }
-
-    if (map) Hash_free(map);  // Free the map at the end
+	Listing_markDuplicates(self->entries);
+	if (!skip_index) Listing_buildIndex(self);
 }
 
 
@@ -188,24 +229,7 @@ Directory* Directory_new(char* path, int selected) {
 	Directory* self = malloc(sizeof(Directory));
 	self->path = strdup(path);
 	self->name = strdup(display_name);
-	if (exactMatch(path, SDCARD_PATH)) {
-		self->entries = getRoot();
-	}
-	else if (exactMatch(path, FAUX_RECENT_PATH)) {
-		self->entries = getRecents();
-	}
-	else if (exactMatch(path, ROMS_PATH)) {
-		self->entries = getRoms();
-	}
-	else if (!exactMatch(path, COLLECTIONS_PATH) && prefixMatch(COLLECTIONS_PATH, path) && suffixMatch(".txt", path)) {
-		self->entries = getCollection(path);
-	}
-	else if (suffixMatch(".m3u", path)) {
-		self->entries = getDiscs(path);
-	}
-	else {
-		self->entries = getEntries(path);
-	}
+	self->entries = Listing_source(path);
 	self->alphas = IntArray_new();
 	self->selected = selected;
 	Directory_index(self);
