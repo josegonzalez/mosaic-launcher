@@ -31,5 +31,6 @@
 #include "screens.h"
 #include "art.h"
 #include "quickitems.h"
+#include "tr.h"
 
 #endif

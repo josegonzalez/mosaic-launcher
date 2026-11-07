@@ -84,10 +84,10 @@ void Switcher_render(void) {
 			SDL_FreeSurface(text);
 		}
 
-		GFX_blitButtonGroup((char*[]){ "B","BACK",  NULL }, 0, screen, 0);
+		GFX_blitButtonGroup((char*[]){ "B",TR("BACK"),  NULL }, 0, screen, 0);
 
-		if(can_resume) GFX_blitButtonGroup((char*[]){ "Y", "REMOVE", "A","RESUME", NULL }, 1, screen, 1);
-		else GFX_blitButtonGroup((char*[]){ "A","OPEN", NULL }, 1, screen, 1);
+		if(can_resume) GFX_blitButtonGroup((char*[]){ "Y", TR("REMOVE"), "A",TR("RESUME"), NULL }, 1, screen, 1);
+		else GFX_blitButtonGroup((char*[]){ "A",TR("OPEN"), NULL }, 1, screen, 1);
 
 		if(has_preview) {
 			// lotta memory churn here
@@ -166,15 +166,15 @@ void Switcher_render(void) {
 					GFX_animateSurface(tmpsur,0-screen->w,0,0,0,screen->w,screen->h,CFG_getMenuTransitions() ? 80:20,0,255,LAYER_ALL);
 			}
 			SDL_FreeSurface(tmpsur);
-			GFX_blitMessage(font.large, "No Preview", screen, &preview_rect);
+			GFX_blitMessage(font.large, TR("No Preview"), screen, &preview_rect);
 		}
 		Entry_free(selectedEntry);
 	}
 	else {
 		SDL_Rect preview_rect = {ox,oy,screen->w,screen->h};
 		SDL_FillRect(screen, &preview_rect, 0);
-		GFX_blitMessage(font.large, "No Recents", screen, &preview_rect);
-		GFX_blitButtonGroup((char*[]){ "B","BACK", NULL }, 1, screen, 1);
+		GFX_blitMessage(font.large, TR("No Recents"), screen, &preview_rect);
+		GFX_blitButtonGroup((char*[]){ "B",TR("BACK"), NULL }, 1, screen, 1);
 	}
 
 	GFX_flipHidden();

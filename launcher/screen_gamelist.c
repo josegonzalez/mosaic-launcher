@@ -211,23 +211,23 @@ void GameList_render(void) {
 
 	// buttons
 	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
-	else if (can_resume) GFX_blitButtonGroup((char*[]){ "X","RESUME",  NULL }, 0, screen, 0);
+	else if (can_resume) GFX_blitButtonGroup((char*[]){ "X",TR("RESUME"),  NULL }, 0, screen, 0);
 	else GFX_blitButtonGroup((char*[]){
 		BTN_SLEEP==BTN_POWER?"POWER":"MENU",
-		BTN_SLEEP==BTN_POWER||simple_mode?"SLEEP":"INFO",
+		TR(BTN_SLEEP==BTN_POWER||simple_mode?"SLEEP":"INFO"),
 		NULL }, 0, screen, 0);
 
 	if (total==0) {
 		if (stack->count>1) {
-			GFX_blitButtonGroup((char*[]){ "B","BACK",  NULL }, 0, screen, 1);
+			GFX_blitButtonGroup((char*[]){ "B",TR("BACK"),  NULL }, 0, screen, 1);
 		}
 	}
 	else {
 		if (stack->count>1) {
-			GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OPEN", NULL }, 1, screen, 1);
+			GFX_blitButtonGroup((char*[]){ "B",TR("BACK"), "A",TR("OPEN"), NULL }, 1, screen, 1);
 		}
 		else {
-			GFX_blitButtonGroup((char*[]){ "A","OPEN", NULL }, 0, screen, 1);
+			GFX_blitButtonGroup((char*[]){ "A",TR("OPEN"), NULL }, 0, screen, 1);
 		}
 	}
 
@@ -328,7 +328,7 @@ void GameList_render(void) {
 	}
 	else {
 		// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...
-		GFX_blitMessage(font.large, "Empty folder", screen, &(SDL_Rect){0,0,screen->w,screen->h}); //, NULL);
+		GFX_blitMessage(font.large, TR("Empty folder"), screen, &(SDL_Rect){0,0,screen->w,screen->h}); //, NULL);
 	}
 
 	lastScreen = SCREEN_GAMELIST;

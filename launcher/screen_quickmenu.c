@@ -118,9 +118,9 @@ void QuickMenu_render(void) {
 
 	// buttons (duped and trimmed from below)
 	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
-	else GFX_blitButtonGroup((char*[]){ BTN_SLEEP==BTN_POWER?"POWER":"MENU","SLEEP",  NULL }, 0, screen, 0);
+	else GFX_blitButtonGroup((char*[]){ BTN_SLEEP==BTN_POWER?"POWER":"MENU",TR("SLEEP"),  NULL }, 0, screen, 0);
 
-	GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OPEN", NULL }, 1, screen, 1);
+	GFX_blitButtonGroup((char*[]){ "B",TR("BACK"), "A",TR("OPEN"), NULL }, 1, screen, 1);
 
 	if(CFG_getShowQuickswitcherUI()) {
 		#define MENU_ITEM_SIZE 72 // item size, top line
@@ -189,9 +189,9 @@ void QuickMenu_render(void) {
 			}
 
 			int w, h;
-			GFX_sizeText(font.tiny, item->name, SCALE1(FONT_TINY), &w, &h);
+			GFX_sizeText(font.tiny, TR(item->name), SCALE1(FONT_TINY), &w, &h);
 			SDL_Rect text_rect = {item_rect.x + (item_size - w) / 2, item_rect.y + item_size - h - SCALE1(BUTTON_MARGIN), w, h};
-			GFX_blitText(font.tiny, item->name, SCALE1(FONT_TINY), text_color, screen, &text_rect);
+			GFX_blitText(font.tiny, TR(item->name), SCALE1(FONT_TINY), text_color, screen, &text_rect);
 
 			ox += item_rect.w + SCALE1(MENU_ITEM_MARGIN);
 		}

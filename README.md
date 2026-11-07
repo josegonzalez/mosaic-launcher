@@ -79,6 +79,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `screen_quickmenu.c` | quick menu input and rendering |
 | `art.c` | where each kind of image (thumbnails, backgrounds, quick menu art) is looked up |
 | `quickitems.c` | the quick menu's pak shortcuts and toggles: which appear, their icons, and what they do |
+| `tr.c` | `TR()`, which every piece of fixed UI text passes through where it's drawn |
 
 Upstream changes have to be ported forward by hand. To see what changed upstream since the pinned tag:
 
