@@ -6,7 +6,7 @@
 #include "check.h"
 #include "../../plugins/game-actions/game_actions.c"
 
-struct NUIEntry {
+struct MosaicEntry {
 	char path[1024];
 	char name[128];
 	int type;
@@ -531,7 +531,7 @@ static struct {
 	int button;
 } actions[MAX_FAKE_ACTIONS];
 static int action_count = 0;
-static NUIEntry selected_entry;
+static MosaicEntry selected_entry;
 static int has_selection = 0;
 static char toasted[160];
 static char asked[256];
@@ -554,10 +554,10 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	return fallback;
 }
 static void fakeCfgSet(const char* id, const char* key, const char* value) { (void)id; (void)key; (void)value; }
-static const char* fakeEntryPath(const NUIEntry* e) { return e->path; }
-static const char* fakeEntryName(const NUIEntry* e) { return e->name; }
-static int fakeEntryType(const NUIEntry* e) { return e->type; }
-static const NUIEntry* fakeSelected(void) { return has_selection ? &selected_entry : NULL; }
+static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
+static const MosaicEntry* fakeSelected(void) { return has_selection ? &selected_entry : NULL; }
 static void fakeRedraw(void) {}
 static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
 	(void)data;
@@ -571,7 +571,7 @@ static int fakeRegister(const char* id, const char* label, int (*available)(void
 	return 0;
 }
 static int fakeBind(int screen, int button, int trigger, const char* id) {
-	if (screen != NUI_SCREEN_GAMELIST || trigger != NUI_TRIGGER_PRESS) return -1;
+	if (screen != MOSAIC_SCREEN_GAMELIST || trigger != MOSAIC_TRIGGER_PRESS) return -1;
 	for (int i = 0; i < action_count; i++) {
 		if (!strcmp(actions[i].id, id)) {
 			actions[i].button = button;
@@ -611,9 +611,9 @@ static int fakeRecentRemove(int i) {
 }
 static void fakeReload(void) { reloads++; }
 
-static NUIHost fake = {
-	.size = sizeof(NUIHost),
-	.api_version = NUI_API_VERSION,
+static MosaicHost fake = {
+	.size = sizeof(MosaicHost),
+	.api_version = MOSAIC_API_VERSION,
 	.platform = "desktop",
 	.sdcard_path = CARD,
 	.userdata_path = USERDATA,
@@ -651,16 +651,16 @@ static void select_(const char* path, int type, const char* name) {
 	has_selection = 1;
 }
 
-static const NUIPlugin* start(void) {
+static const MosaicPlugin* start(void) {
 	action_count = 0;
-	const NUIPlugin* p = nextui_plugin_get(&fake);
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
 	CHECK(p->init(&fake) == 0);
 	return p;
 }
 
 static void testPlugin(void) {
 	makeCard();
-	const NUIPlugin* p = start();
+	const MosaicPlugin* p = start();
 	CHECK_STR(p->id, "game-actions");
 	CHECK(action_count == 3);
 	int rename_at = find("game-actions.rename");
@@ -669,9 +669,9 @@ static void testPlugin(void) {
 	CHECK(rename_at >= 0 && collect_at >= 0 && delete_at >= 0);
 	if (rename_at < 0 || collect_at < 0 || delete_at < 0) return;
 	// all on Y, so they share it with favorites and hidden
-	CHECK(actions[rename_at].button == NUI_BUTTON_Y);
-	CHECK(actions[collect_at].button == NUI_BUTTON_Y);
-	CHECK(actions[delete_at].button == NUI_BUTTON_Y);
+	CHECK(actions[rename_at].button == MOSAIC_BUTTON_Y);
+	CHECK(actions[collect_at].button == MOSAIC_BUTTON_Y);
+	CHECK(actions[delete_at].button == MOSAIC_BUTTON_Y);
 	CHECK_STR(actions[rename_at].label, "RENAME");
 	CHECK_STR(actions[delete_at].label, "DELETE");
 
@@ -679,23 +679,23 @@ static void testPlugin(void) {
 	has_selection = 0;
 	CHECK(!actions[rename_at].available(NULL));
 	CHECK(!actions[delete_at].available(NULL));
-	select_(GB "/Zelda.gb", NUI_ENTRY_ROM, "Zelda");
+	select_(GB "/Zelda.gb", MOSAIC_ENTRY_ROM, "Zelda");
 	CHECK(actions[rename_at].available(NULL));
 	CHECK(actions[collect_at].available(NULL));
 	CHECK(actions[delete_at].available(NULL));
-	select_(GB "/Hacks", NUI_ENTRY_DIR, "Hacks");
+	select_(GB "/Hacks", MOSAIC_ENTRY_DIR, "Hacks");
 	CHECK(actions[rename_at].available(NULL));
 	CHECK(!actions[collect_at].available(NULL));
 	CHECK(!actions[delete_at].available(NULL));
-	select_(CARD "/Tools/desktop/Thing.pak", NUI_ENTRY_PAK, "Thing");
+	select_(CARD "/Tools/desktop/Thing.pak", MOSAIC_ENTRY_PAK, "Thing");
 	CHECK(actions[collect_at].available(NULL));
 	CHECK(!actions[delete_at].available(NULL));
 
 	// rename: the keyboard starts on the shown name, and the name sticks
-	NUIEntry zelda = { GB "/Zelda.gb", "Zelda", NUI_ENTRY_ROM };
+	MosaicEntry zelda = { GB "/Zelda.gb", "Zelda", MOSAIC_ENTRY_ROM };
 	char out[256];
 	CHECK(p->display_name(&zelda, out, sizeof(out)) == 0);
-	select_(GB "/Zelda.gb", NUI_ENTRY_ROM, "Zelda");
+	select_(GB "/Zelda.gb", MOSAIC_ENTRY_ROM, "Zelda");
 	reloads = 0;
 	actions[rename_at].run(NULL);
 	CHECK_STR(kb_title, "Rename");
@@ -747,17 +747,17 @@ static void testPlugin(void) {
 	CHECK_STR(readText(CARD "/Collections/Zelda games.txt"), "/Roms/Game Boy (GB)/Zelda.gb\n");
 
 	// delete: a game folder, named in the question with what goes with it
-	select_(PS "/FF7/FF7 (Disc 1).cue", NUI_ENTRY_ROM, "Disc 1");
+	select_(PS "/FF7/FF7 (Disc 1).cue", MOSAIC_ENTRY_ROM, "Disc 1");
 	actions[rename_at].run(NULL);
 	kb_done("Final Fantasy", NULL);
-	select_(PS "/FF7", NUI_ENTRY_DIR, "FF7");
+	select_(PS "/FF7", MOSAIC_ENTRY_DIR, "FF7");
 	actions[rename_at].run(NULL);
 	kb_done("Final Fantasy VII", NULL);
 	snprintf(recents[0], sizeof(recents[0]), "%s", GB "/Zelda.gb");
 	snprintf(recents[1], sizeof(recents[1]), "%s", PS "/FF7/FF7.m3u");
 	snprintf(recents[2], sizeof(recents[2]), "%s", PS "/FF7 Remake.m3u");
 	recent_count = 3;
-	select_(PS "/FF7", NUI_ENTRY_DIR, "Final Fantasy VII");
+	select_(PS "/FF7", MOSAIC_ENTRY_DIR, "Final Fantasy VII");
 	answer_yes = NULL;
 	actions[delete_at].run(NULL);
 	CHECK_STR(asked, "Delete Final Fantasy VII?\nAlso deletes its folder, 2 saves, 1 state and its art.\nThis can't be undone.");
@@ -779,7 +779,7 @@ static void testPlugin(void) {
 	CHECK(!actions[delete_at].available(NULL));
 
 	// a plain game, from Recently Played
-	select_(GB "/Zelda.gb", NUI_ENTRY_ROM, "Zelda");
+	select_(GB "/Zelda.gb", MOSAIC_ENTRY_ROM, "Zelda");
 	CHECK(actions[delete_at].available(NULL));
 	actions[delete_at].run(NULL);
 	CHECK_STR(asked, "Delete Zelda?\nAlso deletes 1 save.\nThis can't be undone.");
@@ -797,7 +797,7 @@ static void testPlugin(void) {
 	p->quit();
 	p = start();
 	delete_at = find("game-actions.delete");
-	select_(GB "/Tetris.gb", NUI_ENTRY_ROM, "Tetris");
+	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM, "Tetris");
 	actions[delete_at].run(NULL);
 	CHECK_STR(asked, "Delete Tetris?\nAlso deletes its art.\nThis can't be undone.");
 	answer_yes(NULL);
@@ -806,7 +806,7 @@ static void testPlugin(void) {
 	cfg_saves[0] = '\0';
 
 	// a long name is cut to fit
-	select_(GB "/Dr. Mario.gb", NUI_ENTRY_ROM, "An extremely long name for a game that goes on and on");
+	select_(GB "/Dr. Mario.gb", MOSAIC_ENTRY_ROM, "An extremely long name for a game that goes on and on");
 	answer_yes = NULL;
 	actions[delete_at].run(NULL);
 	CHECK_STR(asked, "Delete An extremely long name for a game that g...?\nAlso deletes its art.\nThis can't be undone.");
@@ -815,11 +815,11 @@ static void testPlugin(void) {
 	p->quit();
 
 	// an older launcher without the dialogs gets no actions
-	fake.size = offsetof(NUIHost, confirm);
+	fake.size = offsetof(MosaicHost, confirm);
 	p = start();
 	CHECK(action_count == 0);
 	p->quit();
-	fake.size = sizeof(NUIHost);
+	fake.size = sizeof(MosaicHost);
 }
 
 int main(void) {

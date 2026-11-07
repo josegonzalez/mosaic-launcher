@@ -23,14 +23,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "nextui_plugin.h"
+#include "mosaic_plugin.h"
 #include "actions_model.h"
 
 #define ID "game-actions"
 #define MAX_COLLECTIONS 63 // choose takes 64 choices, one is "New collection"
 #define MAX_CLEANUP 256    // collections cleaned of a deleted game
 
-static const NUIHost* host;
+static const MosaicHost* host;
 static char state_dir[GA_PATH_LEN];  // <userdata>/launcher
 static char names_path[GA_PATH_LEN + 32];
 static char collections_dir[GA_PATH_LEN];
@@ -43,11 +43,11 @@ static void say(const char* message) {
 }
 
 static void toast(const char* message) {
-	if (NUI_HOST_HAS(host, toast)) host->toast(message);
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
 
 static void reload(void) {
-	if (NUI_HOST_HAS(host, reload_lists)) host->reload_lists();
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	else host->request_redraw();
 }
 
@@ -59,8 +59,8 @@ static const char* relative(const char* path) {
 }
 
 static const char* selectedPath(void) {
-	const NUIEntry* entry = host->selected_entry();
-	if (!entry || host->entry_type(entry) == NUI_ENTRY_TOGGLE) return NULL;
+	const MosaicEntry* entry = host->selected_entry();
+	if (!entry || host->entry_type(entry) == MOSAIC_ENTRY_TOGGLE) return NULL;
 	return host->entry_path(entry);
 }
 
@@ -90,7 +90,7 @@ static int saveNames(void) {
 	return 0;
 }
 
-static int displayName(const NUIEntry* entry, char* out, size_t size) {
+static int displayName(const MosaicEntry* entry, char* out, size_t size) {
 	if (!names.count) return 0;
 	const char* name = GA_namesGet(&names, relative(host->entry_path(entry)));
 	if (!name) return 0;
@@ -176,7 +176,7 @@ static void forget(const char* target, int is_dir) {
 	char rel_copy[GA_PATH_LEN];
 	snprintf(rel_copy, sizeof(rel_copy), "%s", rel);
 
-	if (NUI_HOST_HAS(host, recent_remove)) {
+	if (MOSAIC_HOST_HAS(host, recent_remove)) {
 		size_t len = strlen(target);
 		for (int i = host->recents_count() - 1; i >= 0; i--) {
 			const char* recent = host->recent_path(i);
@@ -351,21 +351,21 @@ static const struct {
 	const char* name;
 	int button;
 } buttons[] = {
-	{ "Y", NUI_BUTTON_Y },
-	{ "L2", NUI_BUTTON_L2 },
-	{ "R2", NUI_BUTTON_R2 },
+	{ "Y", MOSAIC_BUTTON_Y },
+	{ "L2", MOSAIC_BUTTON_L2 },
+	{ "R2", MOSAIC_BUTTON_R2 },
 };
 
 static void add(const char* id, const char* label, int (*available)(void*), void (*run)(void*), int button) {
 	if (host->register_action(id, label, available, run, NULL) != 0
-			|| host->bind_button(NUI_SCREEN_GAMELIST, button, NUI_TRIGGER_PRESS, id) != 0) {
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, id) != 0) {
 		char message[128];
 		snprintf(message, sizeof(message), "couldn't bind %s", id);
 		say(message);
 	}
 }
 
-static int init(const NUIHost* h) {
+static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(state_dir, sizeof(state_dir), "%s/launcher", host->userdata_path);
 	snprintf(names_path, sizeof(names_path), "%s/game-actions-names.txt", state_dir);
@@ -379,29 +379,29 @@ static int init(const NUIHost* h) {
 	with_saves = settingOn("saves");
 
 	const char* name = host->cfg_get(ID, "button", "Y");
-	int button = NUI_BUTTON_Y;
+	int button = MOSAIC_BUTTON_Y;
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 
 	if (settingOn("rename")) {
-		if (NUI_HOST_HAS(host, keyboard)) add("game-actions.rename", "RENAME", canRename, rename_, button);
+		if (MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.rename", "RENAME", canRename, rename_, button);
 		else say("this launcher has no keyboard; rename is off");
 	}
 	if (settingOn("collections")) {
-		if (NUI_HOST_HAS(host, choose) && NUI_HOST_HAS(host, keyboard)) add("game-actions.collect", "ADD TO COLLECTION", canCollect, collect, button);
+		if (MOSAIC_HOST_HAS(host, choose) && MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.collect", "ADD TO COLLECTION", canCollect, collect, button);
 		else say("this launcher can't show a choice list; add to collection is off");
 	}
 	if (settingOn("delete")) {
-		if (NUI_HOST_HAS(host, confirm) && NUI_HOST_HAS(host, reload_lists)) add("game-actions.delete", "DELETE", canDelete, delete_, button);
+		if (MOSAIC_HOST_HAS(host, confirm) && MOSAIC_HOST_HAS(host, reload_lists)) add("game-actions.delete", "DELETE", canDelete, delete_, button);
 		else say("this launcher has no confirm dialog; delete is off");
 	}
 	return 0;
 }
 
-static const NUIPlugin plugin = {
-	.size = sizeof(NUIPlugin),
-	.api_version = NUI_API_VERSION,
+static const MosaicPlugin plugin = {
+	.size = sizeof(MosaicPlugin),
+	.api_version = MOSAIC_API_VERSION,
 	.id = ID,
 	.init = init,
 	.quit = quit,
@@ -409,7 +409,7 @@ static const NUIPlugin plugin = {
 	.post_return = postReturn,
 };
 
-const NUIPlugin* nextui_plugin_get(const NUIHost* h) {
+const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {
 	(void)h;
 	return &plugin;
 }
