@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -157,6 +157,12 @@ SIMPLE := ../../plugins/simple-mode
 $(BUILD)/test_simple_mode: test_simple_mode.c $(wildcard $(SIMPLE)/*.c $(SIMPLE)/*.h) $(SDK)/mosaic_plugin.h check.h
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) test_simple_mode.c $(SIMPLE)/simple_model.c -o $@
+
+PLATFORM_JUMP := ../../plugins/platform-jump
+
+$(BUILD)/test_platform_jump: test_platform_jump.c $(wildcard $(PLATFORM_JUMP)/*.c $(PLATFORM_JUMP)/*.h) $(SDK)/mosaic_plugin.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) test_platform_jump.c $(PLATFORM_JUMP)/jump_model.c -o $@
 
 clean:
 	rm -rf $(BUILD)
