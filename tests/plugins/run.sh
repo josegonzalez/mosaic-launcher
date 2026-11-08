@@ -584,8 +584,9 @@ run_launcher "$WORK/badger-nowidget.log" "plugin badger: rows " || fail "the lau
 log="$WORK/badger-nowidget.log"
 expect "rows 4, widths 3, widgets 0"
 without=$(top_row Apple "$log")
-[ -n "$without" ] && [ -n "$with_widget" ] && [ $((without - with_widget)) -eq 75 ] \
-	|| fail "the widget didn't take 75 off the top row: $without without, $with_widget with"
+if [ -z "$without" ] || [ -z "$with_widget" ] || [ $((without - with_widget)) -ne 75 ]; then
+	fail "the widget didn't take 75 off the top row: $without without, $with_widget with"
+fi
 [ "$(top_row Banana "$log")" = "$other_row" ] || fail "the widget changed a row below the header"
 grep -qF "row Apple clear of the widget" "$log" && fail "badger saw a widget it didn't ask for"
 
