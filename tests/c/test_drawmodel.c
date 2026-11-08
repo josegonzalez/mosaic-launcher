@@ -63,6 +63,33 @@ static void testOwners(void) {
 	CHECK(DrawReg_remove(&d, DRAW_HOST) == 0);
 }
 
+static void testReadOnly(void) {
+	static int art, lent, mine;
+	CHECK(DrawReg_add(&art, DRAW_HOST, 0) == 0);
+	CHECK(DrawReg_add(&lent, DRAW_HOST, 0) == 0);
+	CHECK(DrawReg_add(&mine, "one", 10) == 0);
+	CHECK(DrawReg_writable(&art) && DrawReg_writable(&lent) && DrawReg_writable(&mine));
+	// only the launcher's own can be made read-only
+	CHECK(DrawReg_lock(&art) == 0);
+	CHECK(DrawReg_lock(&mine) == -1);
+	CHECK(DrawReg_lock(NULL) == -1);
+	static int unknown;
+	CHECK(DrawReg_lock(&unknown) == -1);
+	CHECK(!DrawReg_writable(&art));
+	CHECK(DrawReg_writable(&lent) && DrawReg_writable(&mine));
+	CHECK(!DrawReg_writable(&unknown) && !DrawReg_writable(NULL));
+	// still known, so it can be drawn from, and plugins can't free it
+	CHECK_STR(DrawReg_owner(&art), DRAW_HOST);
+	CHECK(DrawReg_remove(&art, "one") == -1);
+	CHECK(DrawReg_remove(&art, DRAW_HOST) == 0);
+	// a new surface at the same address starts out writable
+	CHECK(DrawReg_add(&art, DRAW_HOST, 0) == 0);
+	CHECK(DrawReg_writable(&art));
+	CHECK(DrawReg_remove(&art, DRAW_HOST) == 0);
+	CHECK(DrawReg_remove(&lent, DRAW_HOST) == 0);
+	CHECK(DrawReg_remove(&mine, "one") == 0);
+}
+
 static void testBudget(void) {
 	CHECK(DrawReg_fits("one", DRAW_PLUGIN_BYTES));
 	CHECK(!DrawReg_fits("one", DRAW_PLUGIN_BYTES + 1));
@@ -238,6 +265,7 @@ static void testColor(void) {
 
 int main(void) {
 	testOwners();
+	testReadOnly();
 	testBudget();
 	testMany();
 	testTruncate();

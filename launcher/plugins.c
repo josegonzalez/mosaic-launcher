@@ -501,6 +501,13 @@ static MosaicSurface* hostSurfaceScale(const char* plugin_id, const MosaicSurfac
 	return isLoaded(plugin_id) ? PluginDraw_surfaceScale(plugin_id, src, w, h, fit) : NULL;
 }
 
+static int hostArtFind(const MosaicEntry* entry, int kind, char* out, size_t size) {
+	return ArtLoader_find((const Entry*)entry, kind, out, size);
+}
+static int hostArtGet(const MosaicEntry* entry, int kind, const MosaicSurface** out) {
+	return ArtLoader_get((const Entry*)entry, kind, out);
+}
+
 // After a plugin's quit, or when its init declines: its surfaces go with it.
 static void freeSurfaces(const char* plugin_id) {
 	int freed = PluginDraw_freeAll(plugin_id);
@@ -581,6 +588,9 @@ static const MosaicHost host = {
 	.text_height = PluginDraw_textHeight,
 	.text_truncate = PluginDraw_textTruncate,
 	.draw_text = PluginDraw_drawText,
+	.art_find = hostArtFind,
+	.art_get = hostArtGet,
+	.art_load = ArtLoader_load,
 };
 
 ///////////////////////////////////////
@@ -1103,6 +1113,11 @@ int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
 		case ART_THUMBNAIL: mosaic_kind = MOSAIC_ART_THUMBNAIL; break;
 		case ART_FOLDER_BG: mosaic_kind = MOSAIC_ART_FOLDER_BG; break;
 		case ART_LIST_BG: mosaic_kind = MOSAIC_ART_LIST_BG; break;
+		case ART_BOX: mosaic_kind = MOSAIC_ART_BOX; break;
+		case ART_BOX_3D: mosaic_kind = MOSAIC_ART_BOX_3D; break;
+		case ART_LOGO: mosaic_kind = MOSAIC_ART_LOGO; break;
+		case ART_SCREENSHOT: mosaic_kind = MOSAIC_ART_SCREENSHOT; break;
+		case ART_BACKDROP: mosaic_kind = MOSAIC_ART_BACKDROP; break;
 		default: return 0;
 	}
 	EACH_PLUGIN_WITH(art_path) {

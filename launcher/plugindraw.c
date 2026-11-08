@@ -10,6 +10,11 @@ static SDL_Surface* known(const MosaicSurface* surface) {
 	return surface && DrawReg_owner(surface) ? (SDL_Surface*)surface : NULL;
 }
 
+// One a plugin can draw on: not one of the art cache's.
+static SDL_Surface* drawable(const MosaicSurface* surface) {
+	return DrawReg_writable(surface) ? (SDL_Surface*)surface : NULL;
+}
+
 static int inRange(int v) {
 	return v >= -COORD_MAX && v <= COORD_MAX;
 }
@@ -66,7 +71,7 @@ MosaicSurface* PluginDraw_surfaceNew(const char* owner, int w, int h) {
 
 // The whole of a regular file, or NULL. Opened without blocking, so a FIFO
 // or device can't stall the main thread.
-static void* readImageFile(const char* path, size_t* size) {
+void* PluginDraw_readImageFile(const char* path, size_t* size) {
 	int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 	if (fd < 0) return NULL;
 	struct stat st;
@@ -93,7 +98,7 @@ static void* readImageFile(const char* path, size_t* size) {
 MosaicSurface* PluginDraw_imageLoad(const char* owner, const char* path) {
 	if (!owner || !owner[0] || !path) return NULL;
 	size_t size = 0;
-	void* data = readImageFile(path, &size);
+	void* data = PluginDraw_readImageFile(path, &size);
 	if (!data) {
 		LOG_warn("plugins: %s can't load %s: not a readable file up to %i MiB\n", owner, path, IMAGE_FILE_MAX / (1024 * 1024));
 		return NULL;
@@ -176,7 +181,7 @@ int PluginDraw_readPixel(const MosaicSurface* surface, int x, int y, MosaicColor
 // shapes and images
 
 static int fill(MosaicSurface* target, const MosaicRect* rect, int radius, MosaicColor color) {
-	SDL_Surface* dst = known(target);
+	SDL_Surface* dst = drawable(target);
 	if (!dst) return -1;
 	MosaicRect r = rect ? *rect : whole(dst);
 	if (!rectOk(&r)) return -1;
@@ -228,7 +233,7 @@ int PluginDraw_fillRoundRect(MosaicSurface* target, const MosaicRect* rect, int 
 }
 
 int PluginDraw_blit(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect, const MosaicRect* dst_rect) {
-	SDL_Surface* dst = known(target);
+	SDL_Surface* dst = drawable(target);
 	SDL_Surface* s = known(src);
 	if (!dst || !s || dst == s) return -1;
 	MosaicRect from = src_rect ? *src_rect : whole(s);
@@ -311,7 +316,7 @@ int PluginDraw_textTruncate(int which, const char* text, int max_width, char* ou
 }
 
 int PluginDraw_drawText(MosaicSurface* target, int which, const char* text, int x, int y, MosaicColor color, int max_width) {
-	SDL_Surface* dst = known(target);
+	SDL_Surface* dst = drawable(target);
 	TTF_Font* f = fontFor(which);
 	if (!dst || !f || !text || max_width < 0 || !inRange(x) || !inRange(y)) return -1;
 	int width;

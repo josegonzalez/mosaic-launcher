@@ -68,7 +68,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `library.c` | entries, directories, recents, and the lists built from the card |
 | `launch.c` | handing off to games and paks, resume state, FN buttons |
 | `nav.c` | the directory stack, restoring the last position, opening entries |
-| `imgloader.c` | background image, thumbnail and selection pill worker threads |
+| `imgloader.c` | the background image, art cache decode and selection pill worker threads |
 | `screens.c` | the screen registry `main()` dispatches through, and state shared with it |
 | `screen_gamelist.c` | game list input and rendering, handing both to the layout slot's owner when there is one, plus the fade shown when launching |
 | `screen_switcher.c` | game switcher input and rendering |
@@ -96,8 +96,10 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `drawmodel.c` | the SDL-free half of plugins' drawing calls: which surfaces exist and which plugin owns each, with its memory budget, text truncation, rounded corners and fitting |
 | `plugindraw.c` | plugins' drawing calls over SDL and stock's fonts, and lending a surface such as the screen to a render hook, clipped to the area it may draw in |
 | `layoutmodel.c` | the SDL-free half of the layout slot: whether the owner's layout is still on after its init and each call, the buttons it sees and consumes, and the area it draws in |
+| `artcache.c` | the SDL-free half of the art cache: decoded images by path and kind, least recently used out first past a byte cap, pins, the worker's load order with prefetches last, and requests dropped by sequence number once the selection moves |
+| `artloader.c` | the art cache over SDL: decoding on the art worker, taking images in and evicting at the start of each frame, the built-in list's thumbnail and its neighbours, and plugins' `art_find`, `art_get` and `art_load` |
 
-See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log.
+See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. `MOSAIC_LAUNCHER_ART_CACHE_BYTES` replaces the art cache's 32 MiB cap, which the eviction case uses to fill a small one. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log.
 
 FN buttons can be bound to a launcher action as well as a pak, with `action:<id>` (eg. `action:gamelist.back`) in place of `pak:<name>`.
 

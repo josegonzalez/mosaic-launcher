@@ -27,6 +27,7 @@ int main (int argc, char *argv[]) {
 
 	// start my threaded image loader :D
 	initImageLoaderPool();
+	ArtLoader_init();
 	// built-in actions first, so plugins can bind buttons to them
 	Screens_init();
 	// before Menu_init: building the root list already runs plugin hooks
@@ -86,7 +87,12 @@ int main (int argc, char *argv[]) {
 		PAD_poll();
 
 		// a plugin changed something on the card (host->reload_lists)
-		if (state.reload) Menu_reload();
+		if (state.reload) {
+			ArtLoader_reset();
+			Menu_reload();
+		}
+		// art decoded since the last frame, and art past the cache's cap dropped
+		ArtLoader_pump(1);
 		// a plugin added or hid a quick menu tile
 		if (state.rebuild_quick) QuickMenu_rebuild();
 
@@ -131,6 +137,9 @@ int main (int argc, char *argv[]) {
 		gsanimdir = ANIM_NONE;
 
 		Screen_get(currentScreen)->handleInput();
+
+		// so a thumbnail decoded meanwhile shows on this frame
+		ArtLoader_pump(0);
 
 		if(state.dirty) {
 			tmpOldScreen = NULL;
@@ -400,7 +409,7 @@ int main (int argc, char *argv[]) {
 	// Now safe to free surfaces after GPU threads are stopped
 	if(blackBG)	SDL_FreeSurface(blackBG);
 	if (folderbgbmp) SDL_FreeSurface(folderbgbmp);
-	if (thumbbmp) SDL_FreeSurface(thumbbmp);
+	ArtLoader_quit(); // thumbbmp is the art cache's
 
 	QuitSettings();
 }

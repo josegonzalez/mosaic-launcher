@@ -1,8 +1,8 @@
 #ifndef IMGLOADER_H
 #define IMGLOADER_H
 
-// Background image and thumbnail loading on worker threads, and the
-// selection pill animation worker. Also holds the render state those
+// Background image loading and the art cache's decoding on worker
+// threads, and the selection pill animation worker. Also holds the render state those
 // workers share with the main loop.
 
 #include <stdbool.h>
@@ -54,6 +54,15 @@ typedef struct AnimTask {
 	SDL_Rect dst;
 } AnimTask;
 
+// A load for the art cache's worker (see artloader.h).
+typedef struct ArtLoad {
+	char path[MAX_PATH];
+	int kind;           // how ArtLoader_decode decodes it
+	SDL_Surface* image; // what it decoded, or NULL
+	size_t bytes;       // what image takes
+	struct ArtLoad* next;
+} ArtLoad;
+
 typedef struct TaskNode {
     LoadBackgroundTask* task;
     struct TaskNode* next;
@@ -104,8 +113,12 @@ extern bool pillanimdone;
 void updatePillTextSurface(const char* entry_name, int move_w, SDL_Color text_color);
 void startLoadFolderBackground(const char* imagePath, BackgroundLoadedCallback callback, void* userData);
 void onBackgroundLoaded(SDL_Surface* surface);
-void startLoadThumb(const char* thumbpath, BackgroundLoadedCallback callback, void* userData);
-void onThumbLoaded(SDL_Surface* surface);
+// Hands path to the art worker, decoded as kind by ArtLoader_decode.
+// Returns 0, or -1 while it still has the last one or isn't running.
+int startLoadArt(const char* path, int kind);
+// The loads the art worker finished since the last call, oldest first,
+// each to free (and its image too, unless kept).
+ArtLoad* takeLoadedArt(void);
 void animPill(AnimTask *task);
 void initImageLoaderPool(void);
 void cleanupImageLoaderPool(void);

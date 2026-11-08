@@ -2,8 +2,9 @@
 
 static TaskNode* taskBGQueueHead = NULL;
 static TaskNode* taskBGQueueTail = NULL;
-static TaskNode* taskThumbQueueHead = NULL;
-static TaskNode* taskThumbQueueTail = NULL;
+static ArtLoad* artWaiting = NULL; // the load the worker takes next
+static ArtLoad* artDoneHead = NULL; // loads it finished, oldest first
+static ArtLoad* artDoneTail = NULL;
 static AnimTaskNode* animTaskQueueHead = NULL;
 static AnimTaskNode* animTtaskQueueTail = NULL;
 SDL_mutex* bgqueueMutex = NULL;
@@ -21,7 +22,7 @@ SDL_mutex* fontMutex = NULL;
 SDL_cond* flipCond = NULL;
 
 static SDL_Thread* bgLoadThread = NULL;
-static SDL_Thread* thumbLoadThread = NULL;
+static SDL_Thread* artLoadThread = NULL;
 static SDL_Thread* animWorkerThread = NULL;
 
 static SDL_atomic_t workerThreadsShutdown; // Flag to signal threads to exit (atomic for thread safety)
@@ -74,7 +75,6 @@ int thumbchanged=0;
 #define MAX_QUEUE_SIZE 1
 
 static int currentBGQueueSize = 0;
-static int currentThumbQueueSize = 0;
 int currentAnimQueueSize = 0;
 
 static void enqueueBGTask(LoadBackgroundTask* task) {
@@ -111,41 +111,6 @@ static void enqueueBGTask(LoadBackgroundTask* task) {
     SDL_CondSignal(bgqueueCond);
     SDL_UnlockMutex(bgqueueMutex);
 }
-static void enqueueThumbTask(LoadBackgroundTask* task) {
-	SDL_LockMutex(thumbqueueMutex);
-    TaskNode* node = (TaskNode*)malloc(sizeof(TaskNode));
-    node->task = task;
-    node->next = NULL;
-
-    // If queue is full, drop the oldest task (head)
-    if (currentThumbQueueSize >= MAX_QUEUE_SIZE) {
-        TaskNode* oldNode = taskThumbQueueHead;
-        if (oldNode) {
-            taskThumbQueueHead = oldNode->next;
-            if (!taskThumbQueueHead) {
-                taskThumbQueueTail = NULL;
-            }
-            if (oldNode->task) {
-                free(oldNode->task);  // Only if task was malloc'd
-            }
-            free(oldNode);
-            currentThumbQueueSize--;
-        }
-    }
-
-    // Enqueue the new task
-    if (taskThumbQueueTail) {
-        taskThumbQueueTail->next = node;
-        taskThumbQueueTail = node;
-    } else {
-        taskThumbQueueHead = taskThumbQueueTail = node;
-    }
-
-    currentThumbQueueSize++;
-    SDL_CondSignal(thumbqueueCond);
-    SDL_UnlockMutex(thumbqueueMutex);
-}
-
 // Worker thread
 static int BGLoadWorker(void* unused) {
     while (!SDL_AtomicGet(&workerThreadsShutdown)) {
@@ -187,43 +152,32 @@ static int BGLoadWorker(void* unused) {
     }
     return 0;
 }
-static int ThumbLoadWorker(void* unused) {
+// The art cache's decode worker: one load at a time, handed over by the
+// main thread, which takes the finished ones back with takeLoadedArt.
+static int ArtLoadWorker(void* unused) {
     while (!SDL_AtomicGet(&workerThreadsShutdown)) {
         SDL_LockMutex(thumbqueueMutex);
-        while (!taskThumbQueueHead && !SDL_AtomicGet(&workerThreadsShutdown)) {
+        while (!artWaiting && !SDL_AtomicGet(&workerThreadsShutdown)) {
         	SDL_CondWait(thumbqueueCond, thumbqueueMutex);
         }
         if (SDL_AtomicGet(&workerThreadsShutdown)) {
             SDL_UnlockMutex(thumbqueueMutex);
             break;
         }
-        TaskNode* node = taskThumbQueueHead;
-        taskThumbQueueHead = node->next;
-        if (!taskThumbQueueHead) taskThumbQueueTail = NULL;
+        ArtLoad* load = artWaiting;
+        artWaiting = NULL;
         SDL_UnlockMutex(thumbqueueMutex);
-		// give processor lil space in between queue items for other shit
-		//SDL_Delay(100);
-        LoadBackgroundTask* task = node->task;
-        free(node);
 
-        SDL_Surface* result = NULL;
-        if (access(task->imagePath, F_OK) == 0) {
-            SDL_Surface* image = IMG_Load(task->imagePath);
-            if (image) {
-                SDL_Surface* imageRGBA = SDL_ConvertSurfaceFormat(image, screen->format->format, 0);
-                SDL_FreeSurface(image);
-                result = imageRGBA;
-            }
-        }
+        load->image = ArtLoader_decode(load->path, load->kind);
+        load->bytes = load->image ? (size_t)load->image->pitch * load->image->h : 0;
 
-        if (task->callback) {
-			task->callback(result);
-		}
-        free(task);
 		SDL_LockMutex(thumbqueueMutex);
-		if (!taskThumbQueueHead) taskThumbQueueTail = NULL;
-		currentThumbQueueSize--;  // <-- add this
+		load->next = NULL;
+		if (artDoneTail) artDoneTail->next = load;
+		else artDoneHead = load;
+		artDoneTail = load;
 		SDL_UnlockMutex(thumbqueueMutex);
+		setNeedDraw(1);
     }
     return 0;
 }
@@ -252,47 +206,35 @@ void onBackgroundLoaded(SDL_Surface* surface) {
 	SDL_UnlockMutex(bgMutex);
 }
 
-void startLoadThumb(const char* thumbpath, BackgroundLoadedCallback callback, void* userData) {
-    LoadBackgroundTask* task = malloc(sizeof(LoadBackgroundTask));
-    if (!task) return;
-
-    snprintf(task->imagePath, sizeof(task->imagePath), "%s", thumbpath);
-    task->callback = callback;
-    task->userData = userData;
-    enqueueThumbTask(task);
+int startLoadArt(const char* path, int kind) {
+	if (!thumbqueueMutex) return -1;
+	ArtLoad* load = calloc(1, sizeof(ArtLoad));
+	if (!load) return -1;
+	snprintf(load->path, sizeof(load->path), "%s", path);
+	load->kind = kind;
+	SDL_LockMutex(thumbqueueMutex);
+	int busy = artWaiting != NULL;
+	if (!busy) {
+		artWaiting = load;
+		SDL_CondSignal(thumbqueueCond);
+	}
+	SDL_UnlockMutex(thumbqueueMutex);
+	if (busy) free(load);
+	return busy ? -1 : 0;
 }
-void onThumbLoaded(SDL_Surface* surface) {
-	SDL_LockMutex(thumbMutex);
-	thumbchanged = 1;
-	if (thumbbmp) SDL_FreeSurface(thumbbmp);
-    if (!surface) {
-		thumbbmp = NULL;
-		SDL_UnlockMutex(thumbMutex);
-		return;
+
+ArtLoad* takeLoadedArt(void) {
+	if (!thumbqueueMutex) {
+		// the worker has stopped
+		ArtLoad* done = artDoneHead;
+		artDoneHead = artDoneTail = NULL;
+		return done;
 	}
-
-
-    thumbbmp = surface;
-	int img_w = thumbbmp->w;
-	int img_h = thumbbmp->h;
-	double aspect_ratio = (double)img_h / img_w;
-	int max_w = (int)(screen->w * CFG_getGameArtWidth());
-	int max_h = (int)(screen->h * 0.6);
-	int new_w = max_w;
-	int new_h = (int)(new_w * aspect_ratio);
-
-	if (new_h > max_h) {
-		new_h = max_h;
-		new_w = (int)(new_h / aspect_ratio);
-	}
-
-	GFX_ApplyRoundedCorners_8888(
-		thumbbmp,
-		&(SDL_Rect){0, 0, thumbbmp->w, thumbbmp->h},
-		SCALE1((float)CFG_getThumbnailRadius() * ((float)img_w / (float)new_w))
-	);
-	setNeedDraw(1);
-	SDL_UnlockMutex(thumbMutex);
+	SDL_LockMutex(thumbqueueMutex);
+	ArtLoad* done = artDoneHead;
+	artDoneHead = artDoneTail = NULL;
+	SDL_UnlockMutex(thumbqueueMutex);
+	return done;
 }
 
 SDL_Rect pillRect;
@@ -435,7 +377,7 @@ void initImageLoaderPool() {
 	flipCond = SDL_CreateCond();
 
     bgLoadThread = SDL_CreateThread(BGLoadWorker, "BGLoadWorker", NULL);
-    thumbLoadThread = SDL_CreateThread(ThumbLoadWorker, "ThumbLoadWorker", NULL);
+    artLoadThread = SDL_CreateThread(ArtLoadWorker, "ArtLoadWorker", NULL);
 	animWorkerThread = SDL_CreateThread(animWorker, "animWorker", NULL);
 }
 
@@ -454,10 +396,13 @@ void cleanupImageLoaderPool() {
 		SDL_WaitThread(bgLoadThread, NULL);
 		bgLoadThread = NULL;
 	}
-	if (thumbLoadThread) {
-		SDL_WaitThread(thumbLoadThread, NULL);
-		thumbLoadThread = NULL;
+	if (artLoadThread) {
+		SDL_WaitThread(artLoadThread, NULL);
+		artLoadThread = NULL;
 	}
+	// a load handed over but never started
+	free(artWaiting);
+	artWaiting = NULL;
 	if (animWorkerThread) {
 		SDL_WaitThread(animWorkerThread, NULL);
 		animWorkerThread = NULL;

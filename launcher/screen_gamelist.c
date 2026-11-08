@@ -325,6 +325,22 @@ void GameList_handleInput(void) {
 		Bindings_dispatchShared(e.shared, e.shared_count, openEntryMenu);
 }
 
+// The built-in list's art for entry: its thumbnail, from plugins' art_path
+// or stock's .media folder, or else the first of a box, 3D box or
+// screenshot that a plugin supplies. Returns 1 with the path of the first
+// that exists.
+static int listArt(Entry* entry, char* out, size_t size) {
+	for (int i = 0, kind; (kind = Art_listKind(i)) >= 0; i++) {
+		if (!Plugins_artPath(entry, kind, out, size)) {
+			if (kind != ART_THUMBNAIL) continue;
+			resolveArt(ART_THUMBNAIL, entry->path, out, size);
+		}
+		if (exists(out)) return 1;
+	}
+	out[0] = '\0';
+	return 0;
+}
+
 // Decides what the next render draws: whether names show, which background
 // and thumbnail to load, and how much width the thumbnail takes. Draws
 // nothing.
@@ -377,15 +393,28 @@ void GameList_update(void) {
 	if (total > 0) {
 		if(CFG_getShowGameArt()) {
 			char thumbpath[1024];
-			if (!Plugins_artPath(entry, ART_THUMBNAIL, thumbpath, sizeof(thumbpath)))
-				resolveArt(ART_THUMBNAIL, entry->path, thumbpath, sizeof(thumbpath));
+			int found = listArt(entry, thumbpath, sizeof(thumbpath));
 			had_thumb = 0;
-			startLoadThumb(thumbpath, onThumbLoaded, NULL);
+			if (Plugins_hasLayout()) {
+				// a plugin layout draws its own art; none is left to come back with the built-in list
+				ArtLoader_showThumb("");
+			}
+			else {
+				ArtLoader_showThumb(found ? thumbpath : "");
+				// the neighbours, ready for the next move
+				int count = state.top->entries->count;
+				for (int side = -1; side <= 1 && count > 1; side += 2) {
+					int i = (state.top->selected + side + count) % count;
+					if (side == 1 && i == (state.top->selected - 1 + count) % count) break;
+					char path[1024];
+					if (listArt(state.top->entries->items[i], path, sizeof(path))) ArtLoader_prefetchThumb(path);
+				}
+			}
 			int max_w = (int)(screen->w - (screen->w * CFG_getGameArtWidth()));
 			int max_h = (int)(screen->h * 0.6);
 			int new_w = max_w;
 			int new_h = max_h;
-			if(exists(thumbpath)) {
+			if(found) {
 				ox = (int)(max_w) - SCALE1(BUTTON_MARGIN*5);
 				had_thumb = 1;
 				snprintf(update_art, sizeof(update_art), "%s", thumbpath);

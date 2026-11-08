@@ -51,3 +51,8 @@ void resolveArt(int kind, const char* subject, char* out, size_t size) {
 			break;
 	}
 }
+
+int Art_listKind(int i) {
+	static const int kinds[] = { ART_THUMBNAIL, ART_BOX, ART_BOX_3D, ART_SCREENSHOT };
+	return i >= 0 && i < (int)(sizeof(kinds) / sizeof(kinds[0])) ? kinds[i] : -1;
+}

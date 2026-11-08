@@ -83,8 +83,9 @@ int Plugins_preLaunch(const char* path, int type);
 // to launch as stock does.
 const LaunchCmd* Plugins_launchReplacement(void);
 
-// The first plugin's image for an entry, for ART_THUMBNAIL, ART_FOLDER_BG or
-// ART_LIST_BG (see art.h). Returns 1 if a plugin answered.
+// The first plugin's image for an entry, for ART_THUMBNAIL, ART_FOLDER_BG,
+// ART_LIST_BG or one of the kinds only plugins supply (see art.h). Returns
+// 1 if a plugin answered.
 int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size);
 
 // The first plugin's new full path for a recent whose file is missing.

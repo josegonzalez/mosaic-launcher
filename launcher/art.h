@@ -14,8 +14,19 @@ enum ArtKind {
 	ART_QUICK_BG,       // subject: tile name+state  -> <sd>/.media/quick_<subject>.png
 	ART_QUICK_FALLBACK, // subject: unused           -> <sd>/.media/quick.png
 	ART_QUICK_ICON,     // subject: tile name        -> <sd>/.system/res/<subject>@<scale>x.png
+	// only plugins' art_path supplies these, so they resolve to ""
+	ART_BOX,
+	ART_BOX_3D,
+	ART_LOGO,
+	ART_SCREENSHOT,
+	ART_BACKDROP,
 };
 
 void resolveArt(int kind, const char* subject, char* out, size_t size);
+
+// The kinds the built-in list looks through for a game's art, in order,
+// showing the first that exists: its thumbnail, then a box, 3D box or
+// screenshot from a plugin. Returns -1 past the last.
+int Art_listKind(int i);
 
 #endif

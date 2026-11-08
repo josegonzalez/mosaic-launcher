@@ -9,6 +9,7 @@ typedef struct Recorded {
 	const void* surface;
 	char owner[64];
 	size_t bytes;
+	int read_only;
 } Recorded;
 
 static Recorded* recorded = NULL;
@@ -54,7 +55,20 @@ int DrawReg_add(const void* surface, const char* owner, size_t bytes) {
 	r->surface = surface;
 	strcpy(r->owner, owner);
 	r->bytes = bytes;
+	r->read_only = 0;
 	return 0;
+}
+
+int DrawReg_lock(const void* surface) {
+	int i = surface ? find(surface) : -1;
+	if (i < 0 || strcmp(recorded[i].owner, DRAW_HOST) != 0) return -1;
+	recorded[i].read_only = 1;
+	return 0;
+}
+
+int DrawReg_writable(const void* surface) {
+	int i = surface ? find(surface) : -1;
+	return i >= 0 && !recorded[i].read_only;
 }
 
 const char* DrawReg_owner(const void* surface) {

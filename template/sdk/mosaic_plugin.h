@@ -81,11 +81,26 @@ enum MosaicTrigger {
 	MOSAIC_TRIGGER_REPEAT,
 };
 
-// Images art_path can supply.
+// Images art_path can supply, and art_find and art_get look up.
 enum MosaicArtKind {
 	MOSAIC_ART_THUMBNAIL, // a game's art beside the list
 	MOSAIC_ART_FOLDER_BG, // the background while a folder is selected
 	MOSAIC_ART_LIST_BG,   // the background while a game in a folder is selected
+	// Added with art_get. The launcher has no place of its own for these,
+	// so only plugins supply them; the built-in list shows the first of a
+	// box, 3D box or screenshot when a game has no thumbnail.
+	MOSAIC_ART_BOX,        // the front of a game's box
+	MOSAIC_ART_BOX_3D,     // its box, drawn in 3D
+	MOSAIC_ART_LOGO,       // its wheel or logo, usually on a clear background
+	MOSAIC_ART_SCREENSHOT, // a screenshot or title screen
+	MOSAIC_ART_BACKDROP,   // wide art to draw behind the list, such as fan art
+};
+
+// What art_get and art_load return.
+enum MosaicArtState {
+	MOSAIC_ART_MISSING = -1, // no image: none found, or it can't be decoded
+	MOSAIC_ART_LOADING = 0,  // being decoded off the main thread
+	MOSAIC_ART_READY = 1,    // the image is in *out
 };
 
 // The quick menu's rows a plugin tile can go in.
@@ -180,7 +195,7 @@ typedef struct MosaicListView {
 	int letter_count;       // how many groups the letter index has
 	int show_names;         // 0 when the folder's art stands in for names, as stock does with Show folder names at root off
 	int show_art;           // 1 while Show game art is on in Settings
-	const char* art;        // the selected entry's thumbnail when show_art is 1 and it exists, else ""
+	const char* art;        // the selected entry's art as the built-in list shows it, when show_art is 1 and it exists, else ""
 	MosaicRect area;        // where the layout draws: the screen above the button hints
 	MosaicRect status;      // the status pill (clock, battery, wifi) in area's top right, already drawn; leave it clear
 } MosaicListView;
@@ -503,6 +518,34 @@ typedef struct MosaicHost {
 	int (*text_height)(int font);
 	int (*text_truncate)(int font, const char* text, int max_width, char* out, size_t size);
 	int (*draw_text)(MosaicSurface* target, int font, const char* text, int x, int y, MosaicColor color, int max_width);
+
+	// Art; check for it with MOSAIC_HOST_HAS(host, art_get). art_find
+	// writes where an entry's image of a kind (an enum MosaicArtKind) is,
+	// as plugins' art_path hooks in load order and then the launcher's own
+	// places answer, and returns 1 when that file exists, or 0 when it
+	// doesn't or nothing answers (writing "").
+	//
+	// art_get gives that image from the launcher's art cache: it returns
+	// MOSAIC_ART_READY with the image in *out, MOSAIC_ART_LOADING while it's
+	// decoded off the main thread (the launcher redraws once it's in), or
+	// MOSAIC_ART_MISSING when art_find finds no file or it can't be decoded.
+	// art_load does the same for an image by its full path, such as a save
+	// state's preview. Ask each frame you draw: when the selection moves,
+	// loads asked for before it that haven't finished are dropped. Asking
+	// for the selected entry's art also loads that kind for the entries
+	// either side of it.
+	//
+	// The images are the launcher's, read-only: draw them with blit, read
+	// them, or copy them with surface_scale, but don't keep them. One stays
+	// valid until the next frame starts, after which it may have been
+	// dropped and calls refuse it. surface_free and drawing onto one
+	// return -1. The cache holds up to 32 MiB of decoded images for the
+	// launcher and every plugin, apart from each plugin's own 32 MiB,
+	// dropping the least recently used first. Each image is a PNG, JPEG or
+	// BMP regular file up to 16 MiB and 4096 pixels a side.
+	int (*art_find)(const MosaicEntry* entry, int kind, char* out, size_t size);
+	int (*art_get)(const MosaicEntry* entry, int kind, const MosaicSurface** out);
+	int (*art_load)(const char* path, const MosaicSurface** out);
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -548,7 +591,8 @@ typedef struct MosaicPlugin {
 	// Art. Writes the image to use for an entry (an enum MosaicArtKind) and
 	// returns 1, or returns 0 to let the launcher look in its usual place.
 	// The first plugin to answer wins. The image doesn't have to exist; the
-	// launcher falls back as it would for its own path.
+	// launcher falls back as it would for its own path. Return 0 for kinds
+	// you don't know: newer launchers ask for more.
 	int (*art_path)(const MosaicEntry* entry, int kind, char* out, size_t size);
 
 	// The root slot. A plugin with slots=root in its plugin.txt can return

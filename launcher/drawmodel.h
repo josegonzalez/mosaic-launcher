@@ -23,6 +23,14 @@ int DrawReg_fits(const char* owner, size_t bytes);
 // The owner of a recorded surface, or NULL for one that isn't.
 const char* DrawReg_owner(const void* surface);
 
+// Makes a DRAW_HOST surface read-only to plugins, such as an image in the
+// art cache: they can draw it and read it, but not draw on it. Returns 0,
+// or -1 for a surface that isn't recorded or isn't DRAW_HOST's.
+int DrawReg_lock(const void* surface);
+
+// 1 when a recorded surface can be drawn on.
+int DrawReg_writable(const void* surface);
+
 // Forgets a surface owner recorded. Returns 0, or -1 when owner didn't.
 int DrawReg_remove(const void* surface, const char* owner);
 

@@ -45,5 +45,6 @@
 #include "settings.h"
 #include "listsort.h"
 #include "layoutmodel.h"
+#include "artloader.h"
 
 #endif

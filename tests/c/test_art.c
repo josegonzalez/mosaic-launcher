@@ -43,5 +43,21 @@ int main(void) {
 	resolveArt(ART_FOLDER_BG, SDCARD_PATH "/Roms/Game Boy (GB)", small, sizeof(small));
 	CHECK(strlen(small) == sizeof(small) - 1);
 
+	// the kinds only plugins supply have no place of their own
+	int only_plugins[] = { ART_BOX, ART_BOX_3D, ART_LOGO, ART_SCREENSHOT, ART_BACKDROP };
+	for (size_t i = 0; i < sizeof(only_plugins) / sizeof(only_plugins[0]); i++) {
+		strcpy(out, "x");
+		resolveArt(only_plugins[i], SDCARD_PATH "/Roms/Game Boy (GB)/Tetris (World).gb", out, sizeof(out));
+		CHECK_STR(out, "");
+	}
+
+	// the built-in list's order: the thumbnail first, never a logo or backdrop
+	CHECK(Art_listKind(0) == ART_THUMBNAIL);
+	CHECK(Art_listKind(1) == ART_BOX);
+	CHECK(Art_listKind(2) == ART_BOX_3D);
+	CHECK(Art_listKind(3) == ART_SCREENSHOT);
+	CHECK(Art_listKind(4) == -1);
+	CHECK(Art_listKind(-1) == -1);
+
 	CHECK_DONE();
 }

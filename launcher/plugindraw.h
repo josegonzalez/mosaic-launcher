@@ -36,6 +36,11 @@ int PluginDraw_textHeight(int font);
 int PluginDraw_textTruncate(int font, const char* text, int max_width, char* out, size_t size);
 int PluginDraw_drawText(MosaicSurface* target, int font, const char* text, int x, int y, MosaicColor color, int max_width);
 
+// The whole of a regular file of up to 16 MiB, to free, or NULL. Opened
+// without blocking, so a FIFO or device can't stall the caller; safe off
+// the main thread.
+void* PluginDraw_readImageFile(const char* path, size_t* size);
+
 // For render hooks: lends surface (such as the screen) to plugins, who can
 // draw on it only inside clip (NULL for all of it), until
 // PluginDraw_unlend. Plugins can't free it. Returns NULL if it's already
