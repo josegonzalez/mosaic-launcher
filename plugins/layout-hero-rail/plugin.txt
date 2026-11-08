@@ -1,0 +1,10 @@
+id=layout-hero-rail
+name=Hero and card rail layout
+api=1
+slots=layout
+# how tall the cards along the bottom are: 22, 28 or 34 percent of the screen above the hints
+setting.cards=choice|Card size|medium|small,medium,large
+# how much the hero art is tinted toward the theme's accent colour, in percent
+setting.tint=choice|Tint|20|0,20,40
+# how long the logo takes to fade in once the selection settles, in milliseconds
+setting.fade=choice|Logo fade|300|0,150,300,600

@@ -1,5 +1,5 @@
 // A plugin that reads a layout's cells back from the screen, for the
-// bundled layout-grid. It adds a <sd>/Peeker folder of three games to the
+// bundled layouts. It adds a <sd>/Peeker folder of three games to the
 // root and opens it, and as a row decorator, which a layout runs on each
 // cell it draws, it reads each cell in that folder: the colour at the
 // middle of the art (the cell above its name) and just inside its top

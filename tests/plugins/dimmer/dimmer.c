@@ -9,6 +9,8 @@
 // Each push into Inner logs pixels down the left edge of the old frame,
 // where the list leaves the background clear, and one at the top right,
 // with the game that was selected. Pushes are drawn with no transition.
+// With probe=<x>,<y> in its config, it logs the pixel there too, on a
+// line of its own.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -23,6 +25,7 @@ static char folder[512];
 static char inner[600];
 static const char* backdrop = "";
 static const char* shot = "";
+static int probe_x = -1, probe_y = -1;
 static const char* names[] = { "Art", "Shot", "Bare" };
 static int game = 0;   // the one to select next
 static int step = 0;
@@ -89,6 +92,7 @@ static int transitionBegin(MosaicTransition* t) {
 		say("from %s top %s quarter %s fade %s low %s right %s, theme %06X", names[game - 1], pixel(t->old_frame, 2, 2),
 			pixel(t->old_frame, 2, h / 4), pixel(t->old_frame, 2, h * 5 / 8), pixel(t->old_frame, 2, h * 7 / 8),
 			pixel(t->old_frame, w - 2, 2), bg < 0 ? 0 : (unsigned)bg);
+		if (probe_x >= 0) say("probe %s %s", names[game - 1], pixel(t->old_frame, probe_x, probe_y));
 	}
 	return MOSAIC_STYLE_OFF;
 }
@@ -138,6 +142,7 @@ static int init(const MosaicHost* h) {
 	snprintf(inner, sizeof(inner), "%s/Inner", folder);
 	backdrop = host->cfg_get(ID, "backdrop", "");
 	shot = host->cfg_get(ID, "shot", "");
+	if (sscanf(host->cfg_get(ID, "probe", ""), "%d,%d", &probe_x, &probe_y) != 2) probe_x = probe_y = -1;
 	return 0;
 }
 
