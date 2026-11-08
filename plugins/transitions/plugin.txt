@@ -1,0 +1,10 @@
+id=transitions
+name=Transition styles
+api=1
+slots=transition
+# how folders push and pop and the game switcher comes in; only while the
+# launcher's Menu transitions setting is on, as with it off there are none
+setting.style=choice|Style|slide|stock,slide,fade,slide_fade,off
+# fast 150 ms, normal 250 ms, slow 500 ms
+setting.speed=choice|Speed|normal|fast,normal,slow
+setting.ease=choice|Ease|out|linear,in,out,in_out
