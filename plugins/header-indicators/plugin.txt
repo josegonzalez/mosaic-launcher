@@ -1,0 +1,11 @@
+id=header-indicators
+name=Header indicators
+api=1
+# free space on the card, such as 12.3G, looked at every 5 seconds
+setting.storage=toggle|Free storage|on
+# a dot while an SSH server listens on port 22; never on desktop
+setting.ssh=toggle|SSH dot|off
+# the launcher's frames a second
+setting.fps=toggle|FPS|off
+# a short name to show, such as whose device it is; empty for none
+setting.profile=text|Profile badge|
