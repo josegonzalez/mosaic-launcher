@@ -984,7 +984,7 @@ rm -rf "$WORK/plugins/layout-carousel.plugin" "$WORK/plugins/art-boxart.plugin" 
 # label, and banana and Cherry, with no art, get letter labels; peeker
 # reads each cartridge back as a row decorator, from the top of its grey
 # body. With art-boxart on, Cherry's box stands in for a thumbnail, and
-# its settings set one shelf and no lift animation.
+# its settings set three shelves and no lift animation.
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" layout-shelf art-boxart >/dev/null || fail "building layout-shelf"
 build_plugin peeker 'id=peeker\nname=Peeker\napi=1\n'
 PEEK_DIR="$CARD/Peeker"
@@ -1008,14 +1008,14 @@ grep -qE "plugin peeker: cell Cherry middle [0-9A-F]{6} top B4B4BC, accent 0, in
 grep -qF "plugins: layout-shelf's" "$log" && fail "layout-shelf's layout was turned off"
 grep -qF "plugins: peeker's" "$log" && fail "peeker's decorator was turned off"
 
-printf 'shelves=1\nanimate=off\n' >"$STATE/layout-shelf.cfg"
+printf 'shelves=3\nanimate=off\n' >"$STATE/layout-shelf.cfg"
 mkdir -p "$PEEK_DIR/.media/boxart2d"
 cp "$ROOT/tests/plugins/peeker/art.png" "$PEEK_DIR/.media/boxart2d/Cherry.png"
 printf 'art-boxart=on\nlayout-shelf=on\npeeker=on\nslot.layout=layout-shelf\n' >"$STATE/plugins.txt"
 run_launcher "$WORK/layout-shelf-set.log" "plugin peeker: cell Apple middle 00FF00" "plugin peeker: cell Cherry middle 00FF00" \
-	|| fail "the launcher exited early with layout-shelf set to one shelf"
+	|| fail "the launcher exited early with layout-shelf set to three shelves"
 log="$WORK/layout-shelf-set.log"
-grep -qE "plugin layout-shelf: 1 shelf of [0-9]+ GB cartridges" "$log" || fail "layout-shelf's settings weren't used: $(grep "plugin layout-shelf:" "$log")"
+grep -qE "plugin layout-shelf: 3 shelves of [0-9]+ GB cartridges" "$log" || fail "layout-shelf's settings weren't used: $(grep "plugin layout-shelf:" "$log")"
 expect "cell Cherry middle 00FF00 top B4B4BC, accent 0, ink 1, named 1"
 rm -rf "$WORK/plugins/peeker.plugin" "$PEEK_DIR" "$STATE/layout-shelf.cfg"
 
