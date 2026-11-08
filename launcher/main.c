@@ -198,6 +198,8 @@ int main (int argc, char *argv[]) {
 		gsanimdir = ANIM_NONE;
 
 		Screen_get(currentScreen)->handleInput();
+		// plugins' screens close once a built-in screen opened over them
+		Plugins_screensCheck();
 
 		// so a thumbnail decoded meanwhile shows on this frame
 		ArtLoader_pump(0);
@@ -238,13 +240,20 @@ int main (int argc, char *argv[]) {
 				GFX_blitBottomCurtain(screen);
 			}
 
-			ow = GFX_blitHardwareGroup(screen, show_setting);
-			// shell paks' status pill, then plugins' header widgets, beside it
-			HeaderRow header;
-			HeaderRow_init(&header, screen->w, SCALE1(PADDING), SCALE1(BUTTON_MARGIN), ow, SCALE1(PILL_SIZE));
-			StatusPill_place(screen, &header);
-			Plugins_header(screen, &header);
-			header_w = HeaderRow_width(&header);
+			// a plugin screen can take the whole screen, header and all
+			if (currentScreen == SCREEN_PLUGIN && (Plugins_screenFlags() & MOSAIC_SCREEN_FULL)) {
+				ow = 0;
+				header_w = 0;
+			}
+			else {
+				ow = GFX_blitHardwareGroup(screen, show_setting);
+				// shell paks' status pill, then plugins' header widgets, beside it
+				HeaderRow header;
+				HeaderRow_init(&header, screen->w, SCALE1(PADDING), SCALE1(BUTTON_MARGIN), ow, SCALE1(PILL_SIZE));
+				StatusPill_place(screen, &header);
+				Plugins_header(screen, &header);
+				header_w = HeaderRow_width(&header);
+			}
 			const Screen* active = Screen_get(currentScreen);
 			if (state.startgame && !active->rendersWhileLaunching) LaunchFade_render();
 			else {
@@ -288,8 +297,10 @@ int main (int argc, char *argv[]) {
 				}
 				SDL_UnlockMutex(animMutex);
 			}
-			if(!state.startgame) // dont flip if game gonna start
+			if(!state.startgame) { // dont flip if game gonna start
+				Overlays_render();
 				GFX_flip(screen);
+			}
 			Plugins_started(); // a frame is up, so plugins survived starting
 
 			state.dirty = 0;
@@ -298,11 +309,15 @@ int main (int argc, char *argv[]) {
 			Uint32 now = SDL_GetTicks();
 			Uint32 frame_start = now;
 			static char cached_display_name[256] = "";
+			// a plugin screen has none of the game list's layers; they wait for it
+			int on_plugin = currentScreen == SCREEN_PLUGIN;
 			SDL_LockMutex(bgMutex);
-			if(folderbgchanged && Background_layer()) folderbgchanged = 0;
+			if(!on_plugin && folderbgchanged && Background_layer()) folderbgchanged = 0;
 			SDL_UnlockMutex(bgMutex);
 			SDL_LockMutex(thumbMutex);
-			if(list_layout_drawn && thumbchanged) {
+			if(on_plugin) {
+				// kept changed for the game list
+			} else if(list_layout_drawn && thumbchanged) {
 				GFX_clearLayers(LAYER_THUMBNAIL);
 				thumbchanged = 0;
 			} else if(thumbchanged) {
@@ -311,14 +326,14 @@ int main (int argc, char *argv[]) {
 			}
 			SDL_UnlockMutex(thumbMutex);
 			SDL_LockMutex(animMutex);
-			if (getAnimationDraw()) {
+			if (!on_plugin && getAnimationDraw()) {
 				GFX_clearLayers(LAYER_TRANSITION);
 				if (list_show_selected_name && !list_layout_drawn)
 					GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 				setAnimationDraw(0);
 			}
 			SDL_UnlockMutex(animMutex);
-			if (currentScreen != SCREEN_GAMESWITCHER && currentScreen != SCREEN_QUICKMENU && currentScreen != SCREEN_MODAL) {
+			if (currentScreen != SCREEN_GAMESWITCHER && currentScreen != SCREEN_QUICKMENU && currentScreen != SCREEN_MODAL && !on_plugin) {
 				if(is_scrolling && pillanimdone && currentAnimQueueSize < 1) {
 					int ow = GFX_blitHardwareGroup(screen, show_setting);
 					Entry* entry = state.top->entries->items[state.top->selected];
@@ -429,6 +444,7 @@ int main (int argc, char *argv[]) {
 	Background_quit();
 	ArtLoader_quit(); // thumbbmp is the art cache's
 	if (swap_copy) SDL_FreeSurface(swap_copy);
+	Overlays_quit();
 
 	QuitSettings();
 }

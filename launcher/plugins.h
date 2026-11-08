@@ -207,6 +207,36 @@ void Plugins_tick(unsigned long now);
 // on another entry. Called every frame after input, before drawing.
 void Plugins_selection(unsigned long now);
 
+// Plugins' screens (see screens.h for SCREEN_PLUGIN, the one the top of
+// them shows as). The top screen's input, once a frame while it shows: a
+// close, an error or an input hook's MOSAIC_SCREEN_CLOSE goes back to what
+// it opened over.
+void Plugins_screenInput(void);
+
+// Lends surface to the top screen's render, with view.
+void Plugins_screenRender(struct SDL_Surface* surface, const MosaicScreenView* view);
+
+// The top screen's MosaicScreenHooks flags, or 0 with none open.
+int Plugins_screenFlags(void);
+
+// What shows, as host->current_screen returns it.
+const char* Plugins_currentScreen(void);
+
+// Once a frame after input: closes the open screens, running their exit,
+// once a built-in screen opened over them, such as from an FN button.
+void Plugins_screensCheck(void);
+
+// Closes every open screen, running their exit, as for a launch or quit.
+void Plugins_screensClose(void);
+
+// 1 when plugins' overlays draw over screen (a SCREEN_* id): one has
+// overlay_render, and screen takes them.
+int Plugins_overlaysOver(int screen);
+
+// Every plugin's overlay_render, in load order, on surface, lent for the
+// call. One that fails logs and is left out from then on.
+void Plugins_overlays(struct SDL_Surface* surface, const MosaicScreenView* view);
+
 void Plugins_beforeSleep(void);
 void Plugins_afterResume(void);
 void Plugins_beforePoweroff(void);

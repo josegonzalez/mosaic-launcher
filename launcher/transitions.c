@@ -90,10 +90,13 @@ int Transition_launch(void) {
 }
 
 void Transition_slide(SDL_Surface* oldScreen, int direction) {
-	// the background slot's owner's too, so the new frame has it
-	SDL_LockMutex(bgMutex);
-	Background_layer();
-	SDL_UnlockMutex(bgMutex);
+	// the background slot's owner's too, so the new frame has it; a plugin
+	// screen has none
+	if (currentScreen != SCREEN_PLUGIN) {
+		SDL_LockMutex(bgMutex);
+		Background_layer();
+		SDL_UnlockMutex(bgMutex);
+	}
 	folderbgchanged = 1;
 	GFX_clearLayers(LAYER_TRANSITION);
 	// Draw the selection pill at its target position before capturing the new
@@ -163,7 +166,7 @@ void Transition_showPreview(SDL_Surface* bmp, SDL_Rect dst, int from, int slide)
 			GFX_animateSurface(bmp,ax-screen->w,ay,ax,ay,aw,ah,CFG_getMenuTransitions() ? 80:20,0,255,LAYER_ALL);
 
 		GFX_drawOnLayer(bmp,ax,ay,aw,ah,1.0f,0,LAYER_BACKGROUND);
-	} else if(from == SCREEN_QUICKMENU) {
+	} else if(from == SCREEN_QUICKMENU || from == SCREEN_PLUGIN) {
 		GFX_flipHidden();
 		GFX_drawOnLayer(blackBG,0,0,screen->w, screen->h,1.0f,0,LAYER_BACKGROUND);
 		GFX_drawOnLayer(bmp,ax,ay,aw,ah,1.0f,0,LAYER_BACKGROUND);

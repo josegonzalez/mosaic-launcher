@@ -19,6 +19,10 @@ typedef struct Screen {
 	int rendersWhileLaunching;
 } Screen;
 
+// The top of plugins' open screens, whichever it is (see plugins.h). Not a
+// real view, like SCREEN_MODAL.
+#define SCREEN_PLUGIN 101
+
 // Unknown ids get the game list, like stock's input and render chains.
 const Screen* Screen_get(int id);
 
@@ -39,6 +43,12 @@ void GameList_handleInput(void);
 void GameList_update(void);
 void GameList_render(void);
 void LaunchFade_render(void);
+void PluginScreen_handleInput(void);
+void PluginScreen_render(void);
+// Plugins' overlays over what was just drawn, on the topmost layer. Call
+// once a frame is drawn, before it's flipped.
+void Overlays_render(void);
+void Overlays_quit(void);
 
 // main loop
 extern int currentScreen;

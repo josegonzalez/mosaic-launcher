@@ -26,9 +26,15 @@ static const Screen modal = {
 	.render = Modal_render,
 };
 
+static const Screen plugin = {
+	.handleInput = PluginScreen_handleInput,
+	.render = PluginScreen_render,
+};
+
 const Screen* Screen_get(int id) {
 	switch (id) {
 		case SCREEN_MODAL: return &modal;
+		case SCREEN_PLUGIN: return &plugin;
 		case SCREEN_QUICKMENU: return &quickmenu;
 		case SCREEN_GAMESWITCHER: return &switcher;
 		default: return &gamelist;

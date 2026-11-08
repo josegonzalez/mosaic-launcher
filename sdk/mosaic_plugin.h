@@ -329,6 +329,56 @@ typedef struct MosaicAchievements {
 	unsigned int game_id;  // the game's RetroAchievements id, or 0 when the cache doesn't say
 } MosaicAchievements;
 
+// Where a plugin screen or an overlay draws, for MosaicScreenHooks' render
+// and overlay_render. It begins with its own size, and fields are only
+// added at the end.
+typedef struct MosaicScreenView {
+	size_t size;       // sizeof(MosaicScreenView) in the launcher
+	MosaicRect area;   // the whole screen
+	MosaicRect status; // the status pill (clock, battery, wifi) in the top right, already drawn; leave it clear. Empty (w 0) when none shows
+	MosaicRect header; // shell paks' status pill and plugins' header widgets left of status, already drawn; leave it clear too. Empty when there are none
+	const char* screen; // what's showing, as host->current_screen returns it
+} MosaicScreenView;
+
+// MosaicScreenHooks' flags.
+enum MosaicScreenFlag {
+	// The whole screen is the plugin's: no status pill, header widgets or
+	// overlays, such as for a screensaver or a charging screen.
+	MOSAIC_SCREEN_FULL = 1,
+};
+
+// What MosaicScreenHooks' input returns.
+enum MosaicScreenResult {
+	MOSAIC_SCREEN_STAY,  // keep the screen open
+	MOSAIC_SCREEN_CLOSE, // close it, back to the screen it opened over
+};
+
+// A screen of a plugin's own, for host->register_screen. The plugin sets
+// size to sizeof(MosaicScreenHooks); the launcher copies the fields that
+// fit in it when the screen is registered, so fields are only added at
+// the end. Every hook gets data. Only render is required.
+typedef struct MosaicScreenHooks {
+	size_t size; // sizeof(MosaicScreenHooks) in the plugin
+	void* data;
+	int flags;   // enum MosaicScreenFlag bits
+	// When the screen opens, from inside host->open_screen: return 0 to
+	// open, or anything else to stay closed, and open_screen returns -1.
+	int (*enter)(void* data);
+	// When it closes, however it closes: input, close_screen, an error, a
+	// launch, or the launcher quitting.
+	void (*exit)(void* data);
+	// Each frame while it's on top, with the buttons, as layout_input gets
+	// them, and MENU too. Returns an enum MosaicScreenResult, or below 0
+	// for an error. Without input, B closes the screen.
+	int (*input)(const MosaicInput* input, void* data);
+	// Draws the screen on screen, lent for the call, on frames the launcher
+	// redraws. Returns 0, or anything else for an error.
+	int (*render)(MosaicSurface* screen, const MosaicScreenView* view, void* data);
+	// Asked each frame while it's on top: 1 to redraw it every frame, such
+	// as while something moves, or 0 to redraw only when asked.
+	int (*animating)(void* data);
+} MosaicScreenHooks;
+
 ///////////////////////////////////////
 // What the launcher offers plugins.
 
@@ -883,6 +933,34 @@ typedef struct MosaicHost {
 	// index not in the list. Check for it with
 	// MOSAIC_HOST_HAS(host, art_replacement).
 	int (*art_replacement)(int index, const MosaicSurface** out);
+
+	// Screens of a plugin's own, over the game list, the quick menu, the
+	// game switcher or another plugin screen. register_screen, from init
+	// only, adds a screen by id ("<plugin id>.<name>" by convention): it
+	// returns 0, or -1 outside init, for an id that's NULL, empty, 64
+	// characters or more, taken, or a built-in screen's name, for hooks
+	// without render, or past 32 screens in all.
+	//
+	// open_screen puts a screen on top of what shows, running its enter,
+	// such as from an action's run (a button, an FN button or a quick menu
+	// tile), tick, a dialog's callback, or another screen's input. It
+	// returns 0, or -1 for an unknown screen, one already open, one off
+	// after an error, past 8 open, an enter that declined, while a dialog
+	// shows or a launch starts, and from init, enter, exit or any hook that
+	// only draws. close_screen closes a screen and any opened above it,
+	// running their exit, and returns 0, or -1 for one that isn't open,
+	// while a dialog shows, and from the hooks open_screen refuses. Opening
+	// slides in as a folder does, and closing out, at the user's Menu
+	// transitions setting, except to or from the game switcher or a dialog;
+	// the transition slot's owner gets them as pushes and pops.
+	//
+	// current_screen returns what's showing: the open plugin screen's id,
+	// or "gamelist", "switcher", "quickmenu" or "dialog". Check for these
+	// and overlay_render with MOSAIC_HOST_HAS(host, open_screen).
+	int (*register_screen)(const char* id, const MosaicScreenHooks* hooks);
+	int (*open_screen)(const char* id);
+	int (*close_screen)(const char* id);
+	const char* (*current_screen)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1028,12 +1106,13 @@ typedef struct MosaicPlugin {
 	int (*decorate_row)(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row);
 
 	// Header widgets, beside the status pill (clock, battery, wifi) on the
-	// game list, game switcher, quick menu and dialogs. Each frame the
-	// launcher redraws, it asks each plugin with both hooks, in load order,
-	// how wide its widget is, given the room left (max_width) and the
-	// pill's height, and lays them out right to left from the pill: the
-	// first in load order next to it. A widget is cut to max_width, and
-	// together they take at most half the header left of the pill.
+	// game list, game switcher, quick menu, dialogs and plugin screens
+	// without MOSAIC_SCREEN_FULL. Each frame the launcher redraws, it asks
+	// each plugin with both hooks, in load order, how wide its widget is,
+	// given the room left (max_width) and the pill's height, and lays them
+	// out right to left from the pill: the first in load order next to it.
+	// A widget is cut to max_width, and together they take at most half the
+	// header left of the pill.
 	// header_width returns the width, 0 for no widget this frame, or below
 	// 0 for an error. header_widget then draws on screen, lent for the call
 	// and clipped to rect, which is that wide and as tall and high as the
@@ -1152,13 +1231,14 @@ typedef struct MosaicPlugin {
 
 	// Input filters, such as an input lock. Every plugin's input_filter
 	// runs, in load order, each frame on every screen (the game list, the
-	// game switcher, the quick menu and dialogs), right after the launcher
-	// reads the pad and before tick, power, the FN buttons and the screen's
-	// own input, a layout's layout_input included. input has every button
-	// in enum MosaicButton, MENU, the power button and the FN buttons too,
-	// less what filters before it took. It sets *consumed (0 on entry) to
-	// the buttons to take, as MOSAIC_BUTTON_BIT masks, which are taken off
-	// pressed, repeated and released for the rest of the frame; held stays
+	// game switcher, the quick menu, dialogs and plugin screens), right
+	// after the launcher reads the pad and before tick, power, the FN
+	// buttons and the screen's own input, a layout's layout_input
+	// included. input has every button in enum MosaicButton, MENU, the
+	// power button and the FN buttons too, less what filters before it
+	// took. It sets *consumed (0 on entry) to the buttons to take, as
+	// MOSAIC_BUTTON_BIT masks, which are taken off pressed, repeated and
+	// released for the rest of the frame; held stays
 	// as the pad has it. A taken power press doesn't sleep, but held for a
 	// second it still powers off, as with stock, whatever filters take. Take
 	// the power button on its press: once a press has got through, its
@@ -1170,6 +1250,20 @@ typedef struct MosaicPlugin {
 	// plugin's input_filter until it restarts. Check for it with
 	// MOSAIC_HOST_HAS(host, hold_switch); an older launcher never calls it.
 	int (*input_filter)(const MosaicInput* input, unsigned int* consumed);
+
+	// Overlays, such as a now playing pill. Every plugin's overlay_render
+	// runs, in load order, each frame the launcher redraws the game list,
+	// the quick menu, the game switcher or a plugin screen, on overlay, a
+	// clear screen-sized surface lent for the call, which then goes over
+	// everything on screen, later plugins' overlays over earlier ones'. It
+	// isn't called over dialogs, plugin screens with MOSAIC_SCREEN_FULL,
+	// transitions or a launch. view->screen says what's under it. Overlays
+	// get no input: take buttons with input_filter. Call
+	// host->request_redraw from tick to change one. It only draws, as
+	// decorate_row does. Return 0, or anything else for an error, after
+	// which the launcher logs it and leaves this plugin's overlay out until
+	// it restarts. Check for it with MOSAIC_HOST_HAS(host, open_screen).
+	int (*overlay_render)(MosaicSurface* overlay, const MosaicScreenView* view);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

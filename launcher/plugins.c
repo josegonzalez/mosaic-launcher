@@ -17,6 +17,7 @@
 #include "inputmodel.h"
 #include "pin.h"
 #include "audiomodel.h"
+#include "screenmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -43,6 +44,7 @@ typedef struct LoadedPlugin {
 	int art_off;         // its art_surface returned a surface it didn't make, so it's no longer asked
 	int art_deco_off;    // its decorate_art failed, so it's no longer called
 	int filter_off;      // its input_filter failed, so it's no longer called
+	int overlay_off;     // its overlay_render failed, so its overlay is left out
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -65,6 +67,9 @@ static int generating = 0;    // while an art_surface runs, which only draws
 static ArtSwap swap = { -1, NULL, 0, 0 }; // a plugin's art_replace surface
 static SelKey swap_key;                     // and the selection it was shown for
 static int swap_drawn = 0;                  // the layout's last layout_render got it with art_replacement
+static ScreenSet screens;      // plugins' screens, and the stack of those open
+static int screen_hook = 0;    // while a screen's enter or exit runs, which can't open or close screens
+static int screen_drawing = 0; // while a screen's render or an overlay runs, which only draw
 
 #define SCREEN_COUNT 3
 
@@ -411,7 +416,7 @@ static int hostSelectedIndex(void) {
 	return state.top->selected;
 }
 static int hostSelectIndex(int index) {
-	if (layout_rendering || decorating || selecting || backgrounding || generating || transition_owner >= 0 || !state.top || index < 0 || index >= state.top->entries->count) return -1;
+	if (layout_rendering || decorating || selecting || backgrounding || generating || screen_drawing || transition_owner >= 0 || !state.top || index < 0 || index >= state.top->entries->count) return -1;
 	Directory_select(state.top, index);
 	// main's copy for this frame, so the game list's input doesn't put it back
 	selected = index;
@@ -681,7 +686,7 @@ static int listShowsArt(void) {
 
 static int hostArtReplace(const char* plugin_id, MosaicSurface* surface) {
 	int owner = loadedIndex(plugin_id);
-	if (owner < 0 || initializing >= 0 || layout_rendering || decorating || backgrounding || generating) return -1;
+	if (owner < 0 || initializing >= 0 || layout_rendering || decorating || backgrounding || generating || screen_drawing) return -1;
 	if (!surface) {
 		// a full redraw: the list may have made room for it, and art decorators placed under it
 		if (ArtSwap_set(&swap, owner, NULL, 0, 0) == ARTSWAP_CLEARED) swapChanged(1);
@@ -749,6 +754,10 @@ static int hostArtGet(const MosaicEntry* entry, int kind, const MosaicSurface** 
 }
 static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* rect, const MosaicRect* name);
 static int hostDecorateArt(MosaicSurface* screen, int index, const MosaicRect* art);
+
+static int hostRegisterScreen(const char* id, const MosaicScreenHooks* hooks);
+static int hostOpenScreen(const char* id);
+static int hostCloseScreen(const char* id);
 
 static void playLog(const char* message) {
 	LOG_info("%s\n", message);
@@ -865,6 +874,10 @@ static const MosaicHost host = {
 	.audio_close = Audio_close,
 	.audio_queue_max_ms = AUDIO_QUEUE_MAX_MS,
 	.art_replacement = hostArtReplacement,
+	.register_screen = hostRegisterScreen,
+	.open_screen = hostOpenScreen,
+	.close_screen = hostCloseScreen,
+	.current_screen = Plugins_currentScreen,
 };
 
 ///////////////////////////////////////
@@ -966,6 +979,8 @@ static void load(const PluginManifest* m) {
 		state.power_off = power_off;
 		hostInhibitSleep(m->id, 0);
 		hostLedClear(m->id);
+		// none can be open: open_screen refuses from init
+		ScreenSet_dropOwner(&screens, loaded_count - 1);
 		freeSurfaces(m->id);
 		Audio_closeFor(m->id, "as it declined to start");
 		if (p->cfg) Hash_free(p->cfg);
@@ -1090,6 +1105,9 @@ void Plugins_started(void) {
 }
 
 void Plugins_quit(void) {
+	// open screens close first, as a launch leaves them
+	Plugins_screensClose();
+	ScreenSet_clear(&screens);
 	LayoutSlot_clear(&layout);
 	TransitionSlots_clear(&transitions);
 	BackgroundSlot_clear(&background);
@@ -1991,4 +2009,242 @@ void Plugins_selection(unsigned long now) {
 			loaded[i].id, rc);
 	}
 	selecting = 0;
+}
+
+///////////////////////////////////////
+// screens and overlays
+
+static int screenKind(int screen) {
+	switch (screen) {
+		case SCREEN_MODAL: return SCREENKIND_DIALOG;
+		case SCREEN_QUICKMENU: return SCREENKIND_QUICKMENU;
+		case SCREEN_GAMESWITCHER: return SCREENKIND_SWITCHER;
+		case SCREEN_PLUGIN: return SCREENKIND_PLUGIN;
+		default: return SCREENKIND_LIST;
+	}
+}
+
+static int hostRegisterScreen(const char* id, const MosaicScreenHooks* hooks) {
+	if (initializing < 0) {
+		LOG_warn("plugins: register_screen only works from init\n");
+		return -1;
+	}
+	const char* owner = loaded[initializing].id;
+	int rc = ScreenSet_add(&screens, id, initializing, hooks);
+	if (rc == SCREEN_ADDED) {
+		LOG_info("plugins: %s registered screen %s\n", owner, id);
+		return 0;
+	}
+	const char* why = rc == SCREEN_BAD_ID ? "its id is empty, too long or a built-in screen's"
+		: rc == SCREEN_BAD_HOOKS ? "it has no render"
+		: rc == SCREEN_TAKEN ? "another screen has its id" : "there are too many screens";
+	LOG_warn("plugins: %s can't register screen %s: %s\n", owner, id ? id : "(null)", why);
+	return -1;
+}
+
+// 1 where open_screen and close_screen work: not from init, a screen's
+// enter or exit, or a hook that only draws, nor while a dialog shows or a
+// launch starts.
+static int screenCallAllowed(const char* call) {
+	if (initializing >= 0 || screen_hook || layout_rendering || decorating || backgrounding || generating
+			|| screen_drawing || transition_owner >= 0) {
+		LOG_warn("plugins: %s doesn't work from init, a screen's enter or exit, or a hook that only draws\n", call);
+		return 0;
+	}
+	return currentScreen != SCREEN_MODAL && !state.startgame;
+}
+
+int Plugins_screenFlags(void) {
+	int top = ScreenSet_top(&screens);
+	return top >= 0 ? screens.screens[top].hooks.flags : 0;
+}
+
+const char* Plugins_currentScreen(void) {
+	int top = ScreenSet_top(&screens);
+	if (currentScreen == SCREEN_PLUGIN && top >= 0) return screens.screens[top].id;
+	switch (currentScreen) {
+		case SCREEN_MODAL: return "dialog";
+		case SCREEN_QUICKMENU: return "quickmenu";
+		case SCREEN_GAMESWITCHER: return "switcher";
+		default: return "gamelist";
+	}
+}
+
+static int hostOpenScreen(const char* id) {
+	if (!screenCallAllowed("open_screen")) return -1;
+	int index = ScreenSet_find(&screens, id);
+	int why = ScreenSet_canOpen(&screens, index);
+	if (why != SCREEN_OPENS) {
+		LOG_warn("plugins: can't open screen %s: %s\n", id ? id : "(null)",
+			why == SCREEN_UNKNOWN ? "there's no such screen" : why == SCREEN_IS_OFF ? "it failed earlier"
+			: why == SCREEN_IS_OPEN ? "it's open already" : "too many screens are open");
+		return -1;
+	}
+	PluginScreen* s = &screens.screens[index];
+	if (s->hooks.enter) {
+		screen_hook = 1;
+		int rc = s->hooks.enter(s->hooks.data);
+		screen_hook = 0;
+		if (rc != 0) {
+			LOG_info("plugins: %s's screen %s didn't open (enter returned %i)\n", loaded[s->owner].id, s->id, rc);
+			return -1;
+		}
+	}
+	int from = currentScreen;
+	// the base is only kept from the first, which opens over a built-in screen
+	ScreenSet_push(&screens, index, currentScreen);
+	currentScreen = SCREEN_PLUGIN;
+	if (ScreenKind_slides(screenKind(from), SCREENKIND_PLUGIN)) state.animationdirection = SLIDE_LEFT;
+	state.dirty = 1;
+	LOG_info("plugins: opened screen %s\n", s->id);
+	return 0;
+}
+
+static void runExit(PluginScreen* s) {
+	if (!s->hooks.exit) return;
+	screen_hook = 1;
+	s->hooks.exit(s->hooks.data);
+	screen_hook = 0;
+}
+
+// Closes the open screens from the top down to index, running their exit,
+// and goes back to what's under it, sliding out as a folder does.
+static void closeTo(int index) {
+	while (screens.depth > 0) {
+		int top = ScreenSet_pop(&screens);
+		runExit(&screens.screens[top]);
+		LOG_info("plugins: closed screen %s\n", screens.screens[top].id);
+		if (top == index) break;
+	}
+	currentScreen = screens.depth > 0 ? SCREEN_PLUGIN : screens.base;
+	if (ScreenKind_slides(SCREENKIND_PLUGIN, screenKind(currentScreen))) state.animationdirection = SLIDE_RIGHT;
+	folderbgchanged = 1; // the screen cleared every layer; repaint the background
+	state.dirty = 1;
+}
+
+static int hostCloseScreen(const char* id) {
+	if (!screenCallAllowed("close_screen")) return -1;
+	int index = ScreenSet_find(&screens, id);
+	if (index < 0 || ScreenSet_position(&screens, index) < 0) {
+		LOG_warn("plugins: can't close screen %s: it isn't open\n", id ? id : "(null)");
+		return -1;
+	}
+	closeTo(index);
+	return 0;
+}
+
+// After an error the screen stays off until the launcher restarts; it
+// closes on the next input, where nothing is mid-draw.
+static void screenFailed(PluginScreen* s, const char* hook, int rc) {
+	s->off = 1;
+	state.dirty = 1;
+	LOG_warn("plugins: %s's screen %s's %s returned %i, closing it until the launcher restarts\n",
+		loaded[s->owner].id, s->id, hook, rc);
+}
+
+// Every button a screen sees: a layout's, and MENU.
+static int screenButtons(LayoutButton* out) {
+	int n = 0;
+	for (int i = 0; i < LAYOUT_BUTTONS; i++) out[n++] = layoutButtons[i];
+	out[n++] = (LayoutButton){ MOSAIC_BUTTON_MENU, BTN_MENU };
+	return n;
+}
+
+void Plugins_screenInput(void) {
+	int top = ScreenSet_top(&screens);
+	if (top < 0) {
+		// nothing open; shouldn't happen
+		currentScreen = screens.base;
+		state.dirty = 1;
+		return;
+	}
+	PluginScreen* s = &screens.screens[top];
+	if (s->off) {
+		closeTo(top);
+		return;
+	}
+	int rc;
+	if (s->hooks.input) {
+		LayoutButton map[LAYOUT_BUTTONS + 1];
+		int count = screenButtons(map);
+		MosaicInput input;
+		LayoutInput_fill(&input, map, count, pad.just_pressed, pad.just_repeated, pad.just_released, pad.is_pressed);
+		rc = s->hooks.input(&input, s->hooks.data);
+	}
+	else rc = PAD_justPressed(BTN_B) ? MOSAIC_SCREEN_CLOSE : MOSAIC_SCREEN_STAY;
+	if (rc != MOSAIC_SCREEN_STAY && rc != MOSAIC_SCREEN_CLOSE) screenFailed(s, "input", rc);
+	// a dialog it opened shows over it, and it closes after
+	if (currentScreen == SCREEN_MODAL) return;
+	if ((rc == MOSAIC_SCREEN_CLOSE || s->off) && ScreenSet_position(&screens, top) >= 0) {
+		closeTo(top);
+		return;
+	}
+	// it, or one it opened, redraws every frame while it says so
+	int now_top = ScreenSet_top(&screens);
+	if (currentScreen != SCREEN_PLUGIN || now_top < 0) return;
+	PluginScreen* shown = &screens.screens[now_top];
+	if (!shown->off && shown->hooks.animating && shown->hooks.animating(shown->hooks.data)) state.dirty = 1;
+}
+
+void Plugins_screenRender(SDL_Surface* surface, const MosaicScreenView* view) {
+	int top = ScreenSet_top(&screens);
+	if (top < 0 || screens.screens[top].off) return;
+	PluginScreen* s = &screens.screens[top];
+	MosaicSurface* lent = PluginDraw_lend(surface, NULL);
+	if (!lent) {
+		LOG_warn("plugins: the screen is already lent, so screen %s can't draw this frame\n", s->id);
+		return;
+	}
+	screen_drawing = 1;
+	int rc = s->hooks.render(lent, view, s->hooks.data);
+	screen_drawing = 0;
+	PluginDraw_unlend(lent);
+	if (rc != 0) screenFailed(s, "render", rc);
+}
+
+void Plugins_screensCheck(void) {
+	if (screens.depth == 0 || currentScreen == SCREEN_PLUGIN || currentScreen == SCREEN_MODAL) return;
+	// left for a built-in screen some other way, such as an FN button's action
+	while (screens.depth > 0) {
+		int top = ScreenSet_pop(&screens);
+		runExit(&screens.screens[top]);
+		LOG_info("plugins: closed screen %s, as the %s opened over it\n", screens.screens[top].id, Plugins_currentScreen());
+	}
+}
+
+void Plugins_screensClose(void) {
+	while (screens.depth > 0) {
+		int top = ScreenSet_pop(&screens);
+		runExit(&screens.screens[top]);
+		LOG_info("plugins: closed screen %s\n", screens.screens[top].id);
+	}
+}
+
+int Plugins_overlaysOver(int screen) {
+	if (!ScreenKind_overlays(screenKind(screen), screen == SCREEN_PLUGIN ? Plugins_screenFlags() : 0)) return 0;
+	for (int i = 0; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (!loaded[i].overlay_off && Plugin_has(p, overlay_render) && p->overlay_render) return 1;
+	}
+	return 0;
+}
+
+void Plugins_overlays(SDL_Surface* surface, const MosaicScreenView* view) {
+	MosaicSurface* lent = PluginDraw_lend(surface, NULL);
+	if (!lent) {
+		LOG_warn("plugins: the overlay is already lent, so overlays can't draw this frame\n");
+		return;
+	}
+	screen_drawing = 1;
+	for (int i = 0; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (loaded[i].overlay_off || !Plugin_has(p, overlay_render) || !p->overlay_render) continue;
+		int rc = p->overlay_render(lent, view);
+		if (rc == 0) continue;
+		loaded[i].overlay_off = 1;
+		LOG_warn("plugins: %s's overlay_render returned %i, leaving its overlay out until the launcher restarts\n",
+			loaded[i].id, rc);
+	}
+	screen_drawing = 0;
+	PluginDraw_unlend(lent);
 }
