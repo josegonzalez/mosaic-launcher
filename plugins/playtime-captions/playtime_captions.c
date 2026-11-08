@@ -7,6 +7,13 @@
 // on games the tracker hasn't seen. Games with unknown history (no
 // database or sqlite) get nothing.
 //
+// The achievements setting (off by default) adds the game's local
+// RetroAchievements progress, as "3/12 achievements", from what minarch
+// keeps on the card, through the host's achievements call. It shows once
+// the launcher has worked out the game's hash, also on games the tracker
+// hasn't seen or whose history is unknown, and not on games with no
+// achievements cached.
+//
 // The caption sits on the name's line, right-aligned, and never over the
 // name. When row-badges is loaded with its dots on, it leaves room for
 // them after the name, and below them in a cell with no name. When the row
@@ -14,11 +21,7 @@
 // end, and shows nothing when even one doesn't fit.
 //
 // Not here yet: captions in the game switcher, which waits for the
-// switcher slot, and RetroAchievements progress. minarch keeps its
-// RetroAchievements data under .userdata/shared/.ra/ by the rcheevos game
-// hash only, with nothing on the card to match a game's path to its hash,
-// and working that out means hashing whole ROMs the way rcheevos does for
-// each system.
+// switcher slot.
 
 #include <stdio.h>
 #include <string.h>
@@ -62,9 +65,17 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	if (host->entry_type(entry) != MOSAIC_ENTRY_ROM) return 0;
 	const char* path = host->entry_path(entry);
 	if (!path) return 0;
-	PCStats stats = { host->play_time(path), host->last_played(path), host->play_count(path) };
-	if (stats.time < 0 || stats.last < 0 || stats.count < 0) return 0;
-	if (!stats.count && !stats.time && !stats.last && !options.never) return 0;
+	PCStats stats = { host->play_time(path), host->last_played(path), host->play_count(path), 0, 0 };
+	if (options.parts & PC_PART_ACHIEVEMENTS) {
+		MosaicAchievements progress = { .size = sizeof(MosaicAchievements) };
+		if (host->achievements(path, &progress) == 1 && progress.total > 0) {
+			stats.cheevos = progress.unlocked;
+			stats.cheevos_total = progress.total;
+		}
+	}
+	int known = stats.time >= 0 && stats.last >= 0 && stats.count >= 0;
+	int unseen = known && !stats.count && !stats.time && !stats.last;
+	if (!stats.cheevos_total && (!known || (unseen && !options.never))) return 0;
 
 	readBadges();
 	int scale = host->screen_scale();
@@ -99,11 +110,16 @@ static int init(const MosaicHost* h) {
 		(isOn("sessions", "off") ? PC_PART_SESSIONS : 0);
 	options.format = PC_formatOf(host->cfg_get(ID, "format", "relative"));
 	options.never = isOn("never", "off");
+	if (isOn("achievements", "off")) {
+		if (MOSAIC_HOST_HAS(host, achievements)) options.parts |= PC_PART_ACHIEVEMENTS;
+		else host->log(ID, "this launcher can't read RetroAchievements progress");
+	}
 	static const char* names[] = { "relative", "compact", "date" };
-	char message[160];
-	snprintf(message, sizeof(message), "time %s, last %s, sessions %s, format %s, never %s",
+	char message[200];
+	snprintf(message, sizeof(message), "time %s, last %s, sessions %s, format %s, never %s, achievements %s",
 		options.parts & PC_PART_TIME ? "on" : "off", options.parts & PC_PART_LAST ? "on" : "off",
-		options.parts & PC_PART_SESSIONS ? "on" : "off", names[options.format], options.never ? "on" : "off");
+		options.parts & PC_PART_SESSIONS ? "on" : "off", names[options.format], options.never ? "on" : "off",
+		options.parts & PC_PART_ACHIEVEMENTS ? "on" : "off");
 	host->log(ID, message);
 	return 0;
 }

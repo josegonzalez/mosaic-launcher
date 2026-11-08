@@ -3,3 +3,9 @@
 	url = https://github.com/LoveRetro/NextUI
 	# libmsettings builds in place inside the vendored tree.
 	ignore = untracked
+[submodule "vendor/rcheevos"]
+	path = vendor/rcheevos
+	url = https://github.com/RetroAchievements/rcheevos
+[submodule "vendor/libchdr"]
+	path = vendor/libchdr
+	url = https://github.com/rtissera/libchdr

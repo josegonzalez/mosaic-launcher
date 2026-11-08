@@ -9,3 +9,5 @@ setting.sessions=toggle|Sessions|off
 setting.format=choice|Format|relative|relative,compact,date
 # "Never played" on games the tracker hasn't seen
 setting.never=toggle|Never played|off
+# local RetroAchievements progress, as "3/12 achievements", from minarch's files on the card
+setting.achievements=toggle|Achievements|off

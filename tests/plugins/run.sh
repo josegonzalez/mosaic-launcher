@@ -11,7 +11,8 @@
 # add header widgets, one that decorates the game's art, one that reads back the dots the bundled row-badges
 # puts on rows, two that supply art and load it through the art
 # cache, one that hears about the selection, one that reads .info
-# sidecars, one that reads the play history, one that picks transition
+# sidecars, one that reads the play history, one that reads local
+# RetroAchievements progress, one that picks transition
 # styles, one that generates art, one that draws the background, one that
 # looks at the bundled box art provider's art, one that reads the bundled
 # grid, carousel, hero rail and shelf layouts' cells back, one that looks
@@ -1398,6 +1399,76 @@ unset TZ
 [ -f "$WORK/game_logs.sqlite.saved" ] && mv "$WORK/game_logs.sqlite.saved" "$PLAY_DB"
 rm -rf "$WORK/plugins/tracker.plugin" "$STATE/tracker.cfg" "$STATE/plugins.txt"
 
+# achiever reads local RetroAchievements progress from fixture .ra files
+# in minarch's format: Hit has a cached set of 3 (unlocks 1, and 2 in
+# hardcore; 2 muted), Bare none, the A5200 game can't be hashed and
+# Missing isn't there. Every answer is unknown at first, the hashes land in
+# the launcher's cache, and a restart reads them back instead of hashing.
+# Nothing is hashed, and no thread starts, when no plugin asks.
+RA_DIR="$CARD/.userdata/shared/.ra"
+RA_HASHES="$CARD/.userdata/shared/launcher/ra-hashes.txt"
+RA_ROMS="$CARD/Roms/RA Test (GB)"
+RA_5200="$CARD/Roms/RA Test 5200 (A5200)"
+grep -qF "retroachievements:" "$WORK/tracker.log" && fail "the launcher read RetroAchievements progress with no plugin asking"
+[ -e "$RA_HASHES" ] && fail "the launcher made $RA_HASHES with no plugin asking"
+[ -d "$RA_DIR" ] && mv "$RA_DIR" "$WORK/ra.saved"
+mkdir -p "$RA_ROMS" "$RA_5200" "$RA_DIR/offline/cache" "$RA_DIR/muted" "$STATE"
+# md5_of <file>
+md5_of() {
+	if command -v md5sum >/dev/null; then md5sum "$1" | cut -d' ' -f1; else md5 -q "$1"; fi
+}
+# frame_json <json> <file>: minarch's [u32 length][json][sha256 of json]
+frame_json() {
+	len=$(printf '%s' "$1" | wc -c | tr -d ' ')
+	# shellcheck disable=SC2059 # the format is the length's four bytes
+	{
+		printf "$(printf '\\%03o\\%03o\\%03o\\%03o' $((len & 255)) $((len >> 8 & 255)) $((len >> 16 & 255)) $((len >> 24 & 255)))"
+		printf '%s' "$1"
+		printf '%s' "$1" | openssl dgst -sha256 -binary
+	} >"$2"
+}
+printf 'mosaic retroachievements test cart %.0s' 1 2 3 4 5 6 7 8 >"$RA_ROMS/Hit.gb"
+printf 'another cart' >"$RA_ROMS/Bare.gb"
+printf 'a 5200 cart' >"$RA_5200/Game.a52"
+HIT_HASH=$(md5_of "$RA_ROMS/Hit.gb")
+BARE_HASH=$(md5_of "$RA_ROMS/Bare.gb")
+frame_json '{"Success":true,"GameId":99,"Sets":[{"Type":"core","Achievements":[{"ID":1,"Flags":3,"Points":5},{"ID":2,"Flags":3,"Points":10},{"ID":3,"Flags":3,"Points":20},{"ID":4,"Flags":5,"Points":50}]}]}' \
+	"$RA_DIR/offline/cache/achievementsets_$HIT_HASH.bin"
+frame_json '{"Success":true,"HardcoreUnlocks":[{"ID":2,"When":1}],"Unlocks":[{"ID":1,"When":2}],"ServerNow":3}' \
+	"$RA_DIR/offline/cache/startsession_$HIT_HASH.bin"
+printf '2\n' >"$RA_DIR/muted/$HIT_HASH.txt"
+printf 'game1=%s\ngame2=%s\ngame3=%s\ngame4=%s\n' "$RA_ROMS/Hit.gb" "$RA_ROMS/Bare.gb" "$RA_5200/Game.a52" \
+	"$RA_ROMS/Missing.gb" >"$STATE/achiever.cfg"
+printf 'achiever=on\n' >"$STATE/plugins.txt"
+build_plugin achiever 'id=achiever\nname=Achiever\napi=1\n'
+run_launcher "$WORK/achiever.log" "plugin achiever: done" || fail "the launcher exited early with achiever loaded"
+log="$WORK/achiever.log"
+plugin=achiever
+expect "first Hit.gb -1"
+expect "first Missing.gb -1"
+expect "game Hit.gb rc 1 total 3 unlocked 2 hardcore 1 points 15/35 muted 1 id 99 hash 1 $HIT_HASH"
+expect "game Bare.gb rc 0 total 0 unlocked 0 hardcore 0 points 0/0 muted 0 id 0 hash 1 $BARE_HASH"
+expect "game Game.a52 rc 0 total 0 unlocked 0 hardcore 0 points 0/0 muted 0 id 0 hash 0 -"
+expect "game Missing.gb rc 0 total 0 unlocked 0 hardcore 0 points 0/0 muted 0 id 0 hash 0 -"
+expect "null -1"
+expect "short rc 1 total 3 rest untouched 1"
+grep -qF "retroachievements: Roms/RA Test (GB)/Hit.gb is $HIT_HASH, hashed as console 4" "$log" || fail "Hit.gb's hash wasn't logged"
+[ "$(grep -c ", hashed as console" "$log")" -eq 3 ] || fail "the games weren't hashed once each: $(grep "retroachievements:" "$log")"
+grep -qF "$HIT_HASH	$(wc -c <"$RA_ROMS/Hit.gb" | tr -d ' ')	" "$RA_HASHES" || fail "Hit.gb's hash isn't in $RA_HASHES"
+grep -qF "Roms/RA Test 5200 (A5200)/Game.a52" "$RA_HASHES" || fail "the unhashable game isn't in $RA_HASHES"
+# a restart reads the hashes back
+run_launcher "$WORK/achiever-cached.log" "plugin achiever: done" || fail "the launcher exited early with achiever after a restart"
+log="$WORK/achiever-cached.log"
+expect "game Hit.gb rc 1 total 3 unlocked 2 hardcore 1 points 15/35 muted 1 id 99 hash 1 $HIT_HASH"
+grep -qF ", hashed as console" "$log" && fail "games were hashed again: $(grep "retroachievements:" "$log")"
+# a damaged cache file says nothing
+printf 'x' >>"$RA_DIR/offline/cache/achievementsets_$HIT_HASH.bin"
+run_launcher "$WORK/achiever-damaged.log" "plugin achiever: done" || fail "the launcher exited early with a damaged cache file"
+log="$WORK/achiever-damaged.log"
+expect "game Hit.gb rc 0 total 0 unlocked 0 hardcore 0 points 0/0 muted 0 id 0 hash 1 $HIT_HASH"
+grep -qF "retroachievements: ignoring" "$log" || fail "the damaged cache file wasn't logged"
+rm -rf "$WORK/plugins/achiever.plugin" "$STATE/achiever.cfg" "$STATE/plugins.txt" "$RA_ROMS" "$RA_5200" "$RA_DIR" "$RA_HASHES"
+
 # playtime-captions puts a caption at the right of played games' rows, which
 # subtitler, after it in load order, reads back off the screen: Tetris was
 # played 2h 15m over 2 sessions 3 days ago, Q 2h 5m an hour ago,
@@ -1490,6 +1561,36 @@ expect "row Unplayed caption none"
 grep -qF "plugins: playtime-captions's" "$log" && fail "playtime-captions' decorations were turned off under layout-grid"
 grep -qF "plugins: layout-grid's" "$log" && fail "layout-grid was turned off with playtime-captions"
 rm -rf "$WORK/plugins/layout-grid.plugin"
+
+# the achievements part: Tetris has a cached set of 3 with 1 unlocked.
+# PCT is a tag minarch doesn't map, so the launcher takes rcheevos' guess
+# that the card has a set for, as minarch takes the one the server knows.
+printf 'Tetris cart %.0s' 1 2 3 4 >"$CAPTION_DIR/Tetris.gb"
+TETRIS_HASH=$(md5_of "$CAPTION_DIR/Tetris.gb")
+[ -d "$RA_DIR" ] && mv "$RA_DIR" "$WORK/ra.saved"
+mkdir -p "$RA_DIR/offline/cache"
+frame_json '{"Success":true,"GameId":7,"Sets":[{"Achievements":[{"ID":1,"Flags":3,"Points":1},{"ID":2,"Flags":3,"Points":1},{"ID":3,"Flags":3,"Points":1}]}]}' \
+	"$RA_DIR/offline/cache/achievementsets_$TETRIS_HASH.bin"
+frame_json '{"Success":true,"Unlocks":[{"ID":3,"When":1}]}' "$RA_DIR/offline/cache/startsession_$TETRIS_HASH.bin"
+printf 'achievements=on\n' >"$STATE/playtime-captions.cfg"
+printf 'folder=Roms/Play Captions (PCT)\nTetris=2h 15m \302\267 3 days ago \302\267 1/3 achievements\n' >"$STATE/subtitler.cfg"
+printf 'playtime-captions=on\nsubtitler=on\n' >"$STATE/plugins.txt"
+run_launcher "$WORK/playtime-captions-achievements.log" "plugin subtitler: row Unplayed" \
+	"plugin subtitler: row Tetris caption at right 1, clear of name 1, as wide as \"2h 15m · 3 days ago · 1/3 achievements\" 1" ||
+	fail "the launcher exited early with playtime-captions' achievements"
+log="$WORK/playtime-captions-achievements.log"
+plugin=playtime-captions
+expect "time on, last on, sessions off, format relative, never off, achievements on"
+plugin=subtitler
+expect "row Tetris caption at right 1, clear of name 1, as wide as \"2h 15m · 3 days ago · 1/3 achievements\" 1"
+expect "row Unplayed caption none"
+grep -qF "retroachievements: Roms/Play Captions (PCT)/Tetris.gb is $TETRIS_HASH, guessed" "$log" || fail "Tetris.gb's guessed hash wasn't logged"
+grep -qF "plugins: playtime-captions's" "$log" && fail "playtime-captions' decorations were turned off with achievements"
+rm -rf "$RA_DIR" "$RA_HASHES"
+# the folder the launcher made for its hash cache, if nothing else is in it
+if [ -d "$(dirname "$RA_HASHES")" ]; then rmdir "$(dirname "$RA_HASHES")" 2>/dev/null; fi
+[ -d "$WORK/ra.saved" ] && mv "$WORK/ra.saved" "$RA_DIR"
+rm -f "$STATE/playtime-captions.cfg"
 
 # with the history unknown, nothing, even with never on
 printf 'never=on\n' >"$STATE/playtime-captions.cfg"

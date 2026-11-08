@@ -1,5 +1,5 @@
 // Play time captions, without the host: the caption's parts (play time,
-// last played, sessions) as text, in local time, fitted into a width by
+// last played, sessions, RetroAchievements progress) as text, in local time, fitted into a width by
 // trying the compact format and then dropping parts, and where it goes in
 // a row. No SDL and no file access, so it's tested on the host.
 
@@ -21,14 +21,18 @@ enum PCPart {
 	PC_PART_TIME = 1,     // play time in all
 	PC_PART_LAST = 2,     // when it was last played
 	PC_PART_SESSIONS = 4, // how many sessions
+	PC_PART_ACHIEVEMENTS = 8, // RetroAchievements unlocked of the game's total
 };
 
 // What the play history says about a game, as the host's play_time,
-// last_played and play_count return it.
+// last_played and play_count return it, and its RetroAchievements
+// progress, as host->achievements fills it in (cheevos_total 0 for none).
 typedef struct PCStats {
 	long long time;
 	long long last;
 	int count;
+	int cheevos;
+	int cheevos_total;
 } PCStats;
 
 // What the user picked.
@@ -47,14 +51,17 @@ void PC_duration(long long seconds, int format, char* out, size_t size);
 // when and now are Unix times, compared as days in local time.
 void PC_lastPlayed(long long when, long long now, int format, char* out, size_t size);
 void PC_sessions(int count, int format, char* out, size_t size);
+// "3/12 achievements", or "3/12" compact.
+void PC_achievements(int unlocked, int total, int format, char* out, size_t size);
 // Local calendar days from when to now: 0 the same day, 1 the day before,
 // and 0 when when is after now.
 int PC_daysBetween(long long when, long long now);
 
 // The first max_parts of the parts picked, joined with " · ". Returns how
-// many parts it wrote, 0 (writing "") for a game with unknown history,
-// or one the history hasn't seen unless never is set, when it writes
-// "Never played" and returns 1.
+// many parts it wrote. A game with unknown history gets no play parts, and
+// one the history hasn't seen gets "Never played" in their place when
+// never is set, or none; the achievements part follows either way, when
+// it's picked and the game has a total. 0 (writing "") for nothing.
 int PC_build(const PCStats* stats, long long now, int parts, int format, int never, int max_parts, char* out,
 	size_t size);
 

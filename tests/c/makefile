@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override test_netplay test_power_plus test_battery_logger test_leds test_genre_view test_core_prefetch test_collate_subfolders test_led_status test_bluetooth test_bt_reconnect test_drawmodel test_layoutmodel test_artcache test_selmodel test_statusmodel test_infomodel test_transmodel test_art_boxart test_layout_grid test_art_placeholder test_art_backdrop test_header_indicators test_row_badges test_layout_carousel test_playmodel test_playhistory test_layout_hero_rail test_layout_shelf test_layout_fancy test_playtime_captions test_metadata_band test_playtime_limit test_collections_plus test_inputmodel test_launch_animation test_transitions test_hold_lock test_pin
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override test_netplay test_power_plus test_battery_logger test_leds test_genre_view test_core_prefetch test_collate_subfolders test_led_status test_bluetooth test_bt_reconnect test_drawmodel test_layoutmodel test_artcache test_selmodel test_statusmodel test_infomodel test_transmodel test_art_boxart test_layout_grid test_art_placeholder test_art_backdrop test_header_indicators test_row_badges test_layout_carousel test_playmodel test_playhistory test_layout_hero_rail test_layout_shelf test_layout_fancy test_playtime_captions test_metadata_band test_playtime_limit test_collections_plus test_inputmodel test_launch_animation test_transitions test_hold_lock test_pin test_ramodel test_rahash test_raprogress
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -133,6 +133,34 @@ $(BUILD)/test_playhistory: test_playhistory.c $(LAUNCHER)/playhistory.c $(LAUNCH
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -DTEST_DIR=\"$(BUILD)/play-history\" \
 		test_playhistory.c $(LAUNCHER)/playhistory.c $(LAUNCHER)/playmodel.c -ldl -o $@
+
+# rcheevos' hashing and libchdr, built as the launcher builds them.
+RCHEEVOS := $(abspath ../../vendor/rcheevos)
+LIBCHDR := $(abspath ../../vendor/libchdr)
+VENDOR_OBJ := $(BUILD)/vendor
+include $(LAUNCHER)/vendor.mk
+RA_CFLAGS = -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(RCHEEVOS)/include -I$(LIBCHDR)/include
+
+# SDL-free: the parsers, on bytes made here.
+$(BUILD)/test_ramodel: test_ramodel.c $(LAUNCHER)/ramodel.c $(LAUNCHER)/ramodel.h check.h
+	mkdir -p $(BUILD)
+	$(CC) $(RA_CFLAGS) test_ramodel.c $(LAUNCHER)/ramodel.c -o $@
+
+# Through rcheevos, on carts, zips and discs it writes in its own folder, and
+# CHD fixtures made from those discs.
+RA_HASH_SOURCES = $(LAUNCHER)/rahash.c $(LAUNCHER)/rachd.c $(LAUNCHER)/ramodel.c
+
+$(BUILD)/test_rahash: test_rahash.c $(RA_HASH_SOURCES) $(wildcard $(LAUNCHER)/ra*.h) $(VENDOR_OBJECTS) check.h
+	mkdir -p $(BUILD)
+	$(CC) $(RA_CFLAGS) -DTEST_DIR=\"$(BUILD)/ra-hash\" -DFIXTURES=\"$(abspath fixtures/ra)\" \
+		test_rahash.c $(RA_HASH_SOURCES) $(VENDOR_OBJECTS) -lz -o $@
+
+# The worker, on a fixture card with minarch's .ra files.
+$(BUILD)/test_raprogress: test_raprogress.c $(LAUNCHER)/raprogress.c $(RA_HASH_SOURCES) $(wildcard $(LAUNCHER)/ra*.h) \
+		$(VENDOR_OBJECTS) check.h
+	mkdir -p $(BUILD)
+	$(CC) $(RA_CFLAGS) -DTEST_DIR=\"$(BUILD)/ra-progress\" test_raprogress.c $(LAUNCHER)/raprogress.c \
+		$(RA_HASH_SOURCES) $(VENDOR_OBJECTS) -lz -lpthread -o $@
 
 $(BUILD)/test_pluginset: test_pluginset.c $(LAUNCHER)/pluginset.c $(LAUNCHER)/pluginset.h check.h
 	mkdir -p $(BUILD)

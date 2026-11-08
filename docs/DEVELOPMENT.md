@@ -22,6 +22,8 @@ The NextUI source is a submodule pinned to a release tag:
 git submodule update --init
 ```
 
+Two more submodules hold the third-party code the launcher hashes games with for RetroAchievements progress, pinned to the commits NextUI's minarch builds: `vendor/rcheevos` (its `src/rhash`, MIT) and `vendor/libchdr` (BSD 3-Clause, with its bundled LZMA SDK, miniz, Zstandard and dr_flac). minarch clones them at build time, rcheevos at a fixed commit and libchdr at whatever its default branch is then; `vendor/libchdr` is pinned to the commit that was current when the pinned NextUI release was made. `launcher/vendor.mk` lists the sources and options and compiles them with flags of their own (not the launcher's, and with their warnings off) into objects the launcher links, for every platform alike; libchdr's CMake build isn't used, so no toolchain needs CMake. When NextUI moves to new commits, move the submodules with it. Their licences are in `THIRD_PARTY_NOTICES.txt`, which the pak carries as `licenses/third-party.txt`.
+
 Device builds run in the LoveRetro toolchain images, through Docker or podman:
 
 ```shell

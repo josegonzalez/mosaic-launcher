@@ -51,6 +51,7 @@ fi
 
 cp "$ROOT/LICENSE" "$OUT/licenses/mosaic-launcher.txt"
 cp "$ROOT/sdk/LICENSE" "$OUT/licenses/mosaic-launcher-sdk.txt"
+cp "$ROOT/THIRD_PARTY_NOTICES.txt" "$OUT/licenses/third-party.txt"
 
 # The launcher only runs on the NextUI build it was compiled against.
 (cd "$ROOT/vendor/NextUI" && git rev-parse HEAD) >"$OUT/supported-versions.txt"

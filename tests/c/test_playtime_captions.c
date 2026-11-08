@@ -269,6 +269,40 @@ int main(void) {
 	CHECK(PC_build(&tetris, now, all, PC_FORMAT_RELATIVE, 0, 3, small, sizeof(small)) == 1);
 	CHECK_STR(small, "2h 15m");
 
+	// RetroAchievements progress, last
+	PC_achievements(3, 12, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "3/12 achievements");
+	PC_achievements(3, 12, PC_FORMAT_COMPACT, out, sizeof(out));
+	CHECK_STR(out, "3/12");
+	PCStats cheevos = { 2 * 3600 + 15 * 60, now - 3 * 86400, 4, 3, 12 };
+	int with = PC_PART_TIME | PC_PART_LAST | PC_PART_ACHIEVEMENTS;
+	CHECK(PC_build(&cheevos, now, with, PC_FORMAT_RELATIVE, 0, 4, out, sizeof(out)) == 3);
+	CHECK_STR(out, "2h 15m \xC2\xB7 3 days ago \xC2\xB7 3/12 achievements");
+	CHECK(PC_build(&cheevos, now, with, PC_FORMAT_COMPACT, 0, 4, out, sizeof(out)) == 3);
+	CHECK_STR(out, "2h \xC2\xB7 3d \xC2\xB7 3/12");
+	// not picked, or no total
+	CHECK(PC_build(&cheevos, now, PC_PART_TIME, PC_FORMAT_RELATIVE, 0, 4, out, sizeof(out)) == 1);
+	CHECK_STR(out, "2h 15m");
+	CHECK(PC_build(&tetris, now, with, PC_FORMAT_RELATIVE, 0, 4, out, sizeof(out)) == 2);
+	// on a game the tracker hasn't seen, after "Never played" when that's on
+	PCStats unseen = { 0, 0, 0, 0, 12 };
+	CHECK(PC_build(&unseen, now, with, PC_FORMAT_RELATIVE, 0, 4, out, sizeof(out)) == 1);
+	CHECK_STR(out, "0/12 achievements");
+	CHECK(PC_build(&unseen, now, with, PC_FORMAT_RELATIVE, 1, 4, out, sizeof(out)) == 2);
+	CHECK_STR(out, "Never played \xC2\xB7 0/12 achievements");
+	// with the history unknown, on its own
+	PCStats unknown_cheevos = { -1, -1, -1, 5, 5 };
+	CHECK(PC_build(&unknown_cheevos, now, with, PC_FORMAT_RELATIVE, 1, 4, out, sizeof(out)) == 1);
+	CHECK_STR(out, "5/5 achievements");
+	// compact first, then dropped first when there's no room
+	PCOptions cheevo_opts = { with, PC_FORMAT_RELATIVE, 0 };
+	CHECK(PC_fit(&cheevos, now, &cheevo_opts, 500, bytes, NULL, out, sizeof(out)) > 0);
+	CHECK_STR(out, "2h 15m \xC2\xB7 3 days ago \xC2\xB7 3/12 achievements");
+	CHECK(PC_fit(&cheevos, now, &cheevo_opts, 120, bytes, NULL, out, sizeof(out)) == 96);
+	CHECK_STR(out, "2h \xC2\xB7 3d \xC2\xB7 3/12");
+	CHECK(PC_fit(&cheevos, now, &cheevo_opts, 95, bytes, NULL, out, sizeof(out)) == 48);
+	CHECK_STR(out, "2h \xC2\xB7 3d");
+
 	// fitting into a width: "2h 15m · 3 days ago" is 20 bytes, "2h 15m" 6,
 	// "2h · 3d" 8 and "2h" 2
 	PCOptions opts = { PC_PART_TIME | PC_PART_LAST, PC_FORMAT_RELATIVE, 0 };

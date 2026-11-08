@@ -96,23 +96,39 @@ void PC_sessions(int count, int format, char* out, size_t size) {
 	else snprintf(out, size, "%i session%s", count, count == 1 ? "" : "s");
 }
 
+void PC_achievements(int unlocked, int total, int format, char* out, size_t size) {
+	if (!out || !size) return;
+	if (format == PC_FORMAT_COMPACT) snprintf(out, size, "%i/%i", unlocked, total);
+	else snprintf(out, size, "%i/%i achievements", unlocked, total);
+}
+
 int PC_build(const PCStats* stats, long long now, int parts, int format, int never, int max_parts, char* out,
 	size_t size) {
 	if (!out || !size) return 0;
 	out[0] = '\0';
-	if (!stats || stats->time < 0 || stats->last < 0 || stats->count < 0) return 0;
-	if (stats->count == 0 && stats->time == 0 && stats->last == 0) {
-		if (!never || max_parts < 1) return 0;
-		snprintf(out, size, "Never played");
-		return 1;
-	}
+	if (!stats) return 0;
+	int known = stats->time >= 0 && stats->last >= 0 && stats->count >= 0;
+	int unseen = known && stats->count == 0 && stats->time == 0 && stats->last == 0;
+	if (!known || unseen) parts &= PC_PART_ACHIEVEMENTS;
+	if (stats->cheevos_total <= 0 || stats->cheevos < 0) parts &= ~PC_PART_ACHIEVEMENTS;
 	int written = 0;
 	size_t used = 0;
-	static const int order[] = { PC_PART_TIME, PC_PART_LAST, PC_PART_SESSIONS };
-	for (int i = 0; i < 3 && written < max_parts; i++) {
+	if (unseen && never && max_parts >= 1) {
+		int n = snprintf(out, size, "Never played");
+		if (n < 0 || (size_t)n >= size) {
+			out[0] = '\0';
+			return 0;
+		}
+		used = (size_t)n;
+		written = 1;
+	}
+	static const int order[] = { PC_PART_TIME, PC_PART_LAST, PC_PART_SESSIONS, PC_PART_ACHIEVEMENTS };
+	for (int i = 0; i < 4 && written < max_parts; i++) {
 		if (!(parts & order[i])) continue;
 		char part[64];
 		if (order[i] == PC_PART_TIME) PC_duration(stats->time, format, part, sizeof(part));
+		else if (order[i] == PC_PART_ACHIEVEMENTS)
+			PC_achievements(stats->cheevos, stats->cheevos_total, format, part, sizeof(part));
 		else if (order[i] == PC_PART_LAST) {
 			// a session that hasn't got a start time says nothing about when
 			if (stats->last <= 0) continue;
@@ -139,7 +155,7 @@ int PC_fit(const PCStats* stats, long long now, const PCOptions* options, int ma
 	int formats[2] = { options->format, PC_FORMAT_COMPACT };
 	int tries = options->format == PC_FORMAT_COMPACT ? 1 : 2;
 	char text[CAPTION_MAX];
-	int all = PC_build(stats, now, options->parts, options->format, options->never, 3, text, sizeof(text));
+	int all = PC_build(stats, now, options->parts, options->format, options->never, 4, text, sizeof(text));
 	for (int n = all; n > 0; n--) {
 		for (int f = 0; f < tries; f++) {
 			PC_build(stats, now, options->parts, formats[f], options->never, n, text, sizeof(text));

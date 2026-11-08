@@ -313,6 +313,21 @@ typedef struct MosaicTransition {
 #define MOSAIC_TRANSITION_HAS(transition, field) \
 	((transition)->size >= offsetof(MosaicTransition, field) + sizeof((transition)->field))
 
+// A game's local RetroAchievements progress, for host->achievements. The
+// plugin sets size to sizeof(MosaicAchievements) before asking, and the
+// launcher fills in only the fields that fit in it, so fields are only
+// added at the end.
+typedef struct MosaicAchievements {
+	size_t size;           // sizeof(MosaicAchievements) in the plugin
+	int total;             // the game's achievements (its core set and the sets minarch loads with it)
+	int unlocked;          // of them, unlocked in either mode
+	int unlocked_hardcore; // of them, unlocked in hardcore
+	int points;            // points for all of them
+	int points_unlocked;   // points for the unlocked ones
+	int muted;             // of them, muted in minarch's menu
+	unsigned int game_id;  // the game's RetroAchievements id, or 0 when the cache doesn't say
+} MosaicAchievements;
+
 ///////////////////////////////////////
 // What the launcher offers plugins.
 
@@ -751,6 +766,30 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, ask_pin).
 	int (*has_pin)(void);
 	void (*ask_pin)(const char* title, void (*on_done)(int result, void* data), void* data);
+
+	// RetroAchievements progress, read-only from what minarch keeps under
+	// .userdata/shared/.ra/: the cached achievement set and unlocks it
+	// fetched for the game (offline/cache), its unlock ledger for unlocks it
+	// made offline (offline/ledger.bin) and the game's muted list. Nothing
+	// is fetched over the network, so a game minarch hasn't loaded with
+	// RetroAchievements on has nothing. minarch names those files by the
+	// game's rcheevos hash, which the launcher works out the way minarch
+	// does, with rcheevos' own code, on a worker thread one game at a time,
+	// and keeps on the card in .userdata/shared/launcher/ra-hashes.txt by
+	// path, size and modification time; a changed file is hashed again.
+	// path is a game's full path on the card, as entry_path and recent_path
+	// return it. achievements fills out (see MosaicAchievements) and returns
+	// 1, returns 0 when there's nothing on the card for the game (no cached
+	// set, a system rcheevos can't hash, a path that isn't a file), or
+	// MOSAIC_ACHIEVEMENTS_UNKNOWN (-1) until its hash is worked out. The
+	// first ask about a path queues it, and the list is drawn again when
+	// answers come in, so asking every frame is fine; an answer then stays
+	// the same until the launcher restarts (it does after every game).
+	// achievement_hash writes the hash (32 hex digits) with the same
+	// answers. Nothing runs until a plugin first asks. Check for them with
+	// MOSAIC_HOST_HAS(host, achievements).
+	int (*achievements)(const char* path, MosaicAchievements* out);
+	int (*achievement_hash)(const char* path, char* out, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -760,6 +799,9 @@ typedef struct MosaicHost {
 #define MOSAIC_PIN_RIGHT 1
 #define MOSAIC_PIN_WRONG 0
 #define MOSAIC_PIN_CANCELLED -1
+
+// What the RetroAchievements calls return until a game's hash is worked out.
+#define MOSAIC_ACHIEVEMENTS_UNKNOWN -1
 
 // True when the launcher's host table has this field, so a plugin can use
 // newer features when they're there and do without on older launchers.

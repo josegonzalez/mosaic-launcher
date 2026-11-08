@@ -13,6 +13,7 @@
 #include "infomodel.h"
 #include "transmodel.h"
 #include "playhistory.h"
+#include "raprogress.h"
 #include "inputmodel.h"
 #include "pin.h"
 
@@ -494,6 +495,30 @@ void Plugins_adoptPin(void) {
 	if (Pin_adopt(PIN_PATH, PLUGIN_STATE_DIR "/simple-mode.cfg")) LOG_info("plugins: simple mode's PIN is the launcher's PIN now\n");
 }
 
+static int hostAchievements(const char* path, MosaicAchievements* out) {
+	RASummary summary;
+	int rc = RAProgress_get(path, &summary);
+	if (rc != 1 || !out) return rc;
+	if (out->size < sizeof(out->size)) return MOSAIC_ACHIEVEMENTS_UNKNOWN;
+	MosaicAchievements full = {
+		.size = out->size,
+		.total = summary.total,
+		.unlocked = summary.unlocked,
+		.unlocked_hardcore = summary.unlocked_hardcore,
+		.points = summary.points,
+		.points_unlocked = summary.points_unlocked,
+		.muted = summary.muted,
+		.game_id = summary.game_id,
+	};
+	// only the fields the plugin knows about
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return 1;
+}
+
+static int hostAchievementHash(const char* path, char* out, size_t size) {
+	return RAProgress_hash(path, out, size);
+}
+
 static int hostBatteryLevel(void) {
 	return HAS_BATTERY ? PWR_getBattery() : -1;
 }
@@ -727,6 +752,8 @@ static const MosaicHost host = {
 	.hold_switch = hostHoldSwitch,
 	.has_pin = hostHasPin,
 	.ask_pin = hostAskPin,
+	.achievements = hostAchievements,
+	.achievement_hash = hostAchievementHash,
 };
 
 ///////////////////////////////////////
@@ -921,6 +948,8 @@ void Plugins_init(void) {
 	sync();
 	// only where to look: nothing is read until a plugin asks
 	PlayHistory_configure(SHARED_USERDATA_PATH "/game_logs.sqlite", ROMS_PATH, playLog);
+	RAProgress_configure(SDCARD_PATH, ROMS_PATH, SHARED_USERDATA_PATH "/.ra", SHARED_USERDATA_PATH "/launcher/ra-hashes.txt",
+		playLog);
 
 	for (int i = 0; i < n; i++) {
 		if (decisions[i].load) load(decisions[i].manifest);
@@ -962,6 +991,7 @@ void Plugins_quit(void) {
 	}
 	loaded_count = 0;
 	PlayHistory_quit();
+	RAProgress_quit();
 	// a refresh or connect still running is stopped and reaped first
 	Bluetooth_quit();
 }
@@ -1382,6 +1412,8 @@ void Plugins_tick(unsigned long now) {
 	// the quick menu's Bluetooth tile may have changed it; the worker,
 	// when there is one, never reads stock's settings itself
 	if (loaded_count && BT_supported()) Bluetooth_setEnabled(CFG_getBluetooth());
+	// RetroAchievements answers came in, for the rows that asked
+	if (RAProgress_news()) state.dirty = 1;
 	EACH_PLUGIN_WITH(tick) p->tick(now);
 }
 

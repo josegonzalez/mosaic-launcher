@@ -15,6 +15,8 @@ endif
 ###########################################################
 
 NEXTUI ?= $(abspath ../vendor/NextUI/workspace)
+RCHEEVOS ?= $(abspath ../vendor/rcheevos)
+LIBCHDR ?= $(abspath ../vendor/libchdr)
 BUILD_DIR ?= $(abspath ../build/$(PLATFORM))
 
 include $(NEXTUI)/$(PLATFORM)/platform/makefile.env
@@ -23,14 +25,15 @@ SDL ?= SDL
 ###########################################################
 
 TARGET = nextui
-INCDIR = -I. -I../sdk -I$(NEXTUI)/all/common/ -I$(NEXTUI)/$(PLATFORM)/platform/
+INCDIR = -I. -I../sdk -I$(NEXTUI)/all/common/ -I$(NEXTUI)/$(PLATFORM)/platform/ \
+	-I$(RCHEEVOS)/include -I$(LIBCHDR)/include
 MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	screens.c screen_gamelist.c screen_switcher.c screen_quickmenu.c art.c quickitems.c quicktiles.c tr.c actions.c transitions.c \
 	pluginset.c plugins.c toast.c awake.c power.c powerwatch.c pakhooks.c kbmodel.c modal.c \
 	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
 	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
-	inputmodel.c pin.c
+	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.
@@ -53,14 +56,21 @@ LDFLAGS += -lmsettings
 
 PRODUCT = $(BUILD_DIR)/$(TARGET).elf
 
+# rcheevos and libchdr, for RetroAchievements hashing; its rules mustn't
+# become the default goal
+.DEFAULT_GOAL := all
+VENDOR_OBJ = $(BUILD_DIR)/vendor
+include vendor.mk
+
 .PHONY: all clean
 
-all: $(PREFIX_LOCAL)/include/msettings.h
+all: $(PREFIX_LOCAL)/include/msettings.h $(VENDOR_OBJECTS)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(SOURCE) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+	$(CC) $(SOURCE) $(VENDOR_OBJECTS) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
 
 clean:
 	rm -f $(PRODUCT)
+	rm -rf $(VENDOR_OBJ)
 
 # libmsettings is built from the vendored tree, the same way stock does it.
 # Its objects land in vendor/NextUI, which .gitmodules ignores as untracked.
