@@ -42,10 +42,11 @@ typedef struct BAConfig {
 	int images;    // visible art folders: Images
 	int hide;      // hide the visible art folders (Imgs, Images) whose convention is on
 	int cover;     // folder as cover: cover.png in a folder
+	int cover_name; // with cover, hide the names of folders that have one
 	int rom_art;   // rom as art: *.p8.png carts
 } BAConfig;
 
-// Everything on but the thumbnail.
+// Everything on but the thumbnail and hiding covered folders' names.
 void BA_defaults(BAConfig* config);
 
 // A toggle setting's value: 1 for "on", 0 for "off", fallback otherwise.
@@ -74,5 +75,9 @@ int BA_find(const BAConfig* config, const char* path, int type, int kind, BAExis
 // named Imgs or Images (ignoring case) with its convention and the hide
 // setting on.
 int BA_hides(const BAConfig* config, const char* path, int type);
+
+// True when an entry's name is hidden, so its cover stands in for it: a
+// folder with a cover.png, with the cover and cover_name settings on.
+int BA_hidesName(const BAConfig* config, const char* path, int type, BAExists exists, void* data);
 
 #endif

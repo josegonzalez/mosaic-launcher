@@ -15,5 +15,7 @@ setting.images=toggle|Images folders|on
 setting.hide=toggle|Hide art folders|on
 # folder as cover: a folder's cover.png
 setting.cover=toggle|Folder covers|on
+# folder as cover: hides the names of folders with a cover.png, so the cover stands in for them
+setting.cover_name=toggle|Hide covered folder names|off
 # rom as art: Pico-8 .p8.png carts are their own art
 setting.rom_art=toggle|Pico-8 carts as art|on

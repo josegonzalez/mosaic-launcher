@@ -1295,8 +1295,9 @@ rm -rf "$WORK/plugins/hider.plugin" "$HIDE_DIR" "$STATE/hider.cfg" "$STATE/plugi
 # its own art, in that order, with nx-redux's .media/boxart as the 3D box,
 # .media/wheel as the logo and .media/screenshot as the screenshot, and
 # stock's .media thumbnail kept unless the thumbnail setting is on. The
-# Imgs and Images folders are left out of the list. Then the settings turn
-# each off.
+# Imgs and Images folders are left out of the list, and no names are
+# hidden until cover_name hides the covered folder's. Then the settings
+# turn each off.
 BOX_DIR="$CARD/Boxart"
 mkdir -p "$BOX_DIR/.media/boxart2d" "$BOX_DIR/.media/boxart" "$BOX_DIR/.media/wheel" "$BOX_DIR/.media/screenshot" \
 	"$BOX_DIR/.media/mix" "$BOX_DIR/Imgs" "$BOX_DIR/.res" "$BOX_DIR/Images" "$BOX_DIR/Cover" "$STATE"
@@ -1339,6 +1340,15 @@ expect 'art Golf.gb box 1 ".media/boxart/Golf.jpg"'
 expect 'art Golf.gb box3d 1 ".media/boxart/Golf.jpg"'
 expect 'art Golf.gb logo 1 ".media/wheel/Golf.jpeg"'
 expect 'art Golf.gb screenshot 1 ".media/screenshot/Golf.jpg"'
+# folders keep their names by default
+expect "hidden none"
+
+# with cover_name on, the folder with a cover shows as its cover, its name
+# hidden, and nothing else's is
+printf 'cover_name=on\n' >"$STATE/art-boxart.cfg"
+run_launcher "$WORK/boxart-cover-name.log" "plugin looker: done" || fail "the launcher exited early with art-boxart hiding covered folders' names"
+log="$WORK/boxart-cover-name.log"
+expect "hidden Cover"
 
 # the thumbnail setting puts this art before stock's, and with nx-redux's
 # folders, covers and carts off the next convention answers; the art

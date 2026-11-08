@@ -12,6 +12,7 @@ void BA_defaults(BAConfig* config) {
 	config->images = 1;
 	config->hide = 1;
 	config->cover = 1;
+	config->cover_name = 0;
 	config->rom_art = 1;
 }
 
@@ -130,4 +131,11 @@ int BA_hides(const BAConfig* config, const char* path, int type) {
 	const char* name = fileName(path);
 	if (!name) return 0;
 	return (config->imgs && !strcasecmp(name, "Imgs")) || (config->images && !strcasecmp(name, "Images"));
+}
+
+int BA_hidesName(const BAConfig* config, const char* path, int type, BAExists exists, void* data) {
+	if (!config->cover || !config->cover_name || type != MOSAIC_ENTRY_DIR || !path || !fileName(path)) return 0;
+	char cover[BA_PATH_LEN];
+	int n = snprintf(cover, sizeof(cover), "%s/cover.png", path);
+	return try(n > 0 && (size_t)n < sizeof(cover), cover, exists, data);
 }

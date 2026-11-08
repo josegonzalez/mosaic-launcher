@@ -1,7 +1,8 @@
 // A plugin that looks at the art a folder's entries have, for the bundled
 // art-boxart plugin. Once the lists are up it opens <sd>/Boxart and logs
 // the entries the list kept, then what art_find answers for each entry's
-// thumbnail, box, 3D box, logo and screenshot, with paths below the folder.
+// thumbnail, box, 3D box, logo and screenshot, with paths below the folder,
+// and, as a row decorator, which of its rows had their names hidden.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -13,6 +14,7 @@
 static const MosaicHost* host;
 static char folder[512];
 static int ticks = 0;
+static char hidden[1000] = ""; // the folder's rows decorated with name_hidden, below it
 
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
@@ -58,6 +60,21 @@ static void logList(void) {
 	}
 }
 
+static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row) {
+	(void)screen;
+	const char* path = host->entry_path(entry);
+	size_t n = strlen(folder);
+	if (!MOSAIC_ROW_HAS(row, name_hidden) || !row->name_hidden || strncmp(path, folder, n) != 0 || path[n] != '/') return 0;
+	char item[600];
+	snprintf(item, sizeof(item), ",%s,", below(path));
+	char list[1002];
+	snprintf(list, sizeof(list), ",%s,", hidden);
+	if (strstr(list, item)) return 0;
+	size_t used = strlen(hidden);
+	snprintf(hidden + used, sizeof(hidden) - used, "%s%s", used ? "," : "", below(path));
+	return 0;
+}
+
 static void tick(unsigned long now) {
 	(void)now;
 	if (!host->current_list()) return;
@@ -65,6 +82,7 @@ static void tick(unsigned long now) {
 	if (ticks == 2) say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
 	if (ticks != 4) return;
 	logList();
+	say("hidden %s", hidden[0] ? hidden : "none");
 	say("done");
 }
 
@@ -74,6 +92,7 @@ static MosaicPlugin plugin = {
 	.id = ID,
 	.init = init,
 	.tick = tick,
+	.decorate_row = decorateRow,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

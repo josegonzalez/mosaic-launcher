@@ -4,7 +4,8 @@
 // order. Each setting turns one convention or mode on or off; the thumbnail
 // setting (off by default) also answers the thumbnail kind, so stock's
 // .media thumbnails stay the default and this art fills in as the box the
-// built-in list falls back to.
+// built-in list falls back to. With cover_name on (off by default), a
+// folder with a cover shows as its cover, with its name hidden.
 
 #include <sys/stat.h>
 #include "boxart_model.h"
@@ -29,6 +30,7 @@ static int init(const MosaicHost* h) {
 	config.images = setting("images", config.images);
 	config.hide = setting("hide", config.hide);
 	config.cover = setting("cover", config.cover);
+	config.cover_name = setting("cover_name", config.cover_name);
 	config.rom_art = setting("rom_art", config.rom_art);
 	return 0;
 }
@@ -49,6 +51,12 @@ static int filter(const MosaicEntry* entry, const char* dir_path) {
 	return !BA_hides(&config, host->entry_path(entry), host->entry_type(entry));
 }
 
+// folder as cover: the cover stands in for the folder's name
+static int hideName(const MosaicEntry* entry, const char* dir_path) {
+	(void)dir_path;
+	return BA_hidesName(&config, host->entry_path(entry), host->entry_type(entry), isFile, NULL);
+}
+
 static MosaicPlugin plugin = {
 	.size = sizeof(MosaicPlugin),
 	.api_version = MOSAIC_API_VERSION,
@@ -56,6 +64,7 @@ static MosaicPlugin plugin = {
 	.init = init,
 	.filter = filter,
 	.art_path = artPath,
+	.hide_name = hideName,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

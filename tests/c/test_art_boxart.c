@@ -88,6 +88,7 @@ static void testToggles(void) {
 	CHECK(!config.thumbnail);
 	CHECK(config.media && config.imgs && config.res && config.images);
 	CHECK(config.hide && config.cover && config.rom_art);
+	CHECK(!config.cover_name);
 }
 
 static void testEachConvention(void) {
@@ -324,6 +325,25 @@ static void testHides(void) {
 	CHECK(!BA_hides(&config, "/r/GB/Imgs", MOSAIC_ENTRY_DIR));
 }
 
+static void testHidesName(void) {
+	static const char* have[] = { "/r/GB/Folder/cover.png", "/r/GB/Tetris.gb/cover.png" };
+	haveFiles(have, 2);
+	BAConfig config;
+	BA_defaults(&config);
+	// off by default: stock folders keep their names
+	CHECK(!BA_hidesName(&config, "/r/GB/Folder", MOSAIC_ENTRY_DIR, fakeExists, NULL));
+	config.cover_name = 1;
+	CHECK(BA_hidesName(&config, "/r/GB/Folder", MOSAIC_ENTRY_DIR, fakeExists, NULL));
+	// only folders, with a cover
+	CHECK(!BA_hidesName(&config, "/r/GB/Other", MOSAIC_ENTRY_DIR, fakeExists, NULL));
+	CHECK(!BA_hidesName(&config, "/r/GB/Tetris.gb", MOSAIC_ENTRY_ROM, fakeExists, NULL));
+	CHECK(!BA_hidesName(&config, NULL, MOSAIC_ENTRY_DIR, fakeExists, NULL));
+	CHECK(!BA_hidesName(&config, "Folder", MOSAIC_ENTRY_DIR, fakeExists, NULL));
+	// and only while covers are on
+	config.cover = 0;
+	CHECK(!BA_hidesName(&config, "/r/GB/Folder", MOSAIC_ENTRY_DIR, fakeExists, NULL));
+}
+
 ///////////////////////////////////////
 // the plugin, against a fake host and a fixture card
 
@@ -378,6 +398,11 @@ static int shown(const MosaicPlugin* p, const char* rel, int type) {
 	return p->filter(&e, CARD "/GB");
 }
 
+static int named(const MosaicPlugin* p, const char* rel, int type) {
+	MosaicEntry e = entry(rel, type);
+	return !p->hide_name(&e, CARD "/GB");
+}
+
 static void testPlugin(void) {
 	CHECK(system("rm -rf '" CARD "'") == 0);
 	mkdir(CARD, 0755);
@@ -419,6 +444,14 @@ static void testPlugin(void) {
 	CHECK(!shown(p, "GB/Images", MOSAIC_ENTRY_DIR));
 	CHECK(shown(p, "GB/Folder", MOSAIC_ENTRY_DIR));
 	CHECK(shown(p, "GB/Alpha.gb", MOSAIC_ENTRY_ROM));
+	CHECK(p->hide_name && named(p, "GB/Other", MOSAIC_ENTRY_DIR));
+
+	// covered folders' names hidden: a folder named cover.png isn't a cover
+	setCfg("cover_name", "on");
+	CHECK(p->init(&host) == 0);
+	CHECK(!named(p, "GB/Other", MOSAIC_ENTRY_DIR));
+	CHECK(named(p, "GB/Folder", MOSAIC_ENTRY_DIR));
+	CHECK(named(p, "GB/Alpha.gb", MOSAIC_ENTRY_ROM));
 
 	// the settings
 	setCfg("thumbnail", "on");
@@ -433,6 +466,8 @@ static void testPlugin(void) {
 	CHECK_STR(art(p, "GB/Other", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX), "");
 	CHECK(shown(p, "GB/Imgs", MOSAIC_ENTRY_DIR));
 	CHECK(shown(p, "GB/Images", MOSAIC_ENTRY_DIR));
+	// with covers off, cover_name hides nothing
+	CHECK(named(p, "GB/Other", MOSAIC_ENTRY_DIR));
 	CHECK(system("rm -rf '" CARD "'") == 0);
 }
 
@@ -446,6 +481,7 @@ int main(void) {
 	testPrecedence();
 	testExtensions();
 	testHides();
+	testHidesName();
 	testPlugin();
 	CHECK_DONE();
 }
