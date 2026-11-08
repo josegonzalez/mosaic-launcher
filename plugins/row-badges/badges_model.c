@@ -192,10 +192,9 @@ int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, i
 	int width = count * dot + (count - 1) * gap + (unplayed && tier ? gap : 0);
 	int margin = gap * 2;
 	int right = rect->x + rect->w - margin;
-	int x, y;
-	if (name && name->w > 0) {
-		x = name->x + name->w + margin;
-		if (x + width > right) x = right - width;
+	int x = name && name->w > 0 ? name->x + name->w + margin : right;
+	int y;
+	if (x + width <= right) {
 		y = name->y + (name->h - dot) / 2;
 	} else {
 		x = right - width;

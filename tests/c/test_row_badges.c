@@ -46,16 +46,23 @@ static int fakeEntryInfo(const MosaicEntry* e, const char* key, char* out, size_
 }
 static int fakeScale(void) { return 2; }
 static int fakeThemeColor(int index) {
-	return index == MOSAIC_COLOR_ACCENT ? 0xAA0000 : index == MOSAIC_COLOR_LIST_TEXT ? 0xFFFFFF : -1;
+	return index == MOSAIC_COLOR_ACCENT ? 0xAA0000 : index == MOSAIC_COLOR_LIST_TEXT ? 0xFFFFFF
+		: index == MOSAIC_COLOR_BACKGROUND ? 0x123456 : -1;
 }
 
-// the dots drawn since the last reset
+// the dots drawn since the last reset, and the background rings around them
 static MosaicRect drawn[8];
 static unsigned int drawn_rgb[8];
 static int drawn_count = 0;
+static MosaicRect rings[8];
+static int ring_count = 0;
 static int fakeFillRound(MosaicSurface* s, const MosaicRect* r, int radius, MosaicColor c) {
 	(void)s;
 	(void)radius;
+	if ((c.r << 16 | c.g << 8 | c.b) == 0x123456) {
+		if (ring_count < 8) rings[ring_count++] = *r;
+		return 0;
+	}
 	if (drawn_count < 8) {
 		drawn[drawn_count] = *r;
 		drawn_rgb[drawn_count++] = (unsigned int)(c.r << 16 | c.g << 8 | c.b);
@@ -99,8 +106,9 @@ static int dots(const char* path, int type, const char* tier, int named) {
 	snprintf(e.tier, sizeof(e.tier), "%s", tier);
 	e.type = type;
 	MosaicRow row = { sizeof(MosaicRow), 0, 0, { 10, 20, 300, 60 }, { 10, 20, named ? 100 : 0, 60 } };
-	drawn_count = 0;
+	drawn_count = ring_count = 0;
 	CHECK(decorateRow(NULL, &e, &row) == 0);
+	CHECK(ring_count == drawn_count);
 	return drawn_count;
 }
 
@@ -214,10 +222,14 @@ int main(void) {
 	CHECK(RB_place(&rect, &name, 8, 4, 1, 0, at) == 1);
 	CHECK(RB_place(&rect, &name, 8, 4, 0, 0, at) == 0);
 	CHECK(RB_place(&rect, &name, 8, 4, 0, 9, at) == RB_MAX_TIER);
-	// a name filling the row: as far right as the row allows
+	// a name filling the row: the top right corner
 	MosaicRect wide = { 10, 20, 295, 60 };
 	CHECK(RB_place(&rect, &wide, 8, 4, 1, 0, at) == 1);
-	CHECK(at[0].x == 10 + 300 - 8 - 8);
+	CHECK(at[0].x == 10 + 300 - 8 - 8 && at[0].y == 28);
+	// just fitting after it stays there
+	MosaicRect fits = { 10, 20, 300 - 8 - 8 - 8, 60 };
+	CHECK(RB_place(&rect, &fits, 8, 4, 1, 0, at) == 1);
+	CHECK(at[0].x == 10 + 300 - 8 - 8 && at[0].y == 46);
 	// no name: the top right corner
 	CHECK(RB_place(&rect, &none, 8, 4, 1, 1, at) == 2);
 	CHECK(at[1].x + at[1].w == 10 + 300 - 8 && at[0].y == 28 && at[0].x == at[1].x - 16);
@@ -261,6 +273,8 @@ int main(void) {
 	CHECK(drawn_rgb[0] == 0xAA0000);
 	// after the name, centred, at the plugin's size for scale 2
 	CHECK(drawn[0].x == 10 + 100 + 8 && drawn[0].y == 20 + (60 - 8) / 2 && drawn[0].w == 8);
+	// with a background ring a scale wide around it
+	CHECK(rings[0].x == drawn[0].x - 2 && rings[0].y == drawn[0].y - 2 && rings[0].w == 12 && rings[0].h == 12);
 	CHECK(dots(GB "/Puzzle/Fresh.gb", MOSAIC_ENTRY_ROM, "", 1) == 1);
 	CHECK(dots(GB "/Saved.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);
 	CHECK(dots(GB "/State.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);

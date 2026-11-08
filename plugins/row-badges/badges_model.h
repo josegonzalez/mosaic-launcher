@@ -73,10 +73,9 @@ int RB_tier(const char* value);
 // Lays out an unplayed dot (when unplayed is 1) and tier tier dots, in
 // that order, each dot pixels square, gap apart, with twice the gap between
 // the unplayed dot and the tier dots. With a name (w above 0), they go
-// twice the gap after it, centred on it, or as far right as rect allows
-// when they don't fit there. Without one, as under a layout that doesn't
-// say, they go in rect's top right corner, twice the gap in from both
-// edges. Writes up to 1 + RB_MAX_TIER rects to out and returns how many,
+// twice the gap after it, centred on it. Without one, as under a layout
+// that doesn't say, or when they don't fit after it, they go in rect's top
+// right corner, twice the gap in from both edges. Writes up to 1 + RB_MAX_TIER rects to out and returns how many,
 // or 0 when there are none or they don't fit in rect.
 int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, int unplayed, int tier,
 	MosaicRect* out);

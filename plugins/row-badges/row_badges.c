@@ -3,7 +3,8 @@
 // marks games that weren't played (the "unplayed" setting), and tier dots,
 // in its list text colour, give the tier= value in an entry's .info
 // sidecar, from 1 to 5 dots, for games and system folders alike (the
-// "tiers" setting). Both are off by default.
+// "tiers" setting), each ringed in its background colour. Both are off by
+// default.
 //
 // A game counts as played when it's in recents, or when stock or minarch
 // left a file for it: a save in Saves/<tag>/, a state in
@@ -112,9 +113,15 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	int count = RB_place(&row->rect, &row->name, 4 * scale, 2 * scale, unplayed, tier, dots);
 	int accent = host->theme_color(MOSAIC_COLOR_ACCENT);
 	int text = host->theme_color(MOSAIC_COLOR_LIST_TEXT);
+	int background = host->theme_color(MOSAIC_COLOR_BACKGROUND);
+	if (background < 0) background = 0x000000;
 	for (int i = 0; i < count; i++) {
 		int rgb = unplayed && i == 0 ? accent : text;
 		if (rgb < 0) rgb = 0xFFFFFF;
+		// a ring in the background colour keeps the dot apart from a
+		// layout's selection or art drawn in the same colour
+		MosaicRect ring = { dots[i].x - scale, dots[i].y - scale, dots[i].w + 2 * scale, dots[i].h + 2 * scale };
+		host->fill_round_rect(screen, &ring, ring.w / 2, mosaic_color((unsigned int)background, 255));
 		host->fill_round_rect(screen, &dots[i], dots[i].w / 2, mosaic_color((unsigned int)rgb, 255));
 	}
 	return 0;
