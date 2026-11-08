@@ -1,6 +1,8 @@
 #include "launcher.h"
 
 void queueNext(char* cmd) {
+	// the game or pak gets the device to itself
+	Audio_hostClose("before a launch", 0);
 	LOG_info("cmd: %s\n", cmd);
 	putFile("/tmp/next", cmd);
 	state.quit = 1;

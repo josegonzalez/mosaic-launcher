@@ -12,7 +12,8 @@
  *
  * It returns a description of the plugin with whichever hooks it
  * implements; every hook is optional. The launcher calls into the plugin
- * only on its main thread.
+ * only on its main thread, and plugins call the host only from it too,
+ * except audio_queue and audio_queued, which are safe from any thread.
  *
  * Both structs begin with their own size, so a launcher and a plugin built
  * against different versions of this header can tell which fields the
@@ -827,6 +828,41 @@ typedef struct MosaicHost {
 	// with Show game art off or under a plugin layout. Main thread only.
 	// Check for it with MOSAIC_HOST_HAS(host, art_replace).
 	int (*art_replace)(const char* plugin_id, MosaicSurface* surface);
+
+	// Audio, such as a video preview's sound, through SDL's audio queue.
+	// One plugin at a time has the device. audio_open opens it for frames
+	// of signed 16-bit samples in the machine's byte order, channels (1 or
+	// 2) of them interleaved, at rate (8000 to 96000 Hz); SDL converts them
+	// to what the device plays. It starts playing at once, silence while
+	// nothing is queued. Opening again in the same format keeps the device
+	// and what's queued; in another format closes and reopens it. It
+	// returns 0, or -1 for a bad rate or channel count, while another
+	// plugin has the device, or when SDL can't open it. audio_queue adds
+	// count frames after what's queued, and returns 0, or -1 when the
+	// plugin doesn't have the device, for NULL frames or a negative count,
+	// or when the queue would hold more than audio_queue_max_ms of frames. audio_queued returns how many frames
+	// are still queued, not yet handed to the device (whose own buffer
+	// adds about 1024 frames), which gives a video its clock, or -1 when
+	// the plugin doesn't have the device. audio_pause(1) stops playing,
+	// keeping the queue, and audio_pause(0) plays on; audio_close closes
+	// the device, dropping what's queued. Both return 0, or -1 when the
+	// plugin doesn't have the device. Closing the device clicks on some
+	// devices, so keep it open on silence between clips and close it after
+	// a short linger. The launcher closes it itself before a sleep, once
+	// what's queued plays out, before a game or pak launches, before
+	// powering off, and when it quits, after which audio_queue and
+	// audio_queued return -1 until the plugin opens it again. Volume and
+	// mute are the system's. audio_queue and audio_queued are the only
+	// host calls that are safe from a plugin's own thread, such as a
+	// decoder's; everything else, audio_open, audio_pause and audio_close
+	// included, is for the main thread only. Check for them with
+	// MOSAIC_HOST_HAS(host, audio_open).
+	int (*audio_open)(const char* plugin_id, int rate, int channels);
+	int (*audio_queue)(const char* plugin_id, const short* frames, int count);
+	int (*audio_queued)(const char* plugin_id);
+	int (*audio_pause)(const char* plugin_id, int paused);
+	int (*audio_close)(const char* plugin_id);
+	int audio_queue_max_ms; // the most audio_queue lets a plugin have queued, in ms
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

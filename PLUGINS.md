@@ -118,7 +118,7 @@ Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files).
 | `transitions` | Picks how folders push and pop and how the game switcher comes in, and owns the `transition` slot. The `style` setting picks `slide` (the default): a push slides the old list out to the left as the new one comes in from the right, a pop slides them the other way, and the game switcher slides down from the top over the game list; `fade`, the new screen fading in over the old one; `slide_fade`, the new screen fading in as it moves a quarter of the way into place, from the right for a push or the top for the game switcher, while for a pop the old list fades out as it moves a quarter of the way to the right; `stock`, stock's transitions; or `off`, none. The `speed` setting is `fast` (150 ms), `normal` (250 ms, the default) or `slow` (500 ms), and `ease` is `linear`, `in`, `out` (the default, as stock's slides) or `in_out`. Launches stay stock's, as the `launch` slot isn't this plugin's. The launcher's Menu transitions setting must be on for any of this to run: with it off there are no menu transitions, whatever the style. From radther and Nocturne. |
 | `hold-lock` | Locks every button the launcher sees, on the game list, the game switcher, the quick menu and the dialogs, with a padlock in the header beside the status pill while it's locked, in the theme's accent with its hint colour. Holding the `chord` setting's buttons (SELECT and START by default, or L1 and R1, L2 and R2, or `off`) for the `hold` setting's seconds (1 by default) locks, and holding them again unlocks; buttons still held from the unlock are taken until they're let go, so the chord's own releases don't reach the screen. With the `switch` setting on (off by default), the hold switch on the side of the tg5040 and tg5050 locks while it's on, and the chord can't unlock it until it's switched off. It's stock's mute switch, so it still mutes as stock's Mute settings say. On the h700 and desktop, which have no switch, the plugin logs that once and only the chord locks. A long power press still powers off, but a short one doesn't sleep. The volume keys, and the brightness with MENU held, are changed by stock's keymon outside the launcher, so they can't be locked, and the Launcher pak's settings screen and games aren't locked either. The lock isn't kept when the launcher restarts. From westo27 and Bramley. |
 
-Every hook in `MosaicPlugin` is optional; leave out what you don't use. The launcher calls plugins only on its main thread. Both `MosaicPlugin` and `MosaicHost` start with their own `size`, and fields are only ever added at the end, so a plugin built against an older header keeps working with a newer launcher.
+Every hook in `MosaicPlugin` is optional; leave out what you don't use. The launcher calls plugins only on its main thread, and plugins call the host only from it too, with one exception: `audio_queue` and `audio_queued` are safe from a plugin's own threads. Both `MosaicPlugin` and `MosaicHost` start with their own `size`, and fields are only ever added at the end, so a plugin built against an older header keeps working with a newer launcher.
 
 ## Turning plugins on and off
 
@@ -500,6 +500,36 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   if (host->art_replace(ID, still) != 0) {
       // another plugin's art shows, or the built-in list shows none here
   }
+  ```
+
+- Audio calls let a plugin play sound, such as a video preview's, through SDL's audio queue. Check for them with `MOSAIC_HOST_HAS(host, audio_open)`. One plugin at a time has the device: the first to open it keeps it until it closes it or the launcher does, and other plugins' calls return -1 meanwhile. Nothing starts until a plugin asks: the first `audio_open` starts SDL's audio, and closing the device quits it again, as minarch does, so with no plugin playing the launcher opens no device, as stock's doesn't. (Stock's launcher does open a device of its own after waking from a sleep, which stays as it is.) Volume and mute are the system's, as for stock's own sounds, so there's nothing to set.
+
+  `audio_open(id, rate, channels)` opens the device for frames of signed 16-bit samples in the machine's byte order (`AUDIO_S16SYS`, ffmpeg's `AV_SAMPLE_FMT_S16`), `channels` (1 or 2) to a frame, interleaved, at `rate` frames a second (8000 to 96000). SDL converts them to whatever the device plays, so open at the clip's own rate and leave resampling to it. The device starts playing at once, silence while nothing is queued. Opening again in the same format keeps the device and what's queued and returns 0; in another format it closes the device and opens it again, dropping what was queued, so open once in the format you'll keep if you can. It returns 0, or -1 for a `NULL` or unknown id, a rate or channel count out of range, while another plugin has the device, or when SDL can't open it (the launcher logs why).
+
+  `audio_queue(id, frames, count)` adds `count` frames after what's queued (copying them, so the buffer is yours again when it returns), and returns 0, also for a `count` of 0, or -1 when the plugin doesn't have the device, for a `NULL` `frames` or a negative `count`, or when the queue would then hold more than `audio_queue_max_ms` (1000) of frames, so a stuck plugin can't fill memory; the launcher logs the first refusal past the cap after each open. `audio_queued(id)` returns how many frames are queued and not yet handed to the device, or -1 when the plugin doesn't have the device. The device's own buffer, 1024 frames, plays after them, so what's heard now is about `audio_queued + 1024` frames behind the last frame queued: that's a video's clock, to show each picture when its time comes. Keep a few hundred milliseconds queued, not the whole clip.
+
+  `audio_pause(id, paused)` stops playing with 1, keeping the queue, and plays on with 0; `audio_queued` stays put while paused. `audio_close(id)` closes the device, dropping what's queued. Both return 0, or -1 when the plugin doesn't have the device. Closing the device power-cycles the codec on some devices, which clicks, so don't close it at the end of each clip: keep it open, on silence, while another may start soon (the next selection's clip), and close it after a short linger with none.
+
+  The launcher closes the device itself, whoever has it, before a sleep, once what's queued has played out (it waits at most for the queue and the device's buffer), before a game or pak launches, before it powers off, and when it quits, after plugins' `before_sleep` and `pre_launch` and before their `quit`. After that `audio_queue` and `audio_queued` return -1, and the plugin opens it again when it wants to play, such as after `after_resume`. A plugin that declines to start has its device closed too.
+
+  `audio_queue` and `audio_queued` are the one exception to host calls being for the main thread only: call them from a decoder thread of your own. The launcher holds a lock while either uses the device, so a close, by the plugin or the launcher, waits for one in progress on another thread, and the device is never closed under it; calls after a close are refused with -1. Everything else, `audio_open`, `audio_pause` and `audio_close` included, is for the main thread only, and the launcher refuses those three from another thread with -1, logging it. Stop your threads in `quit`: the launcher has closed the device by then, so they're refused, but the plugin's code is unloaded after `quit` returns.
+
+  ```c
+  // init or selection_changed, on the main thread: a 44.1 kHz stereo clip
+  if (host->audio_open(ID, 44100, 2) != 0) {
+      // another plugin is playing: show the clip without sound
+  }
+
+  // the decoder thread: keep about a quarter of a second queued
+  while (playing) {
+      int queued = host->audio_queued(ID);
+      if (queued < 0) break; // closed, by the launcher or the plugin
+      if (queued < 44100 / 4) host->audio_queue(ID, pcm, frames);
+      else sleep_ms(10);
+  }
+
+  // tick, after the clip ends: linger, then close
+  if (!playing && now - ended_at > 3000) host->audio_close(ID);
   ```
 
 ## Without writing C

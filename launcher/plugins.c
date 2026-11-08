@@ -16,6 +16,7 @@
 #include "raprogress.h"
 #include "inputmodel.h"
 #include "pin.h"
+#include "audiomodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -722,6 +723,14 @@ void Plugins_artReplaceCheck(void) {
 	swapChanged(1);
 }
 
+// Audio_queue and Audio_queued run on plugins' threads too, so they never
+// read the loaded plugins; the others are refused off the main thread
+// before they do.
+static int hostAudioOpen(const char* plugin_id, int rate, int channels) {
+	if (!Audio_onMain(plugin_id, "audio_open")) return -1;
+	return isLoaded(plugin_id) ? Audio_open(plugin_id, rate, channels) : -1;
+}
+
 static int hostArtFind(const MosaicEntry* entry, int kind, char* out, size_t size) {
 	return ArtLoader_find((const Entry*)entry, kind, out, size);
 }
@@ -839,6 +848,12 @@ static const MosaicHost host = {
 	.achievement_hash = hostAchievementHash,
 	.surface_write = hostSurfaceWrite,
 	.art_replace = hostArtReplace,
+	.audio_open = hostAudioOpen,
+	.audio_queue = Audio_queue,
+	.audio_queued = Audio_queued,
+	.audio_pause = Audio_pause,
+	.audio_close = Audio_close,
+	.audio_queue_max_ms = AUDIO_QUEUE_MAX_MS,
 };
 
 ///////////////////////////////////////
@@ -941,6 +956,7 @@ static void load(const PluginManifest* m) {
 		hostInhibitSleep(m->id, 0);
 		hostLedClear(m->id);
 		freeSurfaces(m->id);
+		Audio_closeFor(m->id, "as it declined to start");
 		if (p->cfg) Hash_free(p->cfg);
 		dlclose(handle);
 		loaded_count--;
@@ -1005,6 +1021,7 @@ static void claimBackground(void) {
 }
 
 void Plugins_init(void) {
+	Audio_setMainThread();
 	if (exists(PAUSED_MARKER)) {
 		LOG_warn("plugins: paused after a crash; turn them back on from the Launcher pak\n");
 		return;
@@ -1065,6 +1082,8 @@ void Plugins_quit(void) {
 	LayoutSlot_clear(&layout);
 	TransitionSlots_clear(&transitions);
 	BackgroundSlot_clear(&background);
+	// before plugins' quit, which stop their threads: one still queueing meanwhile is refused
+	Audio_hostClose("at quit", 0);
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) p->plugin->quit();
@@ -1504,6 +1523,8 @@ void Plugins_tick(unsigned long now) {
 
 void Plugins_beforeSleep(void) {
 	EACH_PLUGIN_WITH(before_sleep) p->before_sleep();
+	// what plugins left open, once its last sound plays out
+	Audio_hostClose("before sleep", 1);
 	Bluetooth_pause(1);
 }
 
@@ -1515,6 +1536,7 @@ void Plugins_afterResume(void) {
 
 void Plugins_beforePoweroff(void) {
 	EACH_PLUGIN_WITH(before_poweroff) p->before_poweroff();
+	Audio_hostClose("before powering off", 0);
 	// so the device doesn't power off in a plugin's colour
 	const char* holder = Leds_holder();
 	if (holder) {

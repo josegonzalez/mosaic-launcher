@@ -48,5 +48,6 @@
 #include "artloader.h"
 #include "statuspill.h"
 #include "background.h"
+#include "audio.h"
 
 #endif
