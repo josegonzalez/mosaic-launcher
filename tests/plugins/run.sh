@@ -1949,8 +1949,9 @@ for mode in list grid; do
 		[ "$on" != "$beside" ] || fail "glider's pill isn't on the pill: $begin"
 	fi
 	# every frame up to the glide's end had the pill where the model puts it,
-	# the rest dimmed by the model's amount, and the last was black
-	last=$(grep "plugin glider: last " "$log")
+	# the rest dimmed by the model's amount, and the last was black (the
+	# ease can reach 1 a frame early, so the last summary counts)
+	last=$(grep "plugin glider: last " "$log" | tail -1)
 	echo "$last" | grep -qE "^.*last frames ([0-9]+) pill ([3-9]|[1-9][0-9]+) of ([0-9]+) dim ([0-9]+) of ([0-9]+) black 1$" \
 		|| fail "launch-animation's frames are wrong: ${last:-no last frame}"
 	# shellcheck disable=SC2046
