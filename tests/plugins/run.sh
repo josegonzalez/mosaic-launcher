@@ -1040,6 +1040,17 @@ for mode in bad frame noframe; do
 done
 rm -f "$STATE/slider.cfg"
 
+# with stock's Menu transitions off there are none: slider isn't asked about
+# the pushes, and the folders still open; the card's settings are put back
+[ -f "$SETTINGS" ] && cp "$SETTINGS" "$WORK/minuisettings.txt.saved"
+printf 'menutransitions=0\n' >"$SETTINGS"
+SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/slider-setting.log" "plugin slider: done at" \
+	|| fail "the launcher exited early with Menu transitions off"
+log="$WORK/slider-setting.log"
+grep -qF "plugin slider: begin" "$log" && fail "slider was asked with Menu transitions off"
+expect "done at $CARD/Slider/Inner"
+if [ -f "$WORK/minuisettings.txt.saved" ]; then cp "$WORK/minuisettings.txt.saved" "$SETTINGS"; else rm -f "$SETTINGS"; fi
+
 # without a slot it's never asked
 printf 'id=slider\nname=Slider\napi=1\n' >"$WORK/plugins/slider.plugin/plugin.txt"
 run_launcher "$WORK/slider-unslotted.log" "plugin slider: done at" || fail "the launcher exited early with slider unslotted"

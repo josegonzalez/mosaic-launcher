@@ -1409,7 +1409,7 @@ int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view, ListS
 // transition styles
 
 int Plugins_hasTransition(int kind) {
-	return TransitionSlots_owner(&transitions, kind) >= 0;
+	return TransitionSlots_asked(&transitions, kind, CFG_getMenuTransitions()) >= 0;
 }
 
 // After an error: stock's transitions for the rest of the run.
@@ -1421,7 +1421,7 @@ static void transitionFailed(const char* hook, int rc) {
 
 int Plugins_transitionBegin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, int stock_ms,
 		const ListSelection* old_sel, const ListSelection* new_sel, MosaicTransition* out) {
-	int owner = TransitionSlots_owner(&transitions, kind);
+	int owner = TransitionSlots_asked(&transitions, kind, CFG_getMenuTransitions());
 	if (owner < 0 || transition_owner >= 0 || !old_frame || !new_frame || old_frame == new_frame) return MOSAIC_STYLE_STOCK;
 	const MosaicSurface* old_lent = PluginDraw_lendReadOnly(old_frame);
 	const MosaicSurface* new_lent = PluginDraw_lendReadOnly(new_frame);

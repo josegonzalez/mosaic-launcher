@@ -150,7 +150,8 @@ void Plugins_decorateRow(struct SDL_Surface* surface, const Entry* entry, Mosaic
 // left out from then on.
 void Plugins_header(struct SDL_Surface* surface, HeaderRow* row);
 
-// 1 while a slot's owner is asked about kind (an enum MosaicTransitionKind).
+// 1 while a slot's owner is asked about kind (an enum MosaicTransitionKind):
+// never for pushes, pops and screen changes with stock's Menu transitions off.
 int Plugins_hasTransition(int kind);
 
 // Asks the owner how to draw a kind of transition between two frames (a

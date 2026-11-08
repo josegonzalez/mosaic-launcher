@@ -44,6 +44,31 @@ static void testSlots(void) {
 	CHECK(s.transition == -1 && s.launch == -1 && !s.transition_off && !s.launch_off);
 }
 
+static void testMenuSetting(void) {
+	TransitionSlots s;
+	TransitionSlots_clear(&s);
+	s.transition = 2;
+	s.launch = 4;
+	// on (snappy or comfy), each slot's owner is asked as usual
+	for (int on = 1; on <= 2; on++) {
+		CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_PUSH, on) == 2);
+		CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_POP, on) == 2);
+		CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_SCREEN, on) == 2);
+		CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_LAUNCH, on) == 4);
+	}
+	// off, the transition slot's owner isn't asked; the launch slot's still is
+	CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_PUSH, 0) == -1);
+	CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_POP, 0) == -1);
+	CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_SCREEN, 0) == -1);
+	CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_LAUNCH, 0) == 4);
+	CHECK(TransitionSlots_asked(&s, -1, 0) == -1);
+	CHECK(TransitionSlots_asked(&s, -1, 1) == -1);
+	// a failed owner stays off either way
+	TransitionSlots_fail(&s, 4);
+	CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_LAUNCH, 0) == -1);
+	CHECK(TransitionSlots_asked(&s, MOSAIC_TRANSITION_LAUNCH, 1) == -1);
+}
+
 static void testStyle(void) {
 	CHECK(Transition_checkStyle(MOSAIC_STYLE_STOCK, 0) == MOSAIC_STYLE_STOCK);
 	CHECK(Transition_checkStyle(MOSAIC_STYLE_OFF, 0) == MOSAIC_STYLE_OFF);
@@ -146,6 +171,7 @@ static void testRun(void) {
 
 int main(void) {
 	testSlots();
+	testMenuSetting();
 	testStyle();
 	testCap();
 	testEase();

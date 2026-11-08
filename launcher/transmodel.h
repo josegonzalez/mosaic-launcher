@@ -30,6 +30,11 @@ void TransitionSlots_clear(TransitionSlots* slots);
 // one that's off, or an unknown kind.
 int TransitionSlots_owner(const TransitionSlots* slots, int kind);
 
+// The owner asked about kind with the stock Menu transitions setting at
+// menu_transitions: as TransitionSlots_owner, but none for pushes, pops and
+// screen changes while it's off, since off means no menu transitions at all.
+int TransitionSlots_asked(const TransitionSlots* slots, int kind, int menu_transitions);
+
 // Turns owner off for every kind it owns.
 void TransitionSlots_fail(TransitionSlots* slots, int owner);
 

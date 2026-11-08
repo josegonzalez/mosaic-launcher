@@ -20,6 +20,11 @@ int TransitionSlots_owner(const TransitionSlots* slots, int kind) {
 	}
 }
 
+int TransitionSlots_asked(const TransitionSlots* slots, int kind, int menu_transitions) {
+	if (!menu_transitions && kind != MOSAIC_TRANSITION_LAUNCH) return -1;
+	return TransitionSlots_owner(slots, kind);
+}
+
 void TransitionSlots_fail(TransitionSlots* slots, int owner) {
 	if (owner < 0) return;
 	if (slots->transition == owner) slots->transition_off = 1;
