@@ -105,6 +105,9 @@ int main (int argc, char *argv[]) {
 	if(currentScreen == SCREEN_GAMESWITCHER)
 		lastScreen = SCREEN_GAME;
 
+	// a plugin's home screen in place of the root list
+	Plugins_homeStart();
+
 	// make sure we have no running games logged as active anymore (we might be launching back into the UI here)
 	system("gametimectl.elf stop_all");
 	// and forget what plugins read before stop_all closed the last session
@@ -422,6 +425,7 @@ int main (int argc, char *argv[]) {
 			char* last = state.top->entries->count > 0 ? ((Entry*)state.top->entries->items[state.top->selected])->path : state.top->path;
 			LOG_info("restarting after HDMI change... (%s)\n", last);
 			saveLast(last); // NOTE: doesn't work in Recents (by design)
+			Plugins_homeLeaving(); // and back to a plugin's home screen, if it showed
 			sleep(1); // cable-seating debounce; the output switch itself happens at next app start
 			state.quit = 1;
 		}

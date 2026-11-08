@@ -11,15 +11,19 @@
 // screener.open action, which opens screener.main, to Y on the game list.
 // It owns the transition slot, picking no transition but logging the old
 // and new frames' pixel at the probe (where tests/plugins/layerer draws its
-// overlay), so a case can see what was on screen, overlays included.
+// overlay), so a case can see what was on screen, overlays included. Its
+// home setting, main or fail, marks that screen MOSAIC_SCREEN_HOME, for
+// the home slot (slots=home in its plugin.txt).
 //
 // Its steps setting is a comma separated list run from tick, one every 20
 // ticks from the 40th: y, a or b presses that button (the desktop build
 // reads the keyboard through SDL, so it pushes key events with
 // SDL_PushEvent, found with dlsym: a test-only shortcut), open:<id> and
-// close:<id> call open_screen and close_screen, and confirm opens a
-// confirm dialog. It logs what each returns, what current_screen says
-// whenever it changes, and "done" 40 ticks after the last step.
+// close:<id> call open_screen and close_screen, action:<id> calls
+// run_action, pak:<path> opens a pak with open_path, and confirm opens a
+// confirm dialog. It logs what each
+// returns, what current_screen says whenever it changes, and "done" 40
+// ticks after the last step.
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -185,16 +189,18 @@ static int init(const MosaicHost* h) {
 	pushEvent = (int (*)(Event*))dlsym(RTLD_DEFAULT, "SDL_PushEvent");
 	if (!pushEvent) say("no SDL_PushEvent");
 
-	registerScreen(&main_screen, 0, 1);
+	const char* home = host->cfg_get(ID, "home", "");
+	registerScreen(&main_screen, !strcmp(home, "main") ? MOSAIC_SCREEN_HOME : 0, 1);
 	registerScreen(&bare_screen, 0, 0);
 	registerScreen(&full_screen, MOSAIC_SCREEN_FULL, 1);
-	registerScreen(&fail_screen, 0, 1);
+	registerScreen(&fail_screen, !strcmp(home, "fail") ? MOSAIC_SCREEN_HOME : 0, 1);
 	MosaicScreenHooks good = { sizeof(good), NULL, 0, NULL, NULL, NULL, render, NULL };
 	MosaicScreenHooks none = { sizeof(none), NULL, 0, NULL, NULL, NULL, NULL, NULL };
 	say("refused dup %i builtin %i empty %i no render %i open %i close %i",
 		host->register_screen("screener.main", &good), host->register_screen("gamelist", &good),
 		host->register_screen("", &good), host->register_screen("screener.none", &none),
 		host->open_screen("screener.main"), host->close_screen("screener.main"));
+	say("run from init %i", host->run_action("gamelist.quick_menu"));
 	host->register_action("screener.open", "Open", canOpen, openMain, NULL);
 	host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "screener.open");
 	return 0;
@@ -225,6 +231,8 @@ static int stepAt(int i, char* out, size_t size) {
 static void runStep(const char* step) {
 	if (!strncmp(step, "open:", 5)) say("open %s %i", step + 5, host->open_screen(step + 5));
 	else if (!strncmp(step, "close:", 6)) say("close %s %i", step + 6, host->close_screen(step + 6));
+	else if (!strncmp(step, "action:", 7)) say("run %s %i", step + 7, host->run_action(step + 7));
+	else if (!strncmp(step, "pak:", 4)) say("open pak %i", host->open_path(step + 4, MOSAIC_ENTRY_PAK));
 	else if (!strcmp(step, "confirm")) host->confirm("Screener?", "Yes", onYes, NULL);
 	else if (!strcmp(step, "register")) {
 		MosaicScreenHooks good = { sizeof(good), NULL, 0, NULL, NULL, NULL, render, NULL };
@@ -251,7 +259,7 @@ static void tick(unsigned long now) {
 	}
 	if (done || ticks < 40 || (ticks - 40) % 20) return;
 	int at = (ticks - 40) / 20;
-	char step[80];
+	char step[512]; // as long as a pak's path
 	if (at < step_count && stepAt(at, step, sizeof(step))) runStep(step);
 	else if (at >= step_count + 2) {
 		done = 1;

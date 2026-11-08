@@ -28,6 +28,7 @@
 #define TRANSITION_SLOT "transition" // the exclusive slot asked how folders push and pop and screens change
 #define LAUNCH_SLOT "launch" // the exclusive slot asked how a launch begins
 #define BACKGROUND_SLOT "background" // the exclusive slot background_render belongs to
+#define HOME_SLOT "home" // the exclusive slot whose MOSAIC_SCREEN_HOME screen is in place of the root list
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -228,6 +229,27 @@ void Plugins_screensCheck(void);
 
 // Closes every open screen, running their exit, as for a launch or quit.
 void Plugins_screensClose(void);
+
+// The home slot. Once at start, after currentScreen is set: opens the home
+// screen over the game list, or remembers it's under the quick menu or game
+// switcher that shows first, unless the last launch was from the game list.
+void Plugins_homeStart(void);
+
+// 1 when the game list's back at the root goes to the home screen.
+int Plugins_homeReady(void);
+
+// The game list's back at the root: opens the home screen, sliding back as
+// from a folder.
+void Plugins_openHome(void);
+
+// The quick menu or game switcher, once it set currentScreen back to the
+// game list: opens the home screen instead when it was under them.
+void Plugins_homeBack(void);
+
+// Saves where the launcher is leaving from, the home screen or the game
+// list, for Plugins_homeStart on the next start: at a launch, and when it
+// restarts for HDMI.
+void Plugins_homeLeaving(void);
 
 // 1 when plugins' overlays draw over screen (a SCREEN_* id): one has
 // overlay_render, and screen takes them.

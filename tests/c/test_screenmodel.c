@@ -166,11 +166,87 @@ static void testOverlays(void) {
 	CHECK(ScreenKind_overlays(SCREENKIND_LIST, MOSAIC_SCREEN_FULL));
 }
 
+static void testHome(void) {
+	ScreenSet set;
+	ScreenSet_clear(&set);
+	CHECK(set.home == -1 && !ScreenSet_homeReady(&set) && !ScreenSet_homeOpen(&set));
+	MosaicScreenHooks plain = hooks();
+	MosaicScreenHooks home = hooks();
+	home.flags = MOSAIC_SCREEN_HOME | MOSAIC_SCREEN_FULL;
+	ScreenSet_add(&set, "a.home", 0, &home); // owner 0 doesn't own the slot below
+	ScreenSet_add(&set, "b.plain", 1, &plain);
+	ScreenSet_add(&set, "b.home", 1, &home);
+	ScreenSet_add(&set, "b.home2", 1, &home);
+
+	// only the owner's, its first with the flag
+	CHECK(ScreenSet_claimHome(&set, 2) == -1);
+	CHECK(!ScreenSet_homeReady(&set));
+	CHECK(ScreenSet_claimHome(&set, 1) == 2);
+	CHECK(set.home == 2 && ScreenSet_homeReady(&set) && !ScreenSet_homeOpen(&set));
+
+	// open anywhere on the stack
+	CHECK(ScreenSet_push(&set, 1, 0) == SCREEN_OPENS);
+	CHECK(!ScreenSet_homeOpen(&set));
+	CHECK(!strcmp(ScreenSet_leftFrom(&set), "list"));
+	CHECK(ScreenSet_push(&set, 2, 0) == SCREEN_OPENS);
+	CHECK(ScreenSet_homeOpen(&set));
+	CHECK(!strcmp(ScreenSet_leftFrom(&set), "home"));
+
+	// a dialog or another plugin screen over it keeps the stack
+	CHECK(!ScreenSet_coveredBy(&set, SCREENKIND_DIALOG));
+	CHECK(!ScreenSet_coveredBy(&set, SCREENKIND_PLUGIN));
+	CHECK(!set.under);
+	// the quick menu over it closes the stack, and goes back to it after
+	CHECK(ScreenSet_coveredBy(&set, SCREENKIND_QUICKMENU));
+	CHECK(set.under);
+	while (ScreenSet_pop(&set) >= 0) {}
+	CHECK(!ScreenSet_coveredBy(&set, SCREENKIND_QUICKMENU));
+	CHECK(set.under && !strcmp(ScreenSet_leftFrom(&set), "home"));
+	CHECK(ScreenSet_backToHome(&set));
+	CHECK(!set.under && !ScreenSet_backToHome(&set));
+
+	// the game list in front forgets it, as a quick menu tile opening a folder does
+	set.under = 1;
+	CHECK(!ScreenSet_coveredBy(&set, SCREENKIND_LIST));
+	CHECK(!set.under && !strcmp(ScreenSet_leftFrom(&set), "list"));
+	// the switcher over the list alone doesn't go to it
+	CHECK(!ScreenSet_coveredBy(&set, SCREENKIND_SWITCHER));
+	CHECK(!set.under);
+
+	// the list in front of it some other way closes it
+	ScreenSet_push(&set, 2, 0);
+	CHECK(ScreenSet_coveredBy(&set, SCREENKIND_LIST));
+	CHECK(!set.under);
+	ScreenSet_pop(&set);
+
+	// after an error, never again until a restart
+	set.under = 1;
+	set.screens[2].off = 1;
+	CHECK(!ScreenSet_homeReady(&set));
+	CHECK(!ScreenSet_backToHome(&set));
+	CHECK(!set.under);
+	set.screens[2].off = 0;
+
+	// where the launcher starts
+	CHECK(Home_start(0, NULL, SCREENKIND_LIST) == HOME_START_NONE);
+	CHECK(Home_start(0, "home", SCREENKIND_LIST) == HOME_START_NONE);
+	CHECK(Home_start(1, NULL, SCREENKIND_LIST) == HOME_START_OPEN);
+	CHECK(Home_start(1, "", SCREENKIND_LIST) == HOME_START_OPEN);
+	CHECK(Home_start(1, "home", SCREENKIND_LIST) == HOME_START_OPEN);
+	CHECK(Home_start(1, "home\n", SCREENKIND_LIST) == HOME_START_OPEN);
+	CHECK(Home_start(1, "list", SCREENKIND_LIST) == HOME_START_NONE);
+	CHECK(Home_start(1, "list\n", SCREENKIND_SWITCHER) == HOME_START_NONE);
+	CHECK(Home_start(1, NULL, SCREENKIND_SWITCHER) == HOME_START_UNDER);
+	CHECK(Home_start(1, "home", SCREENKIND_QUICKMENU) == HOME_START_UNDER);
+	CHECK(Home_start(1, NULL, SCREENKIND_DIALOG) == HOME_START_NONE);
+}
+
 int main(void) {
 	testAdd();
 	testDropOwner();
 	testStack();
 	testSlides();
 	testOverlays();
+	testHome();
 	CHECK_DONE();
 }

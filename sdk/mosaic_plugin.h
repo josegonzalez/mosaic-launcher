@@ -345,6 +345,10 @@ enum MosaicScreenFlag {
 	// The whole screen is the plugin's: no status pill, header widgets or
 	// overlays, such as for a screensaver or a charging screen.
 	MOSAIC_SCREEN_FULL = 1,
+	// The home screen, in place of the root list: what the launcher opens
+	// first and goes back to. Only for the home slot's owner (slots=home),
+	// on one of its screens; the first it registers with the flag wins.
+	MOSAIC_SCREEN_HOME = 2,
 };
 
 // What MosaicScreenHooks' input returns.
@@ -961,6 +965,16 @@ typedef struct MosaicHost {
 	int (*open_screen)(const char* id);
 	int (*close_screen)(const char* id);
 	const char* (*current_screen)(void);
+
+	// Runs an action as a button bound to it would: one from
+	// register_action, or one of the game list's own (see override_button),
+	// such as gamelist.quick_menu or gamelist.switcher to open the quick
+	// menu or game switcher from a plugin screen. Returns 0, or -1 for an
+	// unknown action, one that isn't available, and wherever open_screen
+	// is refused. A built-in screen it opens from a plugin screen closes
+	// the plugin screens, as an FN button does. Check for it with
+	// MOSAIC_HOST_HAS(host, run_action).
+	int (*run_action)(const char* action_id);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

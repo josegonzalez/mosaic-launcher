@@ -53,6 +53,8 @@ void QuickMenu_handleInput(void) {
 		currentScreen = SCREEN_GAMELIST;
 		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
 		state.dirty = 1;
+		// or to a plugin's home screen, when it opened over that
+		Plugins_homeBack();
 	}
 	else if (PAD_justReleased(BTN_A) && selectedTile()) {
 		Entry *selected = selectedTile();

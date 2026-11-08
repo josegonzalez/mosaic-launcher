@@ -78,7 +78,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `screen_switcher.c` | game switcher input and rendering |
 | `screen_quickmenu.c` | quick menu input and rendering |
 | `screen_plugin.c` | plugins' screens, lent the screen under the header `main()` drew, and plugins' overlays, drawn on the topmost layer before each redrawn frame is shown |
-| `screenmodel.c` | the SDL-free half of plugins' screens: the screens registered, the stack of those open over a built-in screen, and which screens slide and take overlays |
+| `screenmodel.c` | the SDL-free half of plugins' screens: the screens registered, the stack of those open over a built-in screen, which screens slide and take overlays, and the home slot's rules for where the launcher starts and goes back to |
 | `art.c` | where each kind of image (thumbnails, backgrounds, quick menu art) is looked up |
 | `quickitems.c` | the quick menu's pak shortcuts and toggles: which appear, their icons, and what they do |
 | `quicktiles.c` | plugins' quick menu tiles, and the tiles plugins hide or relabel |

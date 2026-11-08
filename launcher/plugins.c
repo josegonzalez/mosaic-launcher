@@ -26,6 +26,7 @@
 #define LAUNCHED_MARKER "/tmp/mosaic-launcher-launched" // a launch went ahead; post_return is due
 #define LOADING_MARKER PLUGIN_STATE_DIR "/loading"
 #define PAUSED_MARKER PLUGIN_STATE_DIR "/plugins_paused"
+#define HOME_LEFT_PATH "/tmp/mosaic-launcher-home" // where the last launch left from: home or list
 
 typedef struct LoadedPlugin {
 	void* handle;
@@ -45,6 +46,7 @@ typedef struct LoadedPlugin {
 	int art_deco_off;    // its decorate_art failed, so it's no longer called
 	int filter_off;      // its input_filter failed, so it's no longer called
 	int overlay_off;     // its overlay_render failed, so its overlay is left out
+	int owns_home;       // claims the home slot, so its MOSAIC_SCREEN_HOME screen is in place of the root list
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -758,6 +760,7 @@ static int hostDecorateArt(MosaicSurface* screen, int index, const MosaicRect* a
 static int hostRegisterScreen(const char* id, const MosaicScreenHooks* hooks);
 static int hostOpenScreen(const char* id);
 static int hostCloseScreen(const char* id);
+static int hostRunAction(const char* action_id);
 
 static void playLog(const char* message) {
 	LOG_info("%s\n", message);
@@ -878,6 +881,7 @@ static const MosaicHost host = {
 	.open_screen = hostOpenScreen,
 	.close_screen = hostCloseScreen,
 	.current_screen = Plugins_currentScreen,
+	.run_action = hostRunAction,
 };
 
 ///////////////////////////////////////
@@ -937,6 +941,7 @@ static void load(const PluginManifest* m) {
 	if (!p->owns_background && Plugin_has(plugin, background_render) && plugin->background_render) {
 		LOG_warn("plugins: %s has background_render but no slots=" BACKGROUND_SLOT ", so it won't be called\n", m->id);
 	}
+	p->owns_home = csvHas(m->slots, HOME_SLOT);
 	int has_width = Plugin_has(plugin, header_width) && plugin->header_width;
 	int has_widget = Plugin_has(plugin, header_widget) && plugin->header_widget;
 	if (has_width != has_widget) {
@@ -1046,8 +1051,29 @@ static void claimBackground(void) {
 	}
 }
 
+// The home slot's screen, once every plugin has loaded. The flag on any
+// other plugin's screen means nothing.
+static void claimHome(void) {
+	int owner = -1;
+	for (int i = 0; i < loaded_count && owner < 0; i++) {
+		if (loaded[i].owns_home) owner = i;
+	}
+	for (int i = 0; i < screens.count; i++) {
+		const PluginScreen* s = &screens.screens[i];
+		if (s->owner != owner && (s->hooks.flags & MOSAIC_SCREEN_HOME)) {
+			LOG_warn("plugins: %s's screen %s is marked home but %s has no slots=" HOME_SLOT ", so it's an ordinary screen\n",
+				loaded[s->owner].id, s->id, loaded[s->owner].id);
+		}
+	}
+	if (owner < 0) return;
+	int home = ScreenSet_claimHome(&screens, owner);
+	if (home >= 0) LOG_info("plugins: %s's screen %s is the home screen\n", loaded[owner].id, screens.screens[home].id);
+	else LOG_warn("plugins: %s owns the " HOME_SLOT " slot but registered no MOSAIC_SCREEN_HOME screen, using the root list\n", loaded[owner].id);
+}
+
 void Plugins_init(void) {
 	Audio_setMainThread();
+	ScreenSet_clear(&screens);
 	if (exists(PAUSED_MARKER)) {
 		LOG_warn("plugins: paused after a crash; turn them back on from the Launcher pak\n");
 		return;
@@ -1088,6 +1114,7 @@ void Plugins_init(void) {
 	claimLayout();
 	claimTransitions();
 	claimBackground();
+	claimHome();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
@@ -1471,6 +1498,7 @@ int Plugins_preLaunch(const char* path, int type) {
 	}
 	pending_set = 0;
 	if (loaded_count > 0) putFile(LAUNCHED_MARKER, "");
+	Plugins_homeLeaving();
 	return 1;
 }
 
@@ -2070,16 +2098,10 @@ const char* Plugins_currentScreen(void) {
 	}
 }
 
-static int hostOpenScreen(const char* id) {
-	if (!screenCallAllowed("open_screen")) return -1;
-	int index = ScreenSet_find(&screens, id);
-	int why = ScreenSet_canOpen(&screens, index);
-	if (why != SCREEN_OPENS) {
-		LOG_warn("plugins: can't open screen %s: %s\n", id ? id : "(null)",
-			why == SCREEN_UNKNOWN ? "there's no such screen" : why == SCREEN_IS_OFF ? "it failed earlier"
-			: why == SCREEN_IS_OPEN ? "it's open already" : "too many screens are open");
-		return -1;
-	}
+// Opens a screen that can open, running its enter, and slides it in with
+// slide (ANIM_NONE for none) where screens slide. Returns 0, or -1 when
+// enter declined.
+static int openScreen(int index, int slide) {
 	PluginScreen* s = &screens.screens[index];
 	if (s->hooks.enter) {
 		screen_hook = 1;
@@ -2094,10 +2116,23 @@ static int hostOpenScreen(const char* id) {
 	// the base is only kept from the first, which opens over a built-in screen
 	ScreenSet_push(&screens, index, currentScreen);
 	currentScreen = SCREEN_PLUGIN;
-	if (ScreenKind_slides(screenKind(from), SCREENKIND_PLUGIN)) state.animationdirection = SLIDE_LEFT;
+	if (ScreenKind_slides(screenKind(from), SCREENKIND_PLUGIN)) state.animationdirection = slide;
 	state.dirty = 1;
 	LOG_info("plugins: opened screen %s\n", s->id);
 	return 0;
+}
+
+static int hostOpenScreen(const char* id) {
+	if (!screenCallAllowed("open_screen")) return -1;
+	int index = ScreenSet_find(&screens, id);
+	int why = ScreenSet_canOpen(&screens, index);
+	if (why != SCREEN_OPENS) {
+		LOG_warn("plugins: can't open screen %s: %s\n", id ? id : "(null)",
+			why == SCREEN_UNKNOWN ? "there's no such screen" : why == SCREEN_IS_OFF ? "it failed earlier"
+			: why == SCREEN_IS_OPEN ? "it's open already" : "too many screens are open");
+		return -1;
+	}
+	return openScreen(index, SLIDE_LEFT);
 }
 
 static void runExit(PluginScreen* s) {
@@ -2108,16 +2143,19 @@ static void runExit(PluginScreen* s) {
 }
 
 // Closes the open screens from the top down to index, running their exit,
-// and goes back to what's under it, sliding out as a folder does.
+// and goes back to what's under it, sliding out as a folder does. The home
+// screen, the root's parent, goes on to the list as a folder opens.
 static void closeTo(int index) {
+	int top = -1;
 	while (screens.depth > 0) {
-		int top = ScreenSet_pop(&screens);
+		top = ScreenSet_pop(&screens);
 		runExit(&screens.screens[top]);
 		LOG_info("plugins: closed screen %s\n", screens.screens[top].id);
 		if (top == index) break;
 	}
 	currentScreen = screens.depth > 0 ? SCREEN_PLUGIN : screens.base;
-	if (ScreenKind_slides(SCREENKIND_PLUGIN, screenKind(currentScreen))) state.animationdirection = SLIDE_RIGHT;
+	int forward = screens.depth == 0 && top == screens.home;
+	if (ScreenKind_slides(SCREENKIND_PLUGIN, screenKind(currentScreen))) state.animationdirection = forward ? SLIDE_LEFT : SLIDE_RIGHT;
 	folderbgchanged = 1; // the screen cleared every layer; repaint the background
 	state.dirty = 1;
 }
@@ -2133,6 +2171,18 @@ static int hostCloseScreen(const char* id) {
 	return 0;
 }
 
+static int hostRunAction(const char* action_id) {
+	if (!screenCallAllowed("run_action")) return -1;
+	const Action* action = Actions_find(action_id);
+	if (!action) {
+		LOG_warn("plugins: can't run action %s: there's no such action\n", action_id ? action_id : "(null)");
+		return -1;
+	}
+	if (!Action_available(action)) return -1;
+	Action_run(action);
+	return 0;
+}
+
 // After an error the screen stays off until the launcher restarts; it
 // closes on the next input, where nothing is mid-draw.
 static void screenFailed(PluginScreen* s, const char* hook, int rc) {
@@ -2140,6 +2190,7 @@ static void screenFailed(PluginScreen* s, const char* hook, int rc) {
 	state.dirty = 1;
 	LOG_warn("plugins: %s's screen %s's %s returned %i, closing it until the launcher restarts\n",
 		loaded[s->owner].id, s->id, hook, rc);
+	if (s - screens.screens == screens.home) LOG_warn("plugins: using the root list in place of the home screen until the launcher restarts\n");
 }
 
 // Every button a screen sees: a layout's, and MENU.
@@ -2173,8 +2224,9 @@ void Plugins_screenInput(void) {
 	}
 	else rc = PAD_justPressed(BTN_B) ? MOSAIC_SCREEN_CLOSE : MOSAIC_SCREEN_STAY;
 	if (rc != MOSAIC_SCREEN_STAY && rc != MOSAIC_SCREEN_CLOSE) screenFailed(s, "input", rc);
-	// a dialog it opened shows over it, and it closes after
-	if (currentScreen == SCREEN_MODAL) return;
+	// a dialog it opened shows over it, and it closes after; a built-in
+	// screen it opened with run_action closes the stack in screensCheck
+	if (currentScreen != SCREEN_PLUGIN) return;
 	if ((rc == MOSAIC_SCREEN_CLOSE || s->off) && ScreenSet_position(&screens, top) >= 0) {
 		closeTo(top);
 		return;
@@ -2203,13 +2255,56 @@ void Plugins_screenRender(SDL_Surface* surface, const MosaicScreenView* view) {
 }
 
 void Plugins_screensCheck(void) {
-	if (screens.depth == 0 || currentScreen == SCREEN_PLUGIN || currentScreen == SCREEN_MODAL) return;
-	// left for a built-in screen some other way, such as an FN button's action
+	// left for a built-in screen some other way, such as an FN button's
+	// action; a quick menu or game switcher over the home screen goes back
+	// to it once it closes
+	if (!ScreenSet_coveredBy(&screens, screenKind(currentScreen))) return;
 	while (screens.depth > 0) {
 		int top = ScreenSet_pop(&screens);
 		runExit(&screens.screens[top]);
 		LOG_info("plugins: closed screen %s, as the %s opened over it\n", screens.screens[top].id, Plugins_currentScreen());
 	}
+}
+
+void Plugins_homeStart(void) {
+	char left[16] = "";
+	int has_left = exists(HOME_LEFT_PATH);
+	if (has_left) {
+		getFile(HOME_LEFT_PATH, left, sizeof(left));
+		unlink(HOME_LEFT_PATH);
+	}
+	switch (Home_start(ScreenSet_homeReady(&screens), has_left ? left : NULL, screenKind(currentScreen))) {
+		case HOME_START_OPEN:
+			// as the first screen, so nothing slides
+			openScreen(screens.home, ANIM_NONE);
+			break;
+		case HOME_START_UNDER:
+			screens.under = 1;
+			LOG_info("plugins: the %s goes back to the home screen\n", Plugins_currentScreen());
+			break;
+		default:
+			break;
+	}
+}
+
+int Plugins_homeReady(void) {
+	return ScreenSet_homeReady(&screens) && !ScreenSet_homeOpen(&screens);
+}
+
+void Plugins_openHome(void) {
+	if (!Plugins_homeReady() || currentScreen == SCREEN_MODAL || state.startgame) return;
+	openScreen(screens.home, SLIDE_RIGHT);
+}
+
+void Plugins_homeBack(void) {
+	if (!ScreenSet_backToHome(&screens) || state.startgame) return;
+	// the quick menu and switcher show the list at once, so home does too
+	openScreen(screens.home, ANIM_NONE);
+}
+
+void Plugins_homeLeaving(void) {
+	if (screens.home < 0) return;
+	putFile(HOME_LEFT_PATH, (char*)ScreenSet_leftFrom(&screens));
 }
 
 void Plugins_screensClose(void) {

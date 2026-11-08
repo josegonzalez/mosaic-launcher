@@ -34,6 +34,8 @@ typedef struct ScreenSet {
 	int stack[SCREEN_STACK_MAX]; // indexes into screens, the bottom first
 	int depth;
 	int base; // the built-in screen under the stack, the caller's id for it
+	int home;  // the home slot's screen, or -1
+	int under; // the quick menu or game switcher in front opened over the home screen, so goes back to it
 } ScreenSet;
 
 void ScreenSet_clear(ScreenSet* set);
@@ -94,5 +96,41 @@ int ScreenKind_slides(int from, int to);
 // whose questions they could hide, or a plugin screen with
 // MOSAIC_SCREEN_FULL.
 int ScreenKind_overlays(int kind, int flags);
+
+// The home slot: one plugin's screen in place of the root list.
+
+// Makes owner's first screen with MOSAIC_SCREEN_HOME the home screen, or
+// leaves none. Returns it, or -1.
+int ScreenSet_claimHome(ScreenSet* set, int owner);
+
+// 1 while there's a home screen that can open: it hasn't failed.
+int ScreenSet_homeReady(const ScreenSet* set);
+
+// 1 while the home screen is open, anywhere on the stack.
+int ScreenSet_homeOpen(const ScreenSet* set);
+
+// What the launcher starts on, given whether the home screen is ready,
+// what the last launch left in the home file (NULL without one), and the
+// kind of screen it would start on.
+enum HomeStart {
+	HOME_START_NONE,  // the built-in screen, as stock
+	HOME_START_OPEN,  // the home screen, over the game list
+	HOME_START_UNDER, // the quick menu or game switcher, going back to the home screen
+};
+int Home_start(int ready, const char* left, int kind);
+
+// What a launch leaves in the home file: "home" with the home screen open,
+// or under the quick menu or game switcher in front, and "list" otherwise.
+const char* ScreenSet_leftFrom(const ScreenSet* set);
+
+// After a built-in screen came in front of the stack some other way than
+// open_screen and close_screen, such as an FN button: 1 when the open
+// screens should close. A quick menu or game switcher over the home screen
+// goes back to it once it closes; the game list in front forgets that.
+int ScreenSet_coveredBy(ScreenSet* set, int kind);
+
+// The quick menu or game switcher closing back to the game list: 1 when
+// the home screen opens in the list's place, as it was under them.
+int ScreenSet_backToHome(ScreenSet* set);
 
 #endif

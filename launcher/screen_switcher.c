@@ -6,6 +6,8 @@ void Switcher_handleInput(void) {
 		state.switcher_selected = 0;
 		state.dirty = 1;
 		folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
+		// or to a plugin's home screen, when it opened over that
+		Plugins_homeBack();
 	}
 	else if (state.recents->count > 0 && PAD_justReleased(BTN_A)) {
 		// this will drop us back into game switcher after leaving the game

@@ -32,10 +32,15 @@ static void openSelected(void* data) {
 
 static int canGoBack(void* data) {
 	(void)data;
-	return state.stack->count>1;
+	// at the root, back to a plugin's home screen
+	return state.stack->count>1 || Plugins_homeReady();
 }
 static void goBack(void* data) {
 	(void)data;
+	if (state.stack->count<=1) {
+		Plugins_openHome();
+		return;
+	}
 	closeDirectory();
 	state.animationdirection = SLIDE_RIGHT;
 	total = state.top->entries->count;

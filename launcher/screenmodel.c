@@ -4,6 +4,7 @@
 
 void ScreenSet_clear(ScreenSet* set) {
 	memset(set, 0, sizeof(*set));
+	set->home = -1;
 }
 
 static const char* const builtins[] = { "gamelist", "switcher", "quickmenu", "dialog" };
@@ -92,4 +93,46 @@ int ScreenKind_overlays(int kind, int flags) {
 	if (kind == SCREENKIND_DIALOG) return 0;
 	if (kind == SCREENKIND_PLUGIN && (flags & MOSAIC_SCREEN_FULL)) return 0;
 	return 1;
+}
+
+int ScreenSet_claimHome(ScreenSet* set, int owner) {
+	set->home = -1;
+	for (int i = 0; i < set->count && set->home < 0; i++) {
+		if (set->screens[i].owner == owner && (set->screens[i].hooks.flags & MOSAIC_SCREEN_HOME)) set->home = i;
+	}
+	return set->home;
+}
+
+int ScreenSet_homeReady(const ScreenSet* set) {
+	return set->home >= 0 && set->home < set->count && !set->screens[set->home].off;
+}
+
+int ScreenSet_homeOpen(const ScreenSet* set) {
+	return set->home >= 0 && ScreenSet_position(set, set->home) >= 0;
+}
+
+int Home_start(int ready, const char* left, int kind) {
+	if (!ready) return HOME_START_NONE;
+	// a launch from the game list comes back to it, as stock does
+	if (left && !strncmp(left, "list", 4)) return HOME_START_NONE;
+	if (kind == SCREENKIND_LIST) return HOME_START_OPEN;
+	if (kind == SCREENKIND_QUICKMENU || kind == SCREENKIND_SWITCHER) return HOME_START_UNDER;
+	return HOME_START_NONE;
+}
+
+const char* ScreenSet_leftFrom(const ScreenSet* set) {
+	return ScreenSet_homeOpen(set) || set->under ? "home" : "list";
+}
+
+int ScreenSet_coveredBy(ScreenSet* set, int kind) {
+	if (kind == SCREENKIND_PLUGIN || kind == SCREENKIND_DIALOG) return 0;
+	if (kind == SCREENKIND_LIST) set->under = 0;
+	else if (ScreenSet_homeOpen(set)) set->under = 1;
+	return set->depth > 0;
+}
+
+int ScreenSet_backToHome(ScreenSet* set) {
+	int back = set->under && ScreenSet_homeReady(set) && !ScreenSet_homeOpen(set);
+	set->under = 0;
+	return back;
 }
