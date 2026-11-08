@@ -54,6 +54,8 @@ The bats tests run the pak scripts against a fake SD card, with a fake `mount` t
 
 `make test-profiles` does the same with the bundled plugins together, in two profiles built from their `plugin.txt` files: everything on with the first owner of each exclusive slot, then each slot flipped to its next owner. Plugins whose `requires` can't be met are left off with a note. It fails if the launcher exits on its own or the loader refuses a plugin the profile didn't turn off; logs are in `build/profiles/`.
 
+`scripts/desktop-smoke.sh` can also wait for log lines instead of a fixed time: with `SMOKE_UNTIL` set to fixed strings, one per line, the seconds are the most it waits, and it stops once the log has every line and the file named by `SMOKE_UNTIL_GONE` (if set) is gone, then `SMOKE_SETTLE` more seconds (1 by default) pass. It fails with exit 3 if that doesn't happen in time.
+
 ## Updating NextUI
 
 The launcher in `launcher/` started as upstream's `nextui.c`, split into modules:
@@ -92,7 +94,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `leds.c` | a plugin's LED colour, as stock's ambient LED override, and the theme colours |
 | `bluetooth.c` | plugins' Bluetooth: the worker thread that looks for the connected device and runs connects, each a bounded `fork` and `execvp` |
 
-See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build.
+See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log.
 
 FN buttons can be bound to a launcher action as well as a pak, with `action:<id>` (eg. `action:gamelist.back`) in place of `pak:<name>`.
 

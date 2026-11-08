@@ -47,3 +47,37 @@ smoke() {
 	[ $(($(date +%s) - start)) -lt 15 ]
 	! kill -0 "$(cat "$BATS_TEST_TMPDIR/pid")" 2>/dev/null
 }
+
+@test "with SMOKE_UNTIL it stops once the log has every line" {
+	fake_launcher 'trap "exit 0" TERM; echo one; sleep 0.3; echo two; while :; do sleep 0.1; done'
+	start=$(date +%s)
+	SMOKE_UNTIL="$(printf 'one\ntwo')" SMOKE_SETTLE=0 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30
+	[ "$status" -eq 0 ]
+	[ "$output" = "ready, stopped it; log in $LOG" ]
+	[ $(($(date +%s) - start)) -lt 10 ]
+}
+
+@test "with SMOKE_UNTIL_GONE it also waits for the file to go" {
+	marker="$BATS_TEST_TMPDIR/loading"
+	touch "$marker"
+	fake_launcher "trap 'exit 0' TERM; echo one; sleep 1; rm '$marker'; echo gone; while :; do sleep 0.1; done"
+	SMOKE_UNTIL=one SMOKE_UNTIL_GONE="$marker" SMOKE_SETTLE=0 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30
+	[ "$status" -eq 0 ]
+	grep -q gone "$LOG"
+}
+
+@test "with SMOKE_UNTIL a launcher that never logs the lines fails" {
+	fake_launcher 'trap "exit 0" TERM; echo one; while :; do sleep 0.1; done'
+	SMOKE_UNTIL="$(printf 'one\ntwo')" run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 1
+	[ "$status" -eq 3 ]
+	[ "${lines[0]}" = "not ready after 1s; log in $LOG" ]
+	[ "${lines[1]}" = "  missing line: two" ]
+	[ "${#lines[@]}" -eq 2 ]
+}
+
+@test "with SMOKE_UNTIL a launcher that exits after the lines fails" {
+	fake_launcher 'echo one; sleep 0.3; exit 3'
+	SMOKE_UNTIL=one SMOKE_SETTLE=2 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30
+	[ "$status" -eq 1 ]
+	[ "$output" = "exited early with status 3; log in $LOG" ]
+}

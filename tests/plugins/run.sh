@@ -9,6 +9,10 @@
 # colours and sets an LED colour, one that asks about Bluetooth, and one
 # that crashes during startup.
 #
+# Each case waits up to PLUGIN_TEST_SECONDS (10 by default) for the log
+# lines it checks, and stops as soon as they're in, so a slow machine only
+# makes the run slower.
+#
 #   tests/plugins/run.sh
 
 set -u
@@ -19,15 +23,23 @@ CARD=/var/tmp/nextui/sdcard
 STATE="$CARD/.userdata/desktop/launcher"
 ARCH="desktop-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)"
 CC="${CC:-cc}"
+WAIT="${PLUGIN_TEST_SECONDS:-10}"
 failures=0
+case_log=""
 
+# fail <message>: names the case whose log is $case_log, if there is one
 fail() {
-	echo "FAIL: $*" >&2
+	if [ -n "$case_log" ]; then
+		echo "FAIL: $(basename "$case_log" .log): $*; log in $case_log" >&2
+	else
+		echo "FAIL: $*" >&2
+	fi
 	failures=$((failures + 1))
 }
 
 # build_plugin <name> <manifest text>
 build_plugin() {
+	case_log=""
 	dir="$WORK/plugins/$1.plugin"
 	mkdir -p "$dir/lib/$ARCH"
 	printf '%b' "$2" >"$dir/plugin.txt"
@@ -35,13 +47,38 @@ build_plugin() {
 		"$ROOT/tests/plugins/$1/$1.c" -o "$dir/lib/$ARCH/plugin.so" || fail "building $1"
 }
 
-# run_launcher <log>: 0 if it ran until stopped, 1 if it exited on its own,
-# 2 (also a failure here) if it had to be killed after ignoring SIGTERM
-run_launcher() {
-	MOSAIC_LAUNCHER_PLUGIN_PATH="$WORK/plugins" "$ROOT/scripts/desktop-smoke.sh" "$1" 3 >/dev/null 2>&1
+# clear_guard: forgets earlier starts' crashes, so one slow or failed case
+# can't start the next ones with plugins paused
+clear_guard() {
+	rm -f "$STATE/loading" "$STATE/plugins_paused" "$STATE/crashes" "$STATE/fallback"
+}
+
+# start_launcher <log> [line...]: starts the launcher, keeping the crash
+# guard's state. With lines, stops once the log has all of them and the
+# first frame is up (the loading marker is gone); without, runs until it
+# exits or $WAIT seconds pass. 0 if it ran until stopped, 1 if it exited on
+# its own, 2 (also a failure here) if it had to be killed after ignoring
+# SIGTERM. Not getting the lines in time is a failure too, and returns 0.
+start_launcher() {
+	case_log="$1"
+	shift
+	until=$(printf '%s\n' "$@")
+	MOSAIC_LAUNCHER_PLUGIN_PATH="$WORK/plugins" SMOKE_UNTIL="$until" SMOKE_UNTIL_GONE="$STATE/loading" \
+		"$ROOT/scripts/desktop-smoke.sh" "$case_log" "$WAIT" >/dev/null 2>"$WORK/smoke.err"
 	status=$?
-	[ "$status" -eq 2 ] && fail "the launcher ignored SIGTERM and was killed; log in $1"
+	[ "$status" -eq 2 ] && fail "the launcher ignored SIGTERM and was killed"
+	if [ "$status" -eq 3 ]; then
+		why=$(sed -n 's/^  //p' "$WORK/smoke.err" | tr '\n' ',')
+		fail "not ready after ${WAIT}s (${why%,})"
+		return 0
+	fi
 	return "$status"
+}
+
+# run_launcher <log> [line...]: start_launcher from a clear crash guard
+run_launcher() {
+	clear_guard
+	start_launcher "$@"
 }
 
 # expect <line>: plugin $plugin logged line in $log
@@ -53,7 +90,7 @@ rm -rf "$WORK" "$STATE"
 build_plugin hello 'id=hello\nname=Hello\napi=1\n'
 
 # loads, logs through the host, and saves its config
-run_launcher "$WORK/hello.log" || fail "the launcher exited early with hello loaded"
+run_launcher "$WORK/hello.log" "plugin hello: hello from desktop" || fail "the launcher exited early with hello loaded"
 grep -q "plugins: loaded hello" "$WORK/hello.log" || fail "hello didn't load"
 grep -q "plugin hello: hello from desktop" "$WORK/hello.log" || fail "hello's log line is missing"
 grep -q "^started=yes$" "$STATE/hello.cfg" 2>/dev/null || fail "hello's cfg_set didn't save"
@@ -61,18 +98,18 @@ grep -q "^started=yes$" "$STATE/hello.cfg" 2>/dev/null || fail "hello's cfg_set 
 
 # reads its config back on the next start
 printf 'greeting=hi\nstarted=yes\n' >"$STATE/hello.cfg"
-run_launcher "$WORK/hello-cfg.log" || fail "the launcher exited early on the second start"
+run_launcher "$WORK/hello-cfg.log" "plugin hello: hi from desktop" || fail "the launcher exited early on the second start"
 grep -q "plugin hello: hi from desktop" "$WORK/hello-cfg.log" || fail "hello didn't read its config"
 
 # turned off in plugins.txt
 echo "hello=off" >"$STATE/plugins.txt"
-run_launcher "$WORK/off.log" || fail "the launcher exited early with hello off"
+run_launcher "$WORK/off.log" "plugins: not loading hello: turned off" || fail "the launcher exited early with hello off"
 grep -q "plugins: not loading hello: turned off" "$WORK/off.log" || fail "hello loaded while turned off"
 rm "$STATE/plugins.txt"
 
 # wrong API version is skipped, and the launcher still starts
 printf 'id=hello\nname=Hello\napi=99\n' >"$WORK/plugins/hello.plugin/plugin.txt"
-run_launcher "$WORK/api.log" || fail "the launcher exited early with a mismatched plugin"
+run_launcher "$WORK/api.log" "plugins: hello targets API 99" || fail "the launcher exited early with a mismatched plugin"
 grep -q "plugins: hello targets API 99" "$WORK/api.log" || fail "the API mismatch wasn't reported"
 grep -q "plugins: loaded hello" "$WORK/api.log" && fail "a mismatched plugin loaded"
 rm -rf "$WORK/plugins/hello.plugin"
@@ -87,7 +124,7 @@ mkdir -p "$(dirname "$RECENTS")" "$(dirname "$ROM")" "$STATE"
 echo "/Roms/.rooter-test/Game.gb" >"$RECENTS"
 echo "rom=$ROM" >"$STATE/rooter.cfg"
 build_plugin rooter 'id=rooter\nname=Rooter\napi=1\nslots=root\n'
-run_launcher "$WORK/rooter.log" || fail "the launcher exited early with rooter loaded"
+run_launcher "$WORK/rooter.log" "plugin rooter: selected after reload" || fail "the launcher exited early with rooter loaded"
 plugin=rooter
 log="$WORK/rooter.log"
 expect "open from init 0"
@@ -108,7 +145,7 @@ expect "selected after reload $ROM"
 
 # a plugin that doesn't claim the root slot isn't asked for the root
 printf 'id=rooter\nname=Rooter\napi=1\n' >"$WORK/plugins/rooter.plugin/plugin.txt"
-run_launcher "$WORK/rooter-unslotted.log" || fail "the launcher exited early with rooter unslotted"
+run_launcher "$WORK/rooter-unslotted.log" "plugins: rooter has root_replace but no slots=root" || fail "the launcher exited early with rooter unslotted"
 grep -q "plugins: rooter has root_replace but no slots=root" "$WORK/rooter-unslotted.log" || fail "the missing root slot wasn't reported"
 grep -q "plugin rooter: root_replace called" "$WORK/rooter-unslotted.log" && fail "root_replace ran without the root slot"
 
@@ -118,7 +155,7 @@ if [ -f "$WORK/recent.txt.saved" ]; then cp "$WORK/recent.txt.saved" "$RECENTS";
 # a plugin orders and renames a folder's entries, then reads the list and
 # moves the selection
 build_plugin sorter 'id=sorter\nname=Sorter\napi=1\n'
-run_launcher "$WORK/sorter.log" || fail "the launcher exited early with sorter loaded"
+run_launcher "$WORK/sorter.log" "plugin sorter: next frame selected" || fail "the launcher exited early with sorter loaded"
 plugin=sorter
 log="$WORK/sorter.log"
 expect "current list from init (null)"
@@ -148,7 +185,7 @@ echo "/Roms/.menus-test/Game.gb" >"$RECENTS"
 echo "moved=$MOVED" >"$STATE/menus.cfg"
 build_plugin menus 'id=menus\nname=Menus\napi=1\nslots=root\n'
 build_plugin adder 'id=adder\nname=Adder\napi=1\n'
-run_launcher "$WORK/menus.log" || fail "the launcher exited early with menus loaded"
+run_launcher "$WORK/menus.log" "plugin menus: choose 0" "quick menu: top row Tools,Menus" || fail "the launcher exited early with menus loaded"
 plugin=menus
 log="$WORK/menus.log"
 expect "bound 0 0"
@@ -170,7 +207,7 @@ grep -q "quick menu: bottom row .*Light$" "$log" || fail "the bottom row has no 
 [ -s "$RECENTS" ] && fail "recents_clear didn't save an empty list"
 
 echo "keep=0" >>"$STATE/menus.cfg"
-run_launcher "$WORK/menus-alone.log" || fail "the launcher exited early with menus keeping its root to itself"
+run_launcher "$WORK/menus-alone.log" "plugin menus: choose 0" "quick menu: top row Tools,Menus" || fail "the launcher exited early with menus keeping its root to itself"
 log="$WORK/menus-alone.log"
 expect "root Menus Root"
 grep -qF "plugin menus: root Menus Root,Added" "$log" && fail "the root took other plugins' entries without being asked"
@@ -224,7 +261,7 @@ expect "replace -1"
 quoted_rom=$(printf '%s' "$ROM" | sed "s/'/'\\\\''/g")
 grep -qF "/remap-emu.sh' '--core' 'x'\\''s.so' '$quoted_rom'" /tmp/next 2>/dev/null || fail "the replaced command isn't in /tmp/next: $(cat /tmp/next 2>/dev/null)"
 grep -qF "cmd: '" "$log" || fail "the replaced command wasn't queued"
-run_launcher "$WORK/remap-return.log" || fail "the launcher exited early after the replaced launch"
+run_launcher "$WORK/remap-return.log" "plugin remapper: override from tick" || fail "the launcher exited early after the replaced launch"
 log="$WORK/remap-return.log"
 plugin=remapper
 expect "post_return"
@@ -251,7 +288,7 @@ echo "/Roms/.power-test (PWRT)/Game.gb" >"$RECENTS"
 printf 'powerer=on\ndecliner=on\n' >"$STATE/plugins.txt"
 build_plugin powerer 'id=powerer\nname=Powerer\napi=1\n'
 build_plugin decliner 'id=decliner\nname=Decliner\napi=1\n'
-run_launcher "$WORK/decline.log" || fail "the launcher exited early after decliner declined"
+run_launcher "$WORK/decline.log" "plugin powerer: show_recents 1" "quick menu: bottom row" || fail "the launcher exited early after decliner declined"
 log="$WORK/decline.log"
 plugin=decliner
 expect "declining"
@@ -280,7 +317,7 @@ expect "before_poweroff"
 
 : >"$RECENTS"
 rm "$STATE/powerer.cfg"
-run_launcher "$WORK/no-recents.log" || fail "the launcher exited early with no recents"
+run_launcher "$WORK/no-recents.log" "plugin powerer: show_recents 0" "quick menu: bottom row" || fail "the launcher exited early with no recents"
 log="$WORK/no-recents.log"
 expect "show_recents 0"
 
@@ -297,7 +334,7 @@ mkdir -p "$(dirname "$SETTINGS")" "$STATE"
 printf 'showclock=0\nhaptics=1\n' >"$SETTINGS"
 printf 'toggler=on\n' >"$STATE/plugins.txt"
 build_plugin toggler 'id=toggler\nname=Toggler\napi=1\n'
-SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/toggler.log" || fail "the launcher exited early with toggler loaded"
+SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/toggler.log" "plugin toggler: clock now" || fail "the launcher exited early with toggler loaded"
 log="$WORK/toggler.log"
 plugin=toggler
 expect "clock 0, haptics 1, wifi -1"
@@ -313,7 +350,7 @@ rm -rf "$WORK/plugins/toggler.plugin" "$STATE/plugins.txt"
 printf 'color1=0xFFFFFFFF\ncolor2=0x9B2257FF\ncolor7=0x10203080\n' >"$SETTINGS"
 printf 'lighter=on\n' >"$STATE/plugins.txt"
 build_plugin lighter 'id=lighter\nname=Lighter\napi=1\n'
-SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/lighter.log" || fail "the launcher exited early with lighter loaded"
+SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/lighter.log" "plugin lighter: leds" || fail "the launcher exited early with lighter loaded"
 log="$WORK/lighter.log"
 plugin=lighter
 expect "main FFFFFF, accent 9B2257, background 102030, 0 -1, 8 -1"
@@ -327,7 +364,7 @@ rm -rf "$WORK/plugins/lighter.plugin" "$STATE/plugins.txt"
 printf 'bluetooth=1\n' >"$SETTINGS"
 printf 'bluer=on\n' >"$STATE/plugins.txt"
 build_plugin bluer 'id=bluer\nname=Bluer\napi=1\n'
-SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/bluer.log" || fail "the launcher exited early with bluer loaded"
+SHARED_USERDATA_PATH="$(dirname "$SETTINGS")" run_launcher "$WORK/bluer.log" "plugin bluer: tick:" || fail "the launcher exited early with bluer loaded"
 log="$WORK/bluer.log"
 plugin=bluer
 expect "init: supported 0, enabled 0, connected 0 \"\", connect -1, bad -1"
@@ -342,7 +379,7 @@ if [ -f "$WORK/minuisettings.txt.saved" ]; then cp "$WORK/minuisettings.txt.save
 
 # the bundled plugins load and start cleanly
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building the bundled plugins"
-run_launcher "$WORK/bundled.log" || fail "the launcher exited early with the bundled plugins"
+run_launcher "$WORK/bundled.log" "plugins: loaded favorites" "quick menu: bottom row" || fail "the launcher exited early with the bundled plugins"
 grep -q "plugins: loaded favorites" "$WORK/bundled.log" || fail "favorites didn't load"
 grep -q "couldn't bind Y" "$WORK/bundled.log" && fail "favorites couldn't bind Y"
 rm -rf "$WORK/plugins"/*.plugin
@@ -354,20 +391,20 @@ cp "$ROOT/template/plugin.txt" "$template/"
 (cd "$ROOT/template" && make -s desktop CC="$CC" >/dev/null) || fail "building the template"
 cp -R "$ROOT/template/lib" "$template/"
 rm -rf "$ROOT/template/lib"
-run_launcher "$WORK/template.log" || fail "the launcher exited early with the template plugin"
+run_launcher "$WORK/template.log" "plugins: loaded example" || fail "the launcher exited early with the template plugin"
 grep -q "plugins: loaded example" "$WORK/template.log" || fail "the template plugin didn't load"
 rm -rf "$template"
 
 # /tmp/stay_awake holds off auto-sleep
 touch /tmp/stay_awake
-run_launcher "$WORK/awake.log" || fail "the launcher exited early with /tmp/stay_awake"
+run_launcher "$WORK/awake.log" "awake: holding off auto-sleep" || fail "the launcher exited early with /tmp/stay_awake"
 rm -f /tmp/stay_awake
 grep -q "awake: holding off auto-sleep" "$WORK/awake.log" || fail "/tmp/stay_awake didn't hold off auto-sleep"
 grep -q "awake: holding off auto-sleep" "$WORK/hello.log" && fail "auto-sleep was held off without /tmp/stay_awake"
 
 # so does /tmp/stay_alive
 touch /tmp/stay_alive
-run_launcher "$WORK/alive.log" || fail "the launcher exited early with /tmp/stay_alive"
+run_launcher "$WORK/alive.log" "awake: holding off auto-sleep" || fail "the launcher exited early with /tmp/stay_alive"
 rm -f /tmp/stay_alive
 grep -q "awake: holding off auto-sleep" "$WORK/alive.log" || fail "/tmp/stay_alive didn't hold off auto-sleep"
 
@@ -375,10 +412,10 @@ grep -q "awake: holding off auto-sleep" "$WORK/alive.log" || fail "/tmp/stay_ali
 build_plugin crasher 'id=crasher\nname=Crasher\napi=1\n'
 run_launcher "$WORK/crash.log" && fail "the crashing plugin didn't crash the launcher"
 [ -f "$STATE/loading" ] || fail "no loading marker after the crash"
-run_launcher "$WORK/after-crash.log" || fail "the launcher crashed again instead of pausing plugins"
+start_launcher "$WORK/after-crash.log" "pausing them" || fail "the launcher crashed again instead of pausing plugins"
 grep -q "pausing them" "$WORK/after-crash.log" || fail "plugins weren't paused after the crash"
 [ -f "$STATE/plugins_paused" ] || fail "no plugins_paused marker"
-run_launcher "$WORK/paused.log" || fail "the launcher crashed while plugins were paused"
+start_launcher "$WORK/paused.log" "paused after a crash" || fail "the launcher crashed while plugins were paused"
 grep -q "paused after a crash" "$WORK/paused.log" || fail "plugins didn't stay paused"
 
 rm -rf "$STATE"

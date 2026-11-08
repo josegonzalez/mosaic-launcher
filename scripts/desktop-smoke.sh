@@ -6,6 +6,12 @@
 # after SIGTERM it gets SIGKILL and the run fails too (exit 2). Writes its log
 # to $1 for comparing runs. Anything after the seconds is passed to nextui.elf.
 #
+# With SMOKE_UNTIL set (fixed strings, one per line), the seconds are the
+# most it waits: it stops once the log has every line, and the file named by
+# SMOKE_UNTIL_GONE (if any) is gone, then SMOKE_SETTLE more seconds (1 by
+# default) pass. If that doesn't happen in time it stops the launcher and
+# fails (exit 3).
+#
 #   ./scripts/desktop-smoke.sh build/smoke.log [seconds] [args...]
 
 set -u
@@ -14,6 +20,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="${1:?usage: $0 <log file> [seconds]}"
 SECONDS_TO_RUN="${2:-4}"
 STOP_SECONDS=5
+UNTIL="${SMOKE_UNTIL:-}"
+UNTIL_GONE="${SMOKE_UNTIL_GONE:-}"
+SETTLE="${SMOKE_SETTLE:-1}"
 shift
 [ $# -gt 0 ] && shift
 
@@ -22,11 +31,36 @@ case "$(uname -s)" in
 	*) export LD_LIBRARY_PATH=/var/tmp/nextui/lib ;;
 esac
 
+# missing: prints each SMOKE_UNTIL line the log doesn't have yet
+missing() {
+	printf '%s\n' "$UNTIL" | while IFS= read -r line; do
+		[ -n "$line" ] && ! grep -qF -- "$line" "$LOG" && echo "$line"
+	done
+}
+
+ready() {
+	[ -n "$UNTIL" ] || return 1
+	[ -n "$UNTIL_GONE" ] && [ -e "$UNTIL_GONE" ] && return 1
+	[ -z "$(missing)" ]
+}
+
 bash "$ROOT/vendor/NextUI/workspace/desktop/prepare_fake_sd_root.sh" >/dev/null
 
 "$ROOT/build/desktop/nextui.elf" "$@" >"$LOG" 2>&1 &
 pid=$!
-sleep "$SECONDS_TO_RUN"
+
+# poll, so an early exit or a ready log ends the wait
+waited=0
+is_ready=0
+while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt $((SECONDS_TO_RUN * 10)) ]; do
+	if ready; then
+		is_ready=1
+		sleep "$SETTLE"
+		break
+	fi
+	sleep 0.1
+	waited=$((waited + 1))
+done
 
 if kill -0 "$pid" 2>/dev/null; then
 	kill "$pid"
@@ -43,6 +77,17 @@ if kill -0 "$pid" 2>/dev/null; then
 		exit 2
 	fi
 	wait "$pid" 2>/dev/null
+	if [ "$is_ready" -eq 1 ]; then
+		echo "ready, stopped it; log in $LOG"
+		exit 0
+	fi
+	# check once more, in case the last line came in as the wait ran out
+	if [ -n "$UNTIL" ] && ! ready; then
+		echo "not ready after ${SECONDS_TO_RUN}s; log in $LOG" >&2
+		missing | sed 's/^/  missing line: /' >&2
+		[ -n "$UNTIL_GONE" ] && [ -e "$UNTIL_GONE" ] && echo "  still there: $UNTIL_GONE" >&2
+		exit 3
+	fi
 	echo "still running after ${SECONDS_TO_RUN}s; log in $LOG"
 	exit 0
 fi
