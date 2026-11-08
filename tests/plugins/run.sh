@@ -9,8 +9,9 @@
 # colours and sets an LED colour, one that asks about Bluetooth, one that
 # draws, one that draws the game list as a grid, two that decorate rows and
 # add header widgets, two that supply art and load it through the art
-# cache, one that hears about the selection, and one that crashes during
-# startup.
+# cache, one that hears about the selection, one that reads .info
+# sidecars, and one that crashes during startup. It also checks the status
+# pill shell paks' status files show.
 #
 # Each case waits up to PLUGIN_TEST_SECONDS (10 by default) for the log
 # lines it checks, and stops as soon as they're in, so a slow machine only
@@ -803,6 +804,103 @@ rm -rf "$ROOT/template/lib"
 run_launcher "$WORK/template.log" "plugins: loaded example" || fail "the launcher exited early with the template plugin"
 grep -q "plugins: loaded example" "$WORK/template.log" || fail "the template plugin didn't load"
 rm -rf "$template"
+
+# infoer reads .info sidecars through entry_info: display_name names games
+# by them, each entry reads its sidecar once, and an oversized sidecar or a
+# folder in its place is ignored and logged
+INFO_DIR="$CARD/Infoer"
+mkdir -p "$INFO_DIR/.media/Delta.info" "$STATE"
+for game in Alpha Bravo Charlie Delta Echo; do : >"$INFO_DIR/$game.gb"; done
+printf '# scraped\r\nname=Alpha Prime\r\nyear=1990\r\ngenre=Platformer\r\n' >"$INFO_DIR/.media/Alpha.info"
+printf 'YEAR = 1985 \ngenre=Puzzle\nbroken line\n' >"$INFO_DIR/.media/Bravo.info"
+{ echo "year=1999"; head -c 5000 /dev/zero | tr '\0' '#'; } >"$INFO_DIR/.media/Charlie.info"
+printf 'infoer=on\n' >"$STATE/plugins.txt"
+build_plugin infoer 'id=infoer\nname=Infoer\napi=1\n'
+run_launcher "$WORK/infoer.log" "plugin infoer: done" || fail "the launcher exited early with infoer loaded"
+log="$WORK/infoer.log"
+plugin=infoer
+expect "open folder 1"
+grep -qE "plugin infoer: named [1-9][0-9]*$" "$log" || fail "display_name didn't name a game from its sidecar"
+expect 'game Alpha Prime year 1 "1990" genre "Platformer" players 0 ""'
+expect 'game Bravo year 1 "1985" genre "Puzzle" players 0 ""'
+expect 'game Charlie year 0 "" genre "" players 0 ""'
+expect 'game Delta year 0 "" genre "" players 0 ""'
+expect 'game Echo year 0 "" genre "" players 0 ""'
+expect "bad args -1 -1 -1 -1"
+expect 'cut 1 "Alp"'
+expect "kept 1990"
+expect "fresh 2000"
+grep -qF "plugins: ignoring $INFO_DIR/.media/Charlie.info: it's over 4096 bytes" "$log" || fail "the oversized sidecar wasn't logged"
+grep -qF "plugins: ignoring $INFO_DIR/.media/Delta.info: it isn't a regular file" "$log" || fail "the folder sidecar wasn't logged"
+grep -qF "Echo.info" "$log" && fail "a missing sidecar was logged"
+rm -rf "$WORK/plugins/infoer.plugin" "$INFO_DIR" "$STATE/plugins.txt"
+
+# shell paks' status files show as a pill in the header: the newest valid
+# one that isn't stale, with files that are rejected logged once, and links,
+# dotfiles and old files left out
+STATUS_DIR="$STATE/status.d"
+mkdir -p "$STATUS_DIR"
+printf 'state=running\nlabel=Backup\n' >"$STATUS_DIR/backup.status"
+printf 'state=running\n' >"$STATUS_DIR/old.status"
+touch -t 200001010000 "$STATUS_DIR/old.status"
+sleep 1
+printf 'state=running\ndone=3\ntotal=10\nlabel=Syncing\n' >"$STATUS_DIR/sync.status"
+printf 'state=maybe\n' >"$STATUS_DIR/bad.status"
+head -c 2000 /dev/zero | tr '\0' '#' >"$STATUS_DIR/big.status"
+printf 'state=running\nlabel=Linked\n' >"$WORK/outside.status"
+ln -s "$WORK/outside.status" "$STATUS_DIR/link.status"
+printf 'state=running\nlabel=Hidden\n' >"$STATUS_DIR/.tmp.status"
+run_launcher "$WORK/status.log" "status: showing sync: Syncing 30%" "status: pill at " || fail "the launcher exited early with status files"
+log="$WORK/status.log"
+grep -qF "status: ignoring bad.status: state isn't running, done or error" "$log" || fail "the bad status file wasn't logged"
+grep -qF "status: ignoring big.status: it's over 1024 bytes" "$log" || fail "the oversized status file wasn't logged"
+grep -qF "status: ignoring link.status: it isn't a regular file" "$log" || fail "the linked status file wasn't refused"
+[ "$(grep -cF "status: ignoring bad.status" "$log")" -eq 1 ] || fail "the bad status file was logged more than once"
+grep -qE "status: showing (backup|old|link|\.tmp)" "$log" && fail "a status file other than the newest showed"
+grep -qE "status: pill at [0-9]+,15 [0-9]+x90$" "$log" || fail "the pill isn't in the header: $(grep "status: pill" "$log")"
+
+# the pill goes through the header row, so plugins' widgets sit left of it
+# and have less room
+printf 'badger=on\n' >"$STATE/plugins.txt"
+build_plugin badger 'id=badger\nname=Badger\napi=1\n'
+run_launcher "$WORK/status-badger.log" "status: pill at " "plugin badger: widget rect " || fail "the launcher exited early with badger and a status file"
+log="$WORK/status-badger.log"
+pill_x=$(sed -n 's/.*status: pill at \([0-9]*\),15 .*/\1/p' "$log" | tail -n 1)
+pill_w=$(sed -n 's/.*status: pill at [0-9]*,15 \([0-9]*\)x90$/\1/p' "$log" | tail -n 1)
+widget_x=$(sed -n 's/.*plugin badger: widget rect \([0-9]*\),.*/\1/p' "$log")
+room=$(sed -n 's/.*plugin badger: width first: room \([0-9]*\) .*/\1/p' "$log")
+if [ -z "$pill_x" ] || [ -z "$widget_x" ] || [ $((widget_x + 60 + 15)) -ne "$pill_x" ]; then
+	fail "badger's widget isn't left of the status pill: pill at $pill_x, widget at $widget_x"
+fi
+# the stock pill starts a gap right of the status pill, and the widgets
+# together keep to half the header left of it
+stock_x=$((pill_x + pill_w + 15))
+if [ -z "$room" ] || [ "$room" -ne $(((pill_x - 15) - (stock_x - (stock_x - 15) / 2))) ]; then
+	fail "badger's room doesn't leave out the status pill: $room"
+fi
+rm -rf "$WORK/plugins/badger.plugin" "$STATE/plugins.txt"
+
+# a file rewritten while the launcher runs is read again; done shows for a
+# few seconds and then the pill goes
+rm -rf "$STATUS_DIR" "$WORK/outside.status"
+mkdir -p "$STATUS_DIR"
+printf 'state=running\ndone=1\ntotal=4\nlabel=Scraping\n' >"$STATUS_DIR/scrape.status"
+(
+	sleep 2
+	printf 'state=done\nlabel=Scraped\n' >"$STATUS_DIR/.scrape.tmp"
+	mv "$STATUS_DIR/.scrape.tmp" "$STATUS_DIR/scrape.status"
+) &
+writer=$!
+# done stays up for 5 seconds, so this case gets longer
+wait_was=$WAIT
+WAIT=$((WAIT + 10))
+run_launcher "$WORK/status-done.log" "status: showing scrape: Scraped done" "status: none" || fail "the launcher exited early with a status file changing"
+WAIT=$wait_was
+wait "$writer"
+log="$WORK/status-done.log"
+grep -qF "status: showing scrape: Scraping 25%" "$log" || fail "the running status file didn't show"
+rm -rf "$STATUS_DIR"
+grep -qE "status: (showing|pill|ignoring|none)" "$WORK/hello.log" && fail "a status pill showed with no status files"
 
 # /tmp/stay_awake holds off auto-sleep
 touch /tmp/stay_awake

@@ -99,6 +99,9 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `artcache.c` | the SDL-free half of the art cache: decoded images by path and kind, least recently used out first past a byte cap, pins, the worker's load order with prefetches last, and requests dropped by sequence number once the selection moves |
 | `selmodel.c` | the SDL-free half of selection events: seeing the selection move (the art cache uses it too), and when it has settled on an entry plugins haven't heard about |
 | `artloader.c` | the art cache over SDL: decoding on the art worker, taking images in and evicting at the start of each frame, the built-in list's thumbnail and its neighbours, and plugins' `art_find`, `art_get` and `art_load` |
+| `statusmodel.c` | the SDL-free half of the status pill: parsing shell paks' status files, tracking the files in `status.d` between polls, which are stale, and the one the pill shows |
+| `statuspill.c` | the status pill over the card and SDL: looking at `status.d` once a second without following links, and drawing the pill through the header row before plugins' header widgets |
+| `infomodel.c` | parsing `.info` metadata sidecars and where an entry's is; `plugins.c` reads one for `entry_info` and keeps it with the entry |
 
 See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. `MOSAIC_LAUNCHER_ART_CACHE_BYTES` replaces the art cache's 32 MiB cap, which the eviction case uses to fill a small one. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log.
 

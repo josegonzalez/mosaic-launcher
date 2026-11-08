@@ -18,6 +18,8 @@ typedef struct Entry {
 	char* unique;
 	int type;
 	int alpha; // index in parent Directory's alphas Array, which points to the index of an Entry in its entries Array :sweat_smile:
+	void* info;    // its .info sidecar's InfoFile (infomodel.h), freed with it, once info_read
+	int info_read; // a plugin's entry_info has looked for the sidecar
 } Entry;
 
 Entry* Entry_new(char* path, int type);

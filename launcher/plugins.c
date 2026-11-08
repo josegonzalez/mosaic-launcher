@@ -9,6 +9,7 @@
 #include "plugindraw.h"
 #include "layoutmodel.h"
 #include "selmodel.h"
+#include "infomodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -239,6 +240,44 @@ static MosaicEntry* hostEntryNew(const char* path, int type, const char* name) {
 static const char* hostEntryPath(const MosaicEntry* e) { return e ? ((const Entry*)e)->path : NULL; }
 static const char* hostEntryName(const MosaicEntry* e) { return e ? ((const Entry*)e)->name : NULL; }
 static int hostEntryType(const MosaicEntry* e) { return e ? ((const Entry*)e)->type : -1; }
+
+// An entry's .info sidecar, or NULL when it has none or it's ignored: only
+// a regular file, opened without blocking, of up to INFO_FILE_MAX bytes.
+static InfoFile* loadInfo(const char* entry_path) {
+	char path[1024];
+	Info_path(entry_path, path, sizeof(path));
+	int fd = open(path, O_RDONLY | O_NONBLOCK);
+	if (fd < 0) return NULL;
+	struct stat st;
+	if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+		close(fd);
+		LOG_warn("plugins: ignoring %s: it isn't a regular file\n", path);
+		return NULL;
+	}
+	char data[INFO_FILE_MAX + 1];
+	size_t got = 0;
+	while (got < sizeof(data)) {
+		ssize_t n = read(fd, data + got, sizeof(data) - got);
+		if (n <= 0) break;
+		got += (size_t)n;
+	}
+	close(fd);
+	const char* why = NULL;
+	InfoFile* info = Info_parse(data, got, &why);
+	if (!info) LOG_warn("plugins: ignoring %s: %s\n", path, why);
+	return info;
+}
+
+static int hostEntryInfo(const MosaicEntry* e, const char* key, char* out, size_t size) {
+	if (!e || !key || !out || size == 0) return -1;
+	// the cache isn't part of what plugins see of the entry
+	Entry* entry = (Entry*)e;
+	if (!entry->info_read) {
+		entry->info_read = 1;
+		entry->info = loadInfo(entry->path);
+	}
+	return Info_copy(Info_get(entry->info, key), out, size);
+}
 
 static MosaicList* hostListNew(void) { return (MosaicList*)Array_new(); }
 static int hostListCount(const MosaicList* l) { return l ? ((const Array*)l)->count : 0; }
@@ -609,6 +648,7 @@ static const MosaicHost host = {
 	.art_load = ArtLoader_load,
 	.decorate_cell = hostDecorateCell,
 	.selection_settle_ms = SEL_SETTLE_MS,
+	.entry_info = hostEntryInfo,
 };
 
 ///////////////////////////////////////

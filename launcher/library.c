@@ -9,6 +9,8 @@ Entry* Entry_new(char* path, int type) {
 	self->unique = NULL;
 	self->type = type;
 	self->alpha = 0;
+	self->info = NULL;
+	self->info_read = 0;
 	return self;
 }
 
@@ -23,6 +25,7 @@ void Entry_free(Entry* self) {
 	free(self->path);
 	free(self->name);
 	if (self->unique) free(self->unique);
+	free(self->info); // one allocation
 	free(self);
 }
 

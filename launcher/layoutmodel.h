@@ -72,8 +72,8 @@ int LayoutRect_clip(const MosaicRect* a, const MosaicRect* b, MosaicRect* out);
 void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int name_w, int show_names,
 	MosaicRow* out);
 
-// Plugins' header widgets, laid out right to left beside stock's status
-// pill, which is status_w wide in the top right of a screen_w wide screen,
+// Plugins' header widgets, and the status file pill (statuspill.c) before
+// them, laid out right to left beside stock's status pill, which is status_w wide in the top right of a screen_w wide screen,
 // inset by padding, and pill_h tall. Each widget sits gap left of the last,
 // the first gap left of the pill. Together they take at most half the
 // header left of the pill, so stock's items and the start of the top row

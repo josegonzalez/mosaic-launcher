@@ -46,5 +46,6 @@
 #include "listsort.h"
 #include "layoutmodel.h"
 #include "artloader.h"
+#include "statuspill.h"
 
 #endif

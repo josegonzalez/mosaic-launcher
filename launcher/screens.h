@@ -54,7 +54,7 @@ extern SDL_Surface* blackBG;
 extern SDL_Surface* tmpOldScreen;
 extern SDL_Surface* switcherSur;
 extern int ow;
-extern int header_w; // how far plugins' header widgets reach left of the status pill, or 0
+extern int header_w; // how far the status file pill and plugins' header widgets reach left of the status pill, or 0
 
 
 // game list

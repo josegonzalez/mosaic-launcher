@@ -109,6 +109,7 @@ int main (int argc, char *argv[]) {
 		}
 		Toast_tick(now);
 		Awake_tick(now);
+		StatusPill_tick(now);
 
 		// user-assignable buttons, handled before the per-screen input so they work
 		// from the game list, the game switcher and the quick menu alike.
@@ -172,9 +173,10 @@ int main (int argc, char *argv[]) {
 			}
 
 			ow = GFX_blitHardwareGroup(screen, show_setting);
-			// plugins' header widgets, beside it
+			// shell paks' status pill, then plugins' header widgets, beside it
 			HeaderRow header;
 			HeaderRow_init(&header, screen->w, SCALE1(PADDING), SCALE1(BUTTON_MARGIN), ow, SCALE1(PILL_SIZE));
+			StatusPill_place(screen, &header);
 			Plugins_header(screen, &header);
 			header_w = HeaderRow_width(&header);
 			const Screen* active = Screen_get(currentScreen);

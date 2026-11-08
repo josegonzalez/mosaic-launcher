@@ -198,9 +198,10 @@ typedef struct MosaicListView {
 	const char* art;        // the selected entry's art as the built-in list shows it, when show_art is 1 and it exists, else ""
 	MosaicRect area;        // where the layout draws: the screen above the button hints
 	MosaicRect status;      // the status pill (clock, battery, wifi) in area's top right, already drawn; leave it clear
-	// Added with header_widget: plugins' header widgets left of status, from
-	// the leftmost to status, already drawn; leave it clear too. Empty (w 0)
-	// when there are none.
+	// Added with header_widget: plugins' header widgets left of status, and
+	// the launcher's pill for shell paks' status files, from the leftmost
+	// to status, already drawn; leave it clear too. Empty (w 0) when there
+	// are none.
 	MosaicRect header;
 } MosaicListView;
 
@@ -577,6 +578,17 @@ typedef struct MosaicHost {
 	// plugins' selection_changed runs. Check for them with
 	// MOSAIC_HOST_HAS(host, selection_settle_ms).
 	int selection_settle_ms;
+
+	// .info metadata sidecars, for display hooks such as display_name,
+	// decorate_row and layout_render. Writes the value of key (matched
+	// without case) in the entry's <dir>/.media/<file name without its last
+	// extension>.info, such as "year" or "publisher", to out, cut between
+	// characters to fit size, and returns 1, or writes "" and returns 0
+	// when the file or the key isn't there, and returns -1 for a bad
+	// argument. The file is read the first time an entry is asked about,
+	// and kept with the entry until its list is freed. Check for it with
+	// MOSAIC_HOST_HAS(host, entry_info).
+	int (*entry_info)(const MosaicEntry* entry, const char* key, char* out, size_t size);
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
