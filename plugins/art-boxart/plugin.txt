@@ -1,0 +1,19 @@
+id=art-boxart
+name=Box art
+api=1
+# also use this art as the thumbnail, before stock's .media/<game>.png
+setting.thumbnail=toggle|Use as the thumbnail|off
+# nx-redux: .media/box, .media/3d and .media/wheel beside the games
+setting.media=toggle|Box, 3D box and wheel in .media|on
+# MyMinUI: Imgs/<game>.png beside the games
+setting.imgs=toggle|Imgs folders|on
+# UnuOS: .res/<game>.png beside the games
+setting.res=toggle|.res folders|on
+# visible art folders: Images/<game>.png beside the games
+setting.images=toggle|Images folders|on
+# leaves the Imgs and Images folders out of the list
+setting.hide=toggle|Hide art folders|on
+# folder as cover: a folder's cover.png
+setting.cover=toggle|Folder covers|on
+# rom as art: Pico-8 .p8.png carts are their own art
+setting.rom_art=toggle|Pico-8 carts as art|on
