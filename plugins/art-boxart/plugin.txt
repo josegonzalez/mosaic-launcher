@@ -3,8 +3,8 @@ name=Box art
 api=1
 # also use this art as the thumbnail, before stock's .media/<game>.png
 setting.thumbnail=toggle|Use as the thumbnail|off
-# nx-redux: .media/box, .media/3d and .media/wheel beside the games
-setting.media=toggle|Box, 3D box and wheel in .media|on
+# nx-redux: .media/boxart2d, boxart, wheel and screenshot beside the games
+setting.media=toggle|Box, wheel and screenshot in .media|on
 # MyMinUI: Imgs/<game>.png beside the games
 setting.imgs=toggle|Imgs folders|on
 # UnuOS: .res/<game>.png beside the games

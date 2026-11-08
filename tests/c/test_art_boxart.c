@@ -94,19 +94,22 @@ static void testEachConvention(void) {
 	BAConfig config;
 	BA_defaults(&config);
 	const char* card[] = {
-		"/r/GB/.media/box/Alpha.png",
-		"/r/GB/.media/3d/Alpha.png",
+		"/r/GB/.media/boxart2d/Alpha.png",
+		"/r/GB/.media/boxart/Alpha.png",
 		"/r/GB/.media/wheel/Alpha.png",
+		"/r/GB/.media/screenshot/Alpha.png",
 		"/r/GB/Imgs/Bravo.png",
 		"/r/GB/.res/Charlie.png",
 		"/r/GB/Images/Delta.png",
 		"/r/GB/Folder/cover.png",
 		"/r/P8/celeste.p8.png",
 	};
-	haveFiles(card, 8);
-	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/box/Alpha.png");
-	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX_3D), "/r/GB/.media/3d/Alpha.png");
+	haveFiles(card, 9);
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Alpha.png");
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX_3D), "/r/GB/.media/boxart/Alpha.png");
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_LOGO), "/r/GB/.media/wheel/Alpha.png");
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_SCREENSHOT),
+		"/r/GB/.media/screenshot/Alpha.png");
 	CHECK_STR(find(&config, "/r/GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/Imgs/Bravo.png");
 	CHECK_STR(find(&config, "/r/GB/Charlie.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.res/Charlie.png");
 	CHECK_STR(find(&config, "/r/GB/Delta.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/Images/Delta.png");
@@ -116,9 +119,9 @@ static void testEachConvention(void) {
 	// the other kinds come only from .media
 	CHECK_STR(find(&config, "/r/GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX_3D), "");
 	CHECK_STR(find(&config, "/r/GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_LOGO), "");
+	CHECK_STR(find(&config, "/r/GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_SCREENSHOT), "");
 	// kinds it doesn't answer, and the thumbnail while its setting is off
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_THUMBNAIL), "");
-	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_SCREENSHOT), "");
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BACKDROP), "");
 	CHECK_STR(find(&config, "/r/GB/Folder", MOSAIC_ENTRY_DIR, MOSAIC_ART_FOLDER_BG), "");
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_LIST_BG), "");
@@ -172,7 +175,7 @@ static void testNamesInPaths(void) {
 		"/r/NES/Imgs/Super Mario Bros. 3 (USA).png",
 		"/r/GB/.res/Tetris (World) [!].png",
 		"/r/GB/Images/Pokémon Rot (Germany).png",
-		"/r/PS/.media/box/Final Fantasy VII (USA).png",
+		"/r/PS/.media/boxart/Final Fantasy VII (USA).png",
 		"/r/Roms/Game Boy (GB)/cover.png",
 	};
 	haveFiles(card, 5);
@@ -184,7 +187,7 @@ static void testNamesInPaths(void) {
 		"/r/GB/Images/Pokémon Rot (Germany).png");
 	// a game folder, such as a multi-disc one, is named by its whole name
 	CHECK_STR(find(&config, "/r/PS/Final Fantasy VII (USA)", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX),
-		"/r/PS/.media/box/Final Fantasy VII (USA).png");
+		"/r/PS/.media/boxart/Final Fantasy VII (USA).png");
 	// a system folder's cover
 	CHECK_STR(find(&config, "/r/Roms/Game Boy (GB)", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX), "/r/Roms/Game Boy (GB)/cover.png");
 }
@@ -194,28 +197,35 @@ static void testPrecedence(void) {
 	BA_defaults(&config);
 	const char* card[] = {
 		"/r/P8/celeste.p8.png",
-		"/r/P8/.media/box/celeste.p8.png",
+		"/r/P8/.media/boxart2d/celeste.p8.png",
 		"/r/GB/Folder/cover.png",
-		"/r/GB/.media/box/Folder.png",
-		"/r/GB/.media/box/Alpha.png",
+		"/r/GB/.media/boxart2d/Folder.png",
+		"/r/GB/.media/boxart2d/Alpha.png",
+		"/r/GB/.media/boxart/Alpha.png",
 		"/r/GB/Imgs/Alpha.png",
 		"/r/GB/.res/Alpha.png",
 		"/r/GB/Images/Alpha.png",
 	};
-	haveFiles(card, 8);
+	haveFiles(card, 9);
 	// the cart is its own art first
 	CHECK_STR(find(&config, "/r/P8/celeste.p8.png", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/P8/celeste.p8.png");
 	config.rom_art = 0;
-	CHECK_STR(find(&config, "/r/P8/celeste.p8.png", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/P8/.media/box/celeste.p8.png");
+	CHECK_STR(find(&config, "/r/P8/celeste.p8.png", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/P8/.media/boxart2d/celeste.p8.png");
 	// a folder's cover before the art beside it
 	CHECK_STR(find(&config, "/r/GB/Folder", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX), "/r/GB/Folder/cover.png");
 	config.cover = 0;
-	CHECK_STR(find(&config, "/r/GB/Folder", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX), "/r/GB/.media/box/Folder.png");
+	CHECK_STR(find(&config, "/r/GB/Folder", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Folder.png");
 	// a game's cover.png is never asked about
 	config.cover = 1;
-	CHECK_STR(find(&config, "/r/GB/Folder", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/box/Folder.png");
-	// then .media/box, Imgs, .res and Images, each one off showing the next
-	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/box/Alpha.png");
+	CHECK_STR(find(&config, "/r/GB/Folder", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Folder.png");
+	// then .media/boxart2d, .media/boxart, Imgs, .res and Images, each one
+	// off or missing showing the next
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Alpha.png");
+	// the 3D box is .media/boxart's, even with a flat box
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX_3D), "/r/GB/.media/boxart/Alpha.png");
+	card[4] = "/r/GB/.media/boxart2d/missing.png";
+	haveFiles(card, 9);
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart/Alpha.png");
 	config.media = 0;
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/Imgs/Alpha.png");
 	config.imgs = 0;
@@ -229,12 +239,64 @@ static void testPrecedence(void) {
 	const char* later[] = { "/r/GB/Images/Alpha.png" };
 	haveFiles(later, 1);
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/Images/Alpha.png");
-	// .media off takes the 3D box and logo with it
-	const char* media[] = { "/r/GB/.media/3d/Alpha.png", "/r/GB/.media/wheel/Alpha.png" };
-	haveFiles(media, 2);
+	// .media off takes the 3D box, logo and screenshot with it
+	const char* media[] = { "/r/GB/.media/boxart/Alpha.png", "/r/GB/.media/wheel/Alpha.png",
+		"/r/GB/.media/screenshot/Alpha.png" };
+	haveFiles(media, 3);
 	config.media = 0;
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "");
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX_3D), "");
 	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_LOGO), "");
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_SCREENSHOT), "");
+}
+
+static void testExtensions(void) {
+	BAConfig config;
+	BA_defaults(&config);
+	// nx-redux's folders take a .png, then a .jpg, then a .jpeg
+	const char* card[] = {
+		"/r/GB/.media/boxart2d/Alpha.jpeg",
+		"/r/GB/.media/boxart2d/Alpha.jpg",
+		"/r/GB/.media/boxart2d/Alpha.png",
+		"/r/GB/.media/boxart/Alpha.jpg",
+		"/r/GB/.media/wheel/Alpha.jpeg",
+		"/r/GB/.media/screenshot/Alpha.jpg",
+		"/r/GB/.media/screenshot/Alpha.jpeg",
+	};
+	haveFiles(card, 7);
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Alpha.png");
+	haveFiles(card, 2);
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Alpha.jpg");
+	haveFiles(card, 1);
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Alpha.jpeg");
+	// with no flat box, .media/boxart's .jpg is the box too
+	haveFiles(card + 3, 4);
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart/Alpha.jpg");
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX_3D), "/r/GB/.media/boxart/Alpha.jpg");
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_LOGO), "/r/GB/.media/wheel/Alpha.jpeg");
+	CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_SCREENSHOT),
+		"/r/GB/.media/screenshot/Alpha.jpg");
+	const char* mixed[] = { "/r/GB/.media/boxart2d/Bravo.jpg", "/r/GB/.media/boxart/Bravo.png" };
+	// a .jpg in .media/boxart2d comes before a .png in .media/boxart
+	haveFiles(mixed, 2);
+	CHECK_STR(find(&config, "/r/GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "/r/GB/.media/boxart2d/Bravo.jpg");
+	// webp isn't read, nor any other case, nor the other conventions' jpgs,
+	// nor nx-redux's mix composite or the old guesses
+	const char* others[] = {
+		"/r/GB/.media/boxart2d/Alpha.webp",
+		"/r/GB/.media/boxart/Alpha.PNG",
+		"/r/GB/.media/wheel/Alpha.JPG",
+		"/r/GB/.media/mix/Alpha.png",
+		"/r/GB/.media/box/Alpha.png",
+		"/r/GB/.media/3d/Alpha.png",
+		"/r/GB/Imgs/Alpha.jpg",
+		"/r/GB/.res/Alpha.jpg",
+		"/r/GB/Images/Alpha.jpeg",
+	};
+	haveFiles(others, 9);
+	for (int kind = MOSAIC_ART_THUMBNAIL; kind <= MOSAIC_ART_BACKDROP; kind++) {
+		CHECK_STR(find(&config, "/r/GB/Alpha.gb", MOSAIC_ENTRY_ROM, kind), "");
+	}
 }
 
 static void testHides(void) {
@@ -323,14 +385,16 @@ static void testPlugin(void) {
 	mkdir(CARD "/GB/Imgs", 0755);
 	mkdir(CARD "/GB/Images", 0755);
 	mkdir(CARD "/GB/.media", 0755);
-	mkdir(CARD "/GB/.media/box", 0755);
+	mkdir(CARD "/GB/.media/boxart", 0755);
+	mkdir(CARD "/GB/.media/screenshot", 0755);
 	mkdir(CARD "/GB/Folder", 0755);
 	// a folder where the art should be isn't art
 	mkdir(CARD "/GB/Folder/cover.png", 0755);
 	mkdir(CARD "/GB/Other", 0755);
 	touch("GB/Imgs/Alpha.png");
 	touch("GB/Images/Bravo.png");
-	touch("GB/.media/box/Bravo.png");
+	touch("GB/.media/boxart/Bravo.png");
+	touch("GB/.media/screenshot/Bravo.jpg");
 	touch("GB/Other/cover.png");
 
 	MosaicHost host = { 0 };
@@ -344,7 +408,9 @@ static void testPlugin(void) {
 	CHECK(p && !strcmp(p->id, "art-boxart") && p->art_path && p->filter && p->init);
 	CHECK(p->init(&host) == 0);
 	CHECK_STR(art(p, "GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "GB/Imgs/Alpha.png");
-	CHECK_STR(art(p, "GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "GB/.media/box/Bravo.png");
+	CHECK_STR(art(p, "GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "GB/.media/boxart/Bravo.png");
+	CHECK_STR(art(p, "GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX_3D), "GB/.media/boxart/Bravo.png");
+	CHECK_STR(art(p, "GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_SCREENSHOT), "GB/.media/screenshot/Bravo.jpg");
 	CHECK_STR(art(p, "GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_THUMBNAIL), "");
 	CHECK_STR(art(p, "GB/Charlie.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "");
 	CHECK_STR(art(p, "GB/Folder", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX), "");
@@ -363,6 +429,7 @@ static void testPlugin(void) {
 	CHECK(p->init(&host) == 0);
 	CHECK_STR(art(p, "GB/Alpha.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_THUMBNAIL), "GB/Imgs/Alpha.png");
 	CHECK_STR(art(p, "GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_BOX), "GB/Images/Bravo.png");
+	CHECK_STR(art(p, "GB/Bravo.gb", MOSAIC_ENTRY_ROM, MOSAIC_ART_SCREENSHOT), "");
 	CHECK_STR(art(p, "GB/Other", MOSAIC_ENTRY_DIR, MOSAIC_ART_BOX), "");
 	CHECK(shown(p, "GB/Imgs", MOSAIC_ENTRY_DIR));
 	CHECK(shown(p, "GB/Images", MOSAIC_ENTRY_DIR));
@@ -377,6 +444,7 @@ int main(void) {
 	testMissing();
 	testNamesInPaths();
 	testPrecedence();
+	testExtensions();
 	testHides();
 	testPlugin();
 	CHECK_DONE();

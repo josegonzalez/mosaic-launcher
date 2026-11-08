@@ -48,18 +48,30 @@ int BA_isCart(const char* path) {
 	return len > n && !strcasecmp(path + len - n, suffix) && path[len - n - 1] != '/';
 }
 
-// Writes <dir>/<folder>/<name>.png, where dir is the folder path is in.
+// Writes <dir>/<folder>/<name><ext>, where dir is the folder path is in.
 // Returns 0 when it doesn't fit.
-static int besidePath(const char* path, const char* folder, const char* name, char* out, size_t size) {
+static int besidePath(const char* path, const char* folder, const char* name, const char* ext, char* out,
+		size_t size) {
 	const char* slash = strrchr(path, '/');
 	int dir_len = (int)(slash - path);
-	int n = snprintf(out, size, "%.*s/%s/%s.png", dir_len, path, folder, name);
+	int n = snprintf(out, size, "%.*s/%s/%s%s", dir_len, path, folder, name, ext);
 	return n > 0 && (size_t)n < size;
 }
 
 // Tries a candidate: 1 when it was built and exists, leaving it in out.
 static int try(int built, const char* out, BAExists exists, void* data) {
 	return built && exists(out, data);
+}
+
+// Tries <dir>/<folder>/<name> as a .png, then a .jpg and a .jpeg, as
+// nx-redux does: 1 when one exists, leaving it in out.
+static int tryMedia(const char* path, const char* folder, const char* name, BAExists exists, void* data,
+		char* out, size_t size) {
+	static const char* exts[] = { ".png", ".jpg", ".jpeg" };
+	for (size_t i = 0; i < sizeof(exts) / sizeof(exts[0]); i++) {
+		if (try(besidePath(path, folder, name, exts[i], out, size), out, exists, data)) return 1;
+	}
+	return 0;
 }
 
 static int findBox(const BAConfig* config, const char* path, int is_dir, const char* name, BAExists exists, void* data,
@@ -72,10 +84,11 @@ static int findBox(const BAConfig* config, const char* path, int is_dir, const c
 		int n = snprintf(out, size, "%s/cover.png", path);
 		if (try(n > 0 && (size_t)n < size, out, exists, data)) return 1;
 	}
-	if (config->media && try(besidePath(path, ".media/box", name, out, size), out, exists, data)) return 1;
-	if (config->imgs && try(besidePath(path, "Imgs", name, out, size), out, exists, data)) return 1;
-	if (config->res && try(besidePath(path, ".res", name, out, size), out, exists, data)) return 1;
-	if (config->images && try(besidePath(path, "Images", name, out, size), out, exists, data)) return 1;
+	if (config->media && tryMedia(path, ".media/boxart2d", name, exists, data, out, size)) return 1;
+	if (config->media && tryMedia(path, ".media/boxart", name, exists, data, out, size)) return 1;
+	if (config->imgs && try(besidePath(path, "Imgs", name, ".png", out, size), out, exists, data)) return 1;
+	if (config->res && try(besidePath(path, ".res", name, ".png", out, size), out, exists, data)) return 1;
+	if (config->images && try(besidePath(path, "Images", name, ".png", out, size), out, exists, data)) return 1;
 	return 0;
 }
 
@@ -97,10 +110,13 @@ int BA_find(const BAConfig* config, const char* path, int type, int kind, BAExis
 			found = findBox(config, path, is_dir, name, exists, data, out, size);
 			break;
 		case MOSAIC_ART_BOX_3D:
-			found = config->media && try(besidePath(path, ".media/3d", name, out, size), out, exists, data);
+			found = config->media && tryMedia(path, ".media/boxart", name, exists, data, out, size);
 			break;
 		case MOSAIC_ART_LOGO:
-			found = config->media && try(besidePath(path, ".media/wheel", name, out, size), out, exists, data);
+			found = config->media && tryMedia(path, ".media/wheel", name, exists, data, out, size);
+			break;
+		case MOSAIC_ART_SCREENSHOT:
+			found = config->media && tryMedia(path, ".media/screenshot", name, exists, data, out, size);
 			break;
 		default:
 			break;

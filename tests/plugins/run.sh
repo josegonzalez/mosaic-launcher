@@ -820,8 +820,8 @@ grep -qF "plugins: layout-grid's" "$log" && fail "layout-grid's layout was turne
 grep -qF "plugins: peeker's" "$log" && fail "peeker's decorator was turned off"
 
 printf 'columns=3\nrows=1\n' >"$STATE/layout-grid.cfg"
-mkdir -p "$PEEK_DIR/.media/box"
-cp "$ROOT/tests/plugins/peeker/art.png" "$PEEK_DIR/.media/box/Cherry.png"
+mkdir -p "$PEEK_DIR/.media/boxart2d"
+cp "$ROOT/tests/plugins/peeker/art.png" "$PEEK_DIR/.media/boxart2d/Cherry.png"
 printf 'art-boxart=on\nlayout-grid=on\npeeker=on\nslot.layout=layout-grid\n' >"$STATE/plugins.txt"
 run_launcher "$WORK/layout-grid-set.log" "plugin peeker: cell Apple middle 00FF00" "plugin peeker: cell Cherry middle 00FF00" \
 	|| fail "the launcher exited early with layout-grid set to 3 columns"
@@ -1224,19 +1224,26 @@ rm -rf "$WORK/plugins/backer.plugin" "$BACK_BG" "$STATE/plugins.txt"
 grep -qF "draws the background" "$WORK/hello.log" && fail "a background was drawn with no plugin taking the slot"
 
 # the bundled art-boxart answers art from each fork's folder convention, as
-# looker sees it through art_find: nx-redux's .media/box, 3d and wheel,
-# MyMinUI's Imgs, UnuOS's .res, visible Images folders, a folder's
-# cover.png and a Pico-8 cart as its own art, in that order, with stock's
-# .media thumbnail kept unless the thumbnail setting is on. The Imgs and
-# Images folders are left out of the list. Then the settings turn each off.
+# looker sees it through art_find: nx-redux's .media/boxart2d and
+# .media/boxart (a .png, then a .jpg or .jpeg), MyMinUI's Imgs, UnuOS's
+# .res, visible Images folders, a folder's cover.png and a Pico-8 cart as
+# its own art, in that order, with nx-redux's .media/boxart as the 3D box,
+# .media/wheel as the logo and .media/screenshot as the screenshot, and
+# stock's .media thumbnail kept unless the thumbnail setting is on. The
+# Imgs and Images folders are left out of the list. Then the settings turn
+# each off.
 BOX_DIR="$CARD/Boxart"
-mkdir -p "$BOX_DIR/.media/box" "$BOX_DIR/.media/3d" "$BOX_DIR/.media/wheel" "$BOX_DIR/Imgs" "$BOX_DIR/.res" \
-	"$BOX_DIR/Images" "$BOX_DIR/Cover" "$STATE"
-for game in Alpha Bravo Charlie Delta Foxtrot; do : >"$BOX_DIR/$game.gb"; done
+mkdir -p "$BOX_DIR/.media/boxart2d" "$BOX_DIR/.media/boxart" "$BOX_DIR/.media/wheel" "$BOX_DIR/.media/screenshot" \
+	"$BOX_DIR/.media/mix" "$BOX_DIR/Imgs" "$BOX_DIR/.res" "$BOX_DIR/Images" "$BOX_DIR/Cover" "$STATE"
+for game in Alpha Bravo Charlie Delta Foxtrot Golf; do : >"$BOX_DIR/$game.gb"; done
 : >"$BOX_DIR/Cover/Game.gb"
-for art in .media/Alpha .media/box/Alpha .media/3d/Alpha .media/wheel/Alpha Imgs/Alpha Imgs/Bravo .res/Charlie \
-	Images/Delta Cover/cover Echo.p8; do
+for art in .media/Alpha .media/boxart2d/Alpha .media/boxart/Alpha .media/wheel/Alpha .media/screenshot/Alpha \
+	Imgs/Alpha Imgs/Bravo .res/Charlie Images/Delta Cover/cover Echo.p8 .media/mix/Foxtrot; do
 	cp "$ROOT/tests/plugins/drawer/art.png" "$BOX_DIR/$art.png"
+done
+# art_find only names files, so a .png copy stands in for the .jpg and .jpeg art
+for art in .media/boxart/Golf.jpg .media/wheel/Golf.jpeg .media/screenshot/Golf.jpg; do
+	cp "$ROOT/tests/plugins/drawer/art.png" "$BOX_DIR/$art"
 done
 make -s -C "$ROOT/plugins" art-boxart ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building art-boxart"
 build_plugin looker 'id=looker\nname=Looker\napi=1\n'
@@ -1246,11 +1253,12 @@ log="$WORK/boxart.log"
 plugin=looker
 grep -qF "plugins: loaded art-boxart" "$log" || fail "art-boxart didn't load"
 expect "open folder 1"
-expect "entries Alpha.gb,Bravo.gb,Charlie.gb,Cover,Delta.gb,Echo.p8.png,Foxtrot.gb"
+expect "entries Alpha.gb,Bravo.gb,Charlie.gb,Cover,Delta.gb,Echo.p8.png,Foxtrot.gb,Golf.gb"
 expect 'art Alpha.gb thumbnail 1 ".media/Alpha.png"'
-expect 'art Alpha.gb box 1 ".media/box/Alpha.png"'
-expect 'art Alpha.gb box3d 1 ".media/3d/Alpha.png"'
+expect 'art Alpha.gb box 1 ".media/boxart2d/Alpha.png"'
+expect 'art Alpha.gb box3d 1 ".media/boxart/Alpha.png"'
 expect 'art Alpha.gb logo 1 ".media/wheel/Alpha.png"'
+expect 'art Alpha.gb screenshot 1 ".media/screenshot/Alpha.png"'
 expect 'art Bravo.gb box 1 "Imgs/Bravo.png"'
 expect 'art Bravo.gb thumbnail 0 ".media/Bravo.png"'
 expect 'art Bravo.gb box3d 0 ""'
@@ -1258,8 +1266,14 @@ expect 'art Charlie.gb box 1 ".res/Charlie.png"'
 expect 'art Delta.gb box 1 "Images/Delta.png"'
 expect 'art Cover box 1 "Cover/cover.png"'
 expect 'art Echo.p8.png box 1 "Echo.p8.png"'
+# nx-redux's mix composite isn't any one kind
 expect 'art Foxtrot.gb box 0 ""'
 expect 'art Foxtrot.gb logo 0 ""'
+expect 'art Foxtrot.gb screenshot 0 ""'
+expect 'art Golf.gb box 1 ".media/boxart/Golf.jpg"'
+expect 'art Golf.gb box3d 1 ".media/boxart/Golf.jpg"'
+expect 'art Golf.gb logo 1 ".media/wheel/Golf.jpeg"'
+expect 'art Golf.gb screenshot 1 ".media/screenshot/Golf.jpg"'
 
 # the thumbnail setting puts this art before stock's, and with nx-redux's
 # folders, covers and carts off the next convention answers; the art
@@ -1267,11 +1281,13 @@ expect 'art Foxtrot.gb logo 0 ""'
 printf 'thumbnail=on\nmedia=off\ncover=off\nrom_art=off\nhide=off\n' >"$STATE/art-boxart.cfg"
 run_launcher "$WORK/boxart-settings.log" "plugin looker: done" || fail "the launcher exited early with art-boxart's settings changed"
 log="$WORK/boxart-settings.log"
-expect "entries Alpha.gb,Bravo.gb,Charlie.gb,Cover,Delta.gb,Echo.p8.png,Foxtrot.gb,Images,Imgs"
+expect "entries Alpha.gb,Bravo.gb,Charlie.gb,Cover,Delta.gb,Echo.p8.png,Foxtrot.gb,Golf.gb,Images,Imgs"
 expect 'art Alpha.gb thumbnail 1 "Imgs/Alpha.png"'
 expect 'art Alpha.gb box 1 "Imgs/Alpha.png"'
 expect 'art Alpha.gb box3d 0 ""'
 expect 'art Alpha.gb logo 0 ""'
+expect 'art Alpha.gb screenshot 0 ""'
+expect 'art Golf.gb box 0 ""'
 expect 'art Bravo.gb thumbnail 1 "Imgs/Bravo.png"'
 expect 'art Cover box 0 ""'
 expect 'art Echo.p8.png box 0 ""'
@@ -1281,8 +1297,8 @@ expect 'art Echo.p8.png box 0 ""'
 printf 'imgs=off\nres=off\nimages=off\n' >"$STATE/art-boxart.cfg"
 run_launcher "$WORK/boxart-off.log" "plugin looker: done" || fail "the launcher exited early with art-boxart's folders off"
 log="$WORK/boxart-off.log"
-expect "entries Alpha.gb,Bravo.gb,Charlie.gb,Cover,Delta.gb,Echo.p8.png,Foxtrot.gb,Images,Imgs"
-expect 'art Alpha.gb box 1 ".media/box/Alpha.png"'
+expect "entries Alpha.gb,Bravo.gb,Charlie.gb,Cover,Delta.gb,Echo.p8.png,Foxtrot.gb,Golf.gb,Images,Imgs"
+expect 'art Alpha.gb box 1 ".media/boxart2d/Alpha.png"'
 expect 'art Bravo.gb box 0 ""'
 expect 'art Charlie.gb box 0 ""'
 expect 'art Delta.gb box 0 ""'

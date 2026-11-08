@@ -10,14 +10,20 @@
 //   box and thumbnail
 //     1. rom as art: a Pico-8 cart (*.p8.png) is its own art
 //     2. folder as cover: <folder>/cover.png, for folders
-//     3. nx-redux:   <dir>/.media/box/<name>.png
-//     4. MyMinUI:    <dir>/Imgs/<name>.png
-//     5. UnuOS:      <dir>/.res/<name>.png
-//     6. visible art folders: <dir>/Images/<name>.png
-//   3D box: <dir>/.media/3d/<name>.png (nx-redux)
-//   logo:   <dir>/.media/wheel/<name>.png (nx-redux)
+//     3. nx-redux:   <dir>/.media/boxart2d/<name>.*, the flat box
+//     4. nx-redux:   <dir>/.media/boxart/<name>.*, the 3D box, or the flat
+//                    one when there's no 3D
+//     5. MyMinUI:    <dir>/Imgs/<name>.png
+//     6. UnuOS:      <dir>/.res/<name>.png
+//     7. visible art folders: <dir>/Images/<name>.png
+//   3D box:     <dir>/.media/boxart/<name>.* (nx-redux)
+//   logo:       <dir>/.media/wheel/<name>.* (nx-redux)
+//   screenshot: <dir>/.media/screenshot/<name>.* (nx-redux)
 //
-// where <dir> is the folder the entry is in. Each convention has its own
+// where <dir> is the folder the entry is in, and <name>.* is <name>.png,
+// then <name>.jpg and <name>.jpeg, as nx-redux reads them (its .webp is
+// left out: the art cache can't decode it, and so is its .media/mix
+// composite, which isn't any one art kind). Each convention has its own
 // setting, and the thumbnail is answered only with the thumbnail setting
 // on, so stock's .media thumbnail stays the default.
 
@@ -30,7 +36,7 @@
 
 typedef struct BAConfig {
 	int thumbnail; // answer the thumbnail kind too, before stock's .media one
-	int media;     // nx-redux's .media/box, .media/3d and .media/wheel
+	int media;     // nx-redux's .media/boxart2d, boxart, wheel and screenshot
 	int imgs;      // MyMinUI's Imgs
 	int res;       // UnuOS's .res
 	int images;    // visible art folders: Images

@@ -1,7 +1,7 @@
 // A plugin that looks at the art a folder's entries have, for the bundled
 // art-boxart plugin. Once the lists are up it opens <sd>/Boxart and logs
 // the entries the list kept, then what art_find answers for each entry's
-// thumbnail, box, 3D box and logo, with paths below the folder.
+// thumbnail, box, 3D box, logo and screenshot, with paths below the folder.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -45,11 +45,12 @@ static void logList(void) {
 	}
 	say("entries %s", names);
 
-	static const int kinds[] = { MOSAIC_ART_THUMBNAIL, MOSAIC_ART_BOX, MOSAIC_ART_BOX_3D, MOSAIC_ART_LOGO };
-	static const char* kind_names[] = { "thumbnail", "box", "box3d", "logo" };
+	static const int kinds[] = { MOSAIC_ART_THUMBNAIL, MOSAIC_ART_BOX, MOSAIC_ART_BOX_3D, MOSAIC_ART_LOGO,
+		MOSAIC_ART_SCREENSHOT };
+	static const char* kind_names[] = { "thumbnail", "box", "box3d", "logo", "screenshot" };
 	for (int i = 0; i < count; i++) {
 		const MosaicEntry* entry = host->list_get(list, i);
-		for (int k = 0; k < 4; k++) {
+		for (int k = 0; k < 5; k++) {
 			char out[512];
 			int found = host->art_find(entry, kinds[k], out, sizeof(out));
 			say("art %s %s %i \"%s\"", below(host->entry_path(entry)), kind_names[k], found, below(out));
