@@ -968,9 +968,12 @@ fi
 
 # under a plugin layout, the row is the last cell gridder passed to
 # decorate_cell for the selected entry, the lit one, and there's no pill;
-# Inner is the cell beside Before
+# Inner is the cell beside Before. Where the stock pill would rest on each
+# push's new frame (the first entry, 40,60 inside its left end) is the lit
+# cell, not the pill.
 build_plugin gridder 'id=gridder\nname=Gridder\napi=1\nslots=layout\n'
 printf 'slider=on\ngridder=on\n' >"$STATE/plugins.txt"
+echo "probe=40,60" >"$STATE/slider.cfg"
 run_launcher "$WORK/slider-layout.log" "plugin slider: done at" || fail "the launcher exited early with slider and gridder loaded"
 log="$WORK/slider-layout.log"
 expect "done at $CARD/Slider/Inner"
@@ -983,7 +986,11 @@ set -- $(RECT_NTH='$' rect_at push new) $(RECT_NTH='$' rect_at push old)
 if [ "$#" -ne 22 ] || [ "${12}" -le "$1" ] || [ "${13}" -ne "$2" ]; then
 	fail "Inner isn't the cell beside Before under gridder: $(grep "plugin slider: begin push .* row " "$log")"
 fi
-rm -rf "$WORK/plugins/gridder.plugin" "$STATE/gridder.cfg"
+[ "$(grep -c "plugin slider: begin push probe 40,60 old [0-9A-F]*FF new " "$log")" -ge 2 ] \
+	|| fail "slider didn't read the stock pill's spot under gridder: $(grep "plugin slider: begin push probe" "$log")"
+grep "plugin slider: begin push probe " "$log" | grep -v " new FF0000FF$" \
+	&& fail "the stock pill was drawn over gridder's layout on a push's new frame"
+rm -rf "$WORK/plugins/gridder.plugin" "$STATE/gridder.cfg" "$STATE/slider.cfg"
 printf 'slider=on\n' >"$STATE/plugins.txt"
 
 # off: no frames, and the folders still open

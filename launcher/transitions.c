@@ -98,8 +98,9 @@ void Transition_slide(SDL_Surface* oldScreen, int direction) {
 	GFX_clearLayers(LAYER_TRANSITION);
 	// Draw the selection pill at its target position before capturing the new
 	// screen, so the cursor is present in the incoming slide surface rather than
-	// blinking in after the transition animation ends.
-	if (currentScreen == SCREEN_GAMELIST && total > 0 && globalpill && list_show_entry_names) {
+	// blinking in after the transition animation ends. A frame a plugin
+	// layout drew has neither.
+	if (currentScreen == SCREEN_GAMELIST && total > 0 && globalpill && list_show_entry_names && !list_layout_drawn) {
 		SDL_LockMutex(animMutex);
 		GFX_drawOnLayer(globalpill, SCALE1(BUTTON_MARGIN), (int)SCALE1(targetY + PADDING), globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 		if (globalText) {

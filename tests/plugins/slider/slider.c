@@ -8,12 +8,13 @@
 // blit_alpha, and it reads back what it drew, and what it was lent, along
 // the way. It logs where the selection is in each frame, with a pixel on
 // and one beside each pill and one on each row, so the run can check the
-// pill or a layout's cell is there.
+// pill or a layout's cell is there, and with probe=x,y, the pixel there in
+// each frame.
 //
 // Settings: style (custom, the default, off, stock, bad for an invalid
 // style, or noframe for custom without a transition_frame), duration (ms,
 // 200 by default), ease (a MosaicEase number, linear by default), fail
-// (frame: transition_frame fails on its second frame) and pak.
+// (frame: transition_frame fails on its second frame), pak and probe.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -32,6 +33,7 @@ static const char* fail = "";
 static const char* pak = "";
 static int duration = 200;
 static int ease = MOSAIC_EASE_LINEAR;
+static int probe_x = -1, probe_y = -1; // a spot to read in each frame, or -1
 static MosaicSurface* red = NULL;
 static int step = 0;
 static long step_at = 0; // when the last step ran
@@ -130,6 +132,10 @@ static int transitionBegin(MosaicTransition* t) {
 		rects(t->kind, "old", t->old_frame, &t->old_row, &t->old_pill);
 		rects(t->kind, "new", t->new_frame, &t->new_row, &t->new_pill);
 	}
+	if (probe_x >= 0) {
+		say("begin %s probe %i,%i old %s new %s", kindName(t->kind), probe_x, probe_y,
+			pixel(t->old_frame, probe_x, probe_y), pixel(t->new_frame, probe_x, probe_y));
+	}
 	old_kept = t->old_frame;
 	new_kept = t->new_frame;
 	frames = 0;
@@ -209,6 +215,7 @@ static int init(const MosaicHost* h) {
 	pak = host->cfg_get(ID, "pak", "");
 	duration = atoi(host->cfg_get(ID, "duration", "200"));
 	ease = atoi(host->cfg_get(ID, "ease", "0"));
+	if (sscanf(host->cfg_get(ID, "probe", ""), "%i,%i", &probe_x, &probe_y) != 2) probe_x = probe_y = -1;
 	red = host->surface_new(ID, 8, 8);
 	host->fill_rect(red, NULL, mosaic_color(0xFF0000, 255));
 	if (!strcmp(style, "noframe")) plugin.transition_frame = NULL;
