@@ -14,7 +14,7 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 CFLAGS += -std=gnu99 -Wall -Werror -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)/all/common \
 	-I$(NEXTUI)/desktop/platform $(SDL_CFLAGS) -DUSE_SDL2 -DPLATFORM=\"desktop\"
 
-TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override test_netplay test_power_plus test_battery_logger test_leds test_genre_view test_core_prefetch test_collate_subfolders test_led_status test_bluetooth test_bt_reconnect test_drawmodel test_layoutmodel test_artcache test_selmodel test_statusmodel test_infomodel test_transmodel test_art_boxart test_layout_grid test_art_placeholder test_art_backdrop test_header_indicators
+TESTS = test_art test_library test_actions test_pluginset test_favorites test_pakhooks test_kbmodel test_cfgfile test_smart_collections test_hidden test_numeric_prefix test_focus_mode test_title_disambiguation test_launchcmd test_all_games test_random_game test_clear_recents test_power test_game_actions test_path_repair test_simple_mode test_stock_toggles test_platform_jump test_button_remap test_nav test_quick_menu_plus test_emulator_override test_netplay test_power_plus test_battery_logger test_leds test_genre_view test_core_prefetch test_collate_subfolders test_led_status test_bluetooth test_bt_reconnect test_drawmodel test_layoutmodel test_artcache test_selmodel test_statusmodel test_infomodel test_transmodel test_art_boxart test_layout_grid test_art_placeholder test_art_backdrop test_header_indicators test_row_badges
 
 # Tests that touch the card get a fixture SD card under build/tests, via a
 # platform.h shim that repoints SDCARD_PATH. The shim's directory comes first
@@ -320,6 +320,12 @@ HEADER_INDICATORS := ../../plugins/header-indicators
 $(BUILD)/test_header_indicators: test_header_indicators.c $(wildcard $(HEADER_INDICATORS)/*.c $(HEADER_INDICATORS)/*.h) $(SDK)/mosaic_plugin.h check.h
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_DIR=\"$(BUILD)\" test_header_indicators.c $(HEADER_INDICATORS)/indicators_model.c -o $@
+
+ROW_BADGES := ../../plugins/row-badges
+
+$(BUILD)/test_row_badges: test_row_badges.c $(wildcard $(ROW_BADGES)/*.c $(ROW_BADGES)/*.h) $(SDK)/mosaic_plugin.h check.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -DTEST_SDCARD_PATH=\"$(BUILD)/row-badges-card\" test_row_badges.c $(ROW_BADGES)/badges_model.c -o $@
 
 clean:
 	rm -rf $(BUILD)
