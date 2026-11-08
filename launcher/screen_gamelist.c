@@ -192,6 +192,33 @@ static void openEntryMenu(const Action** actions, int n) {
 	Modal_choose(entry ? entry->name : "", labels, menu_count, 0, menuPicked, NULL);
 }
 
+// What the last GameList_update decided, for a plugin layout's view: whether
+// names show, and the selected entry's thumbnail if it has one.
+static bool update_show_names = true;
+static char update_art[1024] = "";
+
+// The game list as a plugin layout sees it, for a folder with entries.
+static void listView(MosaicListView* v) {
+	memset(v, 0, sizeof(*v));
+	v->size = sizeof(*v);
+	v->list = (const MosaicList*)state.top->entries;
+	v->count = state.top->entries->count;
+	v->selected = state.top->selected;
+	v->start = state.top->start;
+	v->end = state.top->end;
+	v->rows = MAIN_ROW_COUNT;
+	v->depth = state.stack->count;
+	v->path = state.top->path;
+	Entry* entry = state.top->entries->items[state.top->selected];
+	v->letter = entry->alpha;
+	v->letter_count = state.top->alphas->count;
+	v->show_names = update_show_names;
+	v->show_art = CFG_getShowGameArt() ? 1 : 0;
+	v->art = update_art;
+	LayoutView_area(screen->w, screen->h, screen->h - SCALE1(PADDING + PILL_SIZE), SCALE1(PADDING), ow, SCALE1(PILL_SIZE),
+		&v->area, &v->status);
+}
+
 void GameList_registerActions(void) {
 	for (int i = 0; i < SCREEN_BINDINGS; i++) Actions_register(screenBindings[i].action);
 	for (int i = 0; i < BINDING_COUNT; i++) Actions_register(bindings[i].action);
@@ -199,6 +226,16 @@ void GameList_registerActions(void) {
 }
 
 void GameList_handleInput(void) {
+	// a plugin layout goes first, and can take buttons from what follows
+	if (total>0 && Plugins_hasLayout()) {
+		MosaicListView view;
+		listView(&view);
+		Plugins_layoutInput(&view);
+		// it may have moved the selection or opened a folder
+		selected = state.top->selected;
+		total = state.top->entries->count;
+	}
+
 	Effective e;
 	effective(&e);
 
@@ -336,6 +373,7 @@ void GameList_update(void) {
 		list_show_entry_names = true;
 	}
 	// load game thumbnails
+	update_art[0] = '\0';
 	if (total > 0) {
 		if(CFG_getShowGameArt()) {
 			char thumbpath[1024];
@@ -350,11 +388,13 @@ void GameList_update(void) {
 			if(exists(thumbpath)) {
 				ox = (int)(max_w) - SCALE1(BUTTON_MARGIN*5);
 				had_thumb = 1;
+				snprintf(update_art, sizeof(update_art), "%s", thumbpath);
 			}
 			else
 				ox = screen->w;
 		}
 	}
+	update_show_names = list_show_entry_names;
 }
 
 void GameList_render(void) {
@@ -407,8 +447,25 @@ void GameList_render(void) {
 		selected_row = state.top->selected - state.top->start;
 		previousY = state.previous_row * PILL_SIZE;
 		targetY = selected_row * PILL_SIZE;
+
+		// a plugin layout, or the built-in list if there's none or it fails
+		bool was_layout = list_layout_drawn;
+		list_layout_drawn = false;
+		if (Plugins_hasLayout()) {
+			MosaicListView view;
+			listView(&view);
+			list_layout_drawn = Plugins_layoutRender(screen, &view);
+		}
+		if (list_layout_drawn) is_scrolling = 0;
+		else if (was_layout) {
+			// the stock thumbnail comes back with the built-in list
+			SDL_LockMutex(thumbMutex);
+			thumbchanged = 1;
+			SDL_UnlockMutex(thumbMutex);
+		}
+
 		SDL_Color text_color = uintToColour(THEME_COLOR4_255); // list text color
-		for (int i = state.top->start, j = 0; i < state.top->end; i++, j++) {
+		for (int i = state.top->start, j = 0; !list_layout_drawn && i < state.top->end; i++, j++) {
 			Entry* entry = state.top->entries->items[i];
 			char* entry_name = entry->name;
 			char* entry_unique = entry->unique;
@@ -498,6 +555,7 @@ void GameList_render(void) {
 		state.previous_depth = state.stack->count;
 	}
 	else {
+		list_layout_drawn = false;
 		// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...
 		GFX_blitMessage(font.large, TR("Empty folder"), screen, &(SDL_Rect){0,0,screen->w,screen->h}); //, NULL);
 	}

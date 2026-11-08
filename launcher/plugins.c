@@ -7,6 +7,7 @@
 #include "leds.h"
 #include "bluetooth.h"
 #include "plugindraw.h"
+#include "layoutmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -22,12 +23,15 @@ typedef struct LoadedPlugin {
 	char id[64];
 	Hash* cfg; // loaded on first cfg_get or cfg_set
 	int owns_root; // claims the root slot, so its root_replace is asked
+	int owns_layout; // claims the layout slot, so its layout_* hooks are called
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
 static int loaded_count = 0;
 static int initializing = -1; // the loaded plugin whose init is running
 static int launching = -1;    // the loaded plugin whose pre_launch is running
+static LayoutSlot layout = { LAYOUT_NONE, -1 };
+static int layout_rendering = 0; // while layout_render runs, which only draws
 
 #define SCREEN_COUNT 3
 
@@ -329,7 +333,7 @@ static int hostSelectedIndex(void) {
 	return state.top->selected;
 }
 static int hostSelectIndex(int index) {
-	if (!state.top || index < 0 || index >= state.top->entries->count) return -1;
+	if (layout_rendering || !state.top || index < 0 || index >= state.top->entries->count) return -1;
 	Directory_select(state.top, index);
 	// main's copy for this frame, so the game list's input doesn't put it back
 	selected = index;
@@ -618,6 +622,13 @@ static void load(const PluginManifest* m) {
 	if (!p->owns_root && Plugin_has(plugin, root_replace) && plugin->root_replace) {
 		LOG_warn("plugins: %s has root_replace but no slots=" ROOT_SLOT ", so it won't be asked\n", m->id);
 	}
+	p->owns_layout = csvHas(m->slots, LAYOUT_SLOT);
+	int has_layout = (Plugin_has(plugin, layout_init) && plugin->layout_init)
+		|| (Plugin_has(plugin, layout_input) && plugin->layout_input)
+		|| (Plugin_has(plugin, layout_render) && plugin->layout_render);
+	if (!p->owns_layout && has_layout) {
+		LOG_warn("plugins: %s has a layout but no slots=" LAYOUT_SLOT ", so it won't be called\n", m->id);
+	}
 
 	// what init registers, to take back if it declines: its actions, tiles
 	// and bindings point into the code that's about to be unloaded
@@ -666,6 +677,20 @@ static void load(const PluginManifest* m) {
 
 static void logOverridden(void);
 
+// The layout slot's owner, once every plugin has loaded: slot resolution
+// lets only one plugin claim it.
+static void claimLayout(void) {
+	for (int i = 0; i < loaded_count; i++) {
+		if (!loaded[i].owns_layout) continue;
+		const MosaicPlugin* p = loaded[i].plugin;
+		int has_render = Plugin_has(p, layout_render) && p->layout_render;
+		LayoutSlot_claim(&layout, i, has_render);
+		if (has_render) LOG_info("plugins: %s draws the game list\n", loaded[i].id);
+		else LOG_warn("plugins: %s owns the " LAYOUT_SLOT " slot but has no layout_render, using the built-in list\n", loaded[i].id);
+		return;
+	}
+}
+
 void Plugins_init(void) {
 	if (exists(PAUSED_MARKER)) {
 		LOG_warn("plugins: paused after a crash; turn them back on from the Launcher pak\n");
@@ -699,6 +724,7 @@ void Plugins_init(void) {
 	}
 	if (loaded_count == 0) unlink(LOADING_MARKER);
 	logOverridden();
+	claimLayout();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
@@ -714,6 +740,7 @@ void Plugins_started(void) {
 }
 
 void Plugins_quit(void) {
+	LayoutSlot_clear(&layout);
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) p->plugin->quit();
@@ -765,6 +792,25 @@ static const ButtonInfo buttons[] = {
 	{ MOSAIC_BUTTON_START, BTN_START, "START" },
 	{ MOSAIC_BUTTON_SELECT, BTN_SELECT, "SELECT" },
 };
+
+// Every button a layout sees, the d-pad too, which bindings can't take.
+static const LayoutButton layoutButtons[] = {
+	{ MOSAIC_BUTTON_A, BTN_A },
+	{ MOSAIC_BUTTON_B, BTN_B },
+	{ MOSAIC_BUTTON_X, BTN_X },
+	{ MOSAIC_BUTTON_Y, BTN_Y },
+	{ MOSAIC_BUTTON_L1, BTN_L1 },
+	{ MOSAIC_BUTTON_R1, BTN_R1 },
+	{ MOSAIC_BUTTON_L2, BTN_L2 },
+	{ MOSAIC_BUTTON_R2, BTN_R2 },
+	{ MOSAIC_BUTTON_START, BTN_START },
+	{ MOSAIC_BUTTON_SELECT, BTN_SELECT },
+	{ MOSAIC_BUTTON_UP, BTN_UP },
+	{ MOSAIC_BUTTON_DOWN, BTN_DOWN },
+	{ MOSAIC_BUTTON_LEFT, BTN_LEFT },
+	{ MOSAIC_BUTTON_RIGHT, BTN_RIGHT },
+};
+#define LAYOUT_BUTTONS (int)(sizeof(layoutButtons) / sizeof(layoutButtons[0]))
 
 static const ButtonInfo* buttonInfo(int button) {
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
@@ -1105,4 +1151,65 @@ void Plugins_beforePoweroff(void) {
 
 const MosaicPlugin* Plugins_at(int i) {
 	return (i >= 0 && i < loaded_count) ? loaded[i].plugin : NULL;
+}
+
+///////////////////////////////////////
+// the layout slot
+
+int Plugins_hasLayout(void) {
+	return LayoutSlot_active(&layout);
+}
+
+// After a layout call: an error hands the game list back to the built-in
+// list for the rest of the run.
+static int layoutResult(const char* hook, int rc) {
+	if (LayoutSlot_result(&layout, rc)) return 1;
+	LOG_warn("plugins: %s's %s returned %i, using the built-in list until the launcher restarts\n",
+		loaded[layout.owner].id, hook, rc);
+	return 0;
+}
+
+// Runs layout_init first, the first time the layout is needed.
+static int layoutReady(const MosaicListView* view) {
+	if (!LayoutSlot_active(&layout)) return 0;
+	if (!LayoutSlot_needsInit(&layout)) return 1;
+	const MosaicPlugin* p = loaded[layout.owner].plugin;
+	int rc = Plugin_has(p, layout_init) && p->layout_init ? p->layout_init(view) : 0;
+	if (LayoutSlot_result(&layout, rc)) return 1;
+	LOG_warn("plugins: %s declined the " LAYOUT_SLOT " slot (layout_init returned %i), using the built-in list\n",
+		loaded[layout.owner].id, rc);
+	return 0;
+}
+
+void Plugins_layoutInput(const MosaicListView* view) {
+	if (!layoutReady(view)) return;
+	const MosaicPlugin* p = loaded[layout.owner].plugin;
+	if (!Plugin_has(p, layout_input) || !p->layout_input) return;
+	MosaicInput input;
+	LayoutInput_fill(&input, layoutButtons, LAYOUT_BUTTONS, pad.just_pressed, pad.just_repeated, pad.just_released, pad.is_pressed);
+	unsigned int consumed = 0;
+	int rc = p->layout_input(&input, view, &consumed);
+	if (!layoutResult("layout_input", rc)) return;
+	// the game list never sees what the layout handled; what's held stays
+	// held, so the next frame's presses and releases are as the pad has them
+	int taken = LayoutInput_padBits(layoutButtons, LAYOUT_BUTTONS, consumed);
+	pad.just_pressed &= ~taken;
+	pad.just_repeated &= ~taken;
+	pad.just_released &= ~taken;
+}
+
+int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view) {
+	if (!layoutReady(view)) return 0;
+	const MosaicPlugin* p = loaded[layout.owner].plugin;
+	SDL_Rect clip = { view->area.x, view->area.y, view->area.w, view->area.h };
+	MosaicSurface* lent = PluginDraw_lend(surface, &clip);
+	if (!lent) {
+		LOG_warn("plugins: the screen is already lent, so %s's layout can't draw this frame\n", loaded[layout.owner].id);
+		return 0;
+	}
+	layout_rendering = 1;
+	int rc = p->layout_render(lent, view);
+	layout_rendering = 0;
+	PluginDraw_unlend(lent);
+	return layoutResult("layout_render", rc);
 }

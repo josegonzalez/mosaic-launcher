@@ -62,6 +62,9 @@ extern float targetY;
 extern float previousY;
 extern int is_scrolling;
 extern bool list_show_entry_names;
+// The last frame with entries was drawn by a plugin layout, so the stock
+// pill, scrolling name and thumbnail stay off.
+extern bool list_layout_drawn;
 extern char folderBgPath[1024];
 extern int globallpillW;
 

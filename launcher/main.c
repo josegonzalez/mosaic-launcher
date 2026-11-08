@@ -199,7 +199,10 @@ int main (int argc, char *argv[]) {
 				}
 				SDL_UnlockMutex(bgMutex);
 				SDL_LockMutex(thumbMutex);
-				if(thumbbmp && thumbchanged) {
+				if(list_layout_drawn) {
+					// a plugin layout draws its own art
+					GFX_clearLayers(LAYER_THUMBNAIL);
+				} else if(thumbbmp && thumbchanged) {
 					int img_w = thumbbmp->w;
 					int img_h = thumbbmp->h;
 					double aspect_ratio = (double)img_h / img_w;
@@ -227,7 +230,7 @@ int main (int argc, char *argv[]) {
 				GFX_clearLayers(LAYER_SCROLLTEXT);
 
 				SDL_LockMutex(animMutex);
-				if (list_show_entry_names) {
+				if (list_show_entry_names && !list_layout_drawn) {
 					GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 					GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING), pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
 				}
@@ -254,7 +257,10 @@ int main (int argc, char *argv[]) {
 			}
 			SDL_UnlockMutex(bgMutex);
 			SDL_LockMutex(thumbMutex);
-			if(thumbbmp && thumbchanged) {
+			if(list_layout_drawn && thumbchanged) {
+				GFX_clearLayers(LAYER_THUMBNAIL);
+				thumbchanged = 0;
+			} else if(thumbbmp && thumbchanged) {
 				int img_w = thumbbmp->w;
 				int img_h = thumbbmp->h;
 				double aspect_ratio = (double)img_h / img_w;
@@ -284,7 +290,7 @@ int main (int argc, char *argv[]) {
 			SDL_LockMutex(animMutex);
 			if (getAnimationDraw()) {
 				GFX_clearLayers(LAYER_TRANSITION);
-				if (list_show_entry_names)
+				if (list_show_entry_names && !list_layout_drawn)
 					GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 				setAnimationDraw(0);
 			}
@@ -327,7 +333,7 @@ int main (int argc, char *argv[]) {
 					GFX_clearLayers(LAYER_TRANSITION);
 					GFX_clearLayers(LAYER_SCROLLTEXT);
 					SDL_LockMutex(animMutex);
-					if (list_show_entry_names) {
+					if (list_show_entry_names && !list_layout_drawn) {
 						GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 						GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING),pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
 					}

@@ -22,6 +22,7 @@
 #define PLUGIN_STATE_DIR USERDATA_PATH "/launcher"
 #define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
 #define ROOT_SLOT "root" // the exclusive slot root_replace belongs to
+#define LAYOUT_SLOT "layout" // the exclusive slot layout_init, layout_input and layout_render belong to
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -89,6 +90,19 @@ int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size);
 // The first plugin's new full path for a recent whose file is missing.
 // Returns 1 if a plugin answered.
 int Plugins_repairPath(const char* missing, char* out, size_t size);
+
+// 1 while the layout slot's owner draws the game list.
+int Plugins_hasLayout(void);
+
+// The layout's input for this frame, before the game list's own: the
+// buttons it consumed are taken off the pad's presses, repeats and
+// releases for the rest of the frame. Does nothing without a layout.
+void Plugins_layoutInput(const MosaicListView* view);
+
+// Lends surface to the layout, clipped to view->area, to draw the game
+// list on. Returns 1 if it drew, or 0 to draw the built-in list: there's no
+// layout, it declined, or it failed, which logs and turns it off.
+int Plugins_layoutRender(struct SDL_Surface* surface, const MosaicListView* view);
 
 void Plugins_tick(unsigned long now);
 void Plugins_beforeSleep(void);

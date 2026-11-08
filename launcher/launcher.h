@@ -44,5 +44,6 @@
 #include "cfgfile.h"
 #include "settings.h"
 #include "listsort.h"
+#include "layoutmodel.h"
 
 #endif

@@ -62,7 +62,15 @@ enum MosaicButton {
 	MOSAIC_BUTTON_R2,
 	MOSAIC_BUTTON_START,
 	MOSAIC_BUTTON_SELECT,
+	// The d-pad, which only layout_input sees; bindings can't take it.
+	MOSAIC_BUTTON_UP,
+	MOSAIC_BUTTON_DOWN,
+	MOSAIC_BUTTON_LEFT,
+	MOSAIC_BUTTON_RIGHT,
 };
+
+// A button's bit in a MosaicInput mask.
+#define MOSAIC_BUTTON_BIT(button) (1u << (button))
 
 enum MosaicTrigger {
 	MOSAIC_TRIGGER_PRESS,
@@ -153,6 +161,38 @@ enum MosaicFit {
 	MOSAIC_FIT_CONTAIN, // keeps the shape, centred, leaving the rest transparent
 	MOSAIC_FIT_COVER,   // keeps the shape and fills it, cropping the edges
 };
+
+// The game list as the launcher has it this frame, for the layout slot's
+// owner to draw and move around in. The launcher keeps the selection and
+// scroll window; a layout reads them here and moves the selection with
+// host->select_index. It begins with its own size, and fields are only
+// added at the end.
+typedef struct MosaicListView {
+	size_t size;            // sizeof(MosaicListView) in the launcher
+	const MosaicList* list; // the folder's entries, read with list_count and list_get
+	int count;              // how many, never 0: an empty folder shows the launcher's own message
+	int selected;           // the selected entry's index in list
+	int start, end;         // the built-in list's window: entries start to end - 1 are in view
+	int rows;               // how many rows the built-in list shows at once
+	int depth;              // 1 on the root, one more for each folder open
+	const char* path;       // the folder, as current_path returns it
+	int letter;             // the selected entry's group in the letter index L1 and R1 jump between, from 0
+	int letter_count;       // how many groups the letter index has
+	int show_names;         // 0 when the folder's art stands in for names, as stock does with Show folder names at root off
+	int show_art;           // 1 while Show game art is on in Settings
+	const char* art;        // the selected entry's thumbnail when show_art is 1 and it exists, else ""
+	MosaicRect area;        // where the layout draws: the screen above the button hints
+	MosaicRect status;      // the status pill (clock, battery, wifi) in area's top right, already drawn; leave it clear
+} MosaicListView;
+
+// Buttons on the game list this frame, as masks of MOSAIC_BUTTON_BIT.
+typedef struct MosaicInput {
+	size_t size;           // sizeof(MosaicInput) in the launcher
+	unsigned int pressed;  // went down this frame
+	unsigned int repeated; // went down, or repeats while held, at the pace stock moves through the list
+	unsigned int released; // came up this frame
+	unsigned int held;     // down now
+} MosaicInput;
 
 typedef struct MosaicLaunch {
 	const char* path; // the rom or pak being launched
@@ -254,8 +294,9 @@ typedef struct MosaicHost {
 	// user leaves the folder or the lists reload. selected_index returns
 	// the selected row in it, or -1 when it's empty. select_index moves
 	// the selection to a row, scrolling to keep it in view, and returns 0,
-	// or -1 for a row that isn't there. Call them from an action or tick,
-	// not from a list hook, which may be listing another folder.
+	// or -1 for a row that isn't there or during layout_render. Call them
+	// from an action, tick or layout_input, not from a list hook, which may
+	// be listing another folder.
 	const MosaicList* (*current_list)(void);
 	int (*selected_index)(void);
 	int (*select_index)(int index);
@@ -549,6 +590,37 @@ typedef struct MosaicPlugin {
 	// place and name. It runs whenever recents load: at start, and when the
 	// lists reload.
 	int (*repair_path)(const char* missing, char* out, size_t size);
+
+	// The layout slot. A plugin with slots=layout in its plugin.txt draws
+	// the game list in place of the built-in list. Only the slot's owner is
+	// called, and only for a folder with entries. The launcher still owns
+	// the selection, scroll window and letter index, its button hints and
+	// status pill, and every button the layout leaves alone, so navigation
+	// and actions work as with the built-in list.
+	//
+	// layout_init runs once, before the layout's first input or render,
+	// with the first view; return 0 to take the game list, or anything
+	// else to leave it to the built-in list until the launcher restarts.
+	//
+	// layout_input runs each frame before the game list's own input, with
+	// the buttons and the view. It moves the selection with
+	// host->select_index rather than keeping a selection of its own, and
+	// sets *consumed (0 on entry) to the buttons it handled, as
+	// MOSAIC_BUTTON_BIT masks, which the game list then ignores for that
+	// frame, eg. a grid takes the d-pad and leaves A, B and the shoulders.
+	//
+	// layout_render draws the list on screen, a surface lent for the call,
+	// over the background and the status pill and clipped to view->area,
+	// which leaves out the button hints. It only draws: select_index
+	// returns -1 during it. It runs on frames the launcher redraws; call
+	// host->request_redraw from tick to animate.
+	//
+	// Each returns 0, or anything else for an error, after which the
+	// launcher logs it and draws the built-in list from that frame on,
+	// until it restarts.
+	int (*layout_init)(const MosaicListView* view);
+	int (*layout_input)(const MosaicInput* input, const MosaicListView* view, unsigned int* consumed);
+	int (*layout_render)(MosaicSurface* screen, const MosaicListView* view);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"
