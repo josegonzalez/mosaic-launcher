@@ -64,6 +64,7 @@ static int backgrounding = 0; // while background_render runs, which only draws
 static int generating = 0;    // while an art_surface runs, which only draws
 static ArtSwap swap = { -1, NULL, 0, 0 }; // a plugin's art_replace surface
 static SelKey swap_key;                     // and the selection it was shown for
+static int swap_drawn = 0;                  // the layout's last layout_render got it with art_replacement
 
 #define SCREEN_COUNT 3
 
@@ -649,8 +650,8 @@ static int hostSurfaceWrite(const char* plugin_id, MosaicSurface* surface, const
 }
 
 // The thumbnail layer is out of date, and with full the list too: a
-// thumbnail beside rows that left no room for one, or art decorators
-// placed under the last art.
+// thumbnail beside rows that left no room for one, art decorators placed
+// under the last art, or a plugin layout that draws it.
 static void swapChanged(int full) {
 	SDL_LockMutex(thumbMutex);
 	thumbchanged = 1;
@@ -672,11 +673,10 @@ static int loadedIndex(const char* plugin_id) {
 	return -1;
 }
 
-// 1 while the built-in list shows the selected entry's thumbnail, or would
-// with art for it.
+// 1 while the game list shows the selected entry's art, or would with art
+// for it: the built-in list's thumbnail, or a plugin layout's own place.
 static int listShowsArt(void) {
-	return currentScreen == SCREEN_GAMELIST && state.top && state.top->entries->count > 0 && CFG_getShowGameArt()
-		&& !Plugins_hasLayout();
+	return currentScreen == SCREEN_GAMELIST && state.top && state.top->entries->count > 0 && CFG_getShowGameArt();
 }
 
 static int hostArtReplace(const char* plugin_id, MosaicSurface* surface) {
@@ -693,26 +693,36 @@ static int hostArtReplace(const char* plugin_id, MosaicSurface* surface) {
 	if (ArtSwap_active(&swap) && SelKey_changed(&swap_key, state.top, state.top->entries, state.top->selected))
 		ArtSwap_clear(&swap);
 	int had = ArtSwap_active(&swap);
-	switch (ArtSwap_set(&swap, owner, surface, s->w, s->h)) {
-		case ARTSWAP_FRAME:
-			swapChanged(0);
-			return 0;
-		case ARTSWAP_SHOWN:
-			if (!had) {
-				SelKey_reset(&swap_key);
-				SelKey_changed(&swap_key, state.top, state.top->entries, state.top->selected);
-			}
-			// rows beside no art make room, and art decorators go under the new size
-			swapChanged(!had_thumb || Plugins_hasArtDecorators());
-			return 0;
-		default:
-			return -1;
+	int result = ArtSwap_set(&swap, owner, surface, s->w, s->h);
+	if (result == ARTSWAP_REFUSED) return -1;
+	if (result == ARTSWAP_SHOWN && !had) {
+		SelKey_reset(&swap_key);
+		SelKey_changed(&swap_key, state.top, state.top->entries, state.top->selected);
 	}
+	// rows beside no art make room, art decorators go under a new size, and
+	// a layout draws it again
+	int redraw = ArtSwap_redraw(result, Plugins_hasLayout(), swap_drawn, had_thumb, Plugins_hasArtDecorators());
+	if (redraw != ARTSWAP_REDRAW_NONE) swapChanged(redraw == ARTSWAP_REDRAW_LIST);
+	return 0;
 }
 
 SDL_Surface* Plugins_artReplaced(void) {
 	if (!ArtSwap_active(&swap)) return NULL;
 	return DrawReg_mine(swap.surface, loaded[swap.owner].id) ? (SDL_Surface*)swap.surface : NULL;
+}
+
+// Only the selected entry has one; Plugins_artReplaceCheck has dropped it
+// before the frame if the selection moved, and it can't move while a
+// layout draws.
+static int hostArtReplacement(int index, const MosaicSurface** out) {
+	if (!layout_rendering || decorating || !out) return -1;
+	*out = NULL;
+	if (!state.top || index < 0 || index >= state.top->entries->count) return -1;
+	SDL_Surface* s = index == state.top->selected ? Plugins_artReplaced() : NULL;
+	if (!s) return 0;
+	*out = (const MosaicSurface*)s;
+	swap_drawn = 1;
+	return 1;
 }
 
 void Plugins_artReplaceCheck(void) {
@@ -854,6 +864,7 @@ static const MosaicHost host = {
 	.audio_pause = Audio_pause,
 	.audio_close = Audio_close,
 	.audio_queue_max_ms = AUDIO_QUEUE_MAX_MS,
+	.art_replacement = hostArtReplacement,
 };
 
 ///////////////////////////////////////
@@ -1661,6 +1672,7 @@ int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view, ListS
 	layout_lent = lent;
 	layout_area = view->area;
 	ListSelection_clear(&layout_selected);
+	swap_drawn = 0;
 	int rc = p->layout_render(lent, view);
 	layout_rendering = 0;
 	layout_lent = NULL;

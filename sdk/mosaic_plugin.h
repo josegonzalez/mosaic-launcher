@@ -811,11 +811,15 @@ typedef struct MosaicHost {
 	// Shows surface, one the plugin made and still owns, in place of the
 	// selected entry's thumbnail on the built-in list: sized and placed as
 	// a thumbnail of its size would be, with the thumbnail's rounded
-	// corners, and with art decorators under it. The launcher doesn't take
-	// it: the plugin can keep drawing into it or writing into it with
+	// corners, and with art decorators under it. Under a plugin layout the
+	// layout draws it in its own place for the selected entry's art, when
+	// it asks for it with art_replacement. The launcher doesn't take it:
+	// the plugin can keep drawing into it or writing into it with
 	// surface_write, and calls art_replace again with the same surface to
-	// show what it has now, which redraws only the thumbnail, not the list.
-	// Never call request_redraw for each frame: it redraws the whole list.
+	// show what it has now, which redraws only the thumbnail, not the list;
+	// under a layout it redraws the layout's whole area, and only while the
+	// layout drew the surface the last time it drew. Never call
+	// request_redraw for each frame: it redraws the whole list.
 	// NULL takes the plugin's surface away again. It goes away by itself
 	// when the selection moves, the game list is left, the surface is
 	// freed or no longer the plugin's, or the plugin quits; after that the
@@ -823,10 +827,10 @@ typedef struct MosaicHost {
 	// plugin's surface shows at a time: the first keeps the place until it
 	// goes. Returns 0, also for NULL, or -1 for a NULL id, a surface the
 	// plugin didn't make or no longer owns, another plugin's surface
-	// showing, from init or a hook that only draws, or when the built-in
-	// list shows no thumbnail there: off the game list, in an empty folder,
-	// with Show game art off or under a plugin layout. Main thread only.
-	// Check for it with MOSAIC_HOST_HAS(host, art_replace).
+	// showing, from init or a hook that only draws, or where no art for the
+	// selected entry shows: off the game list, in an empty folder or with
+	// Show game art off. Main thread only. Check for it with
+	// MOSAIC_HOST_HAS(host, art_replace).
 	int (*art_replace)(const char* plugin_id, MosaicSurface* surface);
 
 	// Audio, such as a video preview's sound, through SDL's audio queue.
@@ -863,6 +867,22 @@ typedef struct MosaicHost {
 	int (*audio_pause)(const char* plugin_id, int paused);
 	int (*audio_close)(const char* plugin_id);
 	int audio_queue_max_ms; // the most audio_queue lets a plugin have queued, in ms
+
+	// Art replacement under a plugin layout. Called from layout_render, it
+	// writes the surface a plugin showed with art_replace for the entry at
+	// index to *out and returns 1, or returns 0 when there's none for it:
+	// only the selected entry has one, and only while a plugin shows one.
+	// The layout draws it where it draws the selected entry's art, in place
+	// of that art, with blit or blit_alpha, fitting it as it likes. It's
+	// the other plugin's, read-only: draw it, size it or read it, but don't
+	// draw on it, free it or keep it, since it's only good until
+	// layout_render returns. Asking for it is what lets that plugin's new
+	// frames redraw the layout: while the layout's last layout_render got
+	// it, each frame art_replace shows draws the layout again. Returns -1
+	// outside layout_render, from inside a decorator, for a NULL out or an
+	// index not in the list. Check for it with
+	// MOSAIC_HOST_HAS(host, art_replacement).
+	int (*art_replacement)(int index, const MosaicSurface** out);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

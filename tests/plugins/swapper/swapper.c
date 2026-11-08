@@ -72,7 +72,7 @@ static MosaicList* virtualDir(const char* path) {
 	if (!strcmp(path, folder)) {
 		list = host->list_new();
 		addGame(list, folder, "Apple");
-		if (!once) host->list_push(list, host->entry_new(next1, MOSAIC_ENTRY_DIR, "Next"));
+		host->list_push(list, host->entry_new(next1, MOSAIC_ENTRY_DIR, "Next"));
 	}
 	else if (!strcmp(path, next1)) {
 		list = host->list_new();

@@ -86,6 +86,21 @@ int FL_panelArt(int show_art, int prefer_preview, int has_box, int has_preview) 
 	return (has_box ? FL_SHOW_BOX : 0) | (has_preview ? FL_SHOW_PREVIEW : 0);
 }
 
+int FL_replacedArt(int show_art, int prefer_preview, int has_preview) {
+	if (!show_art) return 0;
+	return FL_SHOW_BOX | (has_preview && !prefer_preview ? FL_SHOW_PREVIEW : 0);
+}
+
+MosaicRect FL_around(const MosaicRect* a, const MosaicRect* b) {
+	int a_in = a->w > 0 && a->h > 0, b_in = b->w > 0 && b->h > 0;
+	if (!a_in) return b_in ? *b : (MosaicRect){ a->x, a->y, 0, 0 };
+	if (!b_in) return *a;
+	int x0 = a->x < b->x ? a->x : b->x, y0 = a->y < b->y ? a->y : b->y;
+	int x1 = a->x + a->w > b->x + b->w ? a->x + a->w : b->x + b->w;
+	int y1 = a->y + a->h > b->y + b->h ? a->y + a->h : b->y + b->h;
+	return (MosaicRect){ x0, y0, x1 - x0, y1 - y0 };
+}
+
 void FL_panelParts(const MosaicRect* panel, int show, int gap, MosaicRect* box, MosaicRect* preview) {
 	MosaicRect none = { panel->x, panel->y, 0, 0 };
 	*box = none;

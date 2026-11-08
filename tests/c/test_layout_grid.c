@@ -206,6 +206,10 @@ static int tiles = 0; // letter tiles: rounded fills in the accent colour
 static char letters[16];
 static int blits = 0, blits_of_image = 0;
 static const char* columns_cfg = "auto";
+static MosaicSurface video = { 720, 480, 0 }; // another plugin's art_replace surface
+static int replaced_index = -1; // the entry it's for, or -1 for none
+static int replacement_asks = 0, blits_of_video = 0;
+static MosaicRect blit_video;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
@@ -250,9 +254,13 @@ static int fakeFillRoundRect(MosaicSurface* t, const MosaicRect* r, int radius, 
 	return 0;
 }
 static int fakeBlit(MosaicSurface* t, const MosaicSurface* s, const MosaicRect* sr, const MosaicRect* dr) {
-	(void)t; (void)sr; (void)dr;
+	(void)t; (void)sr;
 	blits++;
 	if (s == &art_image) blits_of_image++;
+	if (s == &video) {
+		blits_of_video++;
+		blit_video = *dr;
+	}
 	return 0;
 }
 static int fakeSurfaceSize(const MosaicSurface* s, int* w, int* h) {
@@ -300,6 +308,14 @@ static int fakeDecorateCell(MosaicSurface* s, int index, const MosaicRect* r, co
 	}
 	if (name && name->w > 0) decorated_named++;
 	return 0;
+}
+
+static int fakeArtReplacement(int index, const MosaicSurface** out) {
+	replacement_asks++;
+	*out = NULL;
+	if (index != replaced_index) return 0;
+	*out = &video;
+	return 1;
 }
 
 static MosaicHost fake_host;
@@ -362,6 +378,7 @@ static void resetCounts(void) {
 	letters[0] = '\0';
 	blits = blits_of_image = 0;
 	scales = 0;
+	replacement_asks = blits_of_video = 0;
 }
 
 static void testPlugin(void) {
@@ -483,6 +500,50 @@ static void testPlugin(void) {
 	CHECK(p->init(&fake_host) == 1);
 }
 
+static void testReplacement(void) {
+	setUp();
+	fake_host.art_replacement = fakeArtReplacement;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	cacheClear();
+	copy_count = 0;
+
+	// Banana, selected, has no art: its video takes the letter tile's place,
+	// fitted inside the tile's art, straight from the plugin's surface
+	replaced_index = 1;
+	resetCounts();
+	MosaicListView v = makeView(1);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 1 && blit_video.w == 220 && blit_video.h == 146);
+	CHECK(tiles == 5 && strchr(letters, 'B') == NULL);
+	CHECK(replacement_asks > 0);
+	int copies_made = scales;
+	// the next frame draws it again, and copies nothing more
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 1 && scales == 0 && copies_made == 2);
+	// Apple, selected, has art of its own, which its video stands in for
+	replaced_index = 0;
+	resetCounts();
+	v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 1 && blits == 2);
+	// gone: Banana's letter again
+	replaced_index = -1;
+	resetCounts();
+	v = makeView(1);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0 && tiles == 6);
+	// art off: none
+	replaced_index = 1;
+	resetCounts();
+	v.show_art = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0 && tiles == 8);
+	replaced_index = -1;
+	p->quit();
+}
+
 static void testCacheLimit(void) {
 	setUp();
 	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
@@ -493,20 +554,20 @@ static void testCacheLimit(void) {
 	copy_count = 0;
 	frees = 0;
 	frame = 1;
-	CHECK(drawArt(&screen_surface, &fake_list.items[0], &a, 2) == 1);
+	CHECK(drawArt(&screen_surface, &fake_list.items[0], 0, &a, 2) == 1);
 	frame = 2;
 	MosaicRect b = { 0, 0, 20, 20 };
-	CHECK(drawArt(&screen_surface, &fake_list.items[0], &b, 2) == 1);
+	CHECK(drawArt(&screen_surface, &fake_list.items[0], 0, &b, 2) == 1);
 	frame = 3;
-	CHECK(drawArt(&screen_surface, &fake_list.items[0], &a, 2) == 1); // a hit, now the newer
+	CHECK(drawArt(&screen_surface, &fake_list.items[0], 0, &a, 2) == 1); // a hit, now the newer
 	MosaicRect c = { 0, 0, 30, 30 };
-	CHECK(drawArt(&screen_surface, &fake_list.items[0], &c, 2) == 1);
+	CHECK(drawArt(&screen_surface, &fake_list.items[0], 0, &c, 2) == 1);
 	CHECK(frees == 1 && copy_count == 3);
 	CHECK(cacheFind("/Roms/Apple.gb", 10, 10) != NULL);
 	CHECK(cacheFind("/Roms/Apple.gb", 20, 20) == NULL);
 	CHECK(cacheFind("/Roms/Apple.gb", 30, 30) != NULL);
 	// no art, no copy
-	CHECK(drawArt(&screen_surface, &fake_list.items[1], &a, 2) == 0);
+	CHECK(drawArt(&screen_surface, &fake_list.items[1], 1, &a, 2) == 0);
 	cacheClear();
 }
 
@@ -519,6 +580,7 @@ int main(void) {
 	testMove();
 	testLetter();
 	testPlugin();
+	testReplacement();
 	testCacheLimit();
 	CHECK_DONE();
 }

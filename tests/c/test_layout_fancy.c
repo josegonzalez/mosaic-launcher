@@ -79,6 +79,20 @@ static void testPanel(void) {
 	CHECK(FL_panelArt(1, 1, 1, 0) == FL_SHOW_BOX);
 	CHECK(FL_panelArt(1, 0, 0, 1) == FL_SHOW_PREVIEW);
 	CHECK(FL_panelArt(1, 1, 0, 0) == 0);
+	// a plugin's replacement takes the box's place, and the preview never hides it
+	CHECK(FL_replacedArt(0, 1, 1) == 0);
+	CHECK(FL_replacedArt(1, 1, 1) == FL_SHOW_BOX);
+	CHECK(FL_replacedArt(1, 0, 1) == (FL_SHOW_BOX | FL_SHOW_PREVIEW));
+	CHECK(FL_replacedArt(1, 0, 0) == FL_SHOW_BOX);
+	CHECK(FL_replacedArt(1, 1, 0) == FL_SHOW_BOX);
+
+	// what art decorators go under: everything the panel drew
+	MosaicRect top = { 519, 150, 460, 226 }, bottom = { 600, 407, 300, 226 }, none = { 519, 150, 0, 0 };
+	CHECK(rectIs(FL_around(&top, &bottom), 519, 150, 460, 483));
+	CHECK(rectIs(FL_around(&top, &none), 519, 150, 460, 226));
+	CHECK(rectIs(FL_around(&none, &bottom), 600, 407, 300, 226));
+	MosaicRect both = FL_around(&none, &none);
+	CHECK(both.w == 0 && both.h == 0);
 
 	MosaicRect panel = { 519, 150, 460, 483 }, box, shot;
 	FL_panelParts(&panel, FL_SHOW_BOX | FL_SHOW_PREVIEW, 30, &box, &shot);
@@ -210,6 +224,12 @@ static MosaicRect blit_box, blit_shot;
 static int loads = 0;
 static char loaded[1024];
 static const char* prefer_cfg = "on";
+static MosaicSurface video = { 720, 480, 0, NULL }; // another plugin's art_replace surface
+static int replaced_index = -1; // the entry it's for, or -1 for none
+static int blits_video = 0;
+static MosaicRect blit_video;
+static int art_decorated = 0, art_decorated_index = -1;
+static MosaicRect art_decorated_rect;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
@@ -270,6 +290,10 @@ static int fakeBlit(MosaicSurface* t, const MosaicSurface* s, const MosaicRect* 
 		blits_shot++;
 		blit_shot = *dr;
 	}
+	if (s == &video) {
+		blits_video++;
+		blit_video = *dr;
+	}
 	return 0;
 }
 static int fakeSurfaceSize(const MosaicSurface* s, int* w, int* h) {
@@ -320,6 +344,20 @@ static int fakeDecorateCell(MosaicSurface* s, int index, const MosaicRect* r, co
 	}
 	decorated++;
 	if (name && name->w > 0) decorated_named++;
+	return 0;
+}
+
+static int fakeArtReplacement(int index, const MosaicSurface** out) {
+	*out = NULL;
+	if (index != replaced_index) return 0;
+	*out = &video;
+	return 1;
+}
+static int fakeDecorateArt(MosaicSurface* s, int index, const MosaicRect* art) {
+	(void)s;
+	art_decorated++;
+	art_decorated_index = index;
+	art_decorated_rect = *art;
 	return 0;
 }
 
@@ -409,6 +447,9 @@ static void resetCounts(void) {
 	loads = 0;
 	loaded[0] = '\0';
 	scales = 0;
+	blits_video = 0;
+	art_decorated = 0;
+	art_decorated_index = -1;
 }
 
 static void testInput(void) {
@@ -552,6 +593,83 @@ static void testRender(void) {
 	CHECK(system("rm -rf '" CARD "'") == 0);
 }
 
+static void testReplacement(void) {
+	setUp();
+	makeCard();
+	fake_host.art_replacement = fakeArtReplacement;
+	fake_host.decorate_art = fakeDecorateArt;
+	prefer_cfg = "on";
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = frees = 0;
+
+	// none showing: Mario's box, with art decorators under it
+	resetCounts();
+	MosaicListView v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_box == 1 && blits_video == 0);
+	CHECK(art_decorated == 1 && art_decorated_index == 0 && rectIs(art_decorated_rect, 568, 150, 362, 483));
+
+	// Mario's video takes its box's place, fitted across the panel, straight
+	// from the plugin's surface
+	replaced_index = 0;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_box == 0 && blits_video == 1 && scales == 0);
+	CHECK(rectIs(blit_video, 519, 238, 460, 306));
+	CHECK(art_decorated == 1 && rectIs(art_decorated_rect, 519, 238, 460, 306));
+	// Tetris's state preview doesn't stand in for its video
+	replaced_index = 1;
+	resetCounts();
+	v = makeView(1);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_video == 1 && blits_shot == 0 && rectIs(blit_video, 519, 238, 460, 306));
+	// another entry's isn't drawn for Zelda
+	replaced_index = 1;
+	resetCounts();
+	v = makeView(2);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_video == 0 && blits_thumb == 1);
+	// Game0 has no art: its video gives the panel art, so a hidden name goes
+	unsigned char hidden[10] = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 };
+	replaced_index = 4;
+	resetCounts();
+	v = makeView(4);
+	v.names_hidden = hidden;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_video == 1 && pills == 0 && art_decorated == 1);
+	// and without it, it has no art and no art decorators
+	replaced_index = -1;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_video == 0 && pills == 1 && art_decorated == 0);
+	// art off: no video, no art decorators
+	replaced_index = 0;
+	resetCounts();
+	v = makeView(0);
+	v.show_art = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_video == 0 && art_decorated == 0);
+	p->quit();
+
+	// with prefer_preview off, Tetris's video goes on top and its preview under it,
+	// and art decorators under both
+	prefer_cfg = "off";
+	CHECK(p->init(&fake_host) == 0);
+	replaced_index = 1;
+	resetCounts();
+	v = makeView(1);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_video == 1 && blits_shot == 1 && blits_box == 0);
+	CHECK(blit_video.y >= 150 && blit_video.y + blit_video.h <= 150 + 226);
+	CHECK(art_decorated == 1 && art_decorated_rect.y == blit_video.y &&
+		art_decorated_rect.y + art_decorated_rect.h == blit_shot.y + blit_shot.h);
+	p->quit();
+	prefer_cfg = "on";
+	replaced_index = -1;
+	CHECK(system("rm -rf '" CARD "'") == 0);
+}
+
 int main(void) {
 	testLayout();
 	testWindow();
@@ -559,5 +677,6 @@ int main(void) {
 	testStatePaths();
 	testInput();
 	testRender();
+	testReplacement();
 	CHECK_DONE();
 }

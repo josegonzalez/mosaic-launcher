@@ -316,6 +316,10 @@ static int blits = 0, blits_of_image = 0, blits_of_box = 0;
 static MosaicRect last_blit, last_blit_src;
 static int redraws = 0;
 static const char* animate_cfg = "on";
+static MosaicSurface video = { 720, 480, 0, NULL }; // another plugin's art_replace surface
+static int replaced_index = -1; // the entry it's for, or -1 for none
+static int blits_of_video = 0;
+static MosaicRect blit_video, blit_video_src;
 static const char* shelves_cfg = "auto";
 static char logged[256];
 
@@ -396,6 +400,11 @@ static int fakeBlit(MosaicSurface* t, const MosaicSurface* s, const MosaicRect* 
 	if (s == &box_image || s->from == &box_image) blits_of_box++;
 	if (dr) last_blit = *dr;
 	last_blit_src = sr ? *sr : (MosaicRect){ 0, 0, 0, 0 };
+	if (s == &video) {
+		blits_of_video++;
+		blit_video = dr ? *dr : (MosaicRect){ 0, 0, 0, 0 };
+		blit_video_src = last_blit_src;
+	}
 	return 0;
 }
 static int fakeSurfaceSize(const MosaicSurface* s, int* w, int* h) {
@@ -450,6 +459,13 @@ static int fakeDecorateCell(MosaicSurface* s, int index, const MosaicRect* r, co
 		if (!within(name, r)) decorated_outside++;
 	}
 	return 0;
+}
+
+static int fakeArtReplacement(int index, const MosaicSurface** out) {
+	*out = NULL;
+	if (index != replaced_index) return 0;
+	*out = &video;
+	return 1;
 }
 
 static MosaicHost fake_host;
@@ -523,6 +539,7 @@ static void resetCounts(void) {
 	blits = blits_of_image = blits_of_box = 0;
 	scales = 0;
 	redraws = 0;
+	blits_of_video = 0;
 }
 
 static int decoratedAt(int index) {
@@ -823,6 +840,40 @@ static void testCache(void) {
 	CHECK(frees == 3);
 }
 
+static void testReplacement(void) {
+	setUp();
+	fake_host.art_replacement = fakeArtReplacement;
+	animate_cfg = "off";
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = 0;
+
+	// Cherry, selected and still loading: its video fills its label in place
+	// of its letter, cut to the label's shape, straight from the plugin's surface
+	replaced_index = 2;
+	resetCounts();
+	MosaicListView v = makeView(2);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 1 && scales == 3);
+	CHECK(strchr(letters, 'C') == NULL);
+	CHECK(blit_video_src.h == 480 && blit_video_src.w < 720 && blit_video_src.x == (720 - blit_video_src.w) / 2);
+	CHECK(blit_video.w > 0 && blit_video.h > 0);
+	// gone: its letter again
+	replaced_index = -1;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0 && strchr(letters, 'C') != NULL);
+	// art off: none
+	replaced_index = 2;
+	resetCounts();
+	v.show_art = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0);
+	replaced_index = -1;
+	p->quit();
+	animate_cfg = "on";
+}
+
 int main(void) {
 	testShapes();
 	testLayout();
@@ -831,6 +882,7 @@ int main(void) {
 	testEaseAndLetter();
 	testInput();
 	testRender();
+	testReplacement();
 	testShapesPlugin();
 	testLift();
 	testCache();

@@ -26,6 +26,14 @@
 // the covers' sizes along the way rather than copied again. A copy that
 // can't be made (the plugin's surfaces are full) is drawn straight from the
 // cache's image that frame instead.
+//
+// A plugin's art_replace surface, such as a video preview, stands in for
+// the selected cover's art, fitted inside the cover the same way. It's
+// asked for with art_replacement each frame and drawn straight from the
+// plugin's surface, never copied, since each of its frames is new. Art
+// decorators, such as metadata-band's, go under the selected cover's name
+// with host->decorate_art, which is handed the cover down to the bottom
+// of its name strip so they don't cover the name.
 
 #include <stdio.h>
 #include <string.h>
@@ -119,6 +127,17 @@ static MosaicRect contain(const MosaicRect* to, int w, int h) {
 		r.y += (to->h - r.h) / 2;
 	}
 	return r;
+}
+
+// Draws the plugin's art_replace surface for the entry at index in rect,
+// fitted inside it. Returns 1 when it drew, or 0 when there's none.
+static int drawReplacement(MosaicSurface* screen, int index, const MosaicRect* rect) {
+	const MosaicSurface* image = NULL;
+	int w = 0, h = 0;
+	if (!MOSAIC_HOST_HAS(host, art_replacement) || host->art_replacement(index, &image) != 1 || !image) return 0;
+	if (host->surface_size(image, &w, &h) != 0) return 0;
+	MosaicRect to = contain(rect, w, h);
+	return host->blit(screen, image, NULL, &to) == 0;
 }
 
 // Draws entry's art in rect: its box, or else its thumbnail. At rest (copy
@@ -314,7 +333,8 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 			const MosaicEntry* entry = host->list_get(view->list, index);
 			if (!entry) continue;
 
-			int drew = view->show_art && drawArt(screen, entry, &rect, shift == 0, limit);
+			int drew = view->show_art && (drawReplacement(screen, index, &rect) ||
+				drawArt(screen, entry, &rect, shift == 0, limit));
 			if (!drew) drawCard(screen, entry, &rect);
 			MosaicRect name = { 0, 0, 0, 0 };
 			if (d == 0 && strip.name.h > 0 && !(drew && hiddenName(view, index))) {
@@ -322,6 +342,11 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 			}
 			MosaicRect cell = around(&rect, &name);
 			host->decorate_cell(screen, index, &cell, name.w > 0 ? &name : NULL);
+			// art decorators under the name strip, which is there whether or not the name shows
+			if (d == 0 && drew && MOSAIC_HOST_HAS(host, decorate_art)) {
+				MosaicRect art = LC_artAbove(&rect, &strip.name);
+				host->decorate_art(screen, index, &art);
+			}
 		}
 	}
 	return 0;

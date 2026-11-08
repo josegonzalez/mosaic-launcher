@@ -69,4 +69,10 @@ int LC_slideFrom(int shift, int delta, int sides);
 // else its first character that isn't a space; "" for a name with none.
 void LC_letter(const char* name, char* out, size_t size);
 
+// The rect to hand art decorators for the selected cover: the cover, down
+// to the bottom of the name strip under it, so what they draw under it
+// goes under the name; just the cover with no name strip (h 0) or one
+// that isn't under it.
+MosaicRect LC_artAbove(const MosaicRect* cover, const MosaicRect* name);
+
 #endif

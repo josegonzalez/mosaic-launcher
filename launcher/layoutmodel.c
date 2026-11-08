@@ -303,3 +303,17 @@ int ArtSwap_dropOwner(ArtSwap* swap, int owner) {
 	ArtSwap_clear(swap);
 	return 1;
 }
+
+int ArtSwap_redraw(int result, int layout, int drawn, int had_thumb, int decorators) {
+	switch (result) {
+		case ARTSWAP_FRAME:
+			if (layout) return drawn ? ARTSWAP_REDRAW_LIST : ARTSWAP_REDRAW_NONE;
+			return ARTSWAP_REDRAW_THUMB;
+		case ARTSWAP_SHOWN:
+			return layout || !had_thumb || decorators ? ARTSWAP_REDRAW_LIST : ARTSWAP_REDRAW_THUMB;
+		case ARTSWAP_CLEARED:
+			return ARTSWAP_REDRAW_LIST;
+		default:
+			return ARTSWAP_REDRAW_NONE;
+	}
+}

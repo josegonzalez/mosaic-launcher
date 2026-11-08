@@ -237,4 +237,20 @@ int ArtSwap_set(ArtSwap* swap, int owner, const void* surface, int w, int h);
 int ArtSwap_dropSurface(ArtSwap* swap, const void* surface);
 int ArtSwap_dropOwner(ArtSwap* swap, int owner);
 
+// What an ArtSwap_set result (an enum ArtSwapResult) needs drawn again.
+enum ArtSwapRedraw {
+	ARTSWAP_REDRAW_NONE,
+	ARTSWAP_REDRAW_THUMB, // the built-in list's thumbnail layer
+	ARTSWAP_REDRAW_LIST,  // the whole list, a plugin layout's included, and the thumbnail layer
+};
+
+// On the built-in list (layout 0) a new frame redraws only the thumbnail
+// layer, and anything else that changed what shows redraws the list too
+// when the rows beside it had no thumbnail (had_thumb 0) or there are art
+// decorators to place under it. Under a plugin layout (layout 1), which
+// draws the surface itself, every change redraws the list, except that a
+// new frame redraws nothing unless the layout drew the surface the last
+// time it drew (drawn).
+int ArtSwap_redraw(int result, int layout, int drawn, int had_thumb, int decorators);
+
 #endif

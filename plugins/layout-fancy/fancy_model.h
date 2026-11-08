@@ -60,6 +60,16 @@ enum {
 // prefer_preview is 1 and there is one.
 int FL_panelArt(int show_art, int prefer_preview, int has_box, int has_preview);
 
+// The panel's art while a plugin's art_replace surface takes the box's
+// place: nothing while show_art is 0; else the replacement, which the
+// preview never stands in for, and the preview under it (has_preview)
+// only when prefer_preview is 0.
+int FL_replacedArt(int show_art, int prefer_preview, int has_preview);
+
+// The smallest rect holding a and b, either of which may be empty (w or h
+// 0); empty when both are.
+MosaicRect FL_around(const MosaicRect* a, const MosaicRect* b);
+
 // Where each part of the panel's art goes: with both, the box in the top
 // half and the preview in the bottom half, gap apart; with one, it takes
 // the panel. The rect for a part that isn't shown gets w 0.

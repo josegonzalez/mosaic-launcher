@@ -126,6 +126,16 @@ static void testSlide(void) {
 	CHECK(LC_slideFrom(0, 1, 0) == 0);
 }
 
+static void testArtAbove(void) {
+	// the cover down to its name, for art decorators to go under
+	MosaicRect cover = { 362, 205, 300, 300 }, name = { 12, 517, 1000, 60 };
+	CHECK(rectIs(LC_artAbove(&cover, &name), 362, 205, 300, 372));
+	// no name strip, or one that isn't under the cover: just the cover
+	MosaicRect none = { 12, 517, 1000, 0 }, above = { 12, 100, 1000, 60 };
+	CHECK(rectIs(LC_artAbove(&cover, &none), 362, 205, 300, 300));
+	CHECK(rectIs(LC_artAbove(&cover, &above), 362, 205, 300, 300));
+}
+
 static void testLetter(void) {
 	char out[8];
 	LC_letter("super mario", out, sizeof(out));
@@ -185,6 +195,9 @@ static int blits = 0, blits_of_image = 0, blits_of_box = 0;
 static MosaicRect last_blit;
 static int redraws = 0;
 static const char* slide_cfg = "on";
+static MosaicSurface video = { 720, 480, 0, NULL }; // another plugin's art_replace surface
+static int replaced_index = -1; // the entry it's for, or -1 for none
+static int replacement_asks = 0, blits_of_video = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
@@ -238,6 +251,7 @@ static int fakeFillRoundRect(MosaicSurface* t, const MosaicRect* r, int radius, 
 static int fakeBlit(MosaicSurface* t, const MosaicSurface* s, const MosaicRect* sr, const MosaicRect* dr) {
 	(void)t; (void)sr;
 	blits++;
+	if (s == &video) blits_of_video++;
 	if (s == &thumb_image || s == &box_image) blits_of_image++;
 	if (s == &box_image || s->from == &box_image) blits_of_box++;
 	if (dr) last_blit = *dr;
@@ -296,6 +310,23 @@ static int fakeDecorateCell(MosaicSurface* s, int index, const MosaicRect* r, co
 			decorated_outside++;
 		}
 	}
+	return 0;
+}
+
+static int art_decorated = 0, art_decorated_index = -1;
+static MosaicRect art_decorated_rect;
+static int fakeArtReplacement(int index, const MosaicSurface** out) {
+	replacement_asks++;
+	*out = NULL;
+	if (index != replaced_index) return 0;
+	*out = &video;
+	return 1;
+}
+static int fakeDecorateArt(MosaicSurface* s, int index, const MosaicRect* art) {
+	(void)s;
+	art_decorated++;
+	art_decorated_index = index;
+	art_decorated_rect = *art;
 	return 0;
 }
 
@@ -362,6 +393,9 @@ static void resetCounts(void) {
 	blits = blits_of_image = blits_of_box = 0;
 	scales = 0;
 	redraws = 0;
+	replacement_asks = blits_of_video = 0;
+	art_decorated = 0;
+	art_decorated_index = -1;
 }
 
 static int wasDecorated(int index) {
@@ -534,6 +568,55 @@ static void testRender(void) {
 	slide_setting = 1;
 }
 
+static void testReplacement(void) {
+	setUp();
+	fake_host.art_replacement = fakeArtReplacement;
+	fake_host.decorate_art = fakeDecorateArt;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	slide_setting = 0;
+	copy_count = 0;
+
+	// none showing: the covers as before, and art decorators under Apple's name
+	resetCounts();
+	MosaicListView v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0 && replacement_asks > 0);
+	CHECK(art_decorated == 1 && art_decorated_index == 0 && rectIs(art_decorated_rect, 362, 205, 300, 372));
+
+	// Apple's video in the middle cover, fitted inside it, straight from the
+	// plugin's surface, and never copied
+	replaced_index = 0;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 1 && rectIs(last_blit, 362, 255, 300, 200));
+	CHECK(scales == 0);
+	CHECK(art_decorated == 1 && art_decorated_index == 0);
+	CHECK_STR(named, "Apple");
+	// Cherry has none of its own, but the video stands in for its card
+	replaced_index = 2;
+	resetCounts();
+	v = makeView(2);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 1 && art_decorated == 1 && art_decorated_index == 2);
+	CHECK(strchr(letters, 'C') == NULL);
+	// a card with no art and no video has no art decorators
+	replaced_index = -1;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0 && art_decorated == 0);
+	// art off: no video either
+	replaced_index = 0;
+	resetCounts();
+	v = makeView(0);
+	v.show_art = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0 && art_decorated == 0);
+	replaced_index = -1;
+	p->quit();
+	slide_setting = 1;
+}
+
 static void testSlidePlugin(void) {
 	setUp();
 	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
@@ -648,9 +731,11 @@ int main(void) {
 	testStrip();
 	testMove();
 	testSlide();
+	testArtAbove();
 	testLetter();
 	testInput();
 	testRender();
+	testReplacement();
 	testSlidePlugin();
 	testCache();
 	CHECK_DONE();

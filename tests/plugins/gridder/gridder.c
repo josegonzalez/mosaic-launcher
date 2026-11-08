@@ -7,6 +7,9 @@
 // passed to host->decorate_cell, for row decorators such as badger's.
 // With art=1 in its config, the top half of the selected cell is its art,
 // passed to host->decorate_art, for art decorators such as bander's.
+// With swap=1, a plugin's art_replace surface for the selected cell, from
+// host->art_replacement, fills that cell, and it logs each change in what
+// art_replacement answers, with the cell's colour read back.
 //
 // With fail=init in its config, layout_init declines; with fail=input or
 // fail=render, that hook returns an error the third time it's called; and
@@ -25,6 +28,8 @@ static const MosaicHost* host;
 static char folder[512];
 static const char* fail = "";
 static int art = 0;
+static int swap = 0;
+static int swap_rc = -2; // what art_replacement last answered for the selected cell
 static int ticks = 0;
 static int inputs = 0;
 static int renders = 0;
@@ -142,6 +147,20 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 				mosaic_color(0xFFFFFF, 255), cell.w - 8);
 		}
 		if (host->decorate_cell(screen, i, &cell, NULL) != 0) decorated = -1;
+		if (lit && swap) {
+			const MosaicSurface* replaced = NULL;
+			int rc = host->art_replacement(i, &replaced);
+			if (rc == 1) host->blit(screen, replaced, NULL, &cell);
+			if (rc != swap_rc) {
+				swap_rc = rc;
+				const MosaicSurface* other = NULL;
+				const MosaicEntry* entry = host->list_get(view->list, i);
+				say("render replacement %s %i lit %s, other %i, bad index %i %i, no out %i", host->entry_name(entry), rc,
+					pixel(screen, cell.x + cell.w / 2, cell.y + 2), host->art_replacement(i == 0 ? 1 : 0, &other),
+					host->art_replacement(-1, &other), host->art_replacement(view->count, &other),
+					host->art_replacement(i, NULL));
+			}
+		}
 		if (lit && art) {
 			MosaicRect top = { cell.x, cell.y, cell.w, cell.h / 2 };
 			int rc = host->decorate_art(screen, i, &top);
@@ -198,6 +217,10 @@ static void tick(unsigned long now) {
 			host->decorate_cell(lent, 0, &(MosaicRect){ 0, 0, 10, 10 }, NULL));
 		if (art) say("after render art %i", host->decorate_art(lent, 0, &(MosaicRect){ 0, 0, 10, 10 }));
 	}
+	if (swap && ticks == 3) {
+		const MosaicSurface* replaced = NULL;
+		say("after render replacement %i", host->art_replacement(host->selected_index(), &replaced));
+	}
 	// keep frames coming, so a failed layout is seen to stay off
 	if (ticks < 60) host->request_redraw();
 	if (ticks == 60) say("renders %i, inputs %i", renders, inputs);
@@ -209,6 +232,7 @@ static int init(const MosaicHost* h) {
 	snprintf(folder, sizeof(folder), "%s/Gridder", host->sdcard_path);
 	fail = host->cfg_get(ID, "fail", "");
 	art = atoi(host->cfg_get(ID, "art", "0")) && MOSAIC_HOST_HAS(host, decorate_art);
+	swap = atoi(host->cfg_get(ID, "swap", "0")) && MOSAIC_HOST_HAS(host, art_replacement);
 	return 0;
 }
 

@@ -471,6 +471,28 @@ static void testArtSwap(void) {
 	CHECK(ArtSwap_set(&swap, 2, &a, 720, 480) == ARTSWAP_SHOWN);
 }
 
+static void testArtSwapRedraw(void) {
+	// the built-in list: a frame redraws only the thumbnail layer
+	CHECK(ArtSwap_redraw(ARTSWAP_FRAME, 0, 0, 1, 1) == ARTSWAP_REDRAW_THUMB);
+	CHECK(ArtSwap_redraw(ARTSWAP_FRAME, 0, 1, 0, 0) == ARTSWAP_REDRAW_THUMB);
+	// a new surface or size redraws the list for rows that made room or art decorators
+	CHECK(ArtSwap_redraw(ARTSWAP_SHOWN, 0, 0, 1, 0) == ARTSWAP_REDRAW_THUMB);
+	CHECK(ArtSwap_redraw(ARTSWAP_SHOWN, 0, 0, 0, 0) == ARTSWAP_REDRAW_LIST);
+	CHECK(ArtSwap_redraw(ARTSWAP_SHOWN, 0, 0, 1, 1) == ARTSWAP_REDRAW_LIST);
+	CHECK(ArtSwap_redraw(ARTSWAP_CLEARED, 0, 0, 1, 0) == ARTSWAP_REDRAW_LIST);
+	// a refusal or a clear of nothing changes nothing
+	CHECK(ArtSwap_redraw(ARTSWAP_REFUSED, 0, 1, 0, 1) == ARTSWAP_REDRAW_NONE);
+	CHECK(ArtSwap_redraw(ARTSWAP_NONE, 1, 1, 0, 1) == ARTSWAP_REDRAW_NONE);
+
+	// a layout draws it itself: every change redraws it
+	CHECK(ArtSwap_redraw(ARTSWAP_SHOWN, 1, 0, 1, 0) == ARTSWAP_REDRAW_LIST);
+	CHECK(ArtSwap_redraw(ARTSWAP_CLEARED, 1, 0, 1, 0) == ARTSWAP_REDRAW_LIST);
+	// but a frame only while the layout drew the surface last time
+	CHECK(ArtSwap_redraw(ARTSWAP_FRAME, 1, 1, 1, 0) == ARTSWAP_REDRAW_LIST);
+	CHECK(ArtSwap_redraw(ARTSWAP_FRAME, 1, 0, 1, 1) == ARTSWAP_REDRAW_NONE);
+	CHECK(ArtSwap_redraw(ARTSWAP_REFUSED, 1, 1, 1, 0) == ARTSWAP_REDRAW_NONE);
+}
+
 int main(void) {
 	testSlot();
 	testInput();
@@ -484,5 +506,6 @@ int main(void) {
 	testBackground();
 	testArt();
 	testArtSwap();
+	testArtSwapRedraw();
 	CHECK_DONE();
 }

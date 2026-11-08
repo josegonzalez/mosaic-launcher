@@ -142,3 +142,10 @@ void LC_letter(const char* name, char* out, size_t size) {
 		}
 	}
 }
+
+MosaicRect LC_artAbove(const MosaicRect* cover, const MosaicRect* name) {
+	MosaicRect r = *cover;
+	int bottom = name->y + name->h;
+	if (name->h > 0 && name->y >= cover->y + cover->h) r.h = bottom - cover->y;
+	return r;
+}

@@ -25,6 +25,13 @@
 // plugin's own surfaces, are kept across frames, the least recently drawn
 // going first. A copy that can't be made (the plugin's surfaces are full)
 // is drawn straight from the cache's image that frame instead.
+//
+// A plugin's art_replace surface, such as a video preview, takes the box's
+// place in the panel (see FL_replacedArt), fitted the same way. It's asked
+// for with art_replacement each frame and drawn straight from the plugin's
+// surface, never copied, since each of its frames is new. Art decorators,
+// such as metadata-band's, go under the panel's art with
+// host->decorate_art.
 
 #include <stdio.h>
 #include <string.h>
@@ -128,12 +135,15 @@ static Scaled* cacheSlot(void) {
 	return oldest;
 }
 
-// Draws image, known by key, fitted inside rect.
-static void drawImage(MosaicSurface* screen, const char* key, const MosaicSurface* image, const MosaicRect* rect) {
+// Draws image, known by key, fitted inside rect; writes where it went to
+// drawn.
+static void drawImage(MosaicSurface* screen, const char* key, const MosaicSurface* image, const MosaicRect* rect,
+		MosaicRect* drawn) {
 	int w = 0, h = 0;
 	if (rect->w <= 0 || rect->h <= 0 || host->surface_size(image, &w, &h) != 0) return;
 	MosaicRect to = FL_contain(rect, w, h);
 	if (to.w <= 0 || to.h <= 0) return;
+	*drawn = to;
 	Scaled* hit = cacheFind(key, to.w, to.h);
 	if (hit) {
 		hit->used = frame;
@@ -191,10 +201,20 @@ static int hiddenName(const MosaicListView* view, int index) {
 		view->names_hidden[index];
 }
 
-// Draws the selected entry's art in the panel. Returns 1 when it has art
+// image fitted inside rect, straight from it; writes where it went to drawn
+static void drawStraight(MosaicSurface* screen, const MosaicSurface* image, const MosaicRect* rect, MosaicRect* drawn) {
+	int w = 0, h = 0;
+	if (rect->w <= 0 || rect->h <= 0 || host->surface_size(image, &w, &h) != 0) return;
+	MosaicRect to = FL_contain(rect, w, h);
+	if (to.w > 0 && to.h > 0 && host->blit(screen, image, NULL, &to) == 0) *drawn = to;
+}
+
+// Draws the selected entry's art in the panel, writing the rect around
+// what it drew to drawn (w 0 for nothing). Returns 1 when it has art
 // (drawn, or still loading), or 0 when it has none.
 static int drawPanel(MosaicSurface* screen, const MosaicListView* view, const FLLayout* layout,
-		const MosaicEntry* entry) {
+		const MosaicEntry* entry, MosaicRect* drawn) {
+	*drawn = (MosaicRect){ layout->panel.x, layout->panel.y, 0, 0 };
 	if (!view->show_art || layout->panel.w <= 0) return 0;
 	const char* path = host->entry_path(entry);
 	if (!path) return 0;
@@ -204,9 +224,13 @@ static int drawPanel(MosaicSurface* screen, const MosaicListView* view, const FL
 	int shot_state = state[0] ? host->art_load(state, &shot) : MOSAIC_ART_MISSING;
 	int has_preview = shot_state != MOSAIC_ART_MISSING;
 
+	// a plugin's replacement, in the box's place
+	const MosaicSurface* replaced = NULL;
+	if (MOSAIC_HOST_HAS(host, art_replacement) && host->art_replacement(view->selected, &replaced) != 1) replaced = NULL;
+
 	const MosaicSurface* box = NULL;
 	int box_state = MOSAIC_ART_MISSING, box_kind = MOSAIC_ART_BOX;
-	if (!(has_preview && prefer_preview)) {
+	if (!replaced && !(has_preview && prefer_preview)) {
 		box_state = host->art_get(entry, MOSAIC_ART_BOX, &box);
 		if (box_state == MOSAIC_ART_MISSING) {
 			box_kind = MOSAIC_ART_THUMBNAIL;
@@ -214,15 +238,21 @@ static int drawPanel(MosaicSurface* screen, const MosaicListView* view, const FL
 		}
 	}
 
-	int show = FL_panelArt(view->show_art, prefer_preview, box_state != MOSAIC_ART_MISSING, has_preview);
-	MosaicRect box_rect, preview_rect;
+	int show = replaced ? FL_replacedArt(view->show_art, prefer_preview, has_preview)
+		: FL_panelArt(view->show_art, prefer_preview, box_state != MOSAIC_ART_MISSING, has_preview);
+	MosaicRect box_rect, preview_rect, box_drawn = *drawn, preview_drawn = *drawn;
 	FL_panelParts(&layout->panel, show, FL_PADDING * host->screen_scale(), &box_rect, &preview_rect);
-	if ((show & FL_SHOW_BOX) && box_state == MOSAIC_ART_READY && box) {
+	if ((show & FL_SHOW_BOX) && replaced) {
+		drawStraight(screen, replaced, &box_rect, &box_drawn);
+	} else if ((show & FL_SHOW_BOX) && box_state == MOSAIC_ART_READY && box) {
 		char key[MAX_PATH_LEN + 8];
 		snprintf(key, sizeof(key), "%s#%i", path, box_kind);
-		drawImage(screen, key, box, &box_rect);
+		drawImage(screen, key, box, &box_rect, &box_drawn);
 	}
-	if ((show & FL_SHOW_PREVIEW) && shot_state == MOSAIC_ART_READY && shot) drawImage(screen, state, shot, &preview_rect);
+	if ((show & FL_SHOW_PREVIEW) && shot_state == MOSAIC_ART_READY && shot) {
+		drawImage(screen, state, shot, &preview_rect, &preview_drawn);
+	}
+	*drawn = FL_around(&box_drawn, &preview_drawn);
 	return show != 0;
 }
 
@@ -251,8 +281,10 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 	frame++;
 
 	const MosaicEntry* selected = host->list_get(view->list, view->selected);
-	// the panel first, so row decorators can see it
-	int has_art = selected ? drawPanel(screen, view, &layout, selected) : 0;
+	// the panel first, so row decorators can see it, with art decorators under its art
+	MosaicRect art = { 0, 0, 0, 0 };
+	int has_art = selected ? drawPanel(screen, view, &layout, selected, &art) : 0;
+	if (art.w > 0 && art.h > 0 && MOSAIC_HOST_HAS(host, decorate_art)) host->decorate_art(screen, view->selected, &art);
 
 	int rows = FL_rows(&layout, &view->area);
 	if (view->rows > 0 && view->rows < rows) rows = view->rows;

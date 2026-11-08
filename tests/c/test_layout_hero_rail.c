@@ -263,6 +263,9 @@ static int tinted = 0, banded = 0, belows = 0;
 static char asked[512]; // "<name>:<kind> " for each art_get
 static const char* cards_cfg = "medium";
 static const char* fade_cfg = "300";
+static MosaicSurface video = { 720, 480, 0 }; // another plugin's art_replace surface
+static int replaced_index = -1; // the entry it's for, or -1 for none
+static int blits_of_video = 0, screen_tinted = 0, screen_banded = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
@@ -319,6 +322,8 @@ static int fakeFillRect(MosaicSurface* t, const MosaicRect* r, MosaicColor c) {
 	if (t == &screen_surface) {
 		if (r && inHole(r)) blits_in_hole++;
 		if (c.r == 0x10 && c.a == 255) belows++;
+		if (c.r == 0x9B && c.a == 51) screen_tinted++;
+		if (c.r == 0x10 && c.a < 255) screen_banded++;
 		return 0;
 	}
 	if (c.r == 0x9B && c.a == 51 && !r) tinted++;
@@ -337,6 +342,7 @@ static int fakeBlit(MosaicSurface* t, const MosaicSurface* s, const MosaicRect* 
 	if (!s->owned) blits_onto_screen_of_cache++;
 	if (dr && inHole(dr)) blits_in_hole++;
 	if (s->w == 1024 && s->h == 528) hero_blits++;
+	if (s == &video) blits_of_video++;
 	return 0;
 }
 static int fakeBlitAlpha(MosaicSurface* t, const MosaicSurface* s, const MosaicRect* sr, const MosaicRect* dr, int a) {
@@ -480,6 +486,14 @@ static void resetCounts(void) {
 	tinted = banded = belows = 0;
 	asked[0] = '\0';
 	scales = news = 0;
+	blits_of_video = screen_tinted = screen_banded = 0;
+}
+
+static int fakeArtReplacement(int index, const MosaicSurface** out) {
+	*out = NULL;
+	if (index != replaced_index) return 0;
+	*out = &video;
+	return 1;
 }
 
 static int askedFor(const char* name, int kind) {
@@ -713,6 +727,45 @@ static void testPool(void) {
 	CHECK(frees == 7); // one each for /b and /h0, and the five left
 }
 
+static void testReplacement(void) {
+	setUp();
+	fake_host.art_replacement = fakeArtReplacement;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = 0;
+
+	// Banana has no hero of its own: its video is the hero, cover-fitted
+	// around the pill, with the tint and fade drawn over it on the screen
+	// rather than baked into a copy
+	replaced_index = 1;
+	resetCounts();
+	MosaicListView v = makeView(1);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 4 && blits_in_hole == 0 && hero_blits == 0);
+	CHECK(news == 0 && scales <= 2);
+	CHECK(screen_tinted == 4 && screen_banded >= 64);
+	CHECK(belows >= 2); // under the video and the rest of the area
+	// Apple's video stands in for its backdrop, which isn't asked for
+	replaced_index = 0;
+	resetCounts();
+	v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 4 && hero_blits == 0 && !askedFor("Apple", MOSAIC_ART_BACKDROP));
+	// gone: Apple's own hero
+	replaced_index = -1;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0 && hero_blits == 4);
+	// art off: none
+	replaced_index = 0;
+	resetCounts();
+	v.show_art = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 0);
+	replaced_index = -1;
+	p->quit();
+}
+
 int main(void) {
 	testSettings();
 	testLayout();
@@ -724,6 +777,7 @@ int main(void) {
 	testBands();
 	testLetter();
 	testPlugin();
+	testReplacement();
 	testPool();
 	CHECK_DONE();
 }

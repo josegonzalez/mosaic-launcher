@@ -19,6 +19,11 @@
 // across frames: up to two screens of tiles, the least recently drawn going
 // first. A copy that can't be made (the plugin's surfaces are full) is
 // drawn straight from the cache's image that frame instead.
+//
+// A plugin's art_replace surface, such as a video preview, stands in for
+// the selected tile's art, fitted inside it the same way. It's asked for
+// with art_replacement each frame and drawn straight from the plugin's
+// surface, never copied, since each of its frames is new.
 
 #include <stdio.h>
 #include <string.h>
@@ -100,11 +105,24 @@ static MosaicRect contain(const MosaicRect* to, int w, int h) {
 	return r;
 }
 
-// Draws entry's art in rect: its thumbnail, or else its box. Returns 1 when
-// it drew, or 0 when there's none yet.
-static int drawArt(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRect* rect, int limit) {
+// Draws the plugin's art_replace surface for the entry at index in rect,
+// fitted inside it. Returns 1 when it drew, or 0 when there's none.
+static int drawReplacement(MosaicSurface* screen, int index, const MosaicRect* rect) {
+	const MosaicSurface* image = NULL;
+	int w = 0, h = 0;
+	if (!MOSAIC_HOST_HAS(host, art_replacement) || host->art_replacement(index, &image) != 1 || !image) return 0;
+	if (host->surface_size(image, &w, &h) != 0) return 0;
+	MosaicRect to = contain(rect, w, h);
+	return host->blit(screen, image, NULL, &to) == 0;
+}
+
+// Draws the entry at index's art in rect: a plugin's replacement, its
+// thumbnail, or else its box. Returns 1 when it drew, or 0 when there's
+// none yet.
+static int drawArt(MosaicSurface* screen, const MosaicEntry* entry, int index, const MosaicRect* rect, int limit) {
 	const char* path = host->entry_path(entry);
 	if (!path || rect->w <= 0 || rect->h <= 0) return 0;
+	if (drawReplacement(screen, index, rect)) return 1;
 	Scaled* hit = cacheFind(path, rect->w, rect->h);
 	if (hit) {
 		hit->used = frame;
@@ -250,7 +268,7 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 		LG_parts(&cell, 2 * scale, 3 * scale, name_h, &highlight, &tile, &art, &name);
 
 		if (selected) host->fill_round_rect(screen, &highlight, 6 * scale, main_color);
-		if (!view->show_art || !drawArt(screen, entry, &art, limit)) {
+		if (!view->show_art || !drawArt(screen, entry, index, &art, limit)) {
 			char letter[8];
 			LG_letter(host->entry_name(entry), letter, sizeof(letter));
 			host->fill_round_rect(screen, &art, 4 * scale, tile_color);

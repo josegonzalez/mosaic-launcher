@@ -158,13 +158,13 @@ int Plugins_hasArtDecorators(void);
 // without art decorators or room. One that fails logs and is turned off.
 void Plugins_decorateArt(struct SDL_Surface* surface, const Entry* entry, const MosaicRect* art, const MosaicRect* below);
 
-// The surface a plugin's art_replace shows in place of the built-in list's
-// thumbnail, or NULL. Main thread only.
+// The surface a plugin's art_replace shows in place of the selected entry's
+// art, on the built-in list or under a layout, or NULL. Main thread only.
 struct SDL_Surface* Plugins_artReplaced(void);
 
 // Once a frame, before the frame is drawn: takes a plugin's art_replace
 // surface away once the selection has moved, the game list is left, it
-// no longer shows a thumbnail there, or the surface is no longer the
+// no longer shows art there, or the surface is no longer the
 // plugin's, marking the thumbnail changed.
 void Plugins_artReplaceCheck(void);
 

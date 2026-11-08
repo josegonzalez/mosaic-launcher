@@ -42,6 +42,13 @@
 // just outside the rail, so the art cache has them in before they show. A
 // copy that can't be made (the plugin's surfaces are full) is drawn
 // straight from the cache's image that frame instead.
+//
+// A plugin's art_replace surface, such as a video preview, stands in for
+// the hero art, cover-fitted, tinted and faded the same way, but straight
+// from the plugin's surface each frame, with the tint and fade drawn over
+// it on the screen, since each of its frames is new. It's asked for with
+// art_replacement. Art decorators aren't asked to draw under the hero, as
+// the cards are there.
 
 #include <stdio.h>
 #include <string.h>
@@ -198,6 +205,28 @@ static int nameHidden(const MosaicListView* view, int index) {
 	return index >= 0 && index < view->count && view->names_hidden[index];
 }
 
+// Draws src as the hero, around the status pill and header: a copy the
+// hero's size, or with raw the crop of an image that's cover-fitted to it.
+static void blitAround(MosaicSurface* screen, const MosaicSurface* src, const MosaicRect* crop, int raw,
+		const HRLayout* layout) {
+	const MosaicRect* hero = &layout->hero;
+	MosaicRect parts[4];
+	int n = HR_avoid(hero, &layout->hole, parts);
+	for (int i = 0; i < n; i++) {
+		MosaicRect* p = &parts[i];
+		MosaicRect from = { p->x - hero->x, p->y - hero->y, p->w, p->h };
+		if (raw) {
+			from.x = crop->x + (int)((long)from.x * crop->w / hero->w);
+			from.y = crop->y + (int)((long)from.y * crop->h / hero->h);
+			from.w = (int)((long)p->w * crop->w / hero->w);
+			from.h = (int)((long)p->h * crop->h / hero->h);
+			if (from.w < 1) from.w = 1;
+			if (from.h < 1) from.h = 1;
+		}
+		host->blit(screen, src, &from, p);
+	}
+}
+
 // The hero copy of image: cover-fitted to w by h on the background colour,
 // tinted and fading into the background colour from fade_y down.
 static MosaicSurface* makeHero(const MosaicSurface* image, int w, int h, int fade_y) {
@@ -222,6 +251,40 @@ static MosaicSurface* makeHero(const MosaicSurface* image, int w, int h, int fad
 	return s;
 }
 
+// Fills rect on the screen in color, around the status pill and header.
+static void fillAround(MosaicSurface* screen, const MosaicRect* rect, const HRLayout* layout, MosaicColor color) {
+	MosaicRect parts[4];
+	int n = HR_avoid(rect, &layout->hole, parts);
+	for (int i = 0; i < n; i++) host->fill_rect(screen, &parts[i], color);
+}
+
+// Draws a plugin's art_replace surface as the hero: on the background
+// colour, cover-fitted, then tinted and faded as makeHero bakes it into a
+// copy, on the screen. Returns 1 when it drew, or 0 when there's none.
+static int drawReplacedHero(MosaicSurface* screen, const MosaicListView* view, const HRLayout* layout) {
+	const MosaicSurface* image = NULL;
+	const MosaicRect* hero = &layout->hero;
+	int iw = 0, ih = 0;
+	MosaicRect crop;
+	if (!MOSAIC_HOST_HAS(host, art_replacement) || host->art_replacement(view->selected, &image) != 1 || !image) return 0;
+	if (host->surface_size(image, &iw, &ih) != 0 || HR_cover(iw, ih, hero->w, hero->h, &crop) != 0) return 0;
+	MosaicColor bg = themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000, 255);
+	fillAround(screen, hero, layout, bg);
+	blitAround(screen, image, &crop, 1, layout);
+	if (tint > 0) fillAround(screen, hero, layout, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257, (unsigned char)tint));
+	int bands = HR_bands(layout->fade_y, hero->h);
+	for (int i = 0; i < bands; i++) {
+		int y = 0, band_h = 0, alpha = 0;
+		if (HR_band(layout->fade_y, hero->h, i, &y, &band_h, &alpha) != 0 || band_h <= 0) continue;
+		MosaicRect band = { hero->x, hero->y + y, hero->w, band_h };
+		bg.a = (unsigned char)alpha;
+		fillAround(screen, &band, layout, bg);
+	}
+	bg.a = 255;
+	fillAround(screen, &layout->below, layout, bg);
+	return 1;
+}
+
 // Draws the selected entry's hero. Returns 1 when it drew, or 0 when
 // there's none yet.
 static int drawHero(MosaicSurface* screen, const MosaicListView* view, const MosaicEntry* entry,
@@ -230,6 +293,7 @@ static int drawHero(MosaicSurface* screen, const MosaicListView* view, const Mos
 	const char* path = host->entry_path(entry);
 	const MosaicRect* hero = &layout->hero;
 	if (!path || hero->w <= 0 || hero->h <= 0) return 0;
+	if (drawReplacedHero(screen, view, layout)) return 1;
 
 	const MosaicSurface* src = NULL;
 	MosaicRect crop = { 0, 0, hero->w, hero->h };
@@ -254,24 +318,8 @@ static int drawHero(MosaicSurface* screen, const MosaicListView* view, const Mos
 		}
 	}
 
-	MosaicRect parts[4];
-	int n = HR_avoid(hero, &layout->hole, parts);
-	for (int i = 0; i < n; i++) {
-		MosaicRect* p = &parts[i];
-		MosaicRect from = { p->x - hero->x, p->y - hero->y, p->w, p->h };
-		if (raw) {
-			from.x = crop.x + (int)((long)from.x * crop.w / hero->w);
-			from.y = crop.y + (int)((long)from.y * crop.h / hero->h);
-			from.w = (int)((long)p->w * crop.w / hero->w);
-			from.h = (int)((long)p->h * crop.h / hero->h);
-			if (from.w < 1) from.w = 1;
-			if (from.h < 1) from.h = 1;
-		}
-		host->blit(screen, src, &from, p);
-	}
-	n = HR_avoid(&layout->below, &layout->hole, parts);
-	MosaicColor bg = themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000, 255);
-	for (int i = 0; i < n; i++) host->fill_rect(screen, &parts[i], bg);
+	blitAround(screen, src, &crop, raw, layout);
+	fillAround(screen, &layout->below, layout, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000, 255));
 	return 1;
 }
 

@@ -36,6 +36,11 @@
 // kept across frames: up to two screens of labels, the least recently
 // drawn going first. A copy that can't be made (the plugin's surfaces are
 // full) is drawn straight from the cache's image that frame instead.
+//
+// A plugin's art_replace surface, such as a video preview, stands in for
+// the selected cartridge's label art, filling the label the same way. It's
+// asked for with art_replacement each frame and drawn straight from the
+// plugin's surface, never copied, since each of its frames is new.
 
 #include <stdio.h>
 #include <string.h>
@@ -130,6 +135,17 @@ static MosaicRect coverSource(const MosaicRect* to, int w, int h) {
 		r.y = (h - r.h) / 2;
 	}
 	return r;
+}
+
+// Draws the plugin's art_replace surface for the entry at index filling
+// rect. Returns 1 when it drew, or 0 when there's none.
+static int drawReplacement(MosaicSurface* screen, int index, const MosaicRect* rect) {
+	const MosaicSurface* image = NULL;
+	int w = 0, h = 0;
+	if (!MOSAIC_HOST_HAS(host, art_replacement) || host->art_replacement(index, &image) != 1 || !image) return 0;
+	if (host->surface_size(image, &w, &h) != 0) return 0;
+	MosaicRect from = coverSource(rect, w, h);
+	return host->blit(screen, image, &from, rect) == 0;
 }
 
 // Draws entry's art filling rect: its box, or else its thumbnail. Returns
@@ -416,7 +432,7 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 				host->fill_round_rect(screen, &edge, cart.w / 14 + scale, main_color);
 			}
 			drawBody(screen, shape, &cart, &label, scale);
-			int drew = view->show_art && drawArt(screen, entry, &label, limit);
+			int drew = view->show_art && (drawReplacement(screen, index, &label) || drawArt(screen, entry, &label, limit));
 			if (!drew) drawLetter(screen, entry, &label, scale);
 
 			MosaicRect name = { 0, 0, 0, 0 };
