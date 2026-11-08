@@ -12,6 +12,10 @@
 // subfolder of one game, then back to Selector's last game and over to
 // <sd>/Tiny, another folder of one game, logging where each open left the
 // selection.
+//
+// With empty=1, it opens <sd>/Selector/Empty, a subfolder with no games,
+// stays a while logging what the host says is selected, then goes back to
+// Selector.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -26,8 +30,10 @@ static const MosaicHost* host;
 static char folder[512];
 static char sub[600];  // <sd>/Selector/Tiny
 static char tiny[512]; // <sd>/Tiny
+static char empty_dir[600]; // <sd>/Selector/Empty
 static int fail = 0;
 static int jump = 0;
+static int empty = 0;
 static int events = 0;
 static int step = 0;
 static int moves = 0;
@@ -49,6 +55,7 @@ static void rootEntries(MosaicList* root) {
 }
 
 static MosaicList* virtualDir(const char* path) {
+	if (!strcmp(path, empty_dir)) return host->list_new();
 	if (!strcmp(path, sub) || !strcmp(path, tiny)) {
 		MosaicList* list = host->list_new();
 		char file[700];
@@ -72,6 +79,7 @@ static const char* where(void) {
 	if (path && !strcmp(path, folder)) return "Selector";
 	if (path && !strcmp(path, sub)) return "Selector/Tiny";
 	if (path && !strcmp(path, tiny)) return "Tiny";
+	if (path && !strcmp(path, empty_dir)) return "Selector/Empty";
 	if (path && !strcmp(path, host->sdcard_path)) return "root";
 	return path ? path : "(null)";
 }
@@ -101,7 +109,7 @@ static void tick(unsigned long now) {
 		}
 		break;
 	case 1: // the folder's first game
-		if (events == 2) step = jump ? 10 : 2;
+		if (events == 2) step = jump ? 10 : empty ? 20 : 2;
 		break;
 	case 2: // a row a frame, faster than it settles
 		moves++;
@@ -158,6 +166,29 @@ static void tick(unsigned long now) {
 		say("done");
 		step = 99;
 		break;
+	// empty=1: into a folder with no games and out again
+	case 20:
+		say("open empty %i", host->open_path(empty_dir, MOSAIC_ENTRY_DIR));
+		since = now;
+		step = 21;
+		break;
+	case 21: // its NULL event, then frames to update and draw it
+		if ((events == 3 && now - since > 1000) || now - since > 2500) {
+			const MosaicEntry* entry = host->selected_entry();
+			say("in %s, %i games, selected %s, after %i events", where(), host->list_count(host->current_list()),
+				entry ? host->entry_name(entry) : "NULL", events);
+			say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
+			since = now;
+			step = 22;
+		}
+		break;
+	case 22:
+		if (events == 4 || now - since > 1500) {
+			say("back in %s, index %i of %i", where(), host->selected_index(), host->list_count(host->current_list()));
+			say("done");
+			step = 99;
+		}
+		break;
 	}
 }
 
@@ -167,8 +198,10 @@ static int init(const MosaicHost* h) {
 	snprintf(folder, sizeof(folder), "%s/Selector", host->sdcard_path);
 	snprintf(sub, sizeof(sub), "%s/Tiny", folder);
 	snprintf(tiny, sizeof(tiny), "%s/Tiny", host->sdcard_path);
+	snprintf(empty_dir, sizeof(empty_dir), "%s/Empty", folder);
 	fail = atoi(host->cfg_get(ID, "fail", "0"));
 	jump = atoi(host->cfg_get(ID, "jump", "0"));
+	empty = atoi(host->cfg_get(ID, "empty", "0"));
 	say("settle %i", host->selection_settle_ms);
 	return 0;
 }

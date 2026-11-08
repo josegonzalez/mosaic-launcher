@@ -396,9 +396,10 @@ int main (int argc, char *argv[]) {
 		if (has_hdmi!=had_hdmi) {
 			had_hdmi = has_hdmi;
 
-			Entry* entry = state.top->entries->items[state.top->selected];
-			LOG_info("restarting after HDMI change... (%s)\n", entry->path);
-			saveLast(entry->path); // NOTE: doesn't work in Recents (by design)
+			// an empty folder has no entry, so the folder itself
+			char* last = state.top->entries->count > 0 ? ((Entry*)state.top->entries->items[state.top->selected])->path : state.top->path;
+			LOG_info("restarting after HDMI change... (%s)\n", last);
+			saveLast(last); // NOTE: doesn't work in Recents (by design)
 			sleep(1); // cable-seating debounce; the output switch itself happens at next app start
 			state.quit = 1;
 		}

@@ -754,6 +754,16 @@ expect "open sub 1"
 expect "in Selector/Tiny, index 0 of 1"
 expect "open tiny 1"
 expect "in Tiny, index 0 of 1"
+# open_path into a folder with no games keeps the launcher up through its
+# frames, and the folder's event has no entry
+printf 'empty=1\n' >"$STATE/selector.cfg"
+run_launcher "$WORK/selector-empty.log" "plugin selector: done" || fail "the launcher exited early with selector opening an empty folder"
+log="$WORK/selector-empty.log"
+expect "open empty 1"
+expect "event 3 NULL in Selector/Empty, index -1, settled 1, select -1"
+expect "in Selector/Empty, 0 games, selected NULL, after 3 events"
+expect "open folder 1"
+expect "back in Selector, index 0 of 7"
 rm -rf "$WORK/plugins/selector.plugin" "$STATE/selector.cfg"
 
 # a saved last path the launcher can't follow up to the card's root, such as

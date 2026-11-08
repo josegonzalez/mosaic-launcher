@@ -316,10 +316,8 @@ void GameList_handleInput(void) {
 		state.dirty = 1;
 	}
 
-	Entry* entry = state.top->entries->items[state.top->selected];
-
 	if (state.dirty && total>0)
-		readyResume(entry);
+		readyResume(state.top->entries->items[state.top->selected]);
 
 	// plugins' bindings rank after the game list's own and the overrides
 	if (!Bindings_dispatch(e.actions, e.action_count))
@@ -342,10 +340,32 @@ static int listArt(Entry* entry, char* out, size_t size) {
 	return 0;
 }
 
+// An empty folder has no entry for its background or art: the default
+// background, no thumbnail and no names, so no pill is left from the last
+// folder. Stock asserts an entry here instead.
+static void emptyUpdate(void) {
+	char defaultBgPath[512];
+	resolveArt(ART_DEFAULT_BG, NULL, defaultBgPath, sizeof(defaultBgPath));
+	if (strcmp(defaultBgPath, folderBgPath) != 0 && exists(defaultBgPath)) {
+		strncpy(folderBgPath, defaultBgPath, sizeof(folderBgPath) - 1);
+		startLoadFolderBackground(defaultBgPath, onBackgroundLoaded, NULL);
+	}
+	ArtLoader_showThumb("");
+	had_thumb = 0;
+	ox = screen->w;
+	update_art[0] = '\0';
+	list_show_entry_names = false;
+	update_show_names = false;
+}
+
 // Decides what the next render draws: whether names show, which background
 // and thumbnail to load, and how much width the thumbnail takes. Draws
 // nothing.
 void GameList_update(void) {
+	if (state.top->entries->count == 0) {
+		emptyUpdate();
+		return;
+	}
 	// background and game art file path stuff
 	Entry* entry = state.top->entries->items[state.top->selected];
 	assert(entry);
@@ -599,6 +619,8 @@ void GameList_render(void) {
 	}
 	else {
 		list_layout_drawn = false;
+		// nothing to scroll; the last folder's selection may have been
+		is_scrolling = 0;
 		// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...
 		GFX_blitMessage(font.large, TR("Empty folder"), screen, &(SDL_Rect){0,0,screen->w,screen->h}); //, NULL);
 	}
