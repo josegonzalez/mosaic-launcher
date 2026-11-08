@@ -12,6 +12,7 @@
 #include "selmodel.h"
 #include "infomodel.h"
 #include "transmodel.h"
+#include "playhistory.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -577,6 +578,10 @@ static int hostArtGet(const MosaicEntry* entry, int kind, const MosaicSurface** 
 }
 static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* rect, const MosaicRect* name);
 
+static void playLog(const char* message) {
+	LOG_info("%s\n", message);
+}
+
 // After a plugin's quit, or when its init declines: its surfaces go with it.
 static void freeSurfaces(const char* plugin_id) {
 	int freed = PluginDraw_freeAll(plugin_id);
@@ -667,6 +672,10 @@ static const MosaicHost host = {
 	.transition_max_ms = TRANSITION_MAX_MS,
 	.plugin_art = 1,
 	.hide_names = 1,
+	.play_time = PlayHistory_seconds,
+	.last_played = PlayHistory_lastPlayed,
+	.play_count = PlayHistory_count,
+	.play_time_today = PlayHistory_today,
 };
 
 ///////////////////////////////////////
@@ -858,6 +867,8 @@ void Plugins_init(void) {
 	Plugins_ensureStateDir();
 	putFile(LOADING_MARKER, "");
 	sync();
+	// only where to look: nothing is read until a plugin asks
+	PlayHistory_configure(SHARED_USERDATA_PATH "/game_logs.sqlite", ROMS_PATH, playLog);
 
 	for (int i = 0; i < n; i++) {
 		if (decisions[i].load) load(decisions[i].manifest);
@@ -871,6 +882,8 @@ void Plugins_init(void) {
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
+		// a game or pak ran, so the play history may have moved on
+		PlayHistory_invalidate();
 		for (int i = 0; i < loaded_count; i++) {
 			const MosaicPlugin* p = loaded[i].plugin;
 			if (Plugin_has(p, post_return) && p->post_return) p->post_return();
@@ -896,6 +909,7 @@ void Plugins_quit(void) {
 		dlclose(p->handle);
 	}
 	loaded_count = 0;
+	PlayHistory_quit();
 	// a refresh or connect still running is stopped and reaped first
 	Bluetooth_quit();
 }

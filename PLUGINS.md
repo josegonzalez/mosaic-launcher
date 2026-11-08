@@ -403,6 +403,13 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
       return host->entry_type(entry) == MOSAIC_ENTRY_DIR && host->art_find(entry, MOSAIC_ART_BOX, path, sizeof(path));
   }
   ```
+- Play history: `play_time(path)`, `last_played(path)`, `play_count(path)` and `play_time_today()` read stock's play tracker, which is what the Game Tracker tool shows: `gametimectl` keeps it in `.userdata/shared/game_logs.sqlite`, adding a session each time a game launches (and each time the device wakes from sleep in one) and closing it when the launcher starts again. `path` is a game's full path on the card, as `entry_path` and `recent_path` return it, so it works for rows, layouts and the game switcher's recents alike. `play_time` returns the seconds the game has been played in all, `last_played` when its latest session started, as a Unix time, and `play_count` how many sessions it has. A game the tracker hasn't seen, or a path outside `Roms`, gets 0 from each. Games carried over from Onion as orphans are matched by name the way `gametimectl` matches them. `play_time_today()` returns the seconds played across every game since local midnight, counting the part of a session from before midnight that ran past it, for things like a daily limit. Each returns `MOSAIC_PLAY_UNKNOWN` (-1) when the history can't be read: there's no database yet (`gametimectl` makes it at the first launch of a game), no sqlite library, or the database can't be opened, isn't one, or stays busy past a short timeout; a NULL `path` gets -1 too. The launcher never writes the database. Nothing reads it, or loads sqlite, until a plugin first asks; then the library is loaded with `dlopen`, the database is opened read-only, everything the calls answer is read in one go, and it's closed again. The answers are kept until a game or pak returns, just before `post_return` (and once more after the launcher's `gametimectl stop_all` closes the last session), so rows and header widgets can ask every frame without touching the file; today's total moves on by itself at midnight. A session `gametimectl` hasn't closed yet counts up to the time it's read. Check for them with `MOSAIC_HOST_HAS(host, play_time)`.
+
+  ```c
+  // "1h 05m" after a game's name
+  long long seconds = host->play_time(host->entry_path(entry));
+  if (seconds > 0) snprintf(caption, sizeof(caption), "%lldh %02lldm", seconds / 3600, seconds / 60 % 60);
+  ```
 
 ## Without writing C
 

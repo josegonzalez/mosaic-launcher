@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "playhistory.h"
 
 int main (int argc, char *argv[]) {
 	// LOG_info("time from launch to:\n");
@@ -52,6 +53,8 @@ int main (int argc, char *argv[]) {
 
 	// make sure we have no running games logged as active anymore (we might be launching back into the UI here)
 	system("gametimectl.elf stop_all");
+	// and forget what plugins read before stop_all closed the last session
+	PlayHistory_invalidate();
 
 	GFX_setVsync(VSYNC_STRICT);
 	PWR_setCPUSpeed(CPU_SPEED_AUTO);

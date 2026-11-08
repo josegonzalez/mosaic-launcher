@@ -681,7 +681,33 @@ typedef struct MosaicHost {
 	// to layouts and row decorators. Check for it with
 	// MOSAIC_HOST_HAS(host, hide_names).
 	int hide_names;
+
+	// Play history, read-only from stock's play tracker: gametimectl's
+	// .userdata/shared/game_logs.sqlite, which the Game Tracker tool shows.
+	// path is a game's full path on the card, as entry_path and recent_path
+	// return it. play_time returns the seconds it has been played in all,
+	// last_played when its latest session started, as a Unix time, and
+	// play_count how many sessions it has, as the Game Tracker counts them
+	// (waking from sleep in a game starts another). A game the tracker
+	// hasn't seen gets 0 from each, and so does a path outside Roms.
+	// play_time_today returns the seconds played across every game since
+	// local midnight, counting the part of a session from before it that
+	// ran past it. Each returns MOSAIC_PLAY_UNKNOWN (-1) when the history
+	// can't be read: there's no database yet (it's made at the first launch
+	// of a game), no sqlite library, or the database can't be opened or is
+	// busy. Nothing is read until a plugin first asks; then the database is
+	// read once, and the answers are kept until a game or pak returns (just
+	// before post_return), so they're cheap enough to ask every frame. A
+	// session gametimectl hasn't closed yet counts up to that read. Check
+	// for them with MOSAIC_HOST_HAS(host, play_time).
+	long long (*play_time)(const char* path);
+	long long (*last_played)(const char* path);
+	int (*play_count)(const char* path);
+	long long (*play_time_today)(void);
 } MosaicHost;
+
+// What the play history calls return when the history can't be read.
+#define MOSAIC_PLAY_UNKNOWN -1
 
 // True when the launcher's host table has this field, so a plugin can use
 // newer features when they're there and do without on older launchers.
