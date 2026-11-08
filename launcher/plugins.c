@@ -8,6 +8,7 @@
 #include "bluetooth.h"
 #include "plugindraw.h"
 #include "layoutmodel.h"
+#include "selmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -26,6 +27,7 @@ typedef struct LoadedPlugin {
 	int owns_layout; // claims the layout slot, so its layout_* hooks are called
 	int rows_off;    // its decorate_row failed, so it's no longer called
 	int header_off;  // its header_width or header_widget failed, so its widget is left out
+	int selection_off; // its selection_changed failed, so it's no longer called
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -37,6 +39,7 @@ static int layout_rendering = 0; // while layout_render runs, which only draws
 static MosaicSurface* layout_lent = NULL; // the screen layout_render was lent
 static MosaicRect layout_area;            // and where it may draw
 static int decorating = 0; // while a decorate_row, header_width or header_widget runs, which only draw
+static int selecting = 0;  // while a selection_changed runs, which can't move the selection
 
 #define SCREEN_COUNT 3
 
@@ -338,7 +341,7 @@ static int hostSelectedIndex(void) {
 	return state.top->selected;
 }
 static int hostSelectIndex(int index) {
-	if (layout_rendering || decorating || !state.top || index < 0 || index >= state.top->entries->count) return -1;
+	if (layout_rendering || decorating || selecting || !state.top || index < 0 || index >= state.top->entries->count) return -1;
 	Directory_select(state.top, index);
 	// main's copy for this frame, so the game list's input doesn't put it back
 	selected = index;
@@ -598,6 +601,7 @@ static const MosaicHost host = {
 	.art_get = hostArtGet,
 	.art_load = ArtLoader_load,
 	.decorate_cell = hostDecorateCell,
+	.selection_settle_ms = SEL_SETTLE_MS,
 };
 
 ///////////////////////////////////////
@@ -1341,4 +1345,39 @@ void Plugins_header(SDL_Surface* surface, HeaderRow* row) {
 		PluginDraw_unlend(lent);
 		if (rc != 0) headerOff(i, "header_widget", rc);
 	}
+}
+
+///////////////////////////////////////
+// selection events
+
+static SelKey sel_key = { NULL, NULL, -1, 0 };
+static SelSettle sel_settle; // all zero: nothing sent yet
+
+static int notifies(int i) {
+	const MosaicPlugin* p = loaded[i].plugin;
+	return !loaded[i].selection_off && Plugin_has(p, selection_changed) && p->selection_changed;
+}
+
+// the buttons that scroll the game list, under the built-in list or a layout
+#define SCROLL_BUTTONS (BTN_UP | BTN_DOWN | BTN_LEFT | BTN_RIGHT | BTN_L1 | BTN_R1 | BTN_L2 | BTN_R2)
+
+void Plugins_selection(unsigned long now) {
+	int any = 0;
+	for (int i = 0; i < loaded_count && !any; i++) any = notifies(i);
+	if (!any || !state.top) return;
+	Array* entries = state.top->entries;
+	const Entry* entry = entries->count > 0 ? entries->items[state.top->selected] : NULL;
+	int moved = SelKey_changed(&sel_key, state.top, entries, state.top->selected);
+	int held = (pad.is_pressed & SCROLL_BUTTONS) != 0;
+	if (!SelSettle_step(&sel_settle, now, moved, held, state.top->path, entry ? entry->path : NULL)) return;
+	selecting = 1;
+	for (int i = 0; i < loaded_count; i++) {
+		if (!notifies(i)) continue;
+		int rc = loaded[i].plugin->selection_changed((const MosaicEntry*)entry);
+		if (rc == 0) continue;
+		loaded[i].selection_off = 1;
+		LOG_warn("plugins: %s's selection_changed returned %i, no longer telling it about the selection until the launcher restarts\n",
+			loaded[i].id, rc);
+	}
+	selecting = 0;
 }

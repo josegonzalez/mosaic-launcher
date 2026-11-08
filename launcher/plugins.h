@@ -120,6 +120,11 @@ void Plugins_decorateRow(struct SDL_Surface* surface, const Entry* entry, Mosaic
 void Plugins_header(struct SDL_Surface* surface, HeaderRow* row);
 
 void Plugins_tick(unsigned long now);
+
+// Runs plugins' selection_changed once the game list's selection settles
+// on another entry. Called every frame after input, before drawing.
+void Plugins_selection(unsigned long now);
+
 void Plugins_beforeSleep(void);
 void Plugins_afterResume(void);
 void Plugins_beforePoweroff(void);

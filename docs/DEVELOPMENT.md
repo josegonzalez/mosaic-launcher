@@ -80,7 +80,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
 | `transitions.c` | the folder slide and the game switcher's entrance animations |
 | `pluginset.c` | which discovered plugins load, and in what order |
-| `plugins.c` | finding and loading plugins, the host table they call, chained hooks such as row decorators and header widgets, and the crash guard |
+| `plugins.c` | finding and loading plugins, the host table they call, chained hooks such as row decorators and header widgets, selection events, and the crash guard |
 | `toast.c` | short messages shown over the current screen |
 | `awake.c` | stay-awake files and plugin requests that keep the device from sleeping |
 | `pakhooks.c` | `pre-launch.sh` scripts next to a pak's `launch.sh` |
@@ -97,6 +97,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `plugindraw.c` | plugins' drawing calls over SDL and stock's fonts, and lending a surface such as the screen to a render hook, clipped to the area it may draw in |
 | `layoutmodel.c` | the SDL-free half of the layout slot: whether the owner's layout is still on after its init and each call, the buttons it sees and consumes, and the area it draws in; also the built-in list's row rects for row decorators, and how header widgets are laid out beside the status pill and what they take off the top row |
 | `artcache.c` | the SDL-free half of the art cache: decoded images by path and kind, least recently used out first past a byte cap, pins, the worker's load order with prefetches last, and requests dropped by sequence number once the selection moves |
+| `selmodel.c` | the SDL-free half of selection events: seeing the selection move (the art cache uses it too), and when it has settled on an entry plugins haven't heard about |
 | `artloader.c` | the art cache over SDL: decoding on the art worker, taking images in and evicting at the start of each frame, the built-in list's thumbnail and its neighbours, and plugins' `art_find`, `art_get` and `art_load` |
 
 See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. `MOSAIC_LAUNCHER_ART_CACHE_BYTES` replaces the art cache's 32 MiB cap, which the eviction case uses to fill a small one. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log.

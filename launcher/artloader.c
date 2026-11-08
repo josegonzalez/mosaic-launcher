@@ -2,6 +2,7 @@
 #include "artcache.h"
 #include "drawmodel.h"
 #include "plugindraw.h"
+#include "selmodel.h"
 
 static ArtCache cache;
 static ArtNames names;
@@ -14,9 +15,7 @@ static char thumb_wanted[ART_CACHE_PATH] = "";
 static char thumb_shown[ART_CACHE_PATH] = "";
 
 // the selection at the last look, and the kinds prefetched either side of it
-static const void* seen_top = NULL;
-static const void* seen_entries = NULL;
-static int seen_selected = -1;
+static SelKey seen = { NULL, NULL, -1, 1 }; // as if no lists had been seen
 static unsigned prefetched = 0;
 
 void ArtLoader_init(void) {
@@ -35,13 +34,7 @@ static void freeImage(void* image) {
 
 // When the selection moves, what was asked for before is stale.
 static void checkSelection(void) {
-	const void* top = state.top;
-	const void* entries = state.top ? state.top->entries : NULL;
-	int selected = state.top ? state.top->selected : -1;
-	if (top == seen_top && entries == seen_entries && selected == seen_selected) return;
-	seen_top = top;
-	seen_entries = entries;
-	seen_selected = selected;
+	if (!SelKey_changed(&seen, state.top, state.top ? state.top->entries : NULL, state.top ? state.top->selected : -1)) return;
 	ArtCache_mark(&cache);
 	ArtNames_clear(&names);
 	prefetched = 0;

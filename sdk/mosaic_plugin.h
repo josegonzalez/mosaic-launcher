@@ -323,9 +323,9 @@ typedef struct MosaicHost {
 	// user leaves the folder or the lists reload. selected_index returns
 	// the selected row in it, or -1 when it's empty. select_index moves
 	// the selection to a row, scrolling to keep it in view, and returns 0,
-	// or -1 for a row that isn't there or during layout_render. Call them
-	// from an action, tick or layout_input, not from a list hook, which may
-	// be listing another folder.
+	// or -1 for a row that isn't there, during layout_render or during
+	// selection_changed. Call them from an action, tick or layout_input,
+	// not from a list hook, which may be listing another folder.
 	const MosaicList* (*current_list)(void);
 	int (*selected_index)(void);
 	int (*select_index)(int index);
@@ -571,6 +571,12 @@ typedef struct MosaicHost {
 	// or a rect outside view->area. Check for it, and for row decorators
 	// and header widgets, with MOSAIC_HOST_HAS(host, decorate_cell).
 	int (*decorate_cell)(MosaicSurface* screen, int index, const MosaicRect* rect, const MosaicRect* name);
+
+	// Selection events: how long, in milliseconds, the game list's
+	// selection stays put, with no d-pad or shoulder button held, before
+	// plugins' selection_changed runs. Check for them with
+	// MOSAIC_HOST_HAS(host, selection_settle_ms).
+	int selection_settle_ms;
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -720,6 +726,23 @@ typedef struct MosaicPlugin {
 	// update one, such as a clock.
 	int (*header_width)(int max_width, int height);
 	int (*header_widget)(MosaicSurface* screen, const MosaicRect* rect);
+
+	// Selection events, for companion screens and previews. Runs, in load
+	// order, once each time the game list's selection settles on another
+	// entry: after it has gone host->selection_settle_ms without moving and
+	// no d-pad or shoulder button is held, so scrolling through a list gives
+	// one call at the end rather than one a row. The selection the launcher
+	// starts on counts once it settles, and so does a folder's when it's
+	// opened, or backed out to; a reload that keeps the same entry selected
+	// doesn't. entry is the selected entry, or NULL in an empty folder; don't
+	// keep it, as it goes with its list. It runs on the main thread after
+	// the frame's input and before it's drawn, where what tick can call
+	// works too, except select_index, which returns -1 during it so a plugin
+	// can't keep moving the selection from its own events; move it from tick
+	// or an action instead. Return 0, or anything else for an error, after
+	// which the launcher logs it and stops calling this plugin's
+	// selection_changed until it restarts.
+	int (*selection_changed)(const MosaicEntry* entry);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

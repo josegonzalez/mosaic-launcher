@@ -138,7 +138,7 @@ Both dialogs return straight away and call back once they close, so open them fr
 - `sort_compare(a, b, dir_path)` in `MosaicPlugin` orders a list, such as pinned games first or by a number in the name. The launcher sorts a folder its own way first, then by every plugin's `sort_compare` in load order: for each pair, the first plugin to return non-zero decides (negative puts `a` first), and a pair no plugin has an opinion on keeps the launcher's order. Return 0 for lists you don't handle. Recents and collections are passed too, in their own order. The letter index L1 and R1 jump through follows the final order.
 - `list_ready(list, dir_path)` in `MosaicPlugin` sees a whole list once it's filtered, named and sorted, before it's shown, so a plugin can rename entries based on their siblings, such as titles that collide. Plugins run in load order. It can't add, remove or reorder entries. If a name changed, the list is sorted again by name and then by `sort_compare`, as for `display_name`, except recents and collections, which keep their order.
 - `entry_set_name(entry, name)` renames an entry from inside `list_ready`. The new name is what the list draws and what the letter index uses. It returns 0, or -1 anywhere else.
-- `current_list()` returns the list the user is looking at, read with `list_count` and `list_get`, or `NULL` before the lists exist. Don't keep it past the call you got it in: it's freed when the user leaves the folder or the lists reload. `selected_index()` returns the selected row in it, or -1 when it's empty. `select_index(index)` moves the selection to a row, scrolling only as far as it takes to show it, and returns 0, or -1 for a row that isn't there or during `layout_render`. Call them from an action, `tick` or `layout_input`, not from a list hook.
+- `current_list()` returns the list the user is looking at, read with `list_count` and `list_get`, or `NULL` before the lists exist. Don't keep it past the call you got it in: it's freed when the user leaves the folder or the lists reload. `selected_index()` returns the selected row in it, or -1 when it's empty. `select_index(index)` moves the selection to a row, scrolling only as far as it takes to show it, and returns 0, or -1 for a row that isn't there or during `layout_render`, the row decorators, header widgets or `selection_changed`. Call them from an action, `tick` or `layout_input`, not from a list hook.
 - `quick_tile(action_id, row, icon, icon_off, is_on)` puts an action from `register_action` on the quick menu, after the built-in tiles of `row`: `MOSAIC_QUICK_TOP` (the large labelled tiles such as Recents and Games) or `MOSAIC_QUICK_BOTTOM` (the small icons such as Wifi and Power off). The tile is labelled with the action's label, A runs it, and it shows only while the action is available. `icon` is a PNG to draw on it, or `NULL`; a bottom tile without one shows its label. With `is_on`, the tile has an on/off state, `icon_off` is drawn while it's off, and the background is `.media/quick_<label>_off.png` as for stock's toggles. If the action opens a folder, the game list shows it. It returns 0, or -1 for an unknown action or row.
 - `hide_quick_tile(name, hidden)` hides a built-in tile by name (`Recents`, `Collections`, `Games`, `Tools`, `Settings`, `Pak Store`, `Wifi`, `Bluetooth`, `Sleep`, `Reboot`, `Poweroff`), or a plugin tile by its action id, while `hidden` is 1, and shows it again with 0.
 
@@ -290,6 +290,32 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
       int size = row->rect.h / 4;
       MosaicRect dot = { row->rect.x + row->rect.w - size * 2, row->rect.y + (row->rect.h - size) / 2, size, size };
       return host->fill_round_rect(screen, &dot, size / 2, mosaic_color(host->theme_color(MOSAIC_COLOR_ACCENT), 255)) == 0 ? 0 : -1;
+  }
+  ```
+- Selection events tell plugins which entry the user settled on, for companion screens and previews. `selection_changed(entry)` in `MosaicPlugin` runs, in load order, once each time the game list's selection settles on another entry, rather than every frame while the user scrolls. The selection has settled once it has gone `host->selection_settle_ms` (250) without moving and no d-pad or shoulder button (L1, R1, L2, R2) is held, so holding a direction through a list, or tapping faster than that, gives one call at the end. It's about the folder and the entry together, by path: the selection the launcher starts on counts once it settles, and so does a folder's when it's opened or backed out to, even on the same game in another folder such as Recently Played; a reload that keeps the same entry selected doesn't, and neither does moving away and back before it settles. Moves a layout or a plugin makes with `select_index` count like the user's. `entry` is the selected entry, or `NULL` in an empty folder; don't keep it, as it goes with its list, so copy its path if you need it later.
+
+  It runs on the main thread, after the frame's input and plugins' `tick`, and before the frame is drawn, never from inside a drawing hook. Anything `tick` can call works from it, except `select_index`, which returns -1 during it: a plugin moving the selection from its own event would hear of it again and could loop. Move it from `tick` or an action instead. Check for it with `MOSAIC_HOST_HAS(host, selection_settle_ms)`. It returns 0, or anything else for an error, after which the launcher logs it and stops calling that plugin's `selection_changed` until it restarts; its other hooks keep working. A preview that should wait longer, such as one that starts a clip after 2 seconds, starts its own timer here and checks it in `tick`.
+
+  ```c
+  // start a preview 2 seconds after the selection settles on a game
+  static char pending[512];
+  static unsigned long due = 0, frame = 0;
+
+  static void tick(unsigned long now) {
+      frame = now;
+      if (due && now >= due) {
+          due = 0;
+          startPreview(pending);
+      }
+  }
+
+  static int selectionChanged(const MosaicEntry* entry) {
+      stopPreview();
+      due = 0;
+      if (!entry || host->entry_type(entry) != MOSAIC_ENTRY_ROM) return 0;
+      snprintf(pending, sizeof(pending), "%s", host->entry_path(entry));
+      due = frame + 2000 - host->selection_settle_ms;
+      return 0;
   }
   ```
 

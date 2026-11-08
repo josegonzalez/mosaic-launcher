@@ -140,6 +140,8 @@ int main (int argc, char *argv[]) {
 
 		// so a thumbnail decoded meanwhile shows on this frame
 		ArtLoader_pump(0);
+		// once the selection settles, before it's drawn
+		Plugins_selection(now);
 
 		if(state.dirty) {
 			tmpOldScreen = NULL;

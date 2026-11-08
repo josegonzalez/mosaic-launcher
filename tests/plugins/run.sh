@@ -9,7 +9,8 @@
 # colours and sets an LED colour, one that asks about Bluetooth, one that
 # draws, one that draws the game list as a grid, two that decorate rows and
 # add header widgets, two that supply art and load it through the art
-# cache, and one that crashes during startup.
+# cache, one that hears about the selection, and one that crashes during
+# startup.
 #
 # Each case waits up to PLUGIN_TEST_SECONDS (10 by default) for the log
 # lines it checks, and stops as soon as they're in, so a slow machine only
@@ -715,6 +716,36 @@ expect "touch Charlie 1"
 expect "fill Echo in 1"
 expect "kept Charlie 1 Echo 1, evicted Delta 0"
 rm -rf "$WORK/plugins/artist.plugin" "$WORK/plugins/framer.plugin" "$ART_DIR" "$STATE/artist.cfg" "$STATE/framer.cfg" "$STATE/plugins.txt"
+
+# selector hears about the selection once it settles: the starting one, a
+# folder it opens, the end of a scroll through it a row a frame, nothing
+# for a reload that keeps the same game, and the root's when it goes back.
+# select_index is refused during the event. With fail=1, an error on the
+# second event turns its selection_changed off.
+build_plugin selector 'id=selector\nname=Selector\napi=1\n'
+run_launcher "$WORK/selector.log" "plugin selector: done" || fail "the launcher exited early with selector loaded"
+log="$WORK/selector.log"
+plugin=selector
+expect "settle 250"
+expect "open folder 1"
+grep -qE "plugin selector: event 1 .* settled 1, select -1$" "$log" || fail "selector's first event is missing"
+expect "event 2 Apple in Selector, index 0, settled 1, select -1"
+expect "event 3 Grape in Selector, index 6, settled 1, select -1"
+expect "after scrolling 3 events"
+expect "after reload 3 events"
+expect "open root 1"
+grep -qE "plugin selector: event 4 .* in root, index [0-9]+, settled 1, select -1$" "$log" || fail "selector didn't hear of the root's selection"
+expect "done"
+grep -qF "plugin selector: event 5" "$log" && fail "selector heard of the selection more than once a settle"
+printf 'fail=1\n' >"$STATE/selector.cfg"
+run_launcher "$WORK/selector-fail.log" "plugin selector: done" || fail "the launcher exited early with selector failing"
+log="$WORK/selector-fail.log"
+expect "event failing"
+expect "after scrolling 2 events"
+grep -qF "plugins: selector's selection_changed returned -1, no longer telling it about the selection until the launcher restarts" "$log" \
+	|| fail "selector's failing selection_changed wasn't logged"
+grep -qF "plugin selector: event 3" "$log" && fail "selector's selection_changed was called after it failed"
+rm -rf "$WORK/plugins/selector.plugin" "$STATE/selector.cfg"
 
 # a saved last path the launcher can't follow up to the card's root, such as
 # the pak off the card drawer's launch left, starts at the root rather than
