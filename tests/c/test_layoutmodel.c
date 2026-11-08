@@ -1,6 +1,7 @@
 // layoutmodel.c: the layout slot's state, the buttons a layout sees and
 // consumes, and where it draws, and where row decorators, header widgets
-// and art decorators draw, and where the selection is for transitions.
+// and art decorators draw, where the selection is for transitions, and a
+// plugin's art in place of the built-in list's thumbnail.
 
 #include "check.h"
 #include "layoutmodel.h"
@@ -373,6 +374,103 @@ static void testArt(void) {
 	CHECK(LayoutArt_below(&(MosaicRect){ 0, 2147483000, 10, 2147483000 }, &area, &below) == 0);
 }
 
+// Stock's GFX_ApplyRoundedCorners_8888: 1 when it clears x, y of a w by h image.
+static int stockClears(int w, int h, int radius, int x, int y) {
+	int dx = (x < radius) ? radius - x : (x >= w - radius) ? x - (w - radius - 1) : 0;
+	int dy = (y < radius) ? radius - y : (y >= h - radius) ? y - (h - radius - 1) : 0;
+	return dx * dx + dy * dy > radius * radius;
+}
+
+// What ListArt_cornerCut clears at x, y.
+static int cutClears(int w, int h, int radius, int x, int y) {
+	int dy = y < radius ? radius - y : y >= h - radius ? y - (h - radius - 1) : 0;
+	int cut = ListArt_cornerCut(radius, dy);
+	return x < cut || x >= w - cut;
+}
+
+static void testArtSwap(void) {
+	// a 720x480 video frame at the desktop's default Game art width sits
+	// where a thumbnail of that shape would
+	MosaicRect art;
+	CHECK(ListArt_rect(1024, 768, 0.45, 45, 720, 480, &art) == 1);
+	CHECK(rectIs(&art, 519, 231, 460, 306));
+	// with the corners stock gives a thumbnail that size: 20 units at scale
+	// 3, as wide again as the art is shrunk, truncated
+	CHECK(ListArt_radius(20, 3, 720, 460, 720, 480) == 93);
+	CHECK(ListArt_radius(20, 3, 460, 460, 460, 460) == 60);
+	// and a small image shown larger gets smaller corners
+	CHECK(ListArt_radius(20, 3, 230, 460, 230, 150) == 30);
+	// at most half the shorter side
+	CHECK(ListArt_radius(20, 3, 720, 46, 720, 480) == 240);
+	// nothing for a radius of 0, an empty image or no art
+	CHECK(ListArt_radius(0, 3, 720, 460, 720, 480) == 0);
+	CHECK(ListArt_radius(20, 3, 0, 460, 720, 480) == 0);
+	CHECK(ListArt_radius(20, 3, 720, 0, 720, 480) == 0);
+	CHECK(ListArt_radius(-4, 3, 720, 460, 720, 480) == 0);
+
+	// a corner's rows: the outermost all clear, the innermost barely
+	CHECK(ListArt_cornerCut(10, 10) == 10);
+	CHECK(ListArt_cornerCut(10, 1) == 1);
+	CHECK(ListArt_cornerCut(10, 0) == 0);
+	CHECK(ListArt_cornerCut(0, 3) == 0);
+	CHECK(ListArt_cornerCut(10, 25) == 10);
+	// pixel for pixel what stock clears, for radii up to half the image
+	int mismatches = 0;
+	int sizes[][2] = { { 40, 30 }, { 9, 9 }, { 64, 20 }, { 1, 1 } };
+	for (int s = 0; s < 4; s++) {
+		int w = sizes[s][0], h = sizes[s][1];
+		int most = (w < h ? w : h) / 2;
+		for (int radius = 0; radius <= most; radius++) {
+			for (int y = 0; y < h; y++) {
+				for (int x = 0; x < w; x++) mismatches += stockClears(w, h, radius, x, y) != cutClears(w, h, radius, x, y);
+			}
+		}
+	}
+	CHECK(mismatches == 0);
+
+	int a = 0, b = 0; // two surfaces, only compared
+	ArtSwap swap;
+	ArtSwap_clear(&swap);
+	CHECK(!ArtSwap_active(&swap));
+	CHECK(swap.owner == -1);
+	// nothing to clear
+	CHECK(ArtSwap_set(&swap, 1, NULL, 0, 0) == ARTSWAP_NONE);
+	// shown, then the same surface again is a new frame of it
+	CHECK(ArtSwap_set(&swap, 1, &a, 720, 480) == ARTSWAP_SHOWN);
+	CHECK(ArtSwap_active(&swap));
+	CHECK(ArtSwap_set(&swap, 1, &a, 720, 480) == ARTSWAP_FRAME);
+	CHECK(ArtSwap_set(&swap, 1, &a, 720, 480) == ARTSWAP_FRAME);
+	// a new size, or another surface of its own, is shown afresh
+	CHECK(ArtSwap_set(&swap, 1, &a, 640, 480) == ARTSWAP_SHOWN);
+	CHECK(ArtSwap_set(&swap, 1, &b, 640, 480) == ARTSWAP_SHOWN);
+	CHECK(swap.surface == &b);
+	// another plugin waits until it's gone, and can't clear it
+	CHECK(ArtSwap_set(&swap, 2, &a, 720, 480) == ARTSWAP_REFUSED);
+	CHECK(ArtSwap_set(&swap, 2, NULL, 0, 0) == ARTSWAP_NONE);
+	CHECK(swap.owner == 1 && swap.surface == &b);
+	// an empty size or no owner is refused
+	CHECK(ArtSwap_set(&swap, 1, &a, 0, 480) == ARTSWAP_REFUSED);
+	CHECK(ArtSwap_set(&swap, -1, &a, 720, 480) == ARTSWAP_REFUSED);
+	CHECK(swap.surface == &b);
+	// its own clear
+	CHECK(ArtSwap_set(&swap, 1, NULL, 0, 0) == ARTSWAP_CLEARED);
+	CHECK(!ArtSwap_active(&swap));
+	CHECK(ArtSwap_set(&swap, 2, &a, 720, 480) == ARTSWAP_SHOWN);
+	// a freed surface, or its plugin quitting, drops it; others don't
+	CHECK(ArtSwap_dropSurface(&swap, &b) == 0);
+	CHECK(ArtSwap_dropSurface(&swap, NULL) == 0);
+	CHECK(ArtSwap_dropSurface(&swap, &a) == 1);
+	CHECK(!ArtSwap_active(&swap));
+	CHECK(ArtSwap_dropSurface(&swap, &a) == 0);
+	CHECK(ArtSwap_set(&swap, 2, &a, 720, 480) == ARTSWAP_SHOWN);
+	CHECK(ArtSwap_dropOwner(&swap, 1) == 0);
+	CHECK(ArtSwap_dropOwner(&swap, 2) == 1);
+	CHECK(!ArtSwap_active(&swap));
+	CHECK(ArtSwap_dropOwner(&swap, 2) == 0);
+	// after a drop, a frame of the same surface shows it afresh
+	CHECK(ArtSwap_set(&swap, 2, &a, 720, 480) == ARTSWAP_SHOWN);
+}
+
 int main(void) {
 	testSlot();
 	testInput();
@@ -385,5 +483,6 @@ int main(void) {
 	testTopRow();
 	testBackground();
 	testArt();
+	testArtSwap();
 	CHECK_DONE();
 }

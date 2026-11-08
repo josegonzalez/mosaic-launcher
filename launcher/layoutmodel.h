@@ -193,4 +193,48 @@ int ListArt_below(int w, double art_w, int margin, int hints_top, const MosaicRe
 // rect.
 int LayoutArt_below(const MosaicRect* art, const MosaicRect* area, MosaicRect* out);
 
+// Art replacement (art_replace). The corner radius in pixels for an img_w
+// wide image shown art_w wide, from the Thumbnail radius setting in stock's
+// units at scale pixels a unit, cast for cast as stock rounds a thumbnail's
+// corners, and cut down to half of w and h; 0 for an empty size.
+int ListArt_radius(int radius, int scale, int img_w, int art_w, int w, int h);
+
+// How many pixels at each end of a row of a rounded image go clear, for
+// stock's rounded corners: dy is how far into a corner the row is, radius
+// for the outermost row down to 1 for the innermost, and 0 for a row
+// between the corners. Never more than radius.
+int ListArt_cornerCut(int radius, int dy);
+
+// A plugin's surface shown in place of the built-in list's thumbnail.
+// Pointers are only compared, never read.
+typedef struct ArtSwap {
+	int owner;           // the loaded plugin's index, or -1
+	const void* surface; // and its surface
+	int w, h;            // the surface's size when last shown
+} ArtSwap;
+
+// What ArtSwap_set did.
+enum ArtSwapResult {
+	ARTSWAP_REFUSED = -1, // another plugin's surface shows
+	ARTSWAP_NONE,         // a clear when the plugin had nothing showing
+	ARTSWAP_SHOWN,        // nothing showed before, or another surface of the plugin's or another size
+	ARTSWAP_FRAME,        // the same surface at the same size: only its pixels changed
+	ARTSWAP_CLEARED,      // its surface no longer shows
+};
+
+void ArtSwap_clear(ArtSwap* swap);
+
+// 1 while a surface shows.
+int ArtSwap_active(const ArtSwap* swap);
+
+// owner shows surface, w by h, or with surface NULL clears its own. The
+// first plugin to show one keeps the place until it clears it or it's
+// dropped.
+int ArtSwap_set(ArtSwap* swap, int owner, const void* surface, int w, int h);
+
+// Drops surface, or every surface of owner's, eg. after it's freed or its
+// plugin quits. Returns 1 when that was what showed.
+int ArtSwap_dropSurface(ArtSwap* swap, const void* surface);
+int ArtSwap_dropOwner(ArtSwap* swap, int owner);
+
 #endif

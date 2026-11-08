@@ -61,6 +61,8 @@ static MosaicTransition transition; // and the transition
 static BackgroundSlot background = { -1, 0, 0, 0 };
 static int backgrounding = 0; // while background_render runs, which only draws
 static int generating = 0;    // while an art_surface runs, which only draws
+static ArtSwap swap = { -1, NULL, 0, 0 }; // a plugin's art_replace surface
+static SelKey swap_key;                     // and the selection it was shown for
 
 #define SCREEN_COUNT 3
 
@@ -645,6 +647,81 @@ static int hostSurfaceWrite(const char* plugin_id, MosaicSurface* surface, const
 	return isLoaded(plugin_id) ? PluginDraw_surfaceWrite(plugin_id, surface, rect, pixels, pitch) : -1;
 }
 
+// The thumbnail layer is out of date, and with full the list too: a
+// thumbnail beside rows that left no room for one, or art decorators
+// placed under the last art.
+static void swapChanged(int full) {
+	SDL_LockMutex(thumbMutex);
+	thumbchanged = 1;
+	SDL_UnlockMutex(thumbMutex);
+	if (full) state.dirty = 1;
+}
+
+// A freed art_replace surface no longer shows.
+static int hostSurfaceFree(const char* plugin_id, MosaicSurface* surface) {
+	if (PluginDraw_surfaceFree(plugin_id, surface) != 0) return -1;
+	if (ArtSwap_dropSurface(&swap, surface)) swapChanged(1);
+	return 0;
+}
+
+static int loadedIndex(const char* plugin_id) {
+	for (int i = 0; plugin_id && i < loaded_count; i++) {
+		if (!strcmp(loaded[i].id, plugin_id)) return i;
+	}
+	return -1;
+}
+
+// 1 while the built-in list shows the selected entry's thumbnail, or would
+// with art for it.
+static int listShowsArt(void) {
+	return currentScreen == SCREEN_GAMELIST && state.top && state.top->entries->count > 0 && CFG_getShowGameArt()
+		&& !Plugins_hasLayout();
+}
+
+static int hostArtReplace(const char* plugin_id, MosaicSurface* surface) {
+	int owner = loadedIndex(plugin_id);
+	if (owner < 0 || initializing >= 0 || layout_rendering || decorating || backgrounding || generating) return -1;
+	if (!surface) {
+		// a full redraw: the list may have made room for it, and art decorators placed under it
+		if (ArtSwap_set(&swap, owner, NULL, 0, 0) == ARTSWAP_CLEARED) swapChanged(1);
+		return 0;
+	}
+	SDL_Surface* s = (SDL_Surface*)surface;
+	if (!DrawReg_mine(surface, plugin_id) || !listShowsArt()) return -1;
+	// a move since it was shown took it away, even if Plugins_artReplaceCheck hasn't run yet
+	if (ArtSwap_active(&swap) && SelKey_changed(&swap_key, state.top, state.top->entries, state.top->selected))
+		ArtSwap_clear(&swap);
+	int had = ArtSwap_active(&swap);
+	switch (ArtSwap_set(&swap, owner, surface, s->w, s->h)) {
+		case ARTSWAP_FRAME:
+			swapChanged(0);
+			return 0;
+		case ARTSWAP_SHOWN:
+			if (!had) {
+				SelKey_reset(&swap_key);
+				SelKey_changed(&swap_key, state.top, state.top->entries, state.top->selected);
+			}
+			// rows beside no art make room, and art decorators go under the new size
+			swapChanged(!had_thumb || Plugins_hasArtDecorators());
+			return 0;
+		default:
+			return -1;
+	}
+}
+
+SDL_Surface* Plugins_artReplaced(void) {
+	if (!ArtSwap_active(&swap)) return NULL;
+	return DrawReg_mine(swap.surface, loaded[swap.owner].id) ? (SDL_Surface*)swap.surface : NULL;
+}
+
+void Plugins_artReplaceCheck(void) {
+	if (!ArtSwap_active(&swap)) return;
+	int moved = !state.top || SelKey_changed(&swap_key, state.top, state.top->entries, state.top->selected);
+	if (!moved && listShowsArt() && DrawReg_mine(swap.surface, loaded[swap.owner].id)) return;
+	ArtSwap_clear(&swap);
+	swapChanged(1);
+}
+
 static int hostArtFind(const MosaicEntry* entry, int kind, char* out, size_t size) {
 	return ArtLoader_find((const Entry*)entry, kind, out, size);
 }
@@ -660,6 +737,8 @@ static void playLog(const char* message) {
 
 // After a plugin's quit, or when its init declines: its surfaces go with it.
 static void freeSurfaces(const char* plugin_id) {
+	int owner = loadedIndex(plugin_id);
+	if (owner >= 0 && ArtSwap_dropOwner(&swap, owner)) swapChanged(1);
 	int freed = PluginDraw_freeAll(plugin_id);
 	if (freed) LOG_info("plugins: freed %i surface%s %s left\n", freed, freed == 1 ? "" : "s", plugin_id);
 }
@@ -728,7 +807,7 @@ static const MosaicHost host = {
 	.surface_new = hostSurfaceNew,
 	.image_load = hostImageLoad,
 	.surface_scale = hostSurfaceScale,
-	.surface_free = PluginDraw_surfaceFree,
+	.surface_free = hostSurfaceFree,
 	.surface_size = PluginDraw_surfaceSize,
 	.read_pixel = PluginDraw_readPixel,
 	.fill_rect = PluginDraw_fillRect,
@@ -759,6 +838,7 @@ static const MosaicHost host = {
 	.achievements = hostAchievements,
 	.achievement_hash = hostAchievementHash,
 	.surface_write = hostSurfaceWrite,
+	.art_replace = hostArtReplace,
 };
 
 ///////////////////////////////////////

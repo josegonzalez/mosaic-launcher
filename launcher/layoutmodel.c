@@ -246,3 +246,60 @@ int LayoutArt_below(const MosaicRect* art, const MosaicRect* area, MosaicRect* o
 	MosaicRect under = { art->x, (int)top, art->w, (int)(bottom - top) };
 	return LayoutRect_clip(&under, area, out);
 }
+
+///////////////////////////////////////
+// art replacement
+
+int ListArt_radius(int radius, int scale, int img_w, int art_w, int w, int h) {
+	if (radius <= 0 || scale <= 0 || img_w <= 0 || art_w <= 0 || w <= 0 || h <= 0) return 0;
+	// as stock's thumbnail worker works it out for GFX_ApplyRoundedCorners_8888
+	int r = (int)(((float)radius * ((float)img_w / (float)art_w)) * scale);
+	int most = (w < h ? w : h) / 2;
+	return r < 0 ? 0 : r < most ? r : most;
+}
+
+int ListArt_cornerCut(int radius, int dy) {
+	if (radius <= 0 || dy <= 0) return 0;
+	if (dy > radius) dy = radius;
+	// stock clears a pixel dx in from the corner's edge when dx*dx + dy*dy
+	// is over radius*radius, for dx from 1 to radius: all but those up to
+	// the square root of what's left
+	long left = (long)radius * radius - (long)dy * dy;
+	int kept = 0;
+	while ((long)(kept + 1) * (kept + 1) <= left) kept++;
+	return radius - kept;
+}
+
+void ArtSwap_clear(ArtSwap* swap) {
+	*swap = (ArtSwap){ -1, NULL, 0, 0 };
+}
+
+int ArtSwap_active(const ArtSwap* swap) {
+	return swap->owner >= 0 && swap->surface;
+}
+
+int ArtSwap_set(ArtSwap* swap, int owner, const void* surface, int w, int h) {
+	if (owner < 0) return ARTSWAP_REFUSED;
+	if (ArtSwap_active(swap) && swap->owner != owner) return surface ? ARTSWAP_REFUSED : ARTSWAP_NONE;
+	if (!surface) {
+		if (!ArtSwap_active(swap)) return ARTSWAP_NONE;
+		ArtSwap_clear(swap);
+		return ARTSWAP_CLEARED;
+	}
+	if (w <= 0 || h <= 0) return ARTSWAP_REFUSED;
+	int same = ArtSwap_active(swap) && swap->surface == surface && swap->w == w && swap->h == h;
+	*swap = (ArtSwap){ owner, surface, w, h };
+	return same ? ARTSWAP_FRAME : ARTSWAP_SHOWN;
+}
+
+int ArtSwap_dropSurface(ArtSwap* swap, const void* surface) {
+	if (!ArtSwap_active(swap) || !surface || swap->surface != surface) return 0;
+	ArtSwap_clear(swap);
+	return 1;
+}
+
+int ArtSwap_dropOwner(ArtSwap* swap, int owner) {
+	if (!ArtSwap_active(swap) || swap->owner != owner) return 0;
+	ArtSwap_clear(swap);
+	return 1;
+}

@@ -478,11 +478,27 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
 - `surface_write(id, surface, rect, pixels, pitch)` copies pixels into `rect` of a surface the plugin made (`NULL` for all of it), for pictures a plugin works out itself, such as decoded video frames. The pixels are RGBA8888: four bytes a pixel in memory, `r`, `g`, `b` then `a`, whatever the machine's byte order, with `a` 255 for opaque and not premultiplied (ffmpeg's `AV_PIX_FMT_RGBA`, SDL's `SDL_PIXELFORMAT_RGBA32`). They start at `rect`'s top left, and each row starts `pitch` bytes after the one before, so `pitch` is at least `rect.w * 4`. The copy replaces what's there, alpha included, rather than blending, and leaves out any part of `rect` past the surface's edges, reading only the pixels that land on it. It returns 0, also when none of `rect` is on the surface, or -1 for a `NULL` (id, surface or pixels), a rect with a negative size, a `pitch` under `rect.w * 4`, or a surface the plugin didn't make or no longer owns: one a hook lent it (such as the screen), an art cache image, one it handed the launcher from `art_surface`, another plugin's, or one already freed. `id` must be the plugin's own, the one that made the surface. It's for the main thread only, like every drawing call, so do any decoding and colour conversion on a thread of your own and hand the finished pixels over to copy; the launcher only copies them, converting into the surface's own format when it differs. Copying a 720x480 frame takes about 0.03 ms on an Apple silicon Mac, about as long as a plain `memcpy` of it. Check for it with `MOSAIC_HOST_HAS(host, surface_write)`.
 
   ```c
-  // in tick, on the main thread: the newest frame the decoder thread finished
+  // in tick, on the main thread: the newest frame the decoder thread finished,
+  // shown in place of the selected game's thumbnail (art_replace, below)
   if (frame_ready) {
       host->surface_write(ID, video, NULL, frame_rgba, FRAME_W * 4);
       frame_ready = 0;
-      host->request_redraw();
+      host->art_replace(ID, video);
+  }
+  ```
+
+- `art_replace(id, surface)` shows a surface the plugin made, and still owns, in place of the selected entry's thumbnail on the built-in list, such as a video preview. It's sized and placed as a thumbnail of the surface's size would be (as wide as the Game art width setting allows and at most 0.6 of the screen tall, keeping its shape, at the right of the screen and centred on its middle), with the rounded corners stock gives a thumbnail that size from the Thumbnail radius setting, on the thumbnail's own layer. Art decorators still run under it, handed its rect. It shows for an entry with no art of its own too, and the rows then make room for it as they do for a thumbnail. `NULL` takes the plugin's surface away again, and the entry's own thumbnail, if it has one, shows.
+
+  The launcher doesn't take the surface, unlike art from `art_surface`: it stays the plugin's, to draw into or write into with `surface_write` while it shows. Calling `art_replace` again with the same surface, at the same size, shows what it holds now, redrawing only the thumbnail layer, not the list: that's how to show each new frame of a video. Never call `request_redraw` for each frame, since that redraws the whole list, its rows, decorators and background included. A first call, another surface or a new size redraws the list once when it has to, for an entry with no art of its own (the rows make room) or when art decorators are on (they're placed under the new art), and the surface going away, or a `NULL`, redraws it once. On an Apple silicon Mac, showing a new 720x480 frame takes about 2.2 ms of the frame, against about 3.9 ms for redrawing a short list: about 0.15 ms to copy the surface and round its corners, about 1.6 ms for stock's own call that puts an image on a layer, and the rest for the selection pill's layers, which the launcher redraws on these frames too.
+
+  The surface goes away by itself when the selection moves, the game list is left (for the game switcher, the quick menu, a dialog or a game), the folder empties, a plugin layout takes over the list, the surface is freed or is no longer the plugin's (such as one handed to the launcher from `art_surface`), or the plugin quits. The next call after that shows it afresh, for whatever is selected then, so check `selected_entry` before showing a frame that belongs to a game, or start from `selection_changed`. Only one plugin's surface shows at a time: the first keeps the place until it goes, and other plugins' calls return -1 meanwhile.
+
+  It returns 0, also for `NULL`, or -1 for a `NULL` id, a surface the plugin didn't make or no longer owns (one a hook lent it, an art cache image, another plugin's or one already freed), another plugin's surface showing, a call from inside a hook that only draws (such as `decorate_art`, `decorate_row` or `layout_render`) or from `init`, or when the built-in list shows no thumbnail there: off the game list, in an empty folder, with Show game art off or under a plugin layout. Layouts don't show it yet: a layout draws its own art, and there's no host call yet for it to draw a plugin's surface in place of an entry's art. It's for the main thread only, like every drawing call. Check for it with `MOSAIC_HOST_HAS(host, art_replace)`.
+
+  ```c
+  // in selection_changed: a still of the game until its video starts
+  if (host->art_replace(ID, still) != 0) {
+      // another plugin's art shows, or the built-in list shows none here
   }
   ```
 

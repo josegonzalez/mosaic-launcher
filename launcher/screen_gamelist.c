@@ -348,11 +348,17 @@ static int listArt(Entry* entry, char* out, size_t size) {
 
 // Plugins' art decorators under the selected entry's thumbnail, placed as
 // the main loop puts it on its layer, once its image is in: one kept from
-// the last entry while it loads isn't this one's.
+// the last entry while it loads isn't this one's. A plugin's art_replace
+// surface stands in for it.
 static void decorateThumb(const Entry* entry) {
 	int img_w = 0, img_h = 0;
+	SDL_Surface* swapped = Plugins_artReplaced();
 	SDL_LockMutex(thumbMutex);
-	if (thumbbmp && ArtLoader_thumbShown()) {
+	if (swapped) {
+		img_w = swapped->w;
+		img_h = swapped->h;
+	}
+	else if (thumbbmp && ArtLoader_thumbShown()) {
 		img_w = thumbbmp->w;
 		img_h = thumbbmp->h;
 	}
@@ -441,6 +447,7 @@ void GameList_update(void) {
 			char thumbpath[1024];
 			int found = listArt(entry, thumbpath, sizeof(thumbpath));
 			int made = 0; // a plugin's generated art, for a game with no art file
+			int swapped = Plugins_artReplaced() != NULL; // a plugin's art_replace surface, in its place
 			had_thumb = 0;
 			if (Plugins_hasLayout()) {
 				// a plugin layout draws its own art; none is left to come back with the built-in list
@@ -462,7 +469,7 @@ void GameList_update(void) {
 			int max_h = (int)(screen->h * 0.6);
 			int new_w = max_w;
 			int new_h = max_h;
-			if(found || made) {
+			if(found || made || swapped) {
 				ox = (int)(max_w) - SCALE1(BUTTON_MARGIN*5);
 				had_thumb = 1;
 				// a file's path; generated art has none

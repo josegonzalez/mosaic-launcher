@@ -10,6 +10,51 @@ static void drawThumb(void) {
 	GFX_drawOnLayer(thumbbmp, art.x, art.y, art.w, art.h, 1.0f, 0, LAYER_THUMBNAIL);
 }
 
+// A plugin's art_replace surface in the thumbnail's place: a copy of what
+// it holds now, with the corners stock would give a thumbnail that size,
+// placed as one. The copy is kept for the next frame of the same size.
+static SDL_Surface* swap_copy = NULL;
+static void drawSwap(SDL_Surface* src) {
+	MosaicRect art;
+	if (!ListArt_rect(screen->w, screen->h, CFG_getGameArtWidth(), SCALE1(BUTTON_MARGIN*3), src->w, src->h, &art)) {
+		GFX_clearLayers(LAYER_THUMBNAIL);
+		return;
+	}
+	if (swap_copy && (swap_copy->w != src->w || swap_copy->h != src->h)) {
+		SDL_FreeSurface(swap_copy);
+		swap_copy = NULL;
+	}
+	// in the format drawOnLayer uploads
+	if (!swap_copy) swap_copy = SDL_CreateRGBSurfaceWithFormat(0, src->w, src->h, 32, SDL_PIXELFORMAT_ARGB8888);
+	if (!swap_copy || SDL_ConvertPixels(src->w, src->h, src->format->format, src->pixels, src->pitch,
+			swap_copy->format->format, swap_copy->pixels, swap_copy->pitch) != 0) {
+		GFX_clearLayers(LAYER_THUMBNAIL);
+		return;
+	}
+	// only the corners' rows have pixels to clear
+	int radius = ListArt_radius(CFG_getThumbnailRadius(), FIXED_SCALE, src->w, art.w, src->w, src->h);
+	for (int i = 0; i < radius; i++) {
+		int cut = ListArt_cornerCut(radius, radius - i);
+		int rows[2] = { i, src->h - 1 - i };
+		for (int r = 0; r < 2; r++) {
+			Uint8* row = (Uint8*)swap_copy->pixels + (size_t)rows[r] * swap_copy->pitch;
+			memset(row, 0, (size_t)cut * 4);
+			memset(row + (size_t)(src->w - cut) * 4, 0, (size_t)cut * 4);
+		}
+	}
+	GFX_clearLayers(LAYER_THUMBNAIL);
+	GFX_drawOnLayer(swap_copy, art.x, art.y, art.w, art.h, 1.0f, 0, LAYER_THUMBNAIL);
+}
+
+// The thumbnail layer, once thumbchanged says it's out of date: a plugin's
+// art_replace surface, the built-in list's thumbnail, or nothing.
+static void showThumb(void) {
+	SDL_Surface* swapped = Plugins_artReplaced();
+	if (swapped) drawSwap(swapped);
+	else if (thumbbmp) drawThumb();
+	else GFX_clearLayers(LAYER_THUMBNAIL);
+}
+
 int main (int argc, char *argv[]) {
 	// LOG_info("time from launch to:\n");
 	// unsigned long main_begin = SDL_GetTicks();
@@ -156,6 +201,8 @@ int main (int argc, char *argv[]) {
 
 		// so a thumbnail decoded meanwhile shows on this frame
 		ArtLoader_pump(0);
+		// a plugin's art in the thumbnail's place goes once the selection moves
+		Plugins_artReplaceCheck();
 		// once the selection settles, before it's drawn
 		Plugins_selection(now);
 
@@ -226,10 +273,8 @@ int main (int argc, char *argv[]) {
 				if(list_layout_drawn) {
 					// a plugin layout draws its own art
 					GFX_clearLayers(LAYER_THUMBNAIL);
-				} else if(thumbbmp && thumbchanged) {
-					drawThumb();
 				} else if(thumbchanged) {
-					GFX_clearLayers(LAYER_THUMBNAIL);
+					showThumb();
 				}
 				SDL_UnlockMutex(thumbMutex);
 
@@ -260,11 +305,8 @@ int main (int argc, char *argv[]) {
 			if(list_layout_drawn && thumbchanged) {
 				GFX_clearLayers(LAYER_THUMBNAIL);
 				thumbchanged = 0;
-			} else if(thumbbmp && thumbchanged) {
-				drawThumb();
-				thumbchanged = 0;
 			} else if(thumbchanged) {
-				GFX_clearLayers(LAYER_THUMBNAIL);
+				showThumb();
 				thumbchanged = 0;
 			}
 			SDL_UnlockMutex(thumbMutex);
@@ -386,6 +428,7 @@ int main (int argc, char *argv[]) {
 	if (folderbgbmp) SDL_FreeSurface(folderbgbmp);
 	Background_quit();
 	ArtLoader_quit(); // thumbbmp is the art cache's
+	if (swap_copy) SDL_FreeSurface(swap_copy);
 
 	QuitSettings();
 }

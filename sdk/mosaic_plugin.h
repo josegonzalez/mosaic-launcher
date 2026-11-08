@@ -806,6 +806,27 @@ typedef struct MosaicHost {
 	// Check for it with MOSAIC_HOST_HAS(host, surface_write).
 	int (*surface_write)(const char* plugin_id, MosaicSurface* surface, const MosaicRect* rect, const void* pixels,
 		int pitch);
+
+	// Shows surface, one the plugin made and still owns, in place of the
+	// selected entry's thumbnail on the built-in list: sized and placed as
+	// a thumbnail of its size would be, with the thumbnail's rounded
+	// corners, and with art decorators under it. The launcher doesn't take
+	// it: the plugin can keep drawing into it or writing into it with
+	// surface_write, and calls art_replace again with the same surface to
+	// show what it has now, which redraws only the thumbnail, not the list.
+	// Never call request_redraw for each frame: it redraws the whole list.
+	// NULL takes the plugin's surface away again. It goes away by itself
+	// when the selection moves, the game list is left, the surface is
+	// freed or no longer the plugin's, or the plugin quits; after that the
+	// next call shows it afresh, for whatever is selected then. Only one
+	// plugin's surface shows at a time: the first keeps the place until it
+	// goes. Returns 0, also for NULL, or -1 for a NULL id, a surface the
+	// plugin didn't make or no longer owns, another plugin's surface
+	// showing, from init or a hook that only draws, or when the built-in
+	// list shows no thumbnail there: off the game list, in an empty folder,
+	// with Show game art off or under a plugin layout. Main thread only.
+	// Check for it with MOSAIC_HOST_HAS(host, art_replace).
+	int (*art_replace)(const char* plugin_id, MosaicSurface* surface);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
