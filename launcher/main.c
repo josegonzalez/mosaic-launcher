@@ -98,6 +98,8 @@ int main (int argc, char *argv[]) {
 		now = SDL_GetTicks();
 
 		PAD_poll();
+		// before anything reads the pad, on every screen
+		Plugins_inputFilter(now);
 
 		// a plugin changed something on the card (host->reload_lists)
 		if (state.reload) {

@@ -62,11 +62,23 @@ enum MosaicButton {
 	MOSAIC_BUTTON_R2,
 	MOSAIC_BUTTON_START,
 	MOSAIC_BUTTON_SELECT,
-	// The d-pad, which only layout_input sees; bindings can't take it.
+	// The d-pad, which only layout_input and input_filter see; bindings
+	// can't take it.
 	MOSAIC_BUTTON_UP,
 	MOSAIC_BUTTON_DOWN,
 	MOSAIC_BUTTON_LEFT,
 	MOSAIC_BUTTON_RIGHT,
+	// Added with input_filter, which is the only hook that sees them;
+	// bindings, overrides and layout_input can't take them. MENU and the
+	// power button are the launcher's: the quick menu, brightness and sleep.
+	// FN1 to FN3 are the buttons stock's Settings lets the user assign (L3
+	// and R3 on the Brick, L4, R4 and HOME on the Brick Pro, HOME on the
+	// tg5050); a device without one never presses it.
+	MOSAIC_BUTTON_MENU,
+	MOSAIC_BUTTON_POWER,
+	MOSAIC_BUTTON_FN1,
+	MOSAIC_BUTTON_FN2,
+	MOSAIC_BUTTON_FN3,
 };
 
 // A button's bit in a MosaicInput mask.
@@ -236,7 +248,8 @@ typedef struct MosaicRow {
 #define MOSAIC_ROW_HAS(row, field) \
 	((row)->size >= offsetof(MosaicRow, field) + sizeof((row)->field))
 
-// Buttons on the game list this frame, as masks of MOSAIC_BUTTON_BIT.
+// Buttons this frame, as masks of MOSAIC_BUTTON_BIT, for layout_input and
+// input_filter.
 typedef struct MosaicInput {
 	size_t size;           // sizeof(MosaicInput) in the launcher
 	unsigned int pressed;  // went down this frame
@@ -716,6 +729,16 @@ typedef struct MosaicHost {
 	// art outside view->area. Check for it, and for the decorate_art hook,
 	// with MOSAIC_HOST_HAS(host, decorate_art).
 	int (*decorate_art)(MosaicSurface* screen, int index, const MosaicRect* art);
+
+	// The hold switch: the switch on the side of the tg5040 and tg5050,
+	// which stock's keymon reads and keeps as msettings' mute state, the one
+	// stock's Mute settings act on. Returns 1 or 0 for its position, as that
+	// mute state has it (1 is muted), or -1 on a device without one, such as
+	// the h700 and desktop. keymon looks at the switch five times a second,
+	// so a change can take a fifth of a second to show. It's cheap enough to
+	// ask every frame. Check for it, and for input_filter and the MENU,
+	// POWER and FN buttons, with MOSAIC_HOST_HAS(host, hold_switch).
+	int (*hold_switch)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -974,6 +997,27 @@ typedef struct MosaicPlugin {
 	// launcher logs it and stops calling this plugin's decorate_art until it
 	// restarts.
 	int (*decorate_art)(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRect* art, const MosaicRect* below);
+
+	// Input filters, such as an input lock. Every plugin's input_filter
+	// runs, in load order, each frame on every screen (the game list, the
+	// game switcher, the quick menu and dialogs), right after the launcher
+	// reads the pad and before tick, power, the FN buttons and the screen's
+	// own input, a layout's layout_input included. input has every button
+	// in enum MosaicButton, MENU, the power button and the FN buttons too,
+	// less what filters before it took. It sets *consumed (0 on entry) to
+	// the buttons to take, as MOSAIC_BUTTON_BIT masks, which are taken off
+	// pressed, repeated and released for the rest of the frame; held stays
+	// as the pad has it. A taken power press doesn't sleep, but held for a
+	// second it still powers off, as with stock, whatever filters take. Take
+	// the power button on its press: once a press has got through, its
+	// release does too. The volume keys, and MENU with them for brightness,
+	// are stock's keymon's, which changes them outside the launcher, so no
+	// filter can stop those. The Launcher pak's settings screen loads no
+	// plugins. Return 0, or anything else for an error, after which the
+	// launcher logs it, takes nothing for that call and stops calling this
+	// plugin's input_filter until it restarts. Check for it with
+	// MOSAIC_HOST_HAS(host, hold_switch); an older launcher never calls it.
+	int (*input_filter)(const MosaicInput* input, unsigned int* consumed);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

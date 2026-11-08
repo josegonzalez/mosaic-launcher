@@ -29,7 +29,8 @@ MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	pluginset.c plugins.c toast.c awake.c power.c powerwatch.c pakhooks.c kbmodel.c modal.c \
 	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
-	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c
+	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
+	inputmodel.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.

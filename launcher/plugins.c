@@ -13,6 +13,7 @@
 #include "infomodel.h"
 #include "transmodel.h"
 #include "playhistory.h"
+#include "inputmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -38,6 +39,7 @@ typedef struct LoadedPlugin {
 	int owns_background; // claims the background slot, so its background_render is called
 	int art_off;         // its art_surface returned a surface it didn't make, so it's no longer asked
 	int art_deco_off;    // its decorate_art failed, so it's no longer called
+	int filter_off;      // its input_filter failed, so it's no longer called
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -449,6 +451,15 @@ static int hostRenameQuickTile(const char* name, const char* label) {
 // on charge and LEDs that aren't there.
 #define HAS_BATTERY (strcmp(PLATFORM, "desktop") != 0)
 
+// The tg5040's and tg5050's switch, which stock's keymon mirrors into
+// msettings' mute state; the h700 and desktop have none.
+#define HAS_HOLD_SWITCH (!strcmp(PLATFORM, "tg5040") || !strcmp(PLATFORM, "tg5050"))
+
+static int hostHoldSwitch(void) {
+	if (!HAS_HOLD_SWITCH || !InitializedSettings()) return -1;
+	return GetMute() ? 1 : 0;
+}
+
 static int hostBatteryLevel(void) {
 	return HAS_BATTERY ? PWR_getBattery() : -1;
 }
@@ -679,6 +690,7 @@ static const MosaicHost host = {
 	.play_count = PlayHistory_count,
 	.play_time_today = PlayHistory_today,
 	.decorate_art = hostDecorateArt,
+	.hold_switch = hostHoldSwitch,
 };
 
 ///////////////////////////////////////
@@ -1402,9 +1414,61 @@ void Plugins_layoutInput(const MosaicListView* view) {
 	// the game list never sees what the layout handled; what's held stays
 	// held, so the next frame's presses and releases are as the pad has them
 	int taken = LayoutInput_padBits(layoutButtons, LAYOUT_BUTTONS, consumed);
-	pad.just_pressed &= ~taken;
-	pad.just_repeated &= ~taken;
-	pad.just_released &= ~taken;
+	InputMask_take(&pad.just_pressed, &pad.just_repeated, &pad.just_released, taken);
+}
+
+///////////////////////////////////////
+// input filters
+
+static PowerHold power_hold;
+
+static int filters(int i) {
+	const MosaicPlugin* p = loaded[i].plugin;
+	return !loaded[i].filter_off && Plugin_has(p, input_filter) && p->input_filter;
+}
+
+// Every button a filter sees: a layout's, and MENU, power and the FN
+// buttons, which on some devices are only known at run time.
+static int filterButtons(LayoutButton* out) {
+	int n = 0;
+	for (int i = 0; i < LAYOUT_BUTTONS; i++) out[n++] = layoutButtons[i];
+	out[n++] = (LayoutButton){ MOSAIC_BUTTON_MENU, BTN_MENU };
+	out[n++] = (LayoutButton){ MOSAIC_BUTTON_POWER, BTN_POWER };
+	out[n++] = (LayoutButton){ MOSAIC_BUTTON_FN1, BTN_FN1 };
+	out[n++] = (LayoutButton){ MOSAIC_BUTTON_FN2, BTN_FN2 };
+	out[n++] = (LayoutButton){ MOSAIC_BUTTON_FN3, BTN_FN3 };
+	return n;
+}
+
+void Plugins_inputFilter(unsigned long now) {
+	int any = 0;
+	for (int i = 0; i < loaded_count && !any; i++) any = filters(i);
+	// a press taken before a filter failed is still timed
+	if (!any && !power_hold.taken_at) return;
+	LayoutButton map[LAYOUT_BUTTONS + 5];
+	int count = filterButtons(map);
+	int pressed = pad.just_pressed, repeated = pad.just_repeated, released = pad.just_released;
+	int taken = 0;
+	for (int i = 0; i < loaded_count; i++) {
+		if (!filters(i)) continue;
+		MosaicInput input;
+		LayoutInput_fill(&input, map, count, pressed & ~taken, repeated & ~taken, released & ~taken, pad.is_pressed);
+		unsigned int consumed = 0;
+		int rc = loaded[i].plugin->input_filter(&input, &consumed);
+		if (rc != 0) {
+			loaded[i].filter_off = 1;
+			LOG_warn("plugins: %s's input_filter returned %i, no longer filtering input with it until the launcher restarts\n",
+				loaded[i].id, rc);
+			continue;
+		}
+		taken |= LayoutInput_padBits(map, count, consumed);
+	}
+	if (PowerHold_step(&power_hold, now, BTN_POWER, pressed, released, pad.is_pressed, &taken)) {
+		// stock's own power-off button, which PWR_update powers off for
+		LOG_info("plugins: power held through an input filter, powering off\n");
+		pad.just_released |= BTN_POWEROFF;
+	}
+	InputMask_take(&pad.just_pressed, &pad.just_repeated, &pad.just_released, taken);
 }
 
 int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view, ListSelection* selected) {

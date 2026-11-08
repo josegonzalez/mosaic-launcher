@@ -185,6 +185,11 @@ int Plugins_transitionFrame(struct SDL_Surface* surface, float progress);
 // Takes the frames back.
 void Plugins_transitionEnd(void);
 
+// Plugins' input_filter, in load order, right after the pad is read: the
+// buttons they consumed are taken off its presses, repeats and releases for
+// the rest of the frame, and a power press they took still powers off when
+// held as long as stock's. Does nothing without filters.
+void Plugins_inputFilter(unsigned long now);
 void Plugins_tick(unsigned long now);
 
 // Runs plugins' selection_changed once the game list's selection settles
