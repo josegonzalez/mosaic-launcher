@@ -4,7 +4,8 @@
 // The parts of the layout slot that don't need SDL or the loader: whether
 // the owner's layout is still in use, the buttons it sees and consumes, and
 // where on the screen it draws. plugins.c calls the layout; screen_gamelist.c
-// builds its view. Also where row decorators and header widgets draw.
+// builds its view. Also where row decorators and header widgets draw, and
+// the background slot.
 
 #include "mosaic_plugin.h"
 
@@ -35,6 +36,42 @@ int LayoutSlot_result(LayoutSlot* slot, int rc);
 
 // Drops the owner, eg. after its quit.
 void LayoutSlot_clear(LayoutSlot* slot);
+
+// The background slot: its owner draws what's behind the game list, over
+// stock's background, and the result goes on the background layer in
+// place of stock's.
+typedef struct BackgroundSlot {
+	int owner;      // the loaded plugin's index, or -1
+	int off;        // its background_render failed: stock's until the launcher restarts
+	int drawn;      // what it last drew is the one to show
+	unsigned built; // the stock background that was under it
+} BackgroundSlot;
+
+// What goes on the background layer.
+enum BackgroundShow {
+	BACKGROUND_STOCK,  // stock's
+	BACKGROUND_PLUGIN, // the owner's
+	BACKGROUND_REDRAW, // the owner's, but stock's changed under it: draw the game list again
+};
+
+void BackgroundSlot_claim(BackgroundSlot* slot, int owner);
+void BackgroundSlot_clear(BackgroundSlot* slot);
+
+// 1 while the owner is asked to draw.
+int BackgroundSlot_active(const BackgroundSlot* slot);
+
+// What background_render returned, drawn over stock's background number
+// serial: 0 shows it, anything else turns the owner off. Returns 1 while
+// it's on.
+int BackgroundSlot_result(BackgroundSlot* slot, int rc, unsigned serial);
+
+// The owner wasn't asked this time, eg. no surface to lend: stock's shows.
+void BackgroundSlot_skip(BackgroundSlot* slot);
+
+// What to show: stock's off the game list, without an owner or until it
+// has drawn, else the owner's, or BACKGROUND_REDRAW once stock's
+// background is no longer serial.
+int BackgroundSlot_show(const BackgroundSlot* slot, int on_gamelist, unsigned serial);
 
 // One button: its MOSAIC_BUTTON_* and the pad's own bit for it.
 typedef struct LayoutButton {

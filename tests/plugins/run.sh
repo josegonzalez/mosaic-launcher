@@ -10,8 +10,9 @@
 # draws, one that draws the game list as a grid, two that decorate rows and
 # add header widgets, two that supply art and load it through the art
 # cache, one that hears about the selection, one that reads .info
-# sidecars, one that picks transition styles, and one that crashes during
-# startup. It also checks the status pill shell paks' status files show.
+# sidecars, one that picks transition styles, one that generates art, one
+# that draws the background, and one that crashes during startup. It also
+# checks the status pill shell paks' status files show.
 #
 # Each case waits up to PLUGIN_TEST_SECONDS (10 by default) for the log
 # lines it checks, and stops as soon as they're in, so a slow machine only
@@ -1007,6 +1008,92 @@ if [ -f "$WORK/last.txt.saved" ]; then cp "$WORK/last.txt.saved" /tmp/last.txt; 
 rm -f "$WORK/recent.txt.saved" "$WORK/next.saved" "$WORK/last.txt.saved"
 rm -rf "$WORK/plugins/slider.plugin" "$WORK/slider" "$STATE/slider.cfg" "$STATE/plugins.txt"
 grep -q "plugin slider:\|transition styles\|launch style" "$WORK/hello.log" && fail "transitions were asked about with no plugin taking them"
+
+# painter generates art with art_surface: art_get hands it out read-only,
+# off the plugin's budget, asked for once; a real file wins and art_find
+# reports files only (writing where stock would look); the built-in list shows a generated thumbnail for a
+# game with no art file, seen in the push's old frame; and art_surface
+# can't ask for generated art or move the selection
+PAINT_DIR="$WORK/paint"
+mkdir -p "$PAINT_DIR" "$STATE"
+cp "$ROOT/tests/plugins/drawer/art.png" "$PAINT_DIR/Real-thumb.png"
+printf 'dir=%s\n' "$PAINT_DIR" >"$STATE/painter.cfg"
+printf 'painter=on\n' >"$STATE/plugins.txt"
+build_plugin painter 'id=painter\nname=Painter\napi=1\nslots=transition\n'
+run_launcher "$WORK/painter.log" "plugin painter: done" || fail "the launcher exited early with painter loaded"
+log="$WORK/painter.log"
+plugin=painter
+expect "open folder 1"
+expect "asked Blank 0"
+expect "inside get -1 select -1"
+expect "blank box 1 1 same 1, 64x64 FF00FF"
+expect "blank box read-only: fill -1, free -1"
+expect "blank thumbnail 1 00FF00"
+expect "blank find 0 \"$CARD/Painter/.media/Blank.png\""
+expect "shy box -1 -1"
+expect "budget 1"
+expect "real thumbnail 1 FF0000"
+expect "asks 3"
+expect "open next 1"
+expect "push to next old thumbnail green 1"
+[ "$(grep -cE "plugin painter: asked (Blank|Real|Shy) " "$log")" -eq 3 ] || fail "painter was asked more than once for the same art: $(grep "plugin painter: asked" "$log" | tr '\n' ',')"
+grep -qF "plugin painter: asked Real" "$log" && fail "painter was asked for art Real has a file for"
+grep -qF "plugins: painter's art_surface" "$log" && fail "painter's art_surface was turned off"
+
+# handing over the same surface twice is an error: it's not asked again
+printf 'dir=%s\nmode=again\n' "$PAINT_DIR" >"$STATE/painter.cfg"
+run_launcher "$WORK/painter-again.log" "plugin painter: done" || fail "the launcher exited early with painter's error"
+log="$WORK/painter-again.log"
+grep -qF "plugins: painter's art_surface returned a surface it didn't make, no longer asking it for art until the launcher restarts" "$log" \
+	|| fail "painter's error wasn't logged"
+expect "blank box -1 -1 same 0"
+expect "shy box -1 -1"
+expect "asks 2"
+rm -rf "$WORK/plugins/painter.plugin" "$PAINT_DIR" "$STATE/painter.cfg" "$STATE/plugins.txt"
+grep -qF "plugin painter:" "$WORK/hello.log" && fail "art was generated with no plugin making it"
+
+# backer owns the background slot: its background_render gets a lent
+# screen-sized surface over stock's background, which it draws over, with
+# NULL in an empty folder, and both pushes start from frames with its
+# background on them, the new one this frame's
+BACK_BG="$WORK/back.png"
+cp "$ROOT/tests/plugins/drawer/art.png" "$BACK_BG"
+printf 'bg=%s\n' "$BACK_BG" >"$STATE/backer.cfg"
+printf 'backer=on\n' >"$STATE/plugins.txt"
+build_plugin backer 'id=backer\nname=Backer\napi=1\nslots=background,transition\n'
+run_launcher "$WORK/backer.log" "plugin backer: done at" || fail "the launcher exited early with backer loaded"
+log="$WORK/backer.log"
+plugin=backer
+grep -qF "plugins: backer draws the background" "$log" || fail "backer didn't take the background slot"
+grep -qE "plugin backer: render size ([0-9]+)x([0-9]+) of \1x\2, select -1, free -1$" "$log" \
+	|| fail "backer's lent surface is wrong: $(grep "plugin backer: render size" "$log")"
+# stock's background, Empty's from art_path, red on the left, under it once it has loaded
+expect "render Empty under FF0000FF"
+# the first push's old frame is from the startup fade, so only its new one
+grep -qE "plugin backer: push to backer old [0-9A-F]{8} new 00FF00FF" "$log" || fail "the first push's new frame has no background from backer"
+expect "push to empty old 00FF00FF new FFFF00FF left FF0000FF"
+expect "render (none) under FF0000FF"
+expect "done at $CARD/Backer/Empty"
+grep -qF "stock's background until" "$log" && fail "backer's background was turned off"
+
+# an error turns it off for the run: stock's background, blue on the right, in the new frame
+printf 'bg=%s\nfail=empty\n' "$BACK_BG" >"$STATE/backer.cfg"
+run_launcher "$WORK/backer-fail.log" "plugin backer: done at" || fail "the launcher exited early with backer's error"
+log="$WORK/backer-fail.log"
+grep -qF "plugins: backer's background_render returned -1, using stock's background until the launcher restarts" "$log" \
+	|| fail "backer's error wasn't logged"
+[ "$(grep -c "plugin backer: render failing" "$log")" -eq 1 ] || fail "backer was asked again after its error"
+expect "push to empty old 00FF00FF new 0000FFFF"
+
+# without the slot it's never called
+rm -f "$STATE/backer.cfg"
+printf 'id=backer\nname=Backer\napi=1\nslots=transition\n' >"$WORK/plugins/backer.plugin/plugin.txt"
+run_launcher "$WORK/backer-unslotted.log" "plugin backer: done at" || fail "the launcher exited early with backer unslotted"
+log="$WORK/backer-unslotted.log"
+grep -qF "plugins: backer has background_render but no slots=background, so it won't be called" "$log" || fail "the missing background slot wasn't reported"
+grep -qF "plugin backer: render" "$log" && fail "backer drew without the slot"
+rm -rf "$WORK/plugins/backer.plugin" "$BACK_BG" "$STATE/plugins.txt"
+grep -qF "draws the background" "$WORK/hello.log" && fail "a background was drawn with no plugin taking the slot"
 
 # /tmp/stay_awake holds off auto-sleep
 touch /tmp/stay_awake

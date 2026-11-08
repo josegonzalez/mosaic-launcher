@@ -133,3 +133,42 @@ int HeaderRow_topRowWidth(int available, int screen_w, int padding, int margin, 
 	if (clear < 0) clear = 0;
 	return available < clear ? available : clear;
 }
+
+///////////////////////////////////////
+// the background slot
+
+void BackgroundSlot_claim(BackgroundSlot* slot, int owner) {
+	slot->owner = owner;
+	slot->off = 0;
+	slot->drawn = 0;
+	slot->built = 0;
+}
+
+void BackgroundSlot_clear(BackgroundSlot* slot) {
+	BackgroundSlot_claim(slot, -1);
+}
+
+int BackgroundSlot_active(const BackgroundSlot* slot) {
+	return slot->owner >= 0 && !slot->off;
+}
+
+int BackgroundSlot_result(BackgroundSlot* slot, int rc, unsigned serial) {
+	if (!BackgroundSlot_active(slot)) return 0;
+	if (rc != 0) {
+		slot->off = 1;
+		slot->drawn = 0;
+		return 0;
+	}
+	slot->drawn = 1;
+	slot->built = serial;
+	return 1;
+}
+
+void BackgroundSlot_skip(BackgroundSlot* slot) {
+	slot->drawn = 0;
+}
+
+int BackgroundSlot_show(const BackgroundSlot* slot, int on_gamelist, unsigned serial) {
+	if (!on_gamelist || !BackgroundSlot_active(slot) || !slot->drawn) return BACKGROUND_STOCK;
+	return slot->built == serial ? BACKGROUND_PLUGIN : BACKGROUND_REDRAW;
+}

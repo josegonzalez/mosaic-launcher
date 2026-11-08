@@ -7,6 +7,7 @@
 #include "leds.h"
 #include "bluetooth.h"
 #include "plugindraw.h"
+#include "drawmodel.h"
 #include "layoutmodel.h"
 #include "selmodel.h"
 #include "infomodel.h"
@@ -33,6 +34,8 @@ typedef struct LoadedPlugin {
 	int rows_off;    // its decorate_row failed, so it's no longer called
 	int header_off;  // its header_width or header_widget failed, so its widget is left out
 	int selection_off; // its selection_changed failed, so it's no longer called
+	int owns_background; // claims the background slot, so its background_render is called
+	int art_off;         // its art_surface returned a surface it didn't make, so it's no longer asked
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -48,6 +51,9 @@ static int selecting = 0;  // while a selection_changed runs, which can't move t
 static TransitionSlots transitions = { -1, -1, 0, 0 };
 static int transition_owner = -1; // the plugin whose transition is running
 static MosaicTransition transition; // and the transition
+static BackgroundSlot background = { -1, 0, 0, 0 };
+static int backgrounding = 0; // while background_render runs, which only draws
+static int generating = 0;    // while an art_surface runs, which only draws
 
 #define SCREEN_COUNT 3
 
@@ -394,7 +400,7 @@ static int hostSelectedIndex(void) {
 	return state.top->selected;
 }
 static int hostSelectIndex(int index) {
-	if (layout_rendering || decorating || selecting || transition_owner >= 0 || !state.top || index < 0 || index >= state.top->entries->count) return -1;
+	if (layout_rendering || decorating || selecting || backgrounding || generating || transition_owner >= 0 || !state.top || index < 0 || index >= state.top->entries->count) return -1;
 	Directory_select(state.top, index);
 	// main's copy for this frame, so the game list's input doesn't put it back
 	selected = index;
@@ -658,6 +664,7 @@ static const MosaicHost host = {
 	.entry_info = hostEntryInfo,
 	.blit_alpha = PluginDraw_blitAlpha,
 	.transition_max_ms = TRANSITION_MAX_MS,
+	.plugin_art = 1,
 };
 
 ///////////////////////////////////////
@@ -712,6 +719,10 @@ static void load(const PluginManifest* m) {
 		|| (Plugin_has(plugin, transition_frame) && plugin->transition_frame);
 	if (!p->owns_transition && !p->owns_launch && has_transitions) {
 		LOG_warn("plugins: %s has transitions but no slots=" TRANSITION_SLOT " or slots=" LAUNCH_SLOT ", so they won't be called\n", m->id);
+	}
+	p->owns_background = csvHas(m->slots, BACKGROUND_SLOT);
+	if (!p->owns_background && Plugin_has(plugin, background_render) && plugin->background_render) {
+		LOG_warn("plugins: %s has background_render but no slots=" BACKGROUND_SLOT ", so it won't be called\n", m->id);
 	}
 	int has_width = Plugin_has(plugin, header_width) && plugin->header_width;
 	int has_widget = Plugin_has(plugin, header_widget) && plugin->header_widget;
@@ -804,6 +815,21 @@ static void claimTransitions(void) {
 	}
 }
 
+// The background slot's owner, once every plugin has loaded.
+static void claimBackground(void) {
+	BackgroundSlot_clear(&background);
+	for (int i = 0; i < loaded_count; i++) {
+		if (!loaded[i].owns_background) continue;
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (Plugin_has(p, background_render) && p->background_render) {
+			BackgroundSlot_claim(&background, i);
+			LOG_info("plugins: %s draws the background\n", loaded[i].id);
+		}
+		else LOG_warn("plugins: %s owns the " BACKGROUND_SLOT " slot but has no background_render, using stock's\n", loaded[i].id);
+		return;
+	}
+}
+
 void Plugins_init(void) {
 	if (exists(PAUSED_MARKER)) {
 		LOG_warn("plugins: paused after a crash; turn them back on from the Launcher pak\n");
@@ -839,6 +865,7 @@ void Plugins_init(void) {
 	logOverridden();
 	claimLayout();
 	claimTransitions();
+	claimBackground();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
@@ -856,6 +883,7 @@ void Plugins_started(void) {
 void Plugins_quit(void) {
 	LayoutSlot_clear(&layout);
 	TransitionSlots_clear(&transitions);
+	BackgroundSlot_clear(&background);
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) p->plugin->quit();
@@ -1212,24 +1240,59 @@ const LaunchCmd* Plugins_launchReplacement(void) {
 	return replacer >= 0 ? &replacement : NULL;
 }
 
-int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
-	int mosaic_kind;
+// The MOSAIC_ART_* kind for an art.h kind, or -1 for one plugins don't see.
+static int mosaicKind(int kind) {
 	switch (kind) {
-		case ART_THUMBNAIL: mosaic_kind = MOSAIC_ART_THUMBNAIL; break;
-		case ART_FOLDER_BG: mosaic_kind = MOSAIC_ART_FOLDER_BG; break;
-		case ART_LIST_BG: mosaic_kind = MOSAIC_ART_LIST_BG; break;
-		case ART_BOX: mosaic_kind = MOSAIC_ART_BOX; break;
-		case ART_BOX_3D: mosaic_kind = MOSAIC_ART_BOX_3D; break;
-		case ART_LOGO: mosaic_kind = MOSAIC_ART_LOGO; break;
-		case ART_SCREENSHOT: mosaic_kind = MOSAIC_ART_SCREENSHOT; break;
-		case ART_BACKDROP: mosaic_kind = MOSAIC_ART_BACKDROP; break;
-		default: return 0;
+		case ART_THUMBNAIL: return MOSAIC_ART_THUMBNAIL;
+		case ART_FOLDER_BG: return MOSAIC_ART_FOLDER_BG;
+		case ART_LIST_BG: return MOSAIC_ART_LIST_BG;
+		case ART_BOX: return MOSAIC_ART_BOX;
+		case ART_BOX_3D: return MOSAIC_ART_BOX_3D;
+		case ART_LOGO: return MOSAIC_ART_LOGO;
+		case ART_SCREENSHOT: return MOSAIC_ART_SCREENSHOT;
+		case ART_BACKDROP: return MOSAIC_ART_BACKDROP;
+		default: return -1;
 	}
+}
+
+int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
+	int mosaic_kind = mosaicKind(kind);
+	if (mosaic_kind < 0) return 0;
 	EACH_PLUGIN_WITH(art_path) {
 		out[0] = '\0';
 		if (p->art_path((const MosaicEntry*)entry, mosaic_kind, out, size) && out[0]) return 1;
 	}
 	return 0;
+}
+
+static int generates(int i) {
+	const MosaicPlugin* p = loaded[i].plugin;
+	return !loaded[i].art_off && Plugin_has(p, art_surface) && p->art_surface;
+}
+
+int Plugins_hasArtSurface(void) {
+	for (int i = 0; i < loaded_count; i++) {
+		if (generates(i)) return 1;
+	}
+	return 0;
+}
+
+SDL_Surface* Plugins_artSurface(const Entry* entry, int kind) {
+	int mosaic_kind = mosaicKind(kind);
+	if (!entry || mosaic_kind < 0 || generating) return NULL;
+	for (int i = 0; i < loaded_count; i++) {
+		if (!generates(i)) continue;
+		generating = 1;
+		MosaicSurface* made = loaded[i].plugin->art_surface((const MosaicEntry*)entry, mosaic_kind);
+		generating = 0;
+		if (!made) continue;
+		// the launcher's from now on, so the plugin can't draw on it or free it
+		if (DrawReg_give(made, loaded[i].id) == 0) return (SDL_Surface*)made;
+		loaded[i].art_off = 1;
+		LOG_warn("plugins: %s's art_surface returned a surface it didn't make, no longer asking it for art until the launcher restarts\n",
+			loaded[i].id);
+	}
+	return NULL;
 }
 
 int Plugins_repairPath(const char* missing, char* out, size_t size) {
@@ -1419,6 +1482,39 @@ void Plugins_transitionEnd(void) {
 	PluginDraw_unlend((MosaicSurface*)transition.new_frame);
 	memset(&transition, 0, sizeof(transition));
 	transition_owner = -1;
+}
+
+///////////////////////////////////////
+// the background slot
+
+int Plugins_hasBackground(void) {
+	return BackgroundSlot_active(&background);
+}
+
+int Plugins_backgroundRender(SDL_Surface* surface, const Entry* selected, unsigned serial) {
+	if (!BackgroundSlot_active(&background)) return 0;
+	MosaicSurface* lent = PluginDraw_lend(surface, NULL);
+	if (!lent) {
+		LOG_warn("plugins: the background is already lent, so %s can't draw it this frame\n", loaded[background.owner].id);
+		BackgroundSlot_skip(&background);
+		return 0;
+	}
+	backgrounding = 1;
+	int rc = loaded[background.owner].plugin->background_render(lent, (const MosaicEntry*)selected);
+	backgrounding = 0;
+	PluginDraw_unlend(lent);
+	if (BackgroundSlot_result(&background, rc, serial)) return 1;
+	LOG_warn("plugins: %s's background_render returned %i, using stock's background until the launcher restarts\n",
+		loaded[background.owner].id, rc);
+	return 0;
+}
+
+void Plugins_backgroundSkip(void) {
+	BackgroundSlot_skip(&background);
+}
+
+int Plugins_backgroundShow(int on_gamelist, unsigned serial) {
+	return BackgroundSlot_show(&background, on_gamelist, serial);
 }
 
 ///////////////////////////////////////

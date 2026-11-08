@@ -9,6 +9,7 @@ static ArtNames names;
 static int started = 0;
 static int busy = 0;    // the worker has a load
 static int finding = 0; // in art_find, so plugins' art_path hooks can't ask again
+static int generating = 0; // in art_surface, so plugins' art_surface hooks can't ask again
 
 // the built-in list's thumbnail: the one it wants, and the one in thumbbmp
 static char thumb_wanted[ART_CACHE_PATH] = "";
@@ -125,13 +126,10 @@ void ArtLoader_quit(void) {
 ///////////////////////////////////////
 // decoding, on the worker
 
-// As stock's thumbnail worker loads it, with the rounded corners it gives it.
-static SDL_Surface* decodeThumb(const char* path) {
-	if (access(path, F_OK) != 0) return NULL;
-	SDL_Surface* image = IMG_Load(path);
-	if (!image) return NULL;
+// A copy of image as stock's thumbnail worker makes one, with the rounded
+// corners it gives it, or NULL.
+static SDL_Surface* thumbOf(SDL_Surface* image) {
 	SDL_Surface* thumb = SDL_ConvertSurfaceFormat(image, screen->format->format, 0);
-	SDL_FreeSurface(image);
 	if (!thumb) return NULL;
 
 	int img_w = thumb->w;
@@ -150,6 +148,16 @@ static SDL_Surface* decodeThumb(const char* path) {
 		&(SDL_Rect){0, 0, thumb->w, thumb->h},
 		SCALE1((float)CFG_getThumbnailRadius() * ((float)img_w / (float)new_w))
 	);
+	return thumb;
+}
+
+// As stock's thumbnail worker loads it.
+static SDL_Surface* decodeThumb(const char* path) {
+	if (access(path, F_OK) != 0) return NULL;
+	SDL_Surface* image = IMG_Load(path);
+	if (!image) return NULL;
+	SDL_Surface* thumb = thumbOf(image);
+	SDL_FreeSurface(image);
 	return thumb;
 }
 
@@ -225,6 +233,14 @@ static int stockKind(int kind) {
 	}
 }
 
+// The MOSAIC_ART_* kind for an art.h kind, or -1.
+static int mosaicKind(int art) {
+	for (int kind = MOSAIC_ART_THUMBNAIL; kind <= MOSAIC_ART_BACKDROP; kind++) {
+		if (stockKind(kind) == art) return kind;
+	}
+	return -1;
+}
+
 int ArtLoader_find(const Entry* entry, int kind, char* out, size_t size) {
 	if (!out || size == 0) return 0;
 	out[0] = '\0';
@@ -288,12 +304,60 @@ static void prefetchAround(int kind) {
 	}
 }
 
+// entry's kind from plugins' art_surface, made on the main thread and kept
+// in the cache under its generated key. Returns ARTC_READY with it in
+// *image, ARTC_FAILED when no plugin made one, or ARTC_NONE without
+// plugins that generate art or room to keep one.
+static int generated(const Entry* entry, int kind, void** image) {
+	*image = NULL;
+	char key[ART_CACHE_PATH];
+	if (generating || !Plugins_hasArtSurface() || !ArtCache_generatedKey(entry->path, key, sizeof(key))) return ARTC_NONE;
+	if (ArtCache_peek(&cache, key, kind, NULL) != ARTC_NONE) return ArtCache_get(&cache, key, kind, 0, image);
+	generating = 1;
+	SDL_Surface* made = Plugins_artSurface(entry, stockKind(kind));
+	generating = 0;
+	size_t bytes = made ? (size_t)made->pitch * made->h : 0;
+	if (!ArtCache_put(&cache, key, kind, made, bytes)) {
+		if (made) freeImage(made);
+		return ARTC_NONE;
+	}
+	*image = made;
+	return made ? ARTC_READY : ARTC_FAILED;
+}
+
+int ArtLoader_listGenerated(const Entry* entry, char* key, size_t size) {
+	if (!started || !entry || !key || size == 0) return 0;
+	key[0] = '\0';
+	if (!Plugins_hasArtSurface() || !ArtCache_generatedKey(entry->path, key, size)) return 0;
+	checkSelection();
+	if (ArtCache_peek(&cache, key, ART_KIND_LIST_THUMB, NULL) == ARTC_READY) return 1;
+	for (int i = 0, art; (art = Art_listKind(i)) >= 0; i++) {
+		int kind = mosaicKind(art);
+		void* image;
+		if (kind < 0 || generated(entry, kind, &image) != ARTC_READY) continue;
+		// the list's own copy, as stock's thumbnails are decoded
+		SDL_Surface* thumb = thumbOf(image);
+		if (!thumb) break;
+		if (ArtCache_put(&cache, key, ART_KIND_LIST_THUMB, thumb, (size_t)thumb->pitch * thumb->h)) return 1;
+		SDL_FreeSurface(thumb);
+		break;
+	}
+	key[0] = '\0';
+	return 0;
+}
+
 int ArtLoader_get(const Entry* entry, int kind, const MosaicSurface** out) {
 	if (out) *out = NULL;
 	if (!started || !entry || !out || stockKind(kind) < 0) return MOSAIC_ART_MISSING;
 	checkSelection();
 	char path[ART_CACHE_PATH];
-	if (!resolve(entry, kind, path, sizeof(path))) return MOSAIC_ART_MISSING;
+	if (!resolve(entry, kind, path, sizeof(path))) {
+		// no file, so a plugin's generated art, if any
+		void* image;
+		if (generated(entry, kind, &image) != ARTC_READY) return MOSAIC_ART_MISSING;
+		*out = image;
+		return MOSAIC_ART_READY;
+	}
 	int result = want(path, kind, ARTC_NOTIFY, out);
 	if (isSelected(entry) && !(prefetched & (1u << kind))) {
 		prefetched |= 1u << kind;

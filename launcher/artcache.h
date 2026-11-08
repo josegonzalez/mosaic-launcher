@@ -58,6 +58,18 @@ void ArtCache_init(ArtCache* c, size_t cap);
 // use, until ArtCache_evict makes room.
 int ArtCache_get(ArtCache* c, const char* path, int kind, int flags, void** image);
 
+// Puts in an image made on the main thread rather than loaded, such as
+// one a plugin generated, as READY and counting a use, or a failure with
+// a NULL image. Returns 1 when it's kept, or 0 for a bad argument, one
+// already there or no entry free, and the caller frees image.
+int ArtCache_put(ArtCache* c, const char* path, int kind, void* image, size_t bytes);
+
+// Generated art's key in the cache, in place of a path: subject (an
+// entry's path) after ART_GENERATED, which no file's path starts with.
+// Returns 1, or 0 when it doesn't fit in size or ART_CACHE_PATH.
+#define ART_GENERATED "generated:"
+int ArtCache_generatedKey(const char* subject, char* out, size_t size);
+
 // Its state, without asking for it or counting a use.
 int ArtCache_peek(const ArtCache* c, const char* path, int kind, void** image);
 

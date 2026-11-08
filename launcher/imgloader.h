@@ -101,6 +101,7 @@ static inline void setNeedDraw(int v) { SDL_AtomicSet(&needDrawAtomic, v); }
 static inline int getNeedDraw(void) { return SDL_AtomicGet(&needDrawAtomic); }
 
 extern int folderbgchanged;
+extern unsigned folderbgserial; // counts changes to folderbgbmp, under bgMutex
 extern int thumbchanged;
 extern int currentAnimQueueSize;
 

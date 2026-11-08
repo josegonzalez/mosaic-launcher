@@ -67,12 +67,9 @@ int Transition_launch(void) {
 }
 
 void Transition_slide(SDL_Surface* oldScreen, int direction) {
+	// the background slot's owner's too, so the new frame has it
 	SDL_LockMutex(bgMutex);
-	if(folderbgbmp) {
-		GFX_drawOnLayer(folderbgbmp, 0, 0, screen->w, screen->h, 1.0f, 0, LAYER_BACKGROUND);
-	} else {
-		GFX_clearLayers(LAYER_BACKGROUND);
-	}
+	Background_layer();
 	SDL_UnlockMutex(bgMutex);
 	folderbgchanged = 1;
 	GFX_clearLayers(LAYER_TRANSITION);

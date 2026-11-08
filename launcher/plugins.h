@@ -26,6 +26,7 @@
 #define LAYOUT_SLOT "layout" // the exclusive slot layout_init, layout_input and layout_render belong to
 #define TRANSITION_SLOT "transition" // the exclusive slot asked how folders push and pop and screens change
 #define LAUNCH_SLOT "launch" // the exclusive slot asked how a launch begins
+#define BACKGROUND_SLOT "background" // the exclusive slot background_render belongs to
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -91,6 +92,15 @@ const LaunchCmd* Plugins_launchReplacement(void);
 // 1 if a plugin answered.
 int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size);
 
+// 1 while any plugin generates art.
+int Plugins_hasArtSurface(void);
+
+// The first plugin's generated image for an entry, for a kind as
+// Plugins_artPath takes, now the launcher's (DRAW_HOST, read-only) for the
+// caller to keep and free, or NULL. One that returns a surface it didn't
+// make logs and is no longer asked. Returns NULL from inside an art_surface.
+struct SDL_Surface* Plugins_artSurface(const Entry* entry, int kind);
+
 // The first plugin's new full path for a recent whose file is missing.
 // Returns 1 if a plugin answered.
 int Plugins_repairPath(const char* missing, char* out, size_t size);
@@ -107,6 +117,23 @@ void Plugins_layoutInput(const MosaicListView* view);
 // list on. Returns 1 if it drew, or 0 to draw the built-in list: there's no
 // layout, it declined, or it failed, which logs and turns it off.
 int Plugins_layoutRender(struct SDL_Surface* surface, const MosaicListView* view);
+
+// 1 while the background slot's owner is asked to draw.
+int Plugins_hasBackground(void);
+
+// Lends surface, filled with stock's background number serial, to the
+// background slot's owner with the selected entry (NULL in an empty
+// folder). Returns 1 if it drew, or 0 for stock's: there's no owner, the
+// surface is already lent, or it failed, which logs and turns it off.
+int Plugins_backgroundRender(struct SDL_Surface* surface, const Entry* selected, unsigned serial);
+
+// The owner wasn't asked this frame, so stock's background shows.
+void Plugins_backgroundSkip(void);
+
+// What goes on the background layer, an enum BackgroundShow (see
+// layoutmodel.h), on or off the game list, with stock's background now
+// number serial.
+int Plugins_backgroundShow(int on_gamelist, unsigned serial);
 
 // 1 while any plugin decorates rows.
 int Plugins_hasDecorators(void);

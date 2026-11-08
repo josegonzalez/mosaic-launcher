@@ -302,6 +302,71 @@ static void testNames(void) {
 	CHECK(ArtNames_get(&names, "/0", 0, path, sizeof(path), &found) == 0);
 }
 
+// generated art goes straight in, under a key no file has, and out like loaded art
+static void testPut(void) {
+	ArtCache* c = &cache;
+	ArtCache_init(c, 100);
+	char key[ART_CACHE_PATH];
+	CHECK(ArtCache_generatedKey("/Roms/a.gb", key, sizeof(key)) == 1);
+	CHECK_STR(key, "generated:/Roms/a.gb");
+	char small[8];
+	CHECK(ArtCache_generatedKey("/Roms/a.gb", small, sizeof(small)) == 0);
+	CHECK(ArtCache_generatedKey("", key, sizeof(key)) == 0);
+	CHECK(ArtCache_generatedKey(NULL, key, sizeof(key)) == 0);
+	char longer[ART_CACHE_PATH];
+	memset(longer, 'x', sizeof(longer) - 1);
+	longer[sizeof(longer) - 1] = '\0';
+	char big[ART_CACHE_PATH * 2];
+	CHECK(ArtCache_generatedKey(longer, big, sizeof(big)) == 0);
+
+	CHECK(ArtCache_generatedKey("/Roms/a.gb", key, sizeof(key)) == 1);
+	CHECK(ArtCache_put(c, key, 3, &images[0], 60) == 1);
+	CHECK(c->bytes == 60);
+	void* got;
+	CHECK(ArtCache_peek(c, key, 3, &got) == ARTC_READY);
+	CHECK(got == &images[0]);
+	CHECK(ArtCache_get(c, key, 3, 0, &got) == ARTC_READY);
+	CHECK(got == &images[0]);
+	// once only, and never handed to the worker
+	CHECK(ArtCache_put(c, key, 3, &images[1], 60) == 0);
+	char path[ART_CACHE_PATH];
+	int kind;
+	CHECK(ArtCache_next(c, path, sizeof(path), &kind) == 0);
+	// the same key as another kind is another image
+	CHECK(ArtCache_put(c, key, 4, NULL, 60) == 1);
+	CHECK(ArtCache_peek(c, key, 4, &got) == ARTC_FAILED);
+	CHECK(c->bytes == 60);
+	CHECK(ArtCache_put(c, "", 3, &images[1], 1) == 0);
+	CHECK(ArtCache_put(NULL, key, 5, &images[1], 1) == 0);
+
+	// the selection moving doesn't drop it, the cap does
+	ArtCache_mark(c);
+	CHECK(ArtCache_peek(c, key, 3, NULL) == ARTC_READY);
+	CHECK(ArtCache_generatedKey("/Roms/b.gb", key, sizeof(key)) == 1);
+	CHECK(ArtCache_put(c, key, 3, &images[2], 60) == 1);
+	CHECK(c->bytes == 120);
+	void* out[4];
+	CHECK(ArtCache_evict(c, out, 4) == 1);
+	CHECK(out[0] == &images[0]);
+	CHECK(c->bytes == 60);
+	// and a pinned one stays
+	CHECK(ArtCache_pin(c, key, 3) == 0);
+	c->cap = 0;
+	CHECK(ArtCache_evict(c, out, 4) == 0);
+	CHECK(ArtCache_unpin(c, key, 3) == 0);
+	CHECK(ArtCache_clear(c, 1, out, 4) == 1);
+	CHECK(out[0] == &images[2]);
+
+	// no entry free
+	ArtCache_init(c, 1000);
+	for (int i = 0; i < ART_CACHE_ENTRIES; i++) {
+		char name[32];
+		snprintf(name, sizeof(name), "generated:/%i", i);
+		CHECK(ArtCache_put(c, name, 0, NULL, 0) == 1);
+	}
+	CHECK(ArtCache_put(c, "generated:/full", 0, &images[3], 1) == 0);
+}
+
 int main(void) {
 	testKeys();
 	testOrder();
@@ -310,5 +375,6 @@ int main(void) {
 	testFull();
 	testClear();
 	testNames();
+	testPut();
 	CHECK_DONE();
 }

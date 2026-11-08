@@ -87,6 +87,15 @@ int DrawReg_remove(const void* surface, const char* owner) {
 	return 0;
 }
 
+int DrawReg_give(const void* surface, const char* from) {
+	int i = surface && from ? find(surface) : -1;
+	if (i < 0 || !strcmp(from, DRAW_HOST) || strcmp(recorded[i].owner, from) != 0 || recorded[i].read_only) return -1;
+	strcpy(recorded[i].owner, DRAW_HOST);
+	recorded[i].bytes = 0;
+	recorded[i].read_only = 1;
+	return 0;
+}
+
 int DrawReg_take(const char* owner, void** out, int max) {
 	int taken = 0;
 	if (!owner || !out) return 0;

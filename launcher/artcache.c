@@ -53,6 +53,31 @@ int ArtCache_get(ArtCache* c, const char* path, int kind, int flags, void** imag
 	return e->state;
 }
 
+int ArtCache_put(ArtCache* c, const char* path, int kind, void* image, size_t bytes) {
+	if (!c || !path || !path[0] || strlen(path) >= ART_CACHE_PATH) return 0;
+	if (find(c, path, kind) >= 0 || c->count == ART_CACHE_ENTRIES) return 0;
+	ArtCacheEntry* e = &c->entries[c->count++];
+	memset(e, 0, sizeof(*e));
+	strcpy(e->path, path);
+	e->kind = kind;
+	e->state = image ? ARTC_READY : ARTC_FAILED;
+	e->image = image;
+	e->bytes = image ? bytes : 0;
+	e->seq = c->next_seq++;
+	e->used = ++c->clock;
+	c->bytes += e->bytes;
+	return 1;
+}
+
+int ArtCache_generatedKey(const char* subject, char* out, size_t size) {
+	if (!subject || !subject[0] || !out) return 0;
+	size_t len = strlen(ART_GENERATED) + strlen(subject);
+	if (len >= size || len >= ART_CACHE_PATH) return 0;
+	strcpy(out, ART_GENERATED);
+	strcat(out, subject);
+	return 1;
+}
+
 int ArtCache_peek(const ArtCache* c, const char* path, int kind, void** image) {
 	if (image) *image = NULL;
 	if (!c || !path) return ARTC_NONE;

@@ -199,26 +199,12 @@ int main (int argc, char *argv[]) {
 
 			if(lastScreen == SCREEN_QUICKMENU) {
 				SDL_LockMutex(bgMutex);
-				if(folderbgchanged) {
-					if(folderbgbmp)
-						GFX_drawOnLayer(folderbgbmp,0, 0, screen->w, screen->h,1.0f,0,LAYER_BACKGROUND);
-					else {
-						GFX_clearLayers(LAYER_BACKGROUND);
-					}
-					folderbgchanged = 0;
-				}
+				if(folderbgchanged && Background_layer()) folderbgchanged = 0;
 				SDL_UnlockMutex(bgMutex);
 			}
 			else if(lastScreen == SCREEN_GAMELIST) {
 				SDL_LockMutex(bgMutex);
-				if(folderbgchanged) {
-					if(folderbgbmp)
-						GFX_drawOnLayer(folderbgbmp,0, 0, screen->w, screen->h,1.0f,0,LAYER_BACKGROUND);
-					else {
-						GFX_clearLayers(LAYER_BACKGROUND);
-					}
-					folderbgchanged = 0;
-				}
+				if(folderbgchanged && Background_layer()) folderbgchanged = 0;
 				SDL_UnlockMutex(bgMutex);
 				SDL_LockMutex(thumbMutex);
 				if(list_layout_drawn) {
@@ -269,14 +255,7 @@ int main (int argc, char *argv[]) {
 			Uint32 frame_start = now;
 			static char cached_display_name[256] = "";
 			SDL_LockMutex(bgMutex);
-			if(folderbgchanged) {
-				if(folderbgbmp)
-					GFX_drawOnLayer(folderbgbmp,0, 0, screen->w, screen->h,1.0f,0,LAYER_BACKGROUND);
-				else {
-					GFX_clearLayers(LAYER_BACKGROUND);
-				}
-				folderbgchanged = 0;
-			}
+			if(folderbgchanged && Background_layer()) folderbgchanged = 0;
 			SDL_UnlockMutex(bgMutex);
 			SDL_LockMutex(thumbMutex);
 			if(list_layout_drawn && thumbchanged) {
@@ -425,6 +404,7 @@ int main (int argc, char *argv[]) {
 	// Now safe to free surfaces after GPU threads are stopped
 	if(blackBG)	SDL_FreeSurface(blackBG);
 	if (folderbgbmp) SDL_FreeSurface(folderbgbmp);
+	Background_quit();
 	ArtLoader_quit(); // thumbbmp is the art cache's
 
 	QuitSettings();

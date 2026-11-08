@@ -210,6 +210,47 @@ static void testTopRow(void) {
 	CHECK(HeaderRow_topRowWidth(stock, 1024, 30, 15, 200, 5000) == 0);
 }
 
+static void testBackground(void) {
+	BackgroundSlot slot;
+	BackgroundSlot_clear(&slot);
+	CHECK(!BackgroundSlot_active(&slot));
+	CHECK(BackgroundSlot_result(&slot, 0, 1) == 0);
+	CHECK(BackgroundSlot_show(&slot, 1, 1) == BACKGROUND_STOCK);
+
+	BackgroundSlot_claim(&slot, 3);
+	CHECK(BackgroundSlot_active(&slot));
+	// stock's until it has drawn
+	CHECK(BackgroundSlot_show(&slot, 1, 1) == BACKGROUND_STOCK);
+	CHECK(BackgroundSlot_result(&slot, 0, 1) == 1);
+	CHECK(BackgroundSlot_show(&slot, 1, 1) == BACKGROUND_PLUGIN);
+	// only on the game list
+	CHECK(BackgroundSlot_show(&slot, 0, 1) == BACKGROUND_STOCK);
+	// stock's background changed under it
+	CHECK(BackgroundSlot_show(&slot, 1, 2) == BACKGROUND_REDRAW);
+	CHECK(BackgroundSlot_result(&slot, 0, 2) == 1);
+	CHECK(BackgroundSlot_show(&slot, 1, 2) == BACKGROUND_PLUGIN);
+	// not asked this time
+	BackgroundSlot_skip(&slot);
+	CHECK(BackgroundSlot_show(&slot, 1, 2) == BACKGROUND_STOCK);
+	CHECK(BackgroundSlot_active(&slot));
+
+	// an error, any non-zero value, turns it off for good
+	CHECK(BackgroundSlot_result(&slot, 0, 2) == 1);
+	CHECK(BackgroundSlot_result(&slot, 5, 2) == 0);
+	CHECK(!BackgroundSlot_active(&slot));
+	CHECK(BackgroundSlot_show(&slot, 1, 2) == BACKGROUND_STOCK);
+	CHECK(BackgroundSlot_result(&slot, 0, 2) == 0);
+	CHECK(BackgroundSlot_show(&slot, 1, 2) == BACKGROUND_STOCK);
+
+	// a new claim starts over
+	BackgroundSlot_claim(&slot, 0);
+	CHECK(BackgroundSlot_active(&slot));
+	CHECK(BackgroundSlot_result(&slot, -1, 1) == 0);
+	CHECK(!BackgroundSlot_active(&slot));
+	BackgroundSlot_clear(&slot);
+	CHECK(slot.owner == -1);
+}
+
 int main(void) {
 	testSlot();
 	testInput();
@@ -218,5 +259,6 @@ int main(void) {
 	testListRow();
 	testHeader();
 	testTopRow();
+	testBackground();
 	CHECK_DONE();
 }

@@ -69,6 +69,7 @@ void updatePillTextSurface(const char* entry_name, int move_w, SDL_Color text_co
 	SDL_UnlockMutex(animMutex);
 }
 int folderbgchanged=0;
+unsigned folderbgserial=0;
 int thumbchanged=0;
 
 // queue a new image load task :D
@@ -195,6 +196,7 @@ void startLoadFolderBackground(const char* imagePath, BackgroundLoadedCallback c
 void onBackgroundLoaded(SDL_Surface* surface) {
 	SDL_LockMutex(bgMutex);
 	folderbgchanged = 1;
+	folderbgserial++;
 	if (folderbgbmp) SDL_FreeSurface(folderbgbmp);
     if (!surface) {
 		folderbgbmp = NULL;

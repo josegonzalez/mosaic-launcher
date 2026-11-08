@@ -34,6 +34,12 @@ int DrawReg_writable(const void* surface);
 // Forgets a surface owner recorded. Returns 0, or -1 when owner didn't.
 int DrawReg_remove(const void* surface, const char* owner);
 
+// Hands a writable surface from to DRAW_HOST, read-only to plugins from
+// then on and off from's budget, such as art a plugin made for the art
+// cache. Returns 0, or -1 for a surface from doesn't own, from being
+// DRAW_HOST, or one that's read-only.
+int DrawReg_give(const void* surface, const char* from);
+
 // Forgets up to max of owner's surfaces, writing them to out to be freed.
 // Returns how many.
 int DrawReg_take(const char* owner, void** out, int max);

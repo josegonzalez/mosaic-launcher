@@ -40,6 +40,13 @@ struct SDL_Surface* ArtLoader_decode(const char* path, int kind);
 void ArtLoader_showThumb(const char* path);
 void ArtLoader_prefetchThumb(const char* path);
 
+// For an entry with no art file, the built-in list's thumbnail from
+// plugins' art_surface: the first of the list's kinds (Art_listKind) one
+// generates, copied as stock decodes thumbnails and kept in the cache.
+// Writes the key ArtLoader_showThumb takes for it and returns 1, or writes
+// "" and returns 0.
+int ArtLoader_listGenerated(const Entry* entry, char* key, size_t size);
+
 // host->art_find, art_get and art_load, for a MOSAIC_ART_* kind.
 int ArtLoader_find(const Entry* entry, int kind, char* out, size_t size);
 int ArtLoader_get(const Entry* entry, int kind, const MosaicSurface** out);

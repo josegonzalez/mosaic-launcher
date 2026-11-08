@@ -115,6 +115,41 @@ static void testBudget(void) {
 	CHECK(DrawReg_take("two", out, 4) == 1);
 }
 
+static void testGive(void) {
+	static int made, other, lent, art;
+	CHECK(DrawReg_add(&made, "one", 1000) == 0);
+	CHECK(DrawReg_add(&other, "two", 10) == 0);
+	CHECK(DrawReg_add(&lent, DRAW_HOST, 0) == 0);
+	CHECK(DrawReg_add(&art, DRAW_HOST, 0) == 0);
+	CHECK(DrawReg_lock(&art) == 0);
+	// only its owner's, and not the launcher's own
+	CHECK(DrawReg_give(&made, "two") == -1);
+	CHECK(DrawReg_give(&other, "one") == -1);
+	CHECK(DrawReg_give(&lent, DRAW_HOST) == -1);
+	CHECK(DrawReg_give(&art, DRAW_HOST) == -1);
+	CHECK(DrawReg_give(NULL, "one") == -1);
+	CHECK(DrawReg_give(&made, NULL) == -1);
+	static int unknown;
+	CHECK(DrawReg_give(&unknown, "one") == -1);
+	CHECK_STR(DrawReg_owner(&made), "one");
+
+	// the launcher's now, read-only, and off the plugin's budget
+	CHECK(DrawReg_give(&made, "one") == 0);
+	CHECK_STR(DrawReg_owner(&made), DRAW_HOST);
+	CHECK(!DrawReg_writable(&made));
+	CHECK(DrawReg_bytes("one") == 0);
+	CHECK(DrawReg_fits("one", DRAW_PLUGIN_BYTES));
+	// the plugin can't free it, or give it again
+	CHECK(DrawReg_remove(&made, "one") == -1);
+	CHECK(DrawReg_give(&made, "one") == -1);
+	void* out[4];
+	CHECK(DrawReg_take("one", out, 4) == 0);
+	CHECK(DrawReg_remove(&made, DRAW_HOST) == 0);
+	CHECK(DrawReg_remove(&other, "two") == 0);
+	CHECK(DrawReg_remove(&lent, DRAW_HOST) == 0);
+	CHECK(DrawReg_remove(&art, DRAW_HOST) == 0);
+}
+
 static void testMany(void) {
 	// more than the first allocation, taken in batches smaller than the count
 	static int handles[100];
@@ -267,6 +302,7 @@ int main(void) {
 	testOwners();
 	testReadOnly();
 	testBudget();
+	testGive();
 	testMany();
 	testTruncate();
 	testRound();

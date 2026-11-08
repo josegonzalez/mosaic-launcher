@@ -415,13 +415,15 @@ void GameList_update(void) {
 		if(CFG_getShowGameArt()) {
 			char thumbpath[1024];
 			int found = listArt(entry, thumbpath, sizeof(thumbpath));
+			int made = 0; // a plugin's generated art, for a game with no art file
 			had_thumb = 0;
 			if (Plugins_hasLayout()) {
 				// a plugin layout draws its own art; none is left to come back with the built-in list
 				ArtLoader_showThumb("");
 			}
 			else {
-				ArtLoader_showThumb(found ? thumbpath : "");
+				if (!found) made = ArtLoader_listGenerated(entry, thumbpath, sizeof(thumbpath));
+				ArtLoader_showThumb(found || made ? thumbpath : "");
 				// the neighbours, ready for the next move
 				int count = state.top->entries->count;
 				for (int side = -1; side <= 1 && count > 1; side += 2) {
@@ -435,10 +437,11 @@ void GameList_update(void) {
 			int max_h = (int)(screen->h * 0.6);
 			int new_w = max_w;
 			int new_h = max_h;
-			if(found) {
+			if(found || made) {
 				ox = (int)(max_w) - SCALE1(BUTTON_MARGIN*5);
 				had_thumb = 1;
-				snprintf(update_art, sizeof(update_art), "%s", thumbpath);
+				// a file's path; generated art has none
+				if (found) snprintf(update_art, sizeof(update_art), "%s", thumbpath);
 			}
 			else
 				ox = screen->w;
@@ -448,6 +451,9 @@ void GameList_update(void) {
 }
 
 void GameList_render(void) {
+	// what's behind the list, from the background slot's owner
+	Background_render();
+
 	Effective e;
 	effective(&e);
 

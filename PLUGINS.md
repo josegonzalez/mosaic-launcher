@@ -35,7 +35,7 @@ conflicts=
 - `id` must match the `id` in the plugin's `MosaicPlugin`.
 - `setting.<key>=<type>|<label>|<default>[|<options>]` declares a setting the Launcher pak's Plugins page shows and edits. `type` is `toggle` (`on` or `off`), `choice` (one of the comma-separated `options`) or `text` (typed on the on-screen keyboard). The plugin reads the value with `host->cfg_get(id, key, default)`. Changes take effect the next time the launcher starts, which is when the user leaves the Launcher pak.
 - `api` is the `MOSAIC_API_VERSION` the plugin was built against. A plugin for a different version is skipped.
-- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, or `transition` and `launch` for the `transition_*` hooks. Only one plugin can own a slot.
+- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, `transition` and `launch` for the `transition_*` hooks, or `background` for `background_render`. Only one plugin can own a slot.
 - `requires` lists plugins that must also load. `conflicts` lists plugins that can't load alongside it.
 
 ## The entry point
@@ -347,6 +347,39 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
       MosaicRect all = { 0, 0, w, h };
       host->blit(screen, t->old_frame, NULL, &all);
       return host->blit_alpha(screen, t->new_frame, NULL, &all, (int)(progress * 255));
+  }
+  ```
+- Generated art lets a plugin supply an image it made, such as a title card for a game with no art, where `art_path` can only name a file. `art_surface(entry, kind)` in `MosaicPlugin` is asked only when no file answers for that entry and kind (an enum `MosaicArtKind`): no plugin's `art_path` names a file that exists and the launcher's own places have none. So real art always comes first, whatever the load order, and generated art never hides it; load order only picks which generating plugin wins. The launcher asks each plugin with `art_surface` in load order, and the first to return a surface wins. Return `NULL` for no art, and for kinds you don't know.
+
+  The surface must be one the plugin made with `surface_new`, `image_load` or `surface_scale`, and the launcher takes it: it moves into the art cache, off the plugin's 32 MiB and into the cache's 32 MiB, and is read-only from then on, like loaded art. The plugin must not draw on it, free it or return it again (`surface_free` and drawing onto it return -1), and the launcher frees it when the cache drops it. `art_get` hands it out like loaded art, `MOSAIC_ART_READY` at once, to the plugin itself, other plugins and layouts, and the built-in list shows the first of a thumbnail, box, 3D box or screenshot one when a game has no art file, as it does with files (`MosaicListView`'s `art` stays `""`, as there's no file). `art_find` still reports files only, so a plugin can check whether real art exists. Folder backgrounds still come only from files. The answer, an image or `NULL`, is kept until the cache drops it, such as when it's full or the lists reload, and only then is the plugin asked again, so don't count on being asked each frame.
+
+  It runs on the main thread while a frame is drawn, so keep it quick. It only draws: `select_index` returns -1, and `art_get` gives no generated art, during it. Returning a surface the plugin didn't make, or one already handed over, is an error: the launcher logs it and stops asking that plugin until it restarts; its other hooks keep working. Check for it, and for the background slot, with `MOSAIC_HOST_HAS(host, plugin_art)`.
+
+  ```c
+  // a plain card for games with no box art
+  static MosaicSurface* artSurface(const MosaicEntry* entry, int kind) {
+      if (kind != MOSAIC_ART_BOX || host->entry_type(entry) != MOSAIC_ENTRY_ROM) return NULL;
+      int scale = host->screen_scale();
+      MosaicSurface* card = host->surface_new("art-placeholder", 100 * scale, 140 * scale);
+      if (!card) return NULL;
+      host->fill_rect(card, NULL, mosaic_color(host->theme_color(MOSAIC_COLOR_ACCENT), 255));
+      host->draw_text(card, MOSAIC_FONT_SMALL, host->entry_name(entry), 4 * scale, 4 * scale,
+          mosaic_color(host->theme_color(MOSAIC_COLOR_LIST_TEXT_SELECTED), 255), 92 * scale);
+      return card;
+  }
+  ```
+- The `background` slot lets a plugin draw what's behind the game list, such as the selected game's art dimmed or full-bleed. It's an exclusive slot, since one background covers the whole screen, picked like the layout (`slot.background=<id>` in `plugins.txt`): only a plugin with `slots=background` in its `plugin.txt` has its `background_render(screen, selected)` in `MosaicPlugin` called, and one with the hook but not the slot is logged and never called. Each frame the game list redraws, before the list draws, it gets `screen`, a screen-sized surface lent for the call and filled with what stock shows there (the folder's background stretched to the screen, and clear where stock shows the theme's background colour), and the selected entry, or `NULL` in an empty folder. What it draws goes on the screen's background layer in place of stock's, under the list, the selection pill, the thumbnail and a plugin layout, and transitions start from frames with it on. When stock's background changes under it, such as a folder's `bg.png` finishing loading, the launcher redraws and asks again. Call `request_redraw` from `tick` to animate it; art it asks for with `art_get` redraws the list once it's in. The game switcher, quick menu and dialogs keep stock's background. With no plugin owning the slot, the background is exactly stock's.
+
+  It only draws: `select_index` returns -1 during it, and the surface can't be freed or drawn on after it returns. It returns 0, or anything else for an error, after which the launcher logs it and shows stock's background until it restarts.
+
+  ```c
+  // the selected game's backdrop, dimmed, behind the list
+  static int backgroundRender(MosaicSurface* screen, const MosaicEntry* selected) {
+      const MosaicSurface* art = NULL;
+      if (!selected || host->art_get(selected, MOSAIC_ART_BACKDROP, &art) != MOSAIC_ART_READY) return 0;
+      MosaicRect all = { 0, 0, host->screen_width(), host->screen_height() };
+      host->blit(screen, art, NULL, &all);
+      return host->fill_rect(screen, NULL, mosaic_color(0x000000, 160));
   }
   ```
 

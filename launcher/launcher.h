@@ -47,5 +47,6 @@
 #include "layoutmodel.h"
 #include "artloader.h"
 #include "statuspill.h"
+#include "background.h"
 
 #endif

@@ -636,6 +636,11 @@ typedef struct MosaicHost {
 	// plugin's transition run. Check for them with
 	// MOSAIC_HOST_HAS(host, transition_max_ms).
 	int transition_max_ms;
+
+	// 1 on a launcher that asks plugins' art_surface for generated art and
+	// has the background slot (background_render). Check for both with
+	// MOSAIC_HOST_HAS(host, plugin_art).
+	int plugin_art;
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -826,6 +831,40 @@ typedef struct MosaicPlugin {
 	// place, and stops asking this plugin until it restarts.
 	int (*transition_begin)(MosaicTransition* transition);
 	int (*transition_frame)(MosaicSurface* screen, const MosaicTransition* transition, float progress);
+
+	// Generated art, such as a title card for a game with none. When no
+	// file answers for an entry's kind (an enum MosaicArtKind): no plugin's
+	// art_path names one that exists and the launcher's own places have
+	// none, so real art always comes first. The launcher asks each plugin
+	// with art_surface, in load order, and the first to return a surface
+	// wins. It's one the plugin made with surface_new, image_load or
+	// surface_scale, and the launcher takes it: it moves into the art
+	// cache, off the plugin's 32 MiB and into the cache's, read-only from
+	// then on, and the plugin must not use or free it again. art_get hands
+	// it out like loaded art, and the built-in list shows the first of a
+	// thumbnail, box, 3D box or screenshot one when a game has no art file.
+	// art_find still reports files only. Return NULL for no art; the
+	// launcher asks again only once the cache has dropped the answer, such
+	// as when the lists reload. It runs on the main thread while a frame is
+	// drawn, so keep it quick. It only draws: select_index returns -1, and
+	// art_get gives no generated art, during it. Returning a surface the
+	// plugin didn't make, or one already handed over, is an error: the
+	// launcher logs it and stops asking this plugin until it restarts.
+	MosaicSurface* (*art_surface)(const MosaicEntry* entry, int kind);
+
+	// The background slot. A plugin with slots=background in its plugin.txt
+	// draws what's behind the game list, such as the selected game's art.
+	// Each frame the game list redraws, before the list draws, the owner's
+	// background_render gets screen, a screen-sized surface lent for the
+	// call and filled with what stock shows there (the folder's background,
+	// or the theme's background colour), and the selected entry, or NULL in
+	// an empty folder. What it draws goes on the screen's background layer
+	// in place of stock's, under the list, the selection pill, the
+	// thumbnail and a plugin layout, and transitions start from it. It only
+	// draws: select_index returns -1 during it. It returns 0, or anything
+	// else for an error, after which the launcher logs it and shows stock's
+	// background until it restarts. Other screens keep stock's background.
+	int (*background_render)(MosaicSurface* screen, const MosaicEntry* selected);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"
