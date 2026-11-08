@@ -1,0 +1,3 @@
+id=collate-subfolders
+name=Collate subfolders
+api=1
