@@ -1,0 +1,13 @@
+id=playtime-limit
+name=Play time limit
+api=1
+# minutes of games a day, across every game, from stock's play tracker; once they're used up, games don't launch.
+# Off by default, so turning the plugin on changes nothing until a limit is set.
+# A game already running isn't stopped when the time runs out: stock minarch can't be told to save and quit.
+setting.limit=choice|Daily limit (minutes)|off|off,15,30,45,60,90,120,180,240
+# the time left in the header turns the warning colour at or under this many minutes
+setting.warn=choice|Warn at (minutes left)|10|off,5,10,15,30
+# with a code set, a refused launch offers this many more minutes for today after typing it
+setting.extra=choice|Extra time (minutes)|15|15,30,60
+# kept only in this plugin's cfg and never logged; empty for no extra time
+setting.code=text|Code for extra time|
