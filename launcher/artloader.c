@@ -73,7 +73,11 @@ void ArtLoader_pump(int evict) {
 			// plugins can draw it and read it, but not draw on it or free it
 			if (image && load->kind != ART_KIND_LIST_THUMB && DrawReg_add(image, DRAW_HOST, 0) == 0) DrawReg_lock(image);
 			if (notify) state.dirty = 1;
-			if (load->kind == ART_KIND_LIST_THUMB && !strcmp(load->path, thumb_wanted)) setShown(load->path, image);
+			if (load->kind == ART_KIND_LIST_THUMB && !strcmp(load->path, thumb_wanted)) {
+				setShown(load->path, image);
+				// art decorators draw on the screen under it, so the list draws again
+				if (image && currentScreen == SCREEN_GAMELIST && Plugins_hasArtDecorators()) state.dirty = 1;
+			}
 		}
 		else if (image) SDL_FreeSurface(image);
 		free(load);
@@ -207,6 +211,10 @@ void ArtLoader_showThumb(const char* path) {
 	if (st == ARTC_READY) setShown(path, image);
 	else if (st == ARTC_FAILED || st == ARTC_NONE) setShown("", NULL);
 	dispatch();
+}
+
+int ArtLoader_thumbShown(void) {
+	return thumb_wanted[0] && !strcmp(thumb_wanted, thumb_shown);
 }
 
 void ArtLoader_prefetchThumb(const char* path) {

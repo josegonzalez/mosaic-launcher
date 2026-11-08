@@ -40,6 +40,10 @@ struct SDL_Surface* ArtLoader_decode(const char* path, int kind);
 void ArtLoader_showThumb(const char* path);
 void ArtLoader_prefetchThumb(const char* path);
 
+// 1 when thumbbmp is the image the last ArtLoader_showThumb asked for, and
+// not one kept from before while it loads.
+int ArtLoader_thumbShown(void);
+
 // For an entry with no art file, the built-in list's thumbnail from
 // plugins' art_surface: the first of the list's kinds (Art_listKind) one
 // generates, copied as stock decodes thumbnails and kept in the cache.

@@ -4,8 +4,8 @@
 // The parts of the layout slot that don't need SDL or the loader: whether
 // the owner's layout is still in use, the buttons it sees and consumes, and
 // where on the screen it draws. plugins.c calls the layout; screen_gamelist.c
-// builds its view. Also where row decorators and header widgets draw, and
-// the background slot.
+// builds its view. Also where row decorators, header widgets and art
+// decorators draw, and the background slot.
 
 #include "mosaic_plugin.h"
 
@@ -172,5 +172,25 @@ void HeaderRow_rect(const HeaderRow* row, MosaicRect* out);
 // the status pill, and the row keeps that gap from the widgets. With no
 // widgets (header_w 0) it's available, as stock has it.
 int HeaderRow_topRowWidth(int available, int screen_w, int padding, int margin, int status_w, int header_w);
+
+// Art decorators. Where the built-in list puts the selected game's
+// thumbnail, an img_w by img_h image on a w by h screen, as stock does: as
+// wide as art_w (the Game art width setting, a share of w) and at most 0.6
+// of h tall, keeping its shape, margin from the right edge and centred on
+// the middle. Returns 1, or 0 for an empty image or an empty rect, still
+// writing the rect stock would use.
+int ListArt_rect(int w, int h, double art_w, int margin, int img_w, int img_h, MosaicRect* out);
+
+// The free space under the built-in list's thumbnail art: the art's
+// column, as wide as the widest thumbnail (art_w of w) and margin from the
+// right edge, which the list's rows stop short of, from the art's bottom
+// down to hints_top, where the button hints start. Returns 1, or 0 when
+// there's no room, writing an empty rect.
+int ListArt_below(int w, double art_w, int margin, int hints_top, const MosaicRect* art, MosaicRect* out);
+
+// Under a plugin layout: the part of area under art, as wide as art, down
+// to area's bottom. Returns 1, or 0 when there's no room, writing an empty
+// rect.
+int LayoutArt_below(const MosaicRect* art, const MosaicRect* area, MosaicRect* out);
 
 #endif

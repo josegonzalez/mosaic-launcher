@@ -149,6 +149,14 @@ int Plugins_hasDecorators(void);
 // decorators. One that fails logs and is turned off.
 void Plugins_decorateRow(struct SDL_Surface* surface, const Entry* entry, MosaicRow* row);
 
+// 1 while any plugin decorates art.
+int Plugins_hasArtDecorators(void);
+
+// Runs every plugin's decorate_art on the built-in list's thumbnail at art,
+// on surface clipped to below, the free space under it. Does nothing
+// without art decorators or room. One that fails logs and is turned off.
+void Plugins_decorateArt(struct SDL_Surface* surface, const Entry* entry, const MosaicRect* art, const MosaicRect* below);
+
 // Plugins' header widgets on surface, placed in row (see layoutmodel.h) in
 // load order. One whose header_width or header_widget fails logs and is
 // left out from then on.

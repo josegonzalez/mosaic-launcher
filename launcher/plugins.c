@@ -37,6 +37,7 @@ typedef struct LoadedPlugin {
 	int selection_off; // its selection_changed failed, so it's no longer called
 	int owns_background; // claims the background slot, so its background_render is called
 	int art_off;         // its art_surface returned a surface it didn't make, so it's no longer asked
+	int art_deco_off;    // its decorate_art failed, so it's no longer called
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -48,7 +49,7 @@ static int layout_rendering = 0; // while layout_render runs, which only draws
 static MosaicSurface* layout_lent = NULL; // the screen layout_render was lent
 static MosaicRect layout_area;            // and where it may draw
 static ListSelection layout_selected;     // and the last cell decorate_cell got for the selected entry
-static int decorating = 0; // while a decorate_row, header_width or header_widget runs, which only draw
+static int decorating = 0; // while a decorate_row, decorate_art, header_width or header_widget runs, which only draw
 static int selecting = 0;  // while a selection_changed runs, which can't move the selection
 static TransitionSlots transitions = { -1, -1, 0, 0 };
 static int transition_owner = -1; // the plugin whose transition is running
@@ -577,6 +578,7 @@ static int hostArtGet(const MosaicEntry* entry, int kind, const MosaicSurface** 
 	return ArtLoader_get((const Entry*)entry, kind, out);
 }
 static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* rect, const MosaicRect* name);
+static int hostDecorateArt(MosaicSurface* screen, int index, const MosaicRect* art);
 
 static void playLog(const char* message) {
 	LOG_info("%s\n", message);
@@ -676,6 +678,7 @@ static const MosaicHost host = {
 	.last_played = PlayHistory_lastPlayed,
 	.play_count = PlayHistory_count,
 	.play_time_today = PlayHistory_today,
+	.decorate_art = hostDecorateArt,
 };
 
 ///////////////////////////////////////
@@ -1554,7 +1557,7 @@ int Plugins_backgroundShow(int on_gamelist, unsigned serial) {
 }
 
 ///////////////////////////////////////
-// row decorators and header widgets
+// row decorators, art decorators and header widgets
 
 static int decorates(int i) {
 	const MosaicPlugin* p = loaded[i].plugin;
@@ -1609,6 +1612,56 @@ static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* 
 	if (name && !LayoutRect_clip(name, rect, &row.name)) row.name = (MosaicRect){ rect->x, rect->y, 0, rect->h };
 	PluginDraw_clip(screen, &(SDL_Rect){ clip.x, clip.y, clip.w, clip.h });
 	decorate(screen, state.top->entries->items[index], &row);
+	PluginDraw_clip(screen, &(SDL_Rect){ layout_area.x, layout_area.y, layout_area.w, layout_area.h });
+	return 0;
+}
+
+static int decoratesArt(int i) {
+	const MosaicPlugin* p = loaded[i].plugin;
+	return !loaded[i].art_deco_off && Plugin_has(p, decorate_art) && p->decorate_art;
+}
+
+int Plugins_hasArtDecorators(void) {
+	for (int i = 0; i < loaded_count; i++) {
+		if (decoratesArt(i)) return 1;
+	}
+	return 0;
+}
+
+// Every art decorator in load order, on a surface lent and clipped to
+// below. One that fails is turned off for the rest of the run.
+static void decorateArt(MosaicSurface* lent, const Entry* entry, const MosaicRect* art, const MosaicRect* below) {
+	decorating = 1;
+	for (int i = 0; i < loaded_count; i++) {
+		if (!decoratesArt(i)) continue;
+		int rc = loaded[i].plugin->decorate_art(lent, (const MosaicEntry*)entry, art, below);
+		if (rc == 0) continue;
+		loaded[i].art_deco_off = 1;
+		LOG_warn("plugins: %s's decorate_art returned %i, leaving its art decorations out until the launcher restarts\n",
+			loaded[i].id, rc);
+	}
+	decorating = 0;
+}
+
+void Plugins_decorateArt(SDL_Surface* surface, const Entry* entry, const MosaicRect* art, const MosaicRect* below) {
+	if (!Plugins_hasArtDecorators() || below->w <= 0 || below->h <= 0) return;
+	MosaicSurface* lent = PluginDraw_lend(surface, &(SDL_Rect){ below->x, below->y, below->w, below->h });
+	if (!lent) {
+		LOG_warn("plugins: the screen is already lent, so the art can't be decorated this frame\n");
+		return;
+	}
+	decorateArt(lent, entry, art, below);
+	PluginDraw_unlend(lent);
+}
+
+static int hostDecorateArt(MosaicSurface* screen, int index, const MosaicRect* art) {
+	if (!layout_rendering || decorating || !screen || screen != layout_lent || !art) return -1;
+	if (!state.top || index < 0 || index >= state.top->entries->count) return -1;
+	MosaicRect inside, below;
+	if (!LayoutRect_clip(art, &layout_area, &inside)) return -1;
+	if (!Plugins_hasArtDecorators() || !LayoutArt_below(art, &layout_area, &below)) return 0;
+	PluginDraw_clip(screen, &(SDL_Rect){ below.x, below.y, below.w, below.h });
+	decorateArt(screen, state.top->entries->items[index], art, &below);
 	PluginDraw_clip(screen, &(SDL_Rect){ layout_area.x, layout_area.y, layout_area.w, layout_area.h });
 	return 0;
 }

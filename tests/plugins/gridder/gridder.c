@@ -5,6 +5,8 @@
 // launcher keeps the selection. It reads back the screen it's lent to see
 // its drawing land inside the area and not past it. Each cell it draws is
 // passed to host->decorate_cell, for row decorators such as badger's.
+// With art=1 in its config, the top half of the selected cell is its art,
+// passed to host->decorate_art, for art decorators such as bander's.
 //
 // With fail=init in its config, layout_init declines; with fail=input or
 // fail=render, that hook returns an error the third time it's called; and
@@ -22,6 +24,7 @@
 static const MosaicHost* host;
 static char folder[512];
 static const char* fail = "";
+static int art = 0;
 static int ticks = 0;
 static int inputs = 0;
 static int renders = 0;
@@ -139,6 +142,11 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 				mosaic_color(0xFFFFFF, 255), cell.w - 8);
 		}
 		if (host->decorate_cell(screen, i, &cell, NULL) != 0) decorated = -1;
+		if (lit && art) {
+			MosaicRect top = { cell.x, cell.y, cell.w, cell.h / 2 };
+			int rc = host->decorate_art(screen, i, &top);
+			if (renders == 1) say("render art %i", rc);
+		}
 	}
 
 	if (view->depth == 2 && !strcmp(view->path, folder)) folder_drawn = 1;
@@ -168,6 +176,12 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 			host->decorate_cell(screen, 0, NULL, NULL),
 			host->decorate_cell(screen, 0, &(MosaicRect){ 0, below, 10, 10 }, NULL),
 			host->decorate_cell(NULL, 0, &cell, NULL));
+		if (art) {
+			say("render art bad index %i %i, no rect %i, outside %i, not the screen %i, at the bottom %i",
+				host->decorate_art(screen, -1, &cell), host->decorate_art(screen, view->count, &cell),
+				host->decorate_art(screen, 0, NULL), host->decorate_art(screen, 0, &(MosaicRect){ 0, below, 10, 10 }),
+				host->decorate_art(NULL, 0, &cell), host->decorate_art(screen, 0, &(MosaicRect){ 0, below - 10, 10, 10 }));
+		}
 	}
 	return 0;
 }
@@ -182,6 +196,7 @@ static void tick(unsigned long now) {
 	if (ticks == 3 && lent) {
 		say("after render fill %i, decorate %i", host->fill_rect(lent, NULL, mosaic_color(0xFFFFFF, 255)),
 			host->decorate_cell(lent, 0, &(MosaicRect){ 0, 0, 10, 10 }, NULL));
+		if (art) say("after render art %i", host->decorate_art(lent, 0, &(MosaicRect){ 0, 0, 10, 10 }));
 	}
 	// keep frames coming, so a failed layout is seen to stay off
 	if (ticks < 60) host->request_redraw();
@@ -193,6 +208,7 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, draw_text) || !MOSAIC_HOST_HAS(host, select_index) || !MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Gridder", host->sdcard_path);
 	fail = host->cfg_get(ID, "fail", "");
+	art = atoi(host->cfg_get(ID, "art", "0")) && MOSAIC_HOST_HAS(host, decorate_art);
 	return 0;
 }
 

@@ -1,7 +1,9 @@
 // A second row decorator and header widget, to load beside badger: it logs
 // whether badger's dot was already on each of badger's rows when it got
 // them, and whether badger's widget is on its right, so the order the
-// launcher calls them in shows. Its widget is a green box 40 wide.
+// launcher calls them in shows. Its widget is a green box 40 wide. As an
+// art decorator beside bander, it logs whether bander's band was already
+// under the art the first time it's called.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -43,6 +45,14 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	return 0;
 }
 
+static int decorateArt(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRect* art, const MosaicRect* below) {
+	(void)entry;
+	(void)art;
+	static int arts = 0;
+	if (++arts == 1) say("art after bander %i", isColor(screen, below->x + below->w / 2, below->y + below->h / 2, 0xFF00FF));
+	return 0;
+}
+
 static int headerWidth(int max_width, int height) {
 	(void)max_width;
 	(void)height;
@@ -74,6 +84,7 @@ static const MosaicPlugin plugin = {
 	.decorate_row = decorateRow,
 	.header_width = headerWidth,
 	.header_widget = headerWidget,
+	.decorate_art = decorateArt,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

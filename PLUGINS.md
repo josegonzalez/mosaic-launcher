@@ -414,6 +414,23 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   long long seconds = host->play_time(host->entry_path(entry));
   if (seconds > 0) snprintf(caption, sizeof(caption), "%lldh %02lldm", seconds / 3600, seconds / 60 % 60);
   ```
+- Art decorators draw details under the game's art, such as its year, publisher and genre. Every plugin's `decorate_art(screen, entry, art, below)` in `MosaicPlugin` runs, in load order, each frame the built-in list draws the selected game's thumbnail beside the list, after the rows. `art` is where the thumbnail is, as the list sizes and places it, and `below` is the free space under it: the art's column, as wide as the widest thumbnail the Game art width setting allows (as wide as the art for a wide image, wider for a tall one) and stopping where the rows do, from the art's bottom down to the button hints. The hook draws on `screen`, lent for the call and clipped to `below`. The thumbnail is on a layer of its own over the screen, and the background on one under it, so what the hook draws shows over the background, and as `below` never overlaps `art`, the thumbnail never covers it, nor it the thumbnail. Transitions start from the frame with both.
+
+  It only runs while a thumbnail shows: not with Show game art off, for an entry with no art (no thumbnail, box, 3D box or screenshot, from a file or a plugin), in an empty folder, or when there's no room under the art. While the selected game's image is still loading, the list keeps showing the last game's art and the hook isn't called; once the image is in, the list draws again with it, so the art and what's under it are always the same game's. A layout runs the decorators on its own art: it calls `host->decorate_art(screen, index, art)` from `layout_render`, with the screen it was lent, after drawing the art of the entry at `index`, such as the selected game's. `below` is then the part of `view->area` under `art`, as wide as it. It returns 0, also when there's no room under the art, or -1 outside `layout_render`, from inside a decorator, for another surface, an index not in the list or art outside `view->area`. A layout that never calls it shows no art decorations.
+
+  Check for both with `MOSAIC_HOST_HAS(host, decorate_art)`. The hook only draws: `select_index` returns -1 during it. It returns 0, or anything else for an error, after which the launcher logs it and stops calling that plugin's `decorate_art` until it restarts; its other hooks keep working. With no art decorators, nothing is lent and the list is exactly stock's.
+
+  ```c
+  // the year under the art, centred on it
+  static int decorateArt(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRect* art, const MosaicRect* below) {
+      char year[16];
+      if (host->entry_info(entry, "year", year, sizeof(year)) != 1) return 0;
+      int x = art->x + (art->w - host->text_width(MOSAIC_FONT_SMALL, year)) / 2;
+      host->draw_text(screen, MOSAIC_FONT_SMALL, year, x > below->x ? x : below->x, below->y,
+          mosaic_color(host->theme_color(MOSAIC_COLOR_HINT), 255), below->w);
+      return 0;
+  }
+  ```
 
 ## Without writing C
 

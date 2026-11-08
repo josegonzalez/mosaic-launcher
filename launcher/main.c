@@ -1,6 +1,15 @@
 #include "launcher.h"
 #include "playhistory.h"
 
+// The built-in list's thumbnail on its layer, sized and placed as stock
+// does, where art decorators were told it is (ListArt_rect).
+static void drawThumb(void) {
+	MosaicRect art;
+	ListArt_rect(screen->w, screen->h, CFG_getGameArtWidth(), SCALE1(BUTTON_MARGIN*3), thumbbmp->w, thumbbmp->h, &art);
+	GFX_clearLayers(LAYER_THUMBNAIL);
+	GFX_drawOnLayer(thumbbmp, art.x, art.y, art.w, art.h, 1.0f, 0, LAYER_THUMBNAIL);
+}
+
 int main (int argc, char *argv[]) {
 	// LOG_info("time from launch to:\n");
 	// unsigned long main_begin = SDL_GetTicks();
@@ -216,24 +225,7 @@ int main (int argc, char *argv[]) {
 					// a plugin layout draws its own art
 					GFX_clearLayers(LAYER_THUMBNAIL);
 				} else if(thumbbmp && thumbchanged) {
-					int img_w = thumbbmp->w;
-					int img_h = thumbbmp->h;
-					double aspect_ratio = (double)img_h / img_w;
-					int max_w = (int)(screen->w * CFG_getGameArtWidth());
-					int max_h = (int)(screen->h * 0.6);
-					int new_w = max_w;
-					int new_h = (int)(new_w * aspect_ratio);
-
-					if (new_h > max_h) {
-						new_h = max_h;
-						new_w = (int)(new_h / aspect_ratio);
-					}
-
-					int target_x = screen->w-(new_w + SCALE1(BUTTON_MARGIN*3));
-					int target_y = (int)(screen->h * 0.50);
-					int center_y = target_y - (new_h / 2); // FIX: use new_h instead of thumbbmp->h
-					GFX_clearLayers(LAYER_THUMBNAIL);
-					GFX_drawOnLayer(thumbbmp,target_x,center_y,new_w,new_h,1.0f,0,LAYER_THUMBNAIL);
+					drawThumb();
 				} else if(thumbchanged) {
 					GFX_clearLayers(LAYER_THUMBNAIL);
 				}
@@ -267,26 +259,7 @@ int main (int argc, char *argv[]) {
 				GFX_clearLayers(LAYER_THUMBNAIL);
 				thumbchanged = 0;
 			} else if(thumbbmp && thumbchanged) {
-				int img_w = thumbbmp->w;
-				int img_h = thumbbmp->h;
-				double aspect_ratio = (double)img_h / img_w;
-
-				int max_w = (int)(screen->w * CFG_getGameArtWidth());
-				int max_h = (int)(screen->h * 0.6);
-
-				int new_w = max_w;
-				int new_h = (int)(new_w * aspect_ratio);
-
-				if (new_h > max_h) {
-					new_h = max_h;
-					new_w = (int)(new_h / aspect_ratio);
-				}
-
-				int target_x = screen->w-(new_w + SCALE1(BUTTON_MARGIN*3));
-				int target_y = (int)(screen->h * 0.50);
-				int center_y = target_y - (new_h / 2); // FIX: use new_h instead of thumbbmp->h
-				GFX_clearLayers(LAYER_THUMBNAIL);
-				GFX_drawOnLayer(thumbbmp,target_x,center_y,new_w,new_h,1.0f,0,LAYER_THUMBNAIL);
+				drawThumb();
 				thumbchanged = 0;
 			} else if(thumbchanged) {
 				GFX_clearLayers(LAYER_THUMBNAIL);

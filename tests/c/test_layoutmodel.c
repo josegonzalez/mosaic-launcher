@@ -1,6 +1,6 @@
 // layoutmodel.c: the layout slot's state, the buttons a layout sees and
-// consumes, and where it draws, and where row decorators and header widgets
-// draw, and where the selection is for transitions.
+// consumes, and where it draws, and where row decorators, header widgets
+// and art decorators draw, and where the selection is for transitions.
 
 #include "check.h"
 #include "layoutmodel.h"
@@ -305,6 +305,74 @@ static void testBackground(void) {
 	CHECK(slot.owner == -1);
 }
 
+static int rectIs(const MosaicRect* r, int x, int y, int w, int h) {
+	return r->x == x && r->y == y && r->w == w && r->h == h;
+}
+
+static void testArt(void) {
+	MosaicRect art, below;
+	// the desktop's 1024x768 at the default Game art width of 0.45, with
+	// stock's 3 margins of 15 from the right: a square is held to 0.6 of
+	// the height, and centred on the middle
+	CHECK(ListArt_rect(1024, 768, 0.45, 45, 8, 8, &art) == 1);
+	CHECK(rectIs(&art, 519, 154, 460, 460));
+	// a wide one is as wide as the setting allows
+	CHECK(ListArt_rect(1024, 768, 0.45, 45, 4, 2, &art) == 1);
+	CHECK(rectIs(&art, 519, 269, 460, 230));
+	// a tall one is narrower, at the column's right
+	CHECK(ListArt_rect(1024, 768, 0.45, 45, 100, 200, &art) == 1);
+	CHECK(rectIs(&art, 749, 154, 230, 460));
+	// stock's casts: 640x480 at 0.3 gives 192 wide, and 3:2 then 128 tall
+	CHECK(ListArt_rect(640, 480, 0.3, 30, 300, 200, &art) == 1);
+	CHECK(rectIs(&art, 418, 176, 192, 128));
+	// an odd height loses its half pixel at the top, as stock's does
+	CHECK(ListArt_rect(1024, 768, 0.45, 45, 460, 231, &art) == 1);
+	CHECK(rectIs(&art, 519, 269, 460, 231));
+	// an empty image, or no width for art, places nothing
+	CHECK(ListArt_rect(1024, 768, 0.45, 45, 0, 8, &art) == 0);
+	CHECK(rectIs(&art, 0, 0, 0, 0));
+	CHECK(ListArt_rect(1024, 768, 0.45, 45, 8, -1, &art) == 0);
+	CHECK(ListArt_rect(1024, 768, 0.0, 45, 8, 8, &art) == 0);
+
+	// under the art, the whole column down to the hints
+	ListArt_rect(1024, 768, 0.45, 45, 8, 8, &art);
+	CHECK(ListArt_below(1024, 0.45, 45, 663, &art, &below) == 1);
+	CHECK(rectIs(&below, 519, 614, 460, 49));
+	// the column is as wide as the widest art, under a tall one too
+	ListArt_rect(1024, 768, 0.45, 45, 100, 200, &art);
+	CHECK(ListArt_below(1024, 0.45, 45, 663, &art, &below) == 1);
+	CHECK(rectIs(&below, 519, 614, 460, 49));
+	ListArt_rect(1024, 768, 0.45, 45, 4, 2, &art);
+	CHECK(ListArt_below(1024, 0.45, 45, 663, &art, &below) == 1);
+	CHECK(rectIs(&below, 519, 499, 460, 164));
+	// art down to the hints, or past them, leaves no room
+	CHECK(ListArt_below(1024, 0.45, 45, 499, &art, &below) == 0);
+	CHECK(rectIs(&below, 0, 0, 0, 0));
+	CHECK(ListArt_below(1024, 0.45, 45, 400, &art, &below) == 0);
+	// nor does no art
+	CHECK(ListArt_below(1024, 0.45, 45, 663, &(MosaicRect){ 0, 0, 0, 0 }, &below) == 0);
+	CHECK(ListArt_below(1024, 0.0, 45, 663, &art, &below) == 0);
+
+	// under a layout, as wide as the art, down to the area's bottom
+	MosaicRect area = { 0, 0, 1024, 663 };
+	CHECK(LayoutArt_below(&(MosaicRect){ 100, 50, 300, 200 }, &area, &below) == 1);
+	CHECK(rectIs(&below, 100, 250, 300, 413));
+	// cut to the area at its sides
+	CHECK(LayoutArt_below(&(MosaicRect){ 900, 50, 300, 200 }, &area, &below) == 1);
+	CHECK(rectIs(&below, 900, 250, 124, 413));
+	CHECK(LayoutArt_below(&(MosaicRect){ -100, -50, 300, 100 }, &area, &below) == 1);
+	CHECK(rectIs(&below, 0, 50, 200, 613));
+	// art to the area's bottom, past it, beside it or empty leaves no room
+	CHECK(LayoutArt_below(&(MosaicRect){ 100, 463, 300, 200 }, &area, &below) == 0);
+	CHECK(rectIs(&below, 0, 0, 0, 0));
+	CHECK(LayoutArt_below(&(MosaicRect){ 100, 600, 300, 200 }, &area, &below) == 0);
+	CHECK(LayoutArt_below(&(MosaicRect){ 1100, 50, 300, 200 }, &area, &below) == 0);
+	CHECK(LayoutArt_below(&(MosaicRect){ 100, 50, 0, 200 }, &area, &below) == 0);
+	CHECK(LayoutArt_below(&(MosaicRect){ 100, 50, 300, 0 }, &area, &below) == 0);
+	// no overflow at the edges of an int
+	CHECK(LayoutArt_below(&(MosaicRect){ 0, 2147483000, 10, 2147483000 }, &area, &below) == 0);
+}
+
 int main(void) {
 	testSlot();
 	testInput();
@@ -316,5 +384,6 @@ int main(void) {
 	testHeader();
 	testTopRow();
 	testBackground();
+	testArt();
 	CHECK_DONE();
 }

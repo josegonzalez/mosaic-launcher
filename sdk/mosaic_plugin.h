@@ -704,6 +704,18 @@ typedef struct MosaicHost {
 	long long (*last_played)(const char* path);
 	int (*play_count)(const char* path);
 	long long (*play_time_today)(void);
+
+	// Art decorators under a plugin layout. Called from layout_render with
+	// the screen it was lent, runs every plugin's decorate_art, in load
+	// order, on the entry at index in the list, with art the rect the
+	// layout drew its art in and below the part of view->area under it, as
+	// wide as art, clipped to below. A layout calls it after drawing the
+	// art it wants details under, such as the selected game's. Returns 0,
+	// also when there's no room under art, or -1 outside layout_render, from
+	// inside a decorator, for another surface, an index not in the list or
+	// art outside view->area. Check for it, and for the decorate_art hook,
+	// with MOSAIC_HOST_HAS(host, decorate_art).
+	int (*decorate_art)(MosaicSurface* screen, int index, const MosaicRect* art);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -945,6 +957,23 @@ typedef struct MosaicPlugin {
 	// names_hidden and decorators in MosaicRow's name_hidden. It's a list
 	// hook: it can't rename entries or move the selection.
 	int (*hide_name)(const MosaicEntry* entry, const char* dir_path);
+
+	// Art decorators, for details under the game's art, such as its year
+	// and publisher. Every plugin's decorate_art runs, in load order, each
+	// frame the built-in list draws its thumbnail beside the list: once the
+	// selected entry's image is in, so a frame still loading it has none.
+	// art is where the thumbnail is, and below the free space under it: the
+	// art's column, as wide as the widest thumbnail, from the art's bottom
+	// to the button hints. It isn't called when no thumbnail shows (Show
+	// game art off, an entry with no art, an empty folder) or there's no
+	// room under it. Under a plugin layout it runs for the art the layout
+	// passes to host->decorate_art. It draws on screen, a surface lent for
+	// the call and clipped to below, over the background and beside the
+	// thumbnail, which never covers it. It only draws: select_index returns
+	// -1 during it. Return 0, or anything else for an error, after which the
+	// launcher logs it and stops calling this plugin's decorate_art until it
+	// restarts.
+	int (*decorate_art)(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRect* art, const MosaicRect* below);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

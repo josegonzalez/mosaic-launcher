@@ -201,3 +201,48 @@ int BackgroundSlot_show(const BackgroundSlot* slot, int on_gamelist, unsigned se
 	if (!on_gamelist || !BackgroundSlot_active(slot) || !slot->drawn) return BACKGROUND_STOCK;
 	return slot->built == serial ? BACKGROUND_PLUGIN : BACKGROUND_REDRAW;
 }
+
+///////////////////////////////////////
+// art decorators
+
+int ListArt_rect(int w, int h, double art_w, int margin, int img_w, int img_h, MosaicRect* out) {
+	if (img_w <= 0 || img_h <= 0) {
+		*out = (MosaicRect){ 0, 0, 0, 0 };
+		return 0;
+	}
+	// as stock's thumbnail is sized and placed, cast for cast
+	double aspect_ratio = (double)img_h / img_w;
+	int max_w = (int)(w * art_w);
+	int max_h = (int)(h * 0.6);
+	int new_w = max_w;
+	int new_h = (int)(new_w * aspect_ratio);
+	if (new_h > max_h) {
+		new_h = max_h;
+		new_w = (int)(new_h / aspect_ratio);
+	}
+	int target_y = (int)(h * 0.50);
+	*out = (MosaicRect){ w - (new_w + margin), target_y - (new_h / 2), new_w, new_h };
+	return new_w > 0 && new_h > 0;
+}
+
+int ListArt_below(int w, double art_w, int margin, int hints_top, const MosaicRect* art, MosaicRect* out) {
+	int col_w = (int)(w * art_w);
+	int top = art->y + art->h;
+	if (art->w <= 0 || art->h <= 0 || col_w <= 0 || hints_top <= top) {
+		*out = (MosaicRect){ 0, 0, 0, 0 };
+		return 0;
+	}
+	*out = (MosaicRect){ w - (col_w + margin), top, col_w, hints_top - top };
+	return 1;
+}
+
+int LayoutArt_below(const MosaicRect* art, const MosaicRect* area, MosaicRect* out) {
+	long top = (long)art->y + art->h;
+	long bottom = (long)area->y + area->h;
+	if (art->w <= 0 || art->h <= 0 || top >= bottom) {
+		*out = (MosaicRect){ 0, 0, 0, 0 };
+		return 0;
+	}
+	MosaicRect under = { art->x, (int)top, art->w, (int)(bottom - top) };
+	return LayoutRect_clip(&under, area, out);
+}

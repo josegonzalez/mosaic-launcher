@@ -346,6 +346,24 @@ static int listArt(Entry* entry, char* out, size_t size) {
 	return 0;
 }
 
+// Plugins' art decorators under the selected entry's thumbnail, placed as
+// the main loop puts it on its layer, once its image is in: one kept from
+// the last entry while it loads isn't this one's.
+static void decorateThumb(const Entry* entry) {
+	int img_w = 0, img_h = 0;
+	SDL_LockMutex(thumbMutex);
+	if (thumbbmp && ArtLoader_thumbShown()) {
+		img_w = thumbbmp->w;
+		img_h = thumbbmp->h;
+	}
+	SDL_UnlockMutex(thumbMutex);
+	MosaicRect art, below;
+	int margin = SCALE1(BUTTON_MARGIN*3);
+	if (!ListArt_rect(screen->w, screen->h, CFG_getGameArtWidth(), margin, img_w, img_h, &art)) return;
+	if (!ListArt_below(screen->w, CFG_getGameArtWidth(), margin, screen->h - SCALE1(PADDING + PILL_SIZE), &art, &below)) return;
+	Plugins_decorateArt(screen, entry, &art, &below);
+}
+
 // An empty folder has no entry for its background or art: the default
 // background, no thumbnail and no names, so no pill is left from the last
 // folder. Stock asserts an entry here instead.
@@ -624,6 +642,9 @@ void GameList_render(void) {
 				Plugins_decorateRow(screen, entry, &row);
 			}
 		}
+		// and their details under the thumbnail, when one shows
+		if (!list_layout_drawn && had_thumb && Plugins_hasArtDecorators())
+			decorateThumb(state.top->entries->items[state.top->selected]);
 		if(lastScreen==SCREEN_GAMESWITCHER) {
 			if(switcherSur) {
 				// update cpu surface here first
