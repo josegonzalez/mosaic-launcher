@@ -7,6 +7,11 @@
 //
 // With fail=1 in its config, selection_changed returns an error on its
 // second event, and the plugin then only scrolls and counts.
+//
+// With jump=1, it goes from Selector's last game to <sd>/Selector/Tiny, a
+// subfolder of one game, then back to Selector's last game and over to
+// <sd>/Tiny, another folder of one game, logging where each open left the
+// selection.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -19,7 +24,10 @@
 
 static const MosaicHost* host;
 static char folder[512];
+static char sub[600];  // <sd>/Selector/Tiny
+static char tiny[512]; // <sd>/Tiny
 static int fail = 0;
+static int jump = 0;
 static int events = 0;
 static int step = 0;
 static int moves = 0;
@@ -41,6 +49,13 @@ static void rootEntries(MosaicList* root) {
 }
 
 static MosaicList* virtualDir(const char* path) {
+	if (!strcmp(path, sub) || !strcmp(path, tiny)) {
+		MosaicList* list = host->list_new();
+		char file[700];
+		snprintf(file, sizeof(file), "%s/Only.gb", path);
+		host->list_push(list, host->entry_new(file, MOSAIC_ENTRY_ROM, "Only"));
+		return list;
+	}
 	if (strcmp(path, folder) != 0) return NULL;
 	static const char* names[GAMES] = { "Apple", "Banana", "Cherry", "Date", "Elder", "Fig", "Grape" };
 	MosaicList* list = host->list_new();
@@ -55,6 +70,8 @@ static MosaicList* virtualDir(const char* path) {
 static const char* where(void) {
 	const char* path = host->current_path();
 	if (path && !strcmp(path, folder)) return "Selector";
+	if (path && !strcmp(path, sub)) return "Selector/Tiny";
+	if (path && !strcmp(path, tiny)) return "Tiny";
 	if (path && !strcmp(path, host->sdcard_path)) return "root";
 	return path ? path : "(null)";
 }
@@ -84,7 +101,7 @@ static void tick(unsigned long now) {
 		}
 		break;
 	case 1: // the folder's first game
-		if (events == 2) step = 2;
+		if (events == 2) step = jump ? 10 : 2;
 		break;
 	case 2: // a row a frame, faster than it settles
 		moves++;
@@ -108,9 +125,6 @@ static void tick(unsigned long now) {
 	case 4: // a reload keeping the same game is nothing
 		if (now - since > 1000) {
 			say("after reload %i events", events);
-			// back to the top first: open_path from tick leaves the game
-			// list this frame's index, which the root may not have
-			host->select_index(0);
 			say("open root %i", host->open_path(host->sdcard_path, MOSAIC_ENTRY_DIR));
 			since = now;
 			step = 5;
@@ -122,6 +136,28 @@ static void tick(unsigned long now) {
 			step = 99;
 		}
 		break;
+	// jump=1: each open from the last game, then where it left the selection
+	// on the next frame, after the game list's input has run
+	case 10:
+		host->select_index(GAMES - 1);
+		say("open sub %i", host->open_path(sub, MOSAIC_ENTRY_DIR));
+		step = 11;
+		break;
+	case 11:
+		say("in %s, index %i of %i", where(), host->selected_index(), host->list_count(host->current_list()));
+		say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
+		step = 12;
+		break;
+	case 12:
+		host->select_index(GAMES - 1);
+		say("open tiny %i", host->open_path(tiny, MOSAIC_ENTRY_DIR));
+		step = 13;
+		break;
+	case 13:
+		say("in %s, index %i of %i", where(), host->selected_index(), host->list_count(host->current_list()));
+		say("done");
+		step = 99;
+		break;
 	}
 }
 
@@ -129,7 +165,10 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, selection_settle_ms)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Selector", host->sdcard_path);
+	snprintf(sub, sizeof(sub), "%s/Tiny", folder);
+	snprintf(tiny, sizeof(tiny), "%s/Tiny", host->sdcard_path);
 	fail = atoi(host->cfg_get(ID, "fail", "0"));
+	jump = atoi(host->cfg_get(ID, "jump", "0"));
 	say("settle %i", host->selection_settle_ms);
 	return 0;
 }

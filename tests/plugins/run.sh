@@ -745,6 +745,15 @@ expect "after scrolling 2 events"
 grep -qF "plugins: selector's selection_changed returned -1, no longer telling it about the selection until the launcher restarts" "$log" \
 	|| fail "selector's failing selection_changed wasn't logged"
 grep -qF "plugin selector: event 3" "$log" && fail "selector's selection_changed was called after it failed"
+# open_path from tick, from a folder's last game into folders of one game,
+# a subfolder and one elsewhere, leaves each on its own game
+printf 'jump=1\n' >"$STATE/selector.cfg"
+run_launcher "$WORK/selector-jump.log" "plugin selector: done" || fail "the launcher exited early with selector opening smaller folders"
+log="$WORK/selector-jump.log"
+expect "open sub 1"
+expect "in Selector/Tiny, index 0 of 1"
+expect "open tiny 1"
+expect "in Tiny, index 0 of 1"
 rm -rf "$WORK/plugins/selector.plugin" "$STATE/selector.cfg"
 
 # a saved last path the launcher can't follow up to the card's root, such as

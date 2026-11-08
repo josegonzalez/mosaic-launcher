@@ -291,7 +291,14 @@ static void hostInhibitSleep(const char* plugin_id, int on) {
 
 static int hostOpenPath(const char* path, int type) {
 	if (type != MOSAIC_ENTRY_ROM && type != MOSAIC_ENTRY_PAK && type != MOSAIC_ENTRY_DIR) return 0;
-	return Entry_openPath(path, type);
+	int opened = Entry_openPath(path, type);
+	// main's copies for this frame, so the game list's input doesn't put
+	// the old folder's index on the new one
+	if (state.top) {
+		selected = state.top->selected;
+		total = state.top->entries->count;
+	}
+	return opened;
 }
 
 static int hostRecentsCount(void) {
