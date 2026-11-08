@@ -1,0 +1,7 @@
+id=video-previews
+name=Video previews
+api=1
+# seconds the selection rests on a game before its clip in <rom dir>/.videos/<rom name>.mp4 plays
+setting.delay=choice|Play after (seconds)|2|1,2,3,5
+# the clip's sound, at the system's volume
+setting.sound=toggle|Sound|on

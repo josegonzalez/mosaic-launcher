@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop plugins-desktop plugins-device build-% devices pak test smoke test-plugins test-profiles lint drift clean
+.PHONY: all desktop run-desktop plugins-desktop plugins-device ffmpeg-device build-% devices pak test smoke test-plugins test-profiles lint drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -75,7 +75,19 @@ plugins-device:
 		ghcr.io/loveretro/tg5040-toolchain:latest \
 		/bin/bash -c 'cd /root/workspace && make -C plugins ARCH=aarch64 CC=$${CROSS_COMPILE}gcc OUT=/root/workspace/build/plugins'
 
-devices: $(addprefix build-,$(PLATFORMS)) plugins-device
+# The trimmed LGPL ffmpeg video-previews loads, built once in the oldest
+# sysroot from a pinned tarball (stamped, so it's a no-op once built), for
+# plugins-device to put beside the plugin. Without it the plugin builds
+# without ffmpeg and says it's unavailable.
+ffmpeg-device:
+	@test -n "$(CONTAINER_RUNTIME)" || (echo "docker or podman is required" && exit 1)
+	$(CONTAINER_RUNTIME) run --rm -v $(CURDIR):/root/workspace \
+		ghcr.io/loveretro/tg5040-toolchain:latest \
+		/bin/bash -c 'cd /root/workspace && sh plugins/video-previews/ffmpeg/build.sh build/ffmpeg/aarch64'
+
+devices: $(addprefix build-,$(PLATFORMS))
+	$(MAKE) ffmpeg-device
+	$(MAKE) plugins-device
 
 ###########################################################
 # packaging
@@ -112,7 +124,7 @@ test-profiles: desktop plugins-desktop
 	./scripts/plugin-profiles.sh
 
 lint:
-	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh
+	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh
 	@# the template ships its own copy of the SDK; it must match
 	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h
 	cmp sdk/LICENSE template/sdk/LICENSE

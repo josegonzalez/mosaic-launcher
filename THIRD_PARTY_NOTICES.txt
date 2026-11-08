@@ -15,6 +15,16 @@ licence in LICENSE, and the plugin SDK under sdk/LICENSE.
     option; the BSD License is taken here).
   - dr_flac (include/dr_libs/dr_flac.h): public domain or MIT-0.
 
+The bundled video-previews plugin loads FFmpeg's libavutil, libavcodec and
+libavformat with dlopen, never linking them. On devices they're FFmpeg
+6.1.2, built by `make devices` from the release tarball at
+https://ffmpeg.org/releases/ffmpeg-6.1.2.tar.xz with the options in
+plugins/video-previews/ffmpeg/build.sh, unchanged, as an LGPL build (no GPL
+parts). They're under the GNU Lesser General Public License, version 2.1
+or later, whose text ships beside them as ffmpeg-COPYING.LGPLv2.1 in the
+plugin's lib folder. They can be replaced with any build of the same
+version and options.
+
 ========================================================================
 rcheevos
 

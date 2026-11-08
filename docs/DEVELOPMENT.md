@@ -32,6 +32,8 @@ make devices          # tg5040, tg5050 and h700
 make pak              # build/Launcher.pak.zip from whatever is built
 ```
 
+`make devices` also runs `make ffmpeg-device`, which builds the trimmed LGPL ffmpeg the `video-previews` plugin loads, in the tg5040 toolchain, before `make plugins-device` puts its three libraries and licence beside the plugin's `plugin.so`. `plugins/video-previews/ffmpeg/build.sh` downloads ffmpeg 6.1.2's release tarball into `build/ffmpeg/aarch64/`, checks it against a pinned SHA-256 and builds it with only what preview clips need (about 2.6 MB of libraries). It's stamped with the script's hash, so it runs once (a few minutes) and then does nothing until the script changes; `rm -rf build/ffmpeg` builds it again. Plugins built without it, by `make plugins-device` on its own or in CI, get a `video-previews` that says it's unavailable. On desktop the plugin builds against the system's ffmpeg through `pkg-config` (`brew install ffmpeg`, or `libavformat-dev libavcodec-dev libavutil-dev`) and loads it from that libdir, and builds without it when there's none. `make test-plugins` makes its clips with the `ffmpeg` command and skips the cases that play them without it.
+
 The desktop build runs natively on macOS (Homebrew) or Linux:
 
 ```shell
