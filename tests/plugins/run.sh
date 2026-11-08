@@ -419,9 +419,9 @@ grep -qF "plugins: refused a 2048x2048 surface for drawer, its surfaces would ta
 grep -qF "plugins: drawer can't load $DRAW_DIR/fifo" "$log" || fail "the refused FIFO wasn't logged"
 grep -q "plugins: freed .* surface\|plugins: refused a .* surface" "$WORK/hello.log" && fail "surfaces were made without a plugin asking"
 
-# a launch quits the launcher, running plugins' quit; the card's recents,
-# /tmp/next and /tmp/last.txt are put back afterwards
-PAK="$CARD/.drawer-test/Drawn.pak"
+# a launch quits the launcher, running plugins' quit; the card's recents
+# and /tmp/next are put back afterwards, and /tmp/last.txt after the next case
+PAK="$DRAW_DIR/Drawn.pak"
 [ -f "$RECENTS" ] && cp "$RECENTS" "$WORK/recent.txt.saved"
 [ -f /tmp/next ] && cp /tmp/next "$WORK/next.saved"
 [ -f /tmp/last.txt ] && cp /tmp/last.txt "$WORK/last.txt.saved"
@@ -441,8 +441,8 @@ fi
 
 if [ -f "$WORK/recent.txt.saved" ]; then cp "$WORK/recent.txt.saved" "$RECENTS"; else rm -f "$RECENTS"; fi
 if [ -f "$WORK/next.saved" ]; then cp "$WORK/next.saved" /tmp/next; else rm -f /tmp/next; fi
-if [ -f "$WORK/last.txt.saved" ]; then cp "$WORK/last.txt.saved" /tmp/last.txt; else rm -f /tmp/last.txt; fi
-rm -rf "$WORK/recent.txt.saved" "$WORK/next.saved" "$WORK/last.txt.saved" "$CARD/.drawer-test"
+grep -qxF "$PAK" /tmp/last.txt 2>/dev/null || fail "opening drawer's pak didn't save it as the last path"
+rm -f "$WORK/recent.txt.saved" "$WORK/next.saved"
 printf 'pak=\ndecline=1\n' >>"$STATE/drawer.cfg"
 run_launcher "$WORK/drawer-decline.log" "plugins: drawer declined to start" || fail "the launcher exited early after drawer declined"
 log="$WORK/drawer-decline.log"
@@ -450,6 +450,26 @@ expect "declining"
 grep -qF "plugins: freed 7 surfaces drawer left" "$log" || fail "drawer's surfaces weren't freed when it declined"
 grep -qF "plugin drawer: quit" "$log" && fail "a declined plugin's quit ran"
 rm -rf "$WORK/plugins/drawer.plugin" "$DRAW_DIR" "$STATE/drawer.cfg" "$STATE/plugins.txt"
+
+# a saved last path the launcher can't follow up to the card's root, such as
+# the pak off the card drawer's launch left, starts at the root rather than
+# crashing; one missing from the card is followed as far as it goes, as stock
+build_plugin hello 'id=hello\nname=Hello\napi=1\n'
+rm -f "$STATE/hello.cfg"
+i=0
+for last in "$PAK" "" "garbage" "${CARD}X/Game.gb" "$CARD/Roms/Missing (MISS)/Game.gb"; do
+	i=$((i + 1))
+	# the first is what drawer's launch saved
+	[ "$i" -gt 1 ] && printf '%s' "$last" >/tmp/last.txt
+	run_launcher "$WORK/last-$i.log" "plugin hello: hello from desktop" || fail "the launcher exited with \"$last\" as the last path"
+	case "$last" in
+	"$CARD"/*) grep -qF "loadLast: ignoring" "$WORK/last-$i.log" && fail "\"$last\" was ignored as the last path" ;;
+	*) grep -qF "loadLast: ignoring \"$last\", it isn't on the card" "$WORK/last-$i.log" || fail "\"$last\" wasn't ignored as the last path" ;;
+	esac
+done
+rm -rf "$WORK/plugins/hello.plugin" "$STATE/hello.cfg"
+if [ -f "$WORK/last.txt.saved" ]; then cp "$WORK/last.txt.saved" /tmp/last.txt; else rm -f /tmp/last.txt; fi
+rm -f "$WORK/last.txt.saved"
 
 # the bundled plugins load and start cleanly
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building the bundled plugins"

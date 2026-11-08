@@ -240,8 +240,16 @@ void saveLast(char* path) {
 void loadLast(void) { // call after loading root directory
 	if (!exists(LAST_PATH)) return;
 
-	char last_path[256];
+	char last_path[256] = ""; // ignored below when it can't be read
 	getFile(LAST_PATH, last_path, 256);
+
+	// stock walks up to the card's root and runs off the start of the path
+	// when it isn't under the card, so start at the root as with no last path
+	size_t card_len = strlen(SDCARD_PATH);
+	if (strncmp(last_path, SDCARD_PATH, card_len) != 0 || (last_path[card_len] != '\0' && last_path[card_len] != '/')) {
+		LOG_info("loadLast: ignoring \"%s\", it isn't on the card\n", last_path);
+		return;
+	}
 
 	char full_path[256];
 	strcpy(full_path, last_path);
