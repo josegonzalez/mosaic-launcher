@@ -109,6 +109,12 @@ int LayoutRect_clip(const MosaicRect* a, const MosaicRect* b, MosaicRect* out);
 void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int name_w, int show_names,
 	MosaicRow* out);
 
+// Whether the built-in list draws a row's name: names show in the folder
+// (show_names), and either no plugin hid it (hidden) or there's no art to
+// stand in for it, which is while Show game art is off (show_art), or on
+// the selected row when no thumbnail shows beside the list (has_art).
+int ListRow_nameShown(int show_names, int hidden, int show_art, int selected, int has_art);
+
 // Where the game list's selection is on a frame, for transitions: the
 // selected row and the pill on it, each empty (w 0) when unknown or not
 // drawn.

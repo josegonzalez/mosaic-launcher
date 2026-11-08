@@ -236,6 +236,9 @@ void Directory_index(Directory* self) {
 
 	Listing_markDuplicates(self->entries);
 	if (!skip_index) Listing_buildIndex(self);
+	// once the names and order are final
+	free(self->names_hidden);
+	self->names_hidden = Plugins_hideNames(self->entries, self->path);
 }
 
 
@@ -249,6 +252,7 @@ Directory* Directory_new(char* path, int selected) {
 	self->entries = Plugins_virtualDir(path);
 	if (!self->entries) self->entries = Listing_source(path);
 	self->alphas = IntArray_new();
+	self->names_hidden = NULL;
 	self->selected = selected;
 	Directory_index(self);
 	return self;
@@ -297,6 +301,7 @@ void Directory_free(Directory* self) {
 	free(self->name);
 	EntryArray_free(self->entries);
 	IntArray_free(self->alphas);
+	free(self->names_hidden);
 	free(self);
 }
 

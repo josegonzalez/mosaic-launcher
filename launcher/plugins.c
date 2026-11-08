@@ -666,6 +666,7 @@ static const MosaicHost host = {
 	.blit_alpha = PluginDraw_blitAlpha,
 	.transition_max_ms = TRANSITION_MAX_MS,
 	.plugin_art = 1,
+	.hide_names = 1,
 };
 
 ///////////////////////////////////////
@@ -1179,6 +1180,13 @@ int Plugins_listReady(Array* entries, const char* dir_path) {
 	return renamed;
 }
 
+unsigned char* Plugins_hideNames(Array* entries, const char* dir_path) {
+	ListHideName hides[PLUGIN_MAX];
+	int count = 0;
+	EACH_PLUGIN_WITH(hide_name) hides[count++] = p->hide_name;
+	return ListHide_chain(entries, hides, count, dir_path);
+}
+
 // The replacement for the launch in progress: the one pre_launch kept, and
 // the one the running pre_launch asked for, kept if it returns REPLACE.
 static LaunchCmd replacement;
@@ -1581,7 +1589,8 @@ static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* 
 	if (!LayoutRect_clip(rect, &layout_area, &clip)) return -1;
 	ListSelection_cell(&layout_selected, index, state.top->selected, rect, &layout_area);
 	if (!Plugins_hasDecorators()) return 0;
-	MosaicRow row = { sizeof(row), index, index == state.top->selected, *rect, { rect->x, rect->y, 0, rect->h } };
+	MosaicRow row = { sizeof(row), index, index == state.top->selected, *rect, { rect->x, rect->y, 0, rect->h },
+		state.top->names_hidden ? state.top->names_hidden[index] : 0 };
 	// a name is kept inside its cell
 	if (name && !LayoutRect_clip(name, rect, &row.name)) row.name = (MosaicRect){ rect->x, rect->y, 0, rect->h };
 	PluginDraw_clip(screen, &(SDL_Rect){ clip.x, clip.y, clip.w, clip.h });

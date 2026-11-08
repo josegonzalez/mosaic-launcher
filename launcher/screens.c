@@ -55,6 +55,7 @@ float targetY;
 float previousY;
 int is_scrolling;
 bool list_show_entry_names;
+bool list_show_selected_name;
 bool list_layout_drawn = false;
 char folderBgPath[1024];
 int globallpillW = 0;

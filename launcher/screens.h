@@ -63,6 +63,10 @@ extern float targetY;
 extern float previousY;
 extern int is_scrolling;
 extern bool list_show_entry_names;
+// The selected row's name shows, so its pill and scrolling name do: names
+// show and a plugin's hide_name didn't hide it, or it has no art to stand
+// in for it.
+extern bool list_show_selected_name;
 // The last frame with entries was drawn by a plugin layout, so the stock
 // pill, scrolling name and thumbnail stay off.
 extern bool list_layout_drawn;

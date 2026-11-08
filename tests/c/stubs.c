@@ -63,6 +63,11 @@ void Plugins_sort(Array* entries, const char* dir_path) {
 int Plugins_listReady(Array* entries, const char* dir_path) {
 	return stub_list_ready ? stub_list_ready(entries, dir_path) : 0;
 }
+// A test sets this to stand in for plugins' hide_name.
+ListHideName stub_hide_name = NULL;
+unsigned char* Plugins_hideNames(Array* entries, const char* dir_path) {
+	return stub_hide_name ? ListHide_chain(entries, &stub_hide_name, 1, dir_path) : NULL;
+}
 // A test sets this to stand in for plugins' repair_path.
 int (*stub_repair_path)(const char* missing, char* out, size_t size) = NULL;
 int Plugins_repairPath(const char* missing, char* out, size_t size) {

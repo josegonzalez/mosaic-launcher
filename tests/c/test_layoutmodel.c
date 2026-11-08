@@ -145,6 +145,23 @@ static void testListRow(void) {
 	CHECK(row.rect.w == 0 && row.name.w == 0);
 }
 
+static void testNameShown(void) {
+	// show_names, hidden, show_art, selected, has_art
+	// stock: names show, or none do, as at the root with folder names off
+	CHECK(ListRow_nameShown(1, 0, 1, 0, 0) == 1);
+	CHECK(ListRow_nameShown(1, 0, 1, 1, 1) == 1);
+	CHECK(ListRow_nameShown(0, 0, 1, 1, 1) == 0);
+	CHECK(ListRow_nameShown(0, 1, 0, 1, 0) == 0);
+	// a hidden name is left out while game art shows
+	CHECK(ListRow_nameShown(1, 1, 1, 0, 0) == 0);
+	CHECK(ListRow_nameShown(1, 1, 1, 0, 1) == 0);
+	CHECK(ListRow_nameShown(1, 1, 1, 1, 1) == 0);
+	// but shows with no art to stand in for it
+	CHECK(ListRow_nameShown(1, 1, 0, 0, 0) == 1);
+	CHECK(ListRow_nameShown(1, 1, 0, 1, 1) == 1);
+	CHECK(ListRow_nameShown(1, 1, 1, 1, 0) == 1);
+}
+
 static void testSelection(void) {
 	ListSelection sel;
 	// the built-in list's selected row and the pill on it, as decorators get them
@@ -294,6 +311,7 @@ int main(void) {
 	testArea();
 	testClip();
 	testListRow();
+	testNameShown();
 	testSelection();
 	testHeader();
 	testTopRow();

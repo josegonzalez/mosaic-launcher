@@ -68,6 +68,7 @@ int main (int argc, char *argv[]) {
 	selected_row = state.top->selected - state.top->start;
 	is_scrolling = 0;
 	list_show_entry_names = true;
+	list_show_selected_name = true;
 
 	folderbgbmp = NULL;
 
@@ -239,7 +240,7 @@ int main (int argc, char *argv[]) {
 				GFX_clearLayers(LAYER_SCROLLTEXT);
 
 				SDL_LockMutex(animMutex);
-				if (list_show_entry_names && !list_layout_drawn) {
+				if (list_show_selected_name && !list_layout_drawn) {
 					GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 					GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING), pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
 				}
@@ -292,7 +293,7 @@ int main (int argc, char *argv[]) {
 			SDL_LockMutex(animMutex);
 			if (getAnimationDraw()) {
 				GFX_clearLayers(LAYER_TRANSITION);
-				if (list_show_entry_names && !list_layout_drawn)
+				if (list_show_selected_name && !list_layout_drawn)
 					GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 				setAnimationDraw(0);
 			}
@@ -320,7 +321,7 @@ int main (int argc, char *argv[]) {
 					int text_offset_y = (SCALE1(PILL_SIZE) - TTF_FontHeight(font.large) + 1) >> 1;
 
 					GFX_clearLayers(LAYER_SCROLLTEXT);
-					if (list_show_entry_names) {
+					if (list_show_selected_name) {
 						GFX_scrollTextTexture(
 							font.large,
 							entry_text,
@@ -337,7 +338,7 @@ int main (int argc, char *argv[]) {
 					GFX_clearLayers(LAYER_TRANSITION);
 					GFX_clearLayers(LAYER_SCROLLTEXT);
 					SDL_LockMutex(animMutex);
-					if (list_show_entry_names && !list_layout_drawn) {
+					if (list_show_selected_name && !list_layout_drawn) {
 						GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
 						GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING),pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
 					}

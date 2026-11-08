@@ -218,6 +218,12 @@ static void listView(MosaicListView* v) {
 	LayoutView_area(screen->w, screen->h, screen->h - SCALE1(PADDING + PILL_SIZE), SCALE1(PADDING), ow, SCALE1(PILL_SIZE),
 		&v->area, &v->status);
 	if (header_w > 0) v->header = (MosaicRect){ v->status.x - header_w, v->status.y, header_w, v->status.h };
+	v->names_hidden = state.top->names_hidden;
+}
+
+// 1 when a plugin's hide_name hid the name of the entry at i in the folder.
+static int nameHidden(int i) {
+	return state.top->names_hidden && state.top->names_hidden[i];
 }
 
 void GameList_registerActions(void) {
@@ -355,6 +361,7 @@ static void emptyUpdate(void) {
 	ox = screen->w;
 	update_art[0] = '\0';
 	list_show_entry_names = false;
+	list_show_selected_name = false;
 	update_show_names = false;
 }
 
@@ -448,6 +455,9 @@ void GameList_update(void) {
 		}
 	}
 	update_show_names = list_show_entry_names;
+	// a hidden name leaves only the art beside the list, if there is some
+	list_show_selected_name = ListRow_nameShown(list_show_entry_names, nameHidden(state.top->selected),
+		CFG_getShowGameArt(), 1, had_thumb);
 }
 
 void GameList_render(void) {
@@ -531,6 +541,9 @@ void GameList_render(void) {
 			bool row_is_selected = (j == selected_row);
 			bool row_is_top = (i == state.top->start);
 			bool row_has_moved = (state.previous_row != selected_row || state.previous_depth != state.stack->count);
+			// a plugin can hide a name its art stands in for
+			bool name_shown = row_is_selected ? list_show_selected_name
+				: ListRow_nameShown(list_show_entry_names, nameHidden(i), CFG_getShowGameArt(), 0, had_thumb);
 			if (row_is_top && !(had_thumb))
 				available_width -= ow;
 			// and clear of plugins' header widgets
@@ -563,8 +576,8 @@ void GameList_render(void) {
 			if (row_is_selected) {
 				// the row the pill rests on, as decorators get it
 				ListSelection_row(&shown, j, SCALE1(BUTTON_MARGIN), SCALE1(PADDING), SCALE1(PILL_SIZE), available_width,
-					max_width, list_show_entry_names);
-				is_scrolling = list_show_entry_names && GFX_textShouldScroll(font.large,display_name, max_width - SCALE1(BUTTON_PADDING*2), fontMutex);
+					max_width, name_shown);
+				is_scrolling = name_shown && GFX_textShouldScroll(font.large,display_name, max_width - SCALE1(BUTTON_PADDING*2), fontMutex);
 				GFX_resetScrollText();
 				bool should_animate = state.previous_depth == state.stack->count;
 				SDL_LockMutex(animMutex);
@@ -593,7 +606,7 @@ void GameList_render(void) {
 			SDL_Rect text_rect = { 0, 0, max_width - SCALE1(BUTTON_PADDING*2), text->h };
 			SDL_Rect dest_rect = { SCALE1(BUTTON_MARGIN + BUTTON_PADDING), SCALE1(PADDING + (j * PILL_SIZE)) + text_offset_y };
 
-			if(list_show_entry_names) {
+			if(name_shown) {
 				SDL_BlitSurface(text_unique, &text_rect, screen, &dest_rect);
 				SDL_BlitSurface(text, &text_rect, screen, &dest_rect);
 			}
@@ -604,9 +617,10 @@ void GameList_render(void) {
 			if (Plugins_hasDecorators()) {
 				MosaicRow row;
 				ListRow_rects(j, SCALE1(BUTTON_MARGIN), SCALE1(PADDING), SCALE1(PILL_SIZE), available_width, max_width,
-					list_show_entry_names, &row);
+					name_shown, &row);
 				row.index = i;
 				row.selected = row_is_selected;
+				row.name_hidden = nameHidden(i);
 				Plugins_decorateRow(screen, entry, &row);
 			}
 		}

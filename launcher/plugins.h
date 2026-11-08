@@ -79,6 +79,10 @@ void Plugins_sort(Array* entries, const char* dir_path);
 // if any name changed.
 int Plugins_listReady(Array* entries, const char* dir_path);
 
+// Asks plugins' hide_name about each entry: one byte per entry, 1 where
+// one hid its name, or NULL when none did. The caller frees it.
+unsigned char* Plugins_hideNames(Array* entries, const char* dir_path);
+
 // Asks plugins before a launch. Returns 1 to go ahead, 0 if one cancelled.
 // Going ahead also arranges for post_return on the next start.
 int Plugins_preLaunch(const char* path, int type);

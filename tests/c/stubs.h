@@ -15,6 +15,7 @@ extern void (*stub_root_entries)(Array* root);
 extern Array* (*stub_quick_items)(void);
 extern ListSortCompare stub_sort_compare;
 extern int (*stub_list_ready)(Array* entries, const char* dir_path);
+extern ListHideName stub_hide_name;
 extern int (*stub_repair_path)(const char* missing, char* out, size_t size);
 
 #endif

@@ -88,6 +88,12 @@ void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int 
 	out->name = (MosaicRect){ margin, out->rect.y, name_w, pill_h };
 }
 
+int ListRow_nameShown(int show_names, int hidden, int show_art, int selected, int has_art) {
+	if (!show_names) return 0;
+	if (!hidden || !show_art) return 1;
+	return selected && !has_art;
+}
+
 void ListSelection_clear(ListSelection* sel) {
 	sel->row = (MosaicRect){ 0, 0, 0, 0 };
 	sel->pill = sel->row;

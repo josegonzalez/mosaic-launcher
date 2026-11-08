@@ -35,6 +35,8 @@ typedef struct Directory {
 	char* name;
 	Array* entries;
 	IntArray* alphas;
+	// one byte per entry, 1 where a plugin's hide_name hid its name, or NULL when none is
+	unsigned char* names_hidden;
 	// rendering
 	int selected;
 	int start;

@@ -203,7 +203,19 @@ typedef struct MosaicListView {
 	// to status, already drawn; leave it clear too. Empty (w 0) when there
 	// are none.
 	MosaicRect header;
+	// Added with hide_name: one byte for each of the count entries, in list
+	// order, 1 where a plugin's hide_name hid the entry's name and 0 where it
+	// didn't, or NULL when no name in the folder is hidden. Asked once when
+	// the folder is listed, so it's cheap to read every frame. A layout
+	// decides how a hidden name looks, such as drawing the entry's art in
+	// its place, and should still show the name where it has no art to
+	// stand in for it. Check for it with MOSAIC_VIEW_HAS(view, names_hidden).
+	const unsigned char* names_hidden;
 } MosaicListView;
+
+// True when the launcher's MosaicListView has this field.
+#define MOSAIC_VIEW_HAS(view, field) \
+	((view)->size >= offsetof(MosaicListView, field) + sizeof((view)->field))
 
 // One row of the game list, or one cell of a layout, for decorate_row. It
 // begins with its own size, and fields are only added at the end.
@@ -213,7 +225,16 @@ typedef struct MosaicRow {
 	int selected;    // 1 on the selected row
 	MosaicRect rect; // the row on the screen; drawing is clipped to it, and under a layout to view->area too
 	MosaicRect name; // the part of rect the entry's name takes, from its left; w is 0 when no name shows or the layout doesn't say
+	// Added with hide_name: 1 when a plugin's hide_name hid the entry's
+	// name, as in MosaicListView's names_hidden, else 0. On the built-in
+	// list, name is then empty unless the name shows anyway for want of
+	// art. Check for it with MOSAIC_ROW_HAS(row, name_hidden).
+	int name_hidden;
 } MosaicRow;
+
+// True when the launcher's MosaicRow has this field.
+#define MOSAIC_ROW_HAS(row, field) \
+	((row)->size >= offsetof(MosaicRow, field) + sizeof((row)->field))
 
 // Buttons on the game list this frame, as masks of MOSAIC_BUTTON_BIT.
 typedef struct MosaicInput {
@@ -655,6 +676,11 @@ typedef struct MosaicHost {
 	// has the background slot (background_render). Check for both with
 	// MOSAIC_HOST_HAS(host, plugin_art).
 	int plugin_art;
+
+	// 1 on a launcher that asks plugins' hide_name, and passes the answers
+	// to layouts and row decorators. Check for it with
+	// MOSAIC_HOST_HAS(host, hide_names).
+	int hide_names;
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -879,6 +905,20 @@ typedef struct MosaicPlugin {
 	// else for an error, after which the launcher logs it and shows stock's
 	// background until it restarts. Other screens keep stock's background.
 	int (*background_render)(MosaicSurface* screen, const MosaicEntry* selected);
+
+	// Hiding names, for entries whose art stands in for them, such as a
+	// folder shown as its cover. Asked once for each entry each time a
+	// folder is listed, after list_ready, when its names and order are
+	// final: return 1 to hide the entry's name, or 0. Plugins are asked in
+	// load order, and the first to return 1 hides it. dir_path is the
+	// folder being listed. The built-in list leaves a hidden name out while
+	// Show game art is on: the row is blank, and when it's selected there's
+	// no pill or scrolling name, only its art beside the list. A selected
+	// entry with no art to show keeps its name, so there's always a way to
+	// tell where the selection is. Layouts get the answers in MosaicListView's
+	// names_hidden and decorators in MosaicRow's name_hidden. It's a list
+	// hook: it can't rename entries or move the selection.
+	int (*hide_name)(const MosaicEntry* entry, const char* dir_path);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

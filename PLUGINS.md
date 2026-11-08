@@ -387,6 +387,18 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
       return host->fill_rect(screen, NULL, mosaic_color(0x000000, 160));
   }
   ```
+- Hiding names lets a plugin show an entry as its art alone, such as a folder shown as its cover. `hide_name(entry, dir_path)` in `MosaicPlugin` returns 1 to hide the entry's name, or 0. It's asked once for each entry each time a folder is listed, after `list_ready`, when the names and order are final, so the answers are kept with the list rather than asked each frame; plugins are asked in load order, and the first to return 1 hides it. It's a list hook like `filter`: it can't rename entries or move the selection.
+
+  The built-in list leaves a hidden name out while Show game art is on: the row is blank, and when it's selected there's no pill or scrolling name, only the entry's art beside the list. A selected entry with no art to show (no thumbnail, box, 3D box or screenshot, from a file or a plugin) keeps its name and pill, so the selection can always be found, and with Show game art off every name shows. Row decorators still run on hidden rows, with `name` empty. Layouts get the answers in `MosaicListView`'s `names_hidden`: one byte for each of `count` entries, in list order, 1 where a name is hidden, or `NULL` when none in the folder is. A layout decides how a hidden name looks, such as drawing the entry's art in its place, and should still show the name where it has no art. Decorators get `MosaicRow`'s `name_hidden`, 1 on a hidden entry's row or cell. With no plugin hiding anything, the list is exactly stock's. Check for the hook with `MOSAIC_HOST_HAS(host, hide_names)`, and for the new fields with `MOSAIC_VIEW_HAS(view, names_hidden)` and `MOSAIC_ROW_HAS(row, name_hidden)`.
+
+  ```c
+  // folders show as their cover
+  static int hideName(const MosaicEntry* entry, const char* dir_path) {
+      (void)dir_path;
+      char path[512];
+      return host->entry_type(entry) == MOSAIC_ENTRY_DIR && host->art_find(entry, MOSAIC_ART_BOX, path, sizeof(path));
+  }
+  ```
 
 ## Without writing C
 

@@ -928,6 +928,88 @@ static void test_list_ready_renames_keep_collection_order(void) {
 }
 
 ///////////////////////////////////////
+// hiding names
+
+static int hide_asks = 0;
+static const char* hide_dir = NULL;
+static int hideB(const MosaicEntry* entry, const char* dir_path) {
+	hide_asks++;
+	hide_dir = dir_path;
+	return !strcmp(((const Entry*)entry)->name, "B");
+}
+static int hideVowels(const MosaicEntry* entry, const char* dir_path) {
+	(void)dir_path;
+	return strchr("AEIOU", ((const Entry*)entry)->name[0]) ? 1 : 0;
+}
+static int hideNothing(const MosaicEntry* entry, const char* dir_path) {
+	(void)entry;
+	(void)dir_path;
+	hide_asks++;
+	return 0;
+}
+
+static void test_hide_chain_any_hides(void) {
+	Array* items = namedEntries("A,B,C,D,E");
+
+	// no hooks, no items, or none hiding anything: no flags
+	CHECK(ListHide_chain(items, NULL, 0, "/x") == NULL);
+	ListHideName nothing[] = { hideNothing };
+	hide_asks = 0;
+	CHECK(ListHide_chain(items, nothing, 1, "/x") == NULL);
+	CHECK(hide_asks == 5);
+	Array* empty = Array_new();
+	CHECK(ListHide_chain(empty, nothing, 1, "/x") == NULL);
+	Array_free(empty);
+
+	// one byte an item, 1 for each one any hook hides
+	ListHideName both[] = { hideVowels, hideB };
+	hide_asks = 0;
+	unsigned char* hidden = ListHide_chain(items, both, 2, "/x");
+	CHECK(hidden != NULL);
+	if (hidden) CHECK(hidden[0] == 1 && hidden[1] == 1 && hidden[2] == 0 && hidden[3] == 0 && hidden[4] == 1);
+	// the first to hide one ends the asking for it: A and E aren't asked again
+	CHECK(hide_asks == 3);
+	CHECK(hide_dir && !strcmp(hide_dir, "/x"));
+	free(hidden);
+	EntryArray_free(items);
+}
+
+static void test_hidden_names_follow_the_final_order(void) {
+	resetCard();
+	addEmu("GB");
+	addGames("A,B,C");
+
+	// stock: none
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	CHECK(dir->names_hidden == NULL);
+	Directory_free(dir);
+
+	// after the plugins' sort, so the flags line up with what's drawn
+	stub_hide_name = hideB;
+	stub_sort_compare = reverseNames;
+	hide_dir = NULL;
+	dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	CHECK_STR(names(dir->entries), "C,B,A");
+	CHECK(hide_dir && !strcmp(hide_dir, ROMS_PATH "/Game Boy (GB)"));
+	CHECK(dir->names_hidden && !dir->names_hidden[0] && dir->names_hidden[1] && !dir->names_hidden[2]);
+
+	// asked again when the folder is listed again
+	removeGame("B");
+	addGames("AA");
+	hide_asks = 0;
+	Directory_reload(dir);
+	CHECK(hide_asks == 3);
+	CHECK(dir->names_hidden == NULL);
+	addGames("B");
+	Directory_reload(dir);
+	CHECK_STR(names(dir->entries), "C,B,AA,A");
+	CHECK(dir->names_hidden && dir->names_hidden[1] && !dir->names_hidden[0] && !dir->names_hidden[2] && !dir->names_hidden[3]);
+	stub_hide_name = NULL;
+	stub_sort_compare = NULL;
+	Directory_free(dir);
+}
+
+///////////////////////////////////////
 // selecting a row
 
 static void test_select_keeps_the_row_in_view(void) {
@@ -992,6 +1074,8 @@ int main(void) {
 	test_plugin_sort_reorders_collections();
 	test_list_ready_names_are_drawn_and_indexed();
 	test_list_ready_renames_keep_collection_order();
+	test_hide_chain_any_hides();
+	test_hidden_names_follow_the_final_order();
 	test_select_keeps_the_row_in_view();
 	CHECK_DONE();
 }
