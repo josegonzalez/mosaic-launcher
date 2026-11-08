@@ -70,7 +70,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `nav.c` | the directory stack, restoring the last position, opening entries |
 | `imgloader.c` | the background image, art cache decode and selection pill worker threads |
 | `screens.c` | the screen registry `main()` dispatches through, and state shared with it |
-| `screen_gamelist.c` | game list input and rendering, handing both to the layout slot's owner when there is one, plus the fade shown when launching |
+| `screen_gamelist.c` | game list input and rendering, handing both to the layout slot's owner when there is one and running plugins' row decorators on the built-in list's rows, plus the fade shown when launching |
 | `screen_switcher.c` | game switcher input and rendering |
 | `screen_quickmenu.c` | quick menu input and rendering |
 | `art.c` | where each kind of image (thumbnails, backgrounds, quick menu art) is looked up |
@@ -80,7 +80,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
 | `transitions.c` | the folder slide and the game switcher's entrance animations |
 | `pluginset.c` | which discovered plugins load, and in what order |
-| `plugins.c` | finding and loading plugins, the host table they call, and the crash guard |
+| `plugins.c` | finding and loading plugins, the host table they call, chained hooks such as row decorators and header widgets, and the crash guard |
 | `toast.c` | short messages shown over the current screen |
 | `awake.c` | stay-awake files and plugin requests that keep the device from sleeping |
 | `pakhooks.c` | `pre-launch.sh` scripts next to a pak's `launch.sh` |
@@ -95,7 +95,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `bluetooth.c` | plugins' Bluetooth: the worker thread that looks for the connected device and runs connects, each a bounded `fork` and `execvp` |
 | `drawmodel.c` | the SDL-free half of plugins' drawing calls: which surfaces exist and which plugin owns each, with its memory budget, text truncation, rounded corners and fitting |
 | `plugindraw.c` | plugins' drawing calls over SDL and stock's fonts, and lending a surface such as the screen to a render hook, clipped to the area it may draw in |
-| `layoutmodel.c` | the SDL-free half of the layout slot: whether the owner's layout is still on after its init and each call, the buttons it sees and consumes, and the area it draws in |
+| `layoutmodel.c` | the SDL-free half of the layout slot: whether the owner's layout is still on after its init and each call, the buttons it sees and consumes, and the area it draws in; also the built-in list's row rects for row decorators, and how header widgets are laid out beside the status pill and what they take off the top row |
 | `artcache.c` | the SDL-free half of the art cache: decoded images by path and kind, least recently used out first past a byte cap, pins, the worker's load order with prefetches last, and requests dropped by sequence number once the selection moves |
 | `artloader.c` | the art cache over SDL: decoding on the art worker, taking images in and evicting at the start of each frame, the built-in list's thumbnail and its neighbours, and plugins' `art_find`, `art_get` and `art_load` |
 

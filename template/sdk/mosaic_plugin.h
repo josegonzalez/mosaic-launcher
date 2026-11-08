@@ -198,7 +198,21 @@ typedef struct MosaicListView {
 	const char* art;        // the selected entry's art as the built-in list shows it, when show_art is 1 and it exists, else ""
 	MosaicRect area;        // where the layout draws: the screen above the button hints
 	MosaicRect status;      // the status pill (clock, battery, wifi) in area's top right, already drawn; leave it clear
+	// Added with header_widget: plugins' header widgets left of status, from
+	// the leftmost to status, already drawn; leave it clear too. Empty (w 0)
+	// when there are none.
+	MosaicRect header;
 } MosaicListView;
+
+// One row of the game list, or one cell of a layout, for decorate_row. It
+// begins with its own size, and fields are only added at the end.
+typedef struct MosaicRow {
+	size_t size;     // sizeof(MosaicRow) in the launcher
+	int index;       // the entry's index in the list
+	int selected;    // 1 on the selected row
+	MosaicRect rect; // the row on the screen; drawing is clipped to it, and under a layout to view->area too
+	MosaicRect name; // the part of rect the entry's name takes, from its left; w is 0 when no name shows or the layout doesn't say
+} MosaicRow;
 
 // Buttons on the game list this frame, as masks of MOSAIC_BUTTON_BIT.
 typedef struct MosaicInput {
@@ -546,6 +560,17 @@ typedef struct MosaicHost {
 	int (*art_find)(const MosaicEntry* entry, int kind, char* out, size_t size);
 	int (*art_get)(const MosaicEntry* entry, int kind, const MosaicSurface** out);
 	int (*art_load)(const char* path, const MosaicSurface** out);
+
+	// Row decorators under a plugin layout. Called from layout_render with
+	// the screen it was lent, runs every plugin's decorate_row, in load
+	// order, on the entry at index in the list, drawn in rect (a cell of
+	// the layout, clipped to view->area) with its name in name, or NULL
+	// when the layout doesn't say. A layout calls it for each cell it draws,
+	// after drawing the cell. Returns 0, or -1 outside layout_render, from
+	// inside a decorate_row, for another surface, an index not in the list
+	// or a rect outside view->area. Check for it, and for row decorators
+	// and header widgets, with MOSAIC_HOST_HAS(host, decorate_cell).
+	int (*decorate_cell)(MosaicSurface* screen, int index, const MosaicRect* rect, const MosaicRect* name);
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -665,6 +690,36 @@ typedef struct MosaicPlugin {
 	int (*layout_init)(const MosaicListView* view);
 	int (*layout_input)(const MosaicInput* input, const MosaicListView* view, unsigned int* consumed);
 	int (*layout_render)(MosaicSurface* screen, const MosaicListView* view);
+
+	// Row decorators, for badges and captions. Every plugin's decorate_row
+	// runs, in load order, for each row the built-in list draws, after its
+	// name, and for each cell a plugin layout passes to host->decorate_cell.
+	// It draws on screen, a surface lent for the call and clipped to
+	// row->rect, which on the built-in list's top row stops short of the
+	// status pill and header widgets. On the built-in list the selected
+	// row's pill is drawn under the screen and its scrolling name over it,
+	// so a badge on it stays in view outside row->name. It only draws:
+	// select_index returns -1 during it. Return 0, or anything else for an
+	// error, after which the launcher logs it and stops calling this
+	// plugin's decorate_row until it restarts.
+	int (*decorate_row)(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row);
+
+	// Header widgets, beside the status pill (clock, battery, wifi) on the
+	// game list, game switcher, quick menu and dialogs. Each frame the
+	// launcher redraws, it asks each plugin with both hooks, in load order,
+	// how wide its widget is, given the room left (max_width) and the
+	// pill's height, and lays them out right to left from the pill: the
+	// first in load order next to it. A widget is cut to max_width, and
+	// together they take at most half the header left of the pill.
+	// header_width returns the width, 0 for no widget this frame, or below
+	// 0 for an error. header_widget then draws on screen, lent for the call
+	// and clipped to rect, which is that wide and as tall and high as the
+	// pill, and returns 0. It only draws, as decorate_row does. After an
+	// error from either, the launcher logs it and leaves this plugin's
+	// widget out until it restarts. Call host->request_redraw from tick to
+	// update one, such as a clock.
+	int (*header_width)(int max_width, int height);
+	int (*header_widget)(MosaicSurface* screen, const MosaicRect* rect);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

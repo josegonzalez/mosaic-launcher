@@ -350,3 +350,8 @@ MosaicSurface* PluginDraw_lend(SDL_Surface* surface, const SDL_Rect* clip) {
 void PluginDraw_unlend(MosaicSurface* lent) {
 	if (DrawReg_remove(lent, DRAW_HOST) == 0) SDL_SetClipRect((SDL_Surface*)lent, NULL);
 }
+
+void PluginDraw_clip(MosaicSurface* lent, const SDL_Rect* clip) {
+	const char* owner = DrawReg_owner(lent);
+	if (owner && !strcmp(owner, DRAW_HOST) && DrawReg_writable(lent)) SDL_SetClipRect((SDL_Surface*)lent, clip);
+}

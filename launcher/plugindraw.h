@@ -48,4 +48,8 @@ void* PluginDraw_readImageFile(const char* path, size_t* size);
 MosaicSurface* PluginDraw_lend(SDL_Surface* surface, const SDL_Rect* clip);
 void PluginDraw_unlend(MosaicSurface* lent);
 
+// Changes what a lent surface can be drawn on inside, such as one cell of
+// a layout for its row decorators.
+void PluginDraw_clip(MosaicSurface* lent, const SDL_Rect* clip);
+
 #endif

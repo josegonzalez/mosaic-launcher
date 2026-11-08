@@ -3,7 +3,8 @@
 // <sd>/Gridder folder of seven games to the root and opens it. Its input
 // moves the selection down a row there once, with select_index, so the
 // launcher keeps the selection. It reads back the screen it's lent to see
-// its drawing land inside the area and not past it.
+// its drawing land inside the area and not past it. Each cell it draws is
+// passed to host->decorate_cell, for row decorators such as badger's.
 //
 // With fail=init in its config, layout_init declines; with fail=input or
 // fail=render, that hook returns an error the third time it's called; and
@@ -121,6 +122,7 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 	int first_row = view->selected / COLUMNS > 1 ? view->selected / COLUMNS - 1 : 0;
 	host->fill_rect(screen, &area, mosaic_color(0x000080, 255));
 	int lit_x = -1, lit_y = -1;
+	int decorated = 0;
 	for (int i = first_row * COLUMNS; i < view->count; i++) {
 		int row = i / COLUMNS - first_row;
 		MosaicRect cell = { area.x + (i % COLUMNS) * cell_w + 4, area.y + row * cell_h + 4, cell_w - 8, cell_h - 8 };
@@ -136,6 +138,7 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 			host->draw_text(screen, MOSAIC_FONT_SMALL, host->entry_name(entry), cell.x + 4, cell.y + cell.h / 2,
 				mosaic_color(0xFFFFFF, 255), cell.w - 8);
 		}
+		if (host->decorate_cell(screen, i, &cell, NULL) != 0) decorated = -1;
 	}
 
 	if (view->depth == 2 && !strcmp(view->path, folder)) folder_drawn = 1;
@@ -148,6 +151,8 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 			view->depth, view->count, view->selected, host->entry_name(entry), view->start, view->end, view->rows,
 			view->letter, view->letter_count, view->show_names, view->show_art, view->art);
 		say("render lit %s, background %s", lit_x >= 0 ? pixel(screen, lit_x, lit_y) : "none", pixel(screen, area.x + 1, area.y + 1));
+		say("render header %ix%i, beside status %i", view->header.w, view->header.h,
+			view->header.w == 0 || (view->header.x + view->header.w == view->status.x && view->header.y == view->status.y));
 	}
 
 	if (renders == 1) {
@@ -157,6 +162,12 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 		int filled = host->fill_rect(screen, &(MosaicRect){ 0, below, 10, 10 }, mosaic_color(0xFFFF00, 255));
 		say("render clipped %i (fill %i), select %i, free %i", !strcmp(before, pixel(screen, 1, below)), filled,
 			host->select_index(0), host->surface_free(ID, screen));
+		MosaicRect cell = { area.x, area.y, 10, 10 };
+		say("render decorated %i, bad index %i %i, no rect %i, outside %i, not the screen %i", decorated,
+			host->decorate_cell(screen, -1, &cell, NULL), host->decorate_cell(screen, view->count, &cell, NULL),
+			host->decorate_cell(screen, 0, NULL, NULL),
+			host->decorate_cell(screen, 0, &(MosaicRect){ 0, below, 10, 10 }, NULL),
+			host->decorate_cell(NULL, 0, &cell, NULL));
 	}
 	return 0;
 }
@@ -169,7 +180,8 @@ static void tick(unsigned long now) {
 		say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
 	}
 	if (ticks == 3 && lent) {
-		say("after render fill %i", host->fill_rect(lent, NULL, mosaic_color(0xFFFFFF, 255)));
+		say("after render fill %i, decorate %i", host->fill_rect(lent, NULL, mosaic_color(0xFFFFFF, 255)),
+			host->decorate_cell(lent, 0, &(MosaicRect){ 0, 0, 10, 10 }, NULL));
 	}
 	// keep frames coming, so a failed layout is seen to stay off
 	if (ticks < 60) host->request_redraw();
@@ -178,7 +190,7 @@ static void tick(unsigned long now) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	if (!MOSAIC_HOST_HAS(host, draw_text) || !MOSAIC_HOST_HAS(host, select_index)) return 1;
+	if (!MOSAIC_HOST_HAS(host, draw_text) || !MOSAIC_HOST_HAS(host, select_index) || !MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Gridder", host->sdcard_path);
 	fail = host->cfg_get(ID, "fail", "");
 	return 0;

@@ -254,7 +254,7 @@ static void choiceRender(void) {
 	int pad = SCALE1(BUTTON_PADDING);
 
 	char shown[256];
-	GFX_truncateText(font.large, title, shown, screen->w - SCALE1(PADDING * 2) - ow, pad * 2);
+	GFX_truncateText(font.large, title, shown, screen->w - SCALE1(PADDING * 2) - ow - header_w, pad * 2);
 	blitRowText(font.large, shown, normal, left + pad, SCALE1(PADDING), screen->w);
 
 	int visible = MAIN_ROW_COUNT - 1;

@@ -47,6 +47,7 @@ SDL_Surface* blackBG;
 SDL_Surface* tmpOldScreen;
 SDL_Surface* switcherSur;
 int ow;
+int header_w;
 
 
 int selected_row;

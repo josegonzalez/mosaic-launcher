@@ -64,7 +64,7 @@ void Switcher_render(void) {
 		Entry *selectedEntry = entryFromRecent(state.recents->items[state.switcher_selected]);
 		// title pill
 		{
-			int max_width = screen->w - SCALE1(PADDING * 2) - ow;
+			int max_width = screen->w - SCALE1(PADDING * 2) - ow - header_w;
 
 			char display_name[256];
 			int text_width = GFX_truncateText(font.large, selectedEntry->name, display_name, max_width, SCALE1(BUTTON_PADDING*2));

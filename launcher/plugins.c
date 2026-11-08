@@ -24,6 +24,8 @@ typedef struct LoadedPlugin {
 	Hash* cfg; // loaded on first cfg_get or cfg_set
 	int owns_root; // claims the root slot, so its root_replace is asked
 	int owns_layout; // claims the layout slot, so its layout_* hooks are called
+	int rows_off;    // its decorate_row failed, so it's no longer called
+	int header_off;  // its header_width or header_widget failed, so its widget is left out
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -32,6 +34,9 @@ static int initializing = -1; // the loaded plugin whose init is running
 static int launching = -1;    // the loaded plugin whose pre_launch is running
 static LayoutSlot layout = { LAYOUT_NONE, -1 };
 static int layout_rendering = 0; // while layout_render runs, which only draws
+static MosaicSurface* layout_lent = NULL; // the screen layout_render was lent
+static MosaicRect layout_area;            // and where it may draw
+static int decorating = 0; // while a decorate_row, header_width or header_widget runs, which only draw
 
 #define SCREEN_COUNT 3
 
@@ -333,7 +338,7 @@ static int hostSelectedIndex(void) {
 	return state.top->selected;
 }
 static int hostSelectIndex(int index) {
-	if (layout_rendering || !state.top || index < 0 || index >= state.top->entries->count) return -1;
+	if (layout_rendering || decorating || !state.top || index < 0 || index >= state.top->entries->count) return -1;
 	Directory_select(state.top, index);
 	// main's copy for this frame, so the game list's input doesn't put it back
 	selected = index;
@@ -507,6 +512,7 @@ static int hostArtFind(const MosaicEntry* entry, int kind, char* out, size_t siz
 static int hostArtGet(const MosaicEntry* entry, int kind, const MosaicSurface** out) {
 	return ArtLoader_get((const Entry*)entry, kind, out);
 }
+static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* rect, const MosaicRect* name);
 
 // After a plugin's quit, or when its init declines: its surfaces go with it.
 static void freeSurfaces(const char* plugin_id) {
@@ -591,6 +597,7 @@ static const MosaicHost host = {
 	.art_find = hostArtFind,
 	.art_get = hostArtGet,
 	.art_load = ArtLoader_load,
+	.decorate_cell = hostDecorateCell,
 };
 
 ///////////////////////////////////////
@@ -638,6 +645,12 @@ static void load(const PluginManifest* m) {
 		|| (Plugin_has(plugin, layout_render) && plugin->layout_render);
 	if (!p->owns_layout && has_layout) {
 		LOG_warn("plugins: %s has a layout but no slots=" LAYOUT_SLOT ", so it won't be called\n", m->id);
+	}
+	int has_width = Plugin_has(plugin, header_width) && plugin->header_width;
+	int has_widget = Plugin_has(plugin, header_widget) && plugin->header_widget;
+	if (has_width != has_widget) {
+		LOG_warn("plugins: %s has %s but no %s, so its header widget won't show\n", m->id,
+			has_width ? "header_width" : "header_widget", has_width ? "header_widget" : "header_width");
 	}
 
 	// what init registers, to take back if it declines: its actions, tiles
@@ -1223,8 +1236,109 @@ int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view) {
 		return 0;
 	}
 	layout_rendering = 1;
+	layout_lent = lent;
+	layout_area = view->area;
 	int rc = p->layout_render(lent, view);
 	layout_rendering = 0;
+	layout_lent = NULL;
 	PluginDraw_unlend(lent);
 	return layoutResult("layout_render", rc);
+}
+
+///////////////////////////////////////
+// row decorators and header widgets
+
+static int decorates(int i) {
+	const MosaicPlugin* p = loaded[i].plugin;
+	return !loaded[i].rows_off && Plugin_has(p, decorate_row) && p->decorate_row;
+}
+
+int Plugins_hasDecorators(void) {
+	for (int i = 0; i < loaded_count; i++) {
+		if (decorates(i)) return 1;
+	}
+	return 0;
+}
+
+// Every decorator in load order on one row, on a surface lent and clipped
+// to it. One that fails is turned off for the rest of the run.
+static void decorate(MosaicSurface* lent, const Entry* entry, const MosaicRow* row) {
+	decorating = 1;
+	for (int i = 0; i < loaded_count; i++) {
+		if (!decorates(i)) continue;
+		int rc = loaded[i].plugin->decorate_row(lent, (const MosaicEntry*)entry, row);
+		if (rc == 0) continue;
+		loaded[i].rows_off = 1;
+		LOG_warn("plugins: %s's decorate_row returned %i, leaving its decorations out until the launcher restarts\n",
+			loaded[i].id, rc);
+	}
+	decorating = 0;
+}
+
+void Plugins_decorateRow(SDL_Surface* surface, const Entry* entry, MosaicRow* row) {
+	if (!Plugins_hasDecorators() || row->rect.w <= 0 || row->rect.h <= 0) return;
+	row->size = sizeof(*row);
+	SDL_Rect clip = { row->rect.x, row->rect.y, row->rect.w, row->rect.h };
+	MosaicSurface* lent = PluginDraw_lend(surface, &clip);
+	if (!lent) {
+		LOG_warn("plugins: the screen is already lent, so rows can't be decorated this frame\n");
+		return;
+	}
+	decorate(lent, entry, row);
+	PluginDraw_unlend(lent);
+}
+
+static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* rect, const MosaicRect* name) {
+	if (!layout_rendering || decorating || !screen || screen != layout_lent || !rect) return -1;
+	if (!state.top || index < 0 || index >= state.top->entries->count) return -1;
+	MosaicRect clip;
+	if (!LayoutRect_clip(rect, &layout_area, &clip)) return -1;
+	if (!Plugins_hasDecorators()) return 0;
+	MosaicRow row = { sizeof(row), index, index == state.top->selected, *rect, { rect->x, rect->y, 0, rect->h } };
+	// a name is kept inside its cell
+	if (name && !LayoutRect_clip(name, rect, &row.name)) row.name = (MosaicRect){ rect->x, rect->y, 0, rect->h };
+	PluginDraw_clip(screen, &(SDL_Rect){ clip.x, clip.y, clip.w, clip.h });
+	decorate(screen, state.top->entries->items[index], &row);
+	PluginDraw_clip(screen, &(SDL_Rect){ layout_area.x, layout_area.y, layout_area.w, layout_area.h });
+	return 0;
+}
+
+static int hasHeader(int i) {
+	const MosaicPlugin* p = loaded[i].plugin;
+	return !loaded[i].header_off && Plugin_has(p, header_width) && p->header_width
+		&& Plugin_has(p, header_widget) && p->header_widget;
+}
+
+static void headerOff(int i, const char* hook, int rc) {
+	loaded[i].header_off = 1;
+	LOG_warn("plugins: %s's %s returned %i, leaving its header widget out until the launcher restarts\n",
+		loaded[i].id, hook, rc);
+}
+
+void Plugins_header(SDL_Surface* surface, HeaderRow* row) {
+	for (int i = 0; i < loaded_count; i++) {
+		if (!hasHeader(i)) continue;
+		int room = HeaderRow_room(row);
+		if (room <= 0) return;
+		const MosaicPlugin* p = loaded[i].plugin;
+		decorating = 1;
+		int want = p->header_width(room, row->h);
+		decorating = 0;
+		if (want < 0) {
+			headerOff(i, "header_width", want);
+			continue;
+		}
+		MosaicRect rect;
+		if (!HeaderRow_place(row, want, &rect)) continue;
+		MosaicSurface* lent = PluginDraw_lend(surface, &(SDL_Rect){ rect.x, rect.y, rect.w, rect.h });
+		if (!lent) {
+			LOG_warn("plugins: the screen is already lent, so header widgets can't draw this frame\n");
+			return;
+		}
+		decorating = 1;
+		int rc = p->header_widget(lent, &rect);
+		decorating = 0;
+		PluginDraw_unlend(lent);
+		if (rc != 0) headerOff(i, "header_widget", rc);
+	}
 }

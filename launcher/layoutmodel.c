@@ -63,3 +63,73 @@ void LayoutView_area(int w, int h, int hints_top, int padding, int status_w, int
 	if (status_w <= 0) *status = (MosaicRect){ 0, 0, 0, 0 };
 	else *status = (MosaicRect){ w - padding - status_w, padding, status_w, status_h };
 }
+
+int LayoutRect_clip(const MosaicRect* a, const MosaicRect* b, MosaicRect* out) {
+	int x1 = a->x > b->x ? a->x : b->x;
+	int y1 = a->y > b->y ? a->y : b->y;
+	long ax2 = (long)a->x + a->w, bx2 = (long)b->x + b->w;
+	long ay2 = (long)a->y + a->h, by2 = (long)b->y + b->h;
+	long x2 = ax2 < bx2 ? ax2 : bx2;
+	long y2 = ay2 < by2 ? ay2 : by2;
+	if (a->w <= 0 || a->h <= 0 || b->w <= 0 || b->h <= 0 || x2 <= x1 || y2 <= y1) {
+		*out = (MosaicRect){ 0, 0, 0, 0 };
+		return 0;
+	}
+	*out = (MosaicRect){ x1, y1, (int)(x2 - x1), (int)(y2 - y1) };
+	return 1;
+}
+
+void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int name_w, int show_names,
+		MosaicRow* out) {
+	if (width < 0) width = 0;
+	if (name_w < 0 || !show_names) name_w = 0;
+	if (name_w > width) name_w = width;
+	out->rect = (MosaicRect){ margin, padding + row * pill_h, width, pill_h };
+	out->name = (MosaicRect){ margin, out->rect.y, name_w, pill_h };
+}
+
+void HeaderRow_init(HeaderRow* row, int screen_w, int padding, int gap, int status_w, int pill_h) {
+	if (status_w < 0) status_w = 0;
+	if (gap < 0) gap = 0;
+	row->y = padding;
+	row->h = pill_h;
+	row->status_x = screen_w - padding - status_w;
+	row->gap = gap;
+	row->next = row->status_x - (status_w > 0 ? gap : 0);
+	// half of what's left of the pill, past the screen's own padding
+	int left = row->status_x - padding;
+	row->limit = row->status_x - (left > 0 ? left / 2 : 0);
+	row->count = 0;
+}
+
+int HeaderRow_room(const HeaderRow* row) {
+	int room = row->next - row->limit;
+	return room > 0 ? room : 0;
+}
+
+int HeaderRow_place(HeaderRow* row, int want, MosaicRect* out) {
+	int room = HeaderRow_room(row);
+	if (want <= 0 || room <= 0) return 0;
+	int w = want < room ? want : room;
+	*out = (MosaicRect){ row->next - w, row->y, w, row->h };
+	row->next = out->x - row->gap;
+	row->count++;
+	return 1;
+}
+
+int HeaderRow_width(const HeaderRow* row) {
+	return row->count ? row->status_x - (row->next + row->gap) : 0;
+}
+
+void HeaderRow_rect(const HeaderRow* row, MosaicRect* out) {
+	int w = HeaderRow_width(row);
+	if (w <= 0) *out = (MosaicRect){ 0, 0, 0, 0 };
+	else *out = (MosaicRect){ row->status_x - w, row->y, w, row->h };
+}
+
+int HeaderRow_topRowWidth(int available, int screen_w, int padding, int margin, int status_w, int header_w) {
+	if (header_w <= 0) return available;
+	int clear = screen_w - padding - status_w - header_w - padding - margin;
+	if (clear < 0) clear = 0;
+	return available < clear ? available : clear;
+}

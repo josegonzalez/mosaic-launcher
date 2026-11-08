@@ -1,5 +1,6 @@
 // layoutmodel.c: the layout slot's state, the buttons a layout sees and
-// consumes, and where it draws.
+// consumes, and where it draws, and where row decorators and header widgets
+// draw.
 
 #include "check.h"
 #include "layoutmodel.h"
@@ -104,9 +105,118 @@ static void testArea(void) {
 	CHECK(area.h == 0);
 }
 
+static void testClip(void) {
+	MosaicRect area = { 0, 0, 1024, 648 }, out;
+	// inside is kept whole
+	CHECK(LayoutRect_clip(&(MosaicRect){ 10, 20, 100, 50 }, &area, &out) == 1);
+	CHECK(out.x == 10 && out.y == 20 && out.w == 100 && out.h == 50);
+	// across an edge is cut to it
+	CHECK(LayoutRect_clip(&(MosaicRect){ -10, 600, 100, 100 }, &area, &out) == 1);
+	CHECK(out.x == 0 && out.y == 600 && out.w == 90 && out.h == 48);
+	// either way round
+	CHECK(LayoutRect_clip(&area, &(MosaicRect){ 1000, -5, 100, 10 }, &out) == 1);
+	CHECK(out.x == 1000 && out.y == 0 && out.w == 24 && out.h == 5);
+	// outside, touching or empty is nothing
+	CHECK(LayoutRect_clip(&(MosaicRect){ 0, 648, 100, 10 }, &area, &out) == 0);
+	CHECK(out.x == 0 && out.y == 0 && out.w == 0 && out.h == 0);
+	CHECK(LayoutRect_clip(&(MosaicRect){ 2000, 0, 10, 10 }, &area, &out) == 0);
+	CHECK(LayoutRect_clip(&(MosaicRect){ 10, 10, 0, 10 }, &area, &out) == 0);
+	CHECK(LayoutRect_clip(&(MosaicRect){ 10, 10, 10, -1 }, &area, &out) == 0);
+	// sizes near the edge of an int don't wrap
+	CHECK(LayoutRect_clip(&(MosaicRect){ 2147483000, 0, 2147483000, 10 }, &(MosaicRect){ 0, 0, 2147483647, 10 }, &out) == 1);
+	CHECK(out.x == 2147483000 && out.w == 647);
+}
+
+static void testListRow(void) {
+	MosaicRow row;
+	// the built-in list at scale 3: margin 15, padding 30, rows 90 tall
+	ListRow_rects(0, 15, 30, 90, 600, 200, 1, &row);
+	CHECK(row.rect.x == 15 && row.rect.y == 30 && row.rect.w == 600 && row.rect.h == 90);
+	CHECK(row.name.x == 15 && row.name.y == 30 && row.name.w == 200 && row.name.h == 90);
+	ListRow_rects(3, 15, 30, 90, 600, 200, 1, &row);
+	CHECK(row.rect.y == 30 + 3 * 90 && row.name.y == row.rect.y);
+	// no names, no name
+	ListRow_rects(1, 15, 30, 90, 600, 200, 0, &row);
+	CHECK(row.rect.w == 600 && row.name.w == 0);
+	// the name never runs past the row, nor below nothing
+	ListRow_rects(1, 15, 30, 90, 100, 200, 1, &row);
+	CHECK(row.name.w == 100);
+	ListRow_rects(1, 15, 30, 90, -4, 200, 1, &row);
+	CHECK(row.rect.w == 0 && row.name.w == 0);
+}
+
+static void testHeader(void) {
+	// 1024 wide at scale 3: padding 30, gap 15, a 200 wide pill 90 tall
+	HeaderRow row;
+	HeaderRow_init(&row, 1024, 30, 15, 200, 90);
+	int pill_x = 1024 - 30 - 200;
+	CHECK(HeaderRow_width(&row) == 0);
+	MosaicRect r;
+	HeaderRow_rect(&row, &r);
+	CHECK(r.w == 0 && r.h == 0);
+	// half of what's left of the pill, less the gap to it
+	int half = (pill_x - 30) / 2;
+	CHECK(HeaderRow_room(&row) == half - 15);
+
+	// right to left, the first next to the pill
+	CHECK(HeaderRow_place(&row, 100, &r) == 1);
+	CHECK(r.x == pill_x - 15 - 100 && r.y == 30 && r.w == 100 && r.h == 90);
+	CHECK(HeaderRow_width(&row) == 115);
+	CHECK(HeaderRow_place(&row, 50, &r) == 1);
+	CHECK(r.x == pill_x - 15 - 100 - 15 - 50 && r.w == 50);
+	CHECK(HeaderRow_width(&row) == 180);
+	HeaderRow_rect(&row, &r);
+	CHECK(r.x == pill_x - 180 && r.y == 30 && r.w == 180 && r.h == 90);
+
+	// nothing asked, nothing placed
+	CHECK(HeaderRow_place(&row, 0, &r) == 0);
+	CHECK(HeaderRow_place(&row, -3, &r) == 0);
+	CHECK(HeaderRow_width(&row) == 180);
+
+	// too wide is cut to the room left, and then there's none
+	int room = HeaderRow_room(&row);
+	CHECK(room == half - 180 - 15);
+	CHECK(HeaderRow_place(&row, 5000, &r) == 1);
+	CHECK(r.w == room && r.x == pill_x - half);
+	CHECK(HeaderRow_room(&row) == 0);
+	CHECK(HeaderRow_place(&row, 10, &r) == 0);
+	CHECK(HeaderRow_width(&row) == half);
+	// so the pill and the left half of the header stay clear
+	CHECK(r.x >= 30 + (pill_x - 30) / 2 - 1);
+
+	// a wider pill (the brightness overlay) moves the widgets over with it
+	HeaderRow_init(&row, 1024, 30, 15, 400, 90);
+	CHECK(HeaderRow_place(&row, 100, &r) == 1);
+	CHECK(r.x == 1024 - 30 - 400 - 15 - 100);
+
+	// a screen too small for any
+	HeaderRow_init(&row, 100, 30, 15, 60, 90);
+	CHECK(HeaderRow_room(&row) == 0);
+	CHECK(HeaderRow_place(&row, 10, &r) == 0);
+}
+
+static void testTopRow(void) {
+	// stock's top row on 1024 wide at scale 3, with no thumbnail: the
+	// margin, twice the padding and the pill come off the screen
+	int stock = 1024 - 15 - 60 - 200;
+	// with no widgets it's left as it is, thumbnail or not
+	CHECK(HeaderRow_topRowWidth(stock, 1024, 30, 15, 200, 0) == stock);
+	CHECK(HeaderRow_topRowWidth(400, 1024, 30, 15, 200, 0) == 400);
+	CHECK(HeaderRow_topRowWidth(stock + 50, 1024, 30, 15, 200, -1) == stock + 50);
+	// widgets take their width off it, keeping stock's gap from them
+	CHECK(HeaderRow_topRowWidth(stock, 1024, 30, 15, 200, 115) == stock - 115);
+	// a row already short of them, beside a thumbnail, is left alone
+	CHECK(HeaderRow_topRowWidth(400, 1024, 30, 15, 200, 115) == 400);
+	CHECK(HeaderRow_topRowWidth(stock, 1024, 30, 15, 200, 5000) == 0);
+}
+
 int main(void) {
 	testSlot();
 	testInput();
 	testArea();
+	testClip();
+	testListRow();
+	testHeader();
+	testTopRow();
 	CHECK_DONE();
 }

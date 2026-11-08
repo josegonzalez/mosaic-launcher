@@ -217,6 +217,7 @@ static void listView(MosaicListView* v) {
 	v->art = update_art;
 	LayoutView_area(screen->w, screen->h, screen->h - SCALE1(PADDING + PILL_SIZE), SCALE1(PADDING), ow, SCALE1(PILL_SIZE),
 		&v->area, &v->status);
+	if (header_w > 0) v->header = (MosaicRect){ v->status.x - header_w, v->status.y, header_w, v->status.h };
 }
 
 void GameList_registerActions(void) {
@@ -504,6 +505,9 @@ void GameList_render(void) {
 			bool row_has_moved = (state.previous_row != selected_row || state.previous_depth != state.stack->count);
 			if (row_is_top && !(had_thumb))
 				available_width -= ow;
+			// and clear of plugins' header widgets
+			if (row_is_top)
+				available_width = HeaderRow_topRowWidth(available_width, screen->w, SCALE1(PADDING), SCALE1(BUTTON_MARGIN), ow, header_w);
 
 			trimSortingMeta(&entry_name);
 			if (entry_unique) // Only render if a unique name exists
@@ -564,6 +568,16 @@ void GameList_render(void) {
 			}
 			SDL_FreeSurface(text_unique); // Free after use
 			SDL_FreeSurface(text); // Free after use
+
+			// plugins' badges and captions, over the row
+			if (Plugins_hasDecorators()) {
+				MosaicRow row;
+				ListRow_rects(j, SCALE1(BUTTON_MARGIN), SCALE1(PADDING), SCALE1(PILL_SIZE), available_width, max_width,
+					list_show_entry_names, &row);
+				row.index = i;
+				row.selected = row_is_selected;
+				Plugins_decorateRow(screen, entry, &row);
+			}
 		}
 		if(lastScreen==SCREEN_GAMESWITCHER) {
 			if(switcherSur) {

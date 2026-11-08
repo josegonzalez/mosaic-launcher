@@ -18,6 +18,7 @@
 #include "mosaic_plugin.h"
 #include "pluginset.h"
 #include "launchcmd.h"
+#include "layoutmodel.h"
 
 #define PLUGIN_STATE_DIR USERDATA_PATH "/launcher"
 #define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
@@ -104,6 +105,19 @@ void Plugins_layoutInput(const MosaicListView* view);
 // list on. Returns 1 if it drew, or 0 to draw the built-in list: there's no
 // layout, it declined, or it failed, which logs and turns it off.
 int Plugins_layoutRender(struct SDL_Surface* surface, const MosaicListView* view);
+
+// 1 while any plugin decorates rows.
+int Plugins_hasDecorators(void);
+
+// Runs every plugin's decorate_row on a row of the built-in list, on surface
+// clipped to row->rect, filling in row->size. Does nothing without
+// decorators. One that fails logs and is turned off.
+void Plugins_decorateRow(struct SDL_Surface* surface, const Entry* entry, MosaicRow* row);
+
+// Plugins' header widgets on surface, placed in row (see layoutmodel.h) in
+// load order. One whose header_width or header_widget fails logs and is
+// left out from then on.
+void Plugins_header(struct SDL_Surface* surface, HeaderRow* row);
 
 void Plugins_tick(unsigned long now);
 void Plugins_beforeSleep(void);

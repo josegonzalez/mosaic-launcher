@@ -170,6 +170,11 @@ int main (int argc, char *argv[]) {
 			}
 
 			ow = GFX_blitHardwareGroup(screen, show_setting);
+			// plugins' header widgets, beside it
+			HeaderRow header;
+			HeaderRow_init(&header, screen->w, SCALE1(PADDING), SCALE1(BUTTON_MARGIN), ow, SCALE1(PILL_SIZE));
+			Plugins_header(screen, &header);
+			header_w = HeaderRow_width(&header);
 			const Screen* active = Screen_get(currentScreen);
 			if (state.startgame && !active->rendersWhileLaunching) LaunchFade_render();
 			else {
@@ -317,6 +322,8 @@ int main (int argc, char *argv[]) {
 
 					int available_width = (had_thumb ? ox + SCALE1(BUTTON_MARGIN) : screen->w - SCALE1(BUTTON_MARGIN)) - SCALE1(PADDING * 2);
 					if (state.top->selected == state.top->start && !had_thumb) available_width -= ow;
+					if (state.top->selected == state.top->start)
+						available_width = HeaderRow_topRowWidth(available_width, screen->w, SCALE1(PADDING), SCALE1(BUTTON_MARGIN), ow, header_w);
 
 					SDL_Color text_color = uintToColour(THEME_COLOR5_255);
 
