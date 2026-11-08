@@ -106,7 +106,7 @@ static int gliderFrame(MosaicSurface* screen, const MosaicTransition* t, float p
 			dim_ok++;
 		}
 	}
-	if (p >= LA_UNIT) {
+	if (progress >= 1.0f) {
 		int black = 1;
 		int xs[] = { 0, w / 2, w - 1, from.x + from.w / 2 }, ys[] = { 0, h / 2, h - 1, from.y + 2 };
 		for (int i = 0; i < 4; i++) {
