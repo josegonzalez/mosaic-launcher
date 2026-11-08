@@ -263,7 +263,21 @@ typedef struct MosaicTransition {
 	// transition_begin can change these two for MOSAIC_STYLE_CUSTOM
 	int duration_ms; // stock_ms on entry; cut to 0 to host->transition_max_ms
 	int ease;        // an enum MosaicEase, MOSAIC_EASE_OUT on entry; one the launcher doesn't know runs linear
+	// Added with the selection's rects: where the game list's selection is
+	// in each frame, in its pixels. Each is empty (w 0) where it isn't
+	// known, such as a frame that isn't the game list, an empty folder, or
+	// a layout that didn't pass the selected entry to decorate_cell, so
+	// check w first. Check for them with
+	// MOSAIC_TRANSITION_HAS(transition, new_pill).
+	MosaicRect old_row;  // the selected row in old_frame; under a layout, the last cell decorate_cell got for it
+	MosaicRect old_pill; // the selection pill the built-in list draws on old_row; empty under a layout or with names hidden
+	MosaicRect new_row;  // the same in new_frame, for pushes and pops
+	MosaicRect new_pill;
 } MosaicTransition;
+
+// True when the launcher's MosaicTransition has this field.
+#define MOSAIC_TRANSITION_HAS(transition, field) \
+	((transition)->size >= offsetof(MosaicTransition, field) + sizeof((transition)->field))
 
 ///////////////////////////////////////
 // What the launcher offers plugins.

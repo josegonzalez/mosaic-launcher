@@ -499,6 +499,8 @@ void GameList_render(void) {
 	if (hint_count > 0) GFX_blitButtonGroup(hints, hint_count - 1, screen, 1);
 
 	// list
+	ListSelection shown; // where the selection is, for transitions
+	ListSelection_clear(&shown);
 	if (total > 0) {
 		selected_row = state.top->selected - state.top->start;
 		previousY = state.previous_row * PILL_SIZE;
@@ -510,7 +512,7 @@ void GameList_render(void) {
 		if (Plugins_hasLayout()) {
 			MosaicListView view;
 			listView(&view);
-			list_layout_drawn = Plugins_layoutRender(screen, &view);
+			list_layout_drawn = Plugins_layoutRender(screen, &view, &shown);
 		}
 		if (list_layout_drawn) is_scrolling = 0;
 		else if (was_layout) {
@@ -559,6 +561,9 @@ void GameList_render(void) {
 			// TODO: Use actual font metrics to center, this only works in simple cases
 			const int text_offset_y = (SCALE1(PILL_SIZE) - text->h + 1) >> 1;
 			if (row_is_selected) {
+				// the row the pill rests on, as decorators get it
+				ListSelection_row(&shown, j, SCALE1(BUTTON_MARGIN), SCALE1(PADDING), SCALE1(PILL_SIZE), available_width,
+					max_width, list_show_entry_names);
 				is_scrolling = list_show_entry_names && GFX_textShouldScroll(font.large,display_name, max_width - SCALE1(BUTTON_PADDING*2), fontMutex);
 				GFX_resetScrollText();
 				bool should_animate = state.previous_depth == state.stack->count;
@@ -631,6 +636,7 @@ void GameList_render(void) {
 		GFX_blitMessage(font.large, TR("Empty folder"), screen, &(SDL_Rect){0,0,screen->w,screen->h}); //, NULL);
 	}
 
+	Transition_listShown(&shown);
 	lastScreen = SCREEN_GAMELIST;
 }
 

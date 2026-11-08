@@ -109,6 +109,27 @@ int LayoutRect_clip(const MosaicRect* a, const MosaicRect* b, MosaicRect* out);
 void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int name_w, int show_names,
 	MosaicRow* out);
 
+// Where the game list's selection is on a frame, for transitions: the
+// selected row and the pill on it, each empty (w 0) when unknown or not
+// drawn.
+typedef struct ListSelection {
+	MosaicRect row;
+	MosaicRect pill;
+} ListSelection;
+
+void ListSelection_clear(ListSelection* sel);
+
+// The built-in list's selection on row, from ListRow_rects with the same
+// arguments: the pill is the row's name, which stock draws the pill
+// under, and empty when names don't show, as stock draws none then.
+void ListSelection_row(ListSelection* sel, int row, int margin, int padding, int pill_h, int width, int name_w,
+	int show_names);
+
+// A cell a plugin layout passed to decorate_cell for index: when it's the
+// selected entry, the part of rect in area becomes the row, replacing an
+// earlier one, with no pill, as the layout draws its own.
+void ListSelection_cell(ListSelection* sel, int index, int selected, const MosaicRect* rect, const MosaicRect* area);
+
 // Plugins' header widgets, and the status file pill (statuspill.c) before
 // them, laid out right to left beside stock's status pill, which is status_w wide in the top right of a screen_w wide screen,
 // inset by padding, and pill_h tall. Each widget sits gap left of the last,

@@ -4,6 +4,7 @@
 // Animated hand-offs between what was on screen and what replaces it.
 
 #include "api.h"
+#include "layoutmodel.h"
 
 // Slides between oldScreen and the freshly rendered frame, SLIDE_LEFT when
 // opening a folder and SLIDE_RIGHT when closing one. Captures the new frame
@@ -22,6 +23,15 @@ void Transition_showPlaceholder(SDL_Surface* placeholder, int from, int slide);
 // Keeps what's on screen as a launch transition's first frame, for the
 // launch slot's owner. Call before the frame starts drawing.
 void Transition_captureLaunch(void);
+
+// Where the game list's selection is on the frame it just drew, or NULL for
+// none, eg. an empty folder. Transitions pass it to their owner.
+void Transition_listShown(const ListSelection* sel);
+
+// Keeps where the selection is on what's on screen, with the frame
+// captured for a push, pop or screen change. Call before the frame starts
+// drawing.
+void Transition_keepSelection(void);
 
 // The launch slot's owner's transition from the kept frame into black.
 // Returns 1 when it drew it or turned it off, or 0 when stock's fade runs.

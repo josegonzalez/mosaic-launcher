@@ -88,6 +88,29 @@ void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int 
 	out->name = (MosaicRect){ margin, out->rect.y, name_w, pill_h };
 }
 
+void ListSelection_clear(ListSelection* sel) {
+	sel->row = (MosaicRect){ 0, 0, 0, 0 };
+	sel->pill = sel->row;
+}
+
+void ListSelection_row(ListSelection* sel, int row, int margin, int padding, int pill_h, int width, int name_w,
+		int show_names) {
+	MosaicRow rects;
+	ListRow_rects(row, margin, padding, pill_h, width, name_w, show_names, &rects);
+	ListSelection_clear(sel);
+	if (rects.rect.w <= 0 || rects.rect.h <= 0) return;
+	sel->row = rects.rect;
+	if (rects.name.w > 0) sel->pill = rects.name;
+}
+
+void ListSelection_cell(ListSelection* sel, int index, int selected, const MosaicRect* rect, const MosaicRect* area) {
+	if (index != selected || !rect || !area) return;
+	MosaicRect clip;
+	if (!LayoutRect_clip(rect, area, &clip)) return;
+	sel->row = clip;
+	sel->pill = (MosaicRect){ 0, 0, 0, 0 };
+}
+
 void HeaderRow_init(HeaderRow* row, int screen_w, int padding, int gap, int status_w, int pill_h) {
 	if (status_w < 0) status_w = 0;
 	if (gap < 0) gap = 0;

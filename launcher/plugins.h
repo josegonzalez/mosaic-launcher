@@ -115,8 +115,10 @@ void Plugins_layoutInput(const MosaicListView* view);
 
 // Lends surface to the layout, clipped to view->area, to draw the game
 // list on. Returns 1 if it drew, or 0 to draw the built-in list: there's no
-// layout, it declined, or it failed, which logs and turns it off.
-int Plugins_layoutRender(struct SDL_Surface* surface, const MosaicListView* view);
+// layout, it declined, or it failed, which logs and turns it off. When it
+// drew, *selected has the last cell it passed to decorate_cell for the
+// selected entry, or is empty.
+int Plugins_layoutRender(struct SDL_Surface* surface, const MosaicListView* view, ListSelection* selected);
 
 // 1 while the background slot's owner is asked to draw.
 int Plugins_hasBackground(void);
@@ -155,10 +157,12 @@ int Plugins_hasTransition(int kind);
 // stock_ms long animation for stock), lending it both read-only. Returns
 // MOSAIC_STYLE_STOCK (also with no owner or after an error, which logs and
 // turns its transitions off), MOSAIC_STYLE_OFF, or MOSAIC_STYLE_CUSTOM with
-// the transition, its duration capped, in *out. Custom then draws with
-// Plugins_transitionFrame and ends with Plugins_transitionEnd.
+// the transition, its duration capped, in *out. old_sel and new_sel are
+// where the game list's selection is in each frame, or NULL for unknown.
+// Custom then draws with Plugins_transitionFrame and ends with
+// Plugins_transitionEnd.
 int Plugins_transitionBegin(int kind, struct SDL_Surface* old_frame, struct SDL_Surface* new_frame, int stock_ms,
-	MosaicTransition* out);
+	const ListSelection* old_sel, const ListSelection* new_sel, MosaicTransition* out);
 
 // The owner's transition_frame on surface, lent for the call, at progress.
 // Returns 0, or -1 after an error, which logs and turns its transitions

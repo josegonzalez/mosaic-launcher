@@ -2,6 +2,26 @@
 #include "transmodel.h"
 
 static SDL_Surface* launchOldScreen = NULL; // the frame a launch transition starts from
+static ListSelection listShown;  // where the selection is on the game list's last frame
+static ListSelection launchOld;  // and on launchOldScreen
+static ListSelection slideOld;   // and on tmpOldScreen
+
+// Where the selection is on what's on screen: none off the game list.
+static ListSelection onScreen(void) {
+	ListSelection sel;
+	if (lastScreen == SCREEN_GAMELIST) sel = listShown;
+	else ListSelection_clear(&sel);
+	return sel;
+}
+
+void Transition_listShown(const ListSelection* sel) {
+	if (sel) listShown = *sel;
+	else ListSelection_clear(&listShown);
+}
+
+void Transition_keepSelection(void) {
+	slideOld = onScreen();
+}
 
 // An opaque black w by h frame, or NULL.
 static SDL_Surface* blackFrame(int w, int h) {
@@ -14,10 +34,12 @@ static SDL_Surface* blackFrame(int w, int h) {
 // frames. Returns 1 when it drew the transition or turned it off, or 0 to
 // draw stock's, as with no owner, a choice of stock's, or an error. A
 // custom transition's frames go on the topmost layer, cleared afterwards.
-static int byPlugin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, int stock_ms) {
+// old_sel and new_sel are where the selection is in each frame, or NULL.
+static int byPlugin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, int stock_ms,
+		const ListSelection* old_sel, const ListSelection* new_sel) {
 	if (!Plugins_hasTransition(kind)) return 0;
 	MosaicTransition t;
-	int style = Plugins_transitionBegin(kind, old_frame, new_frame, stock_ms, &t);
+	int style = Plugins_transitionBegin(kind, old_frame, new_frame, stock_ms, old_sel, new_sel, &t);
 	if (style == MOSAIC_STYLE_OFF) return 1;
 	if (style != MOSAIC_STYLE_CUSTOM) return 0;
 	SDL_Surface* frame = SDL_CreateRGBSurfaceWithFormat(0, screen->w, screen->h, 32, SDL_PIXELFORMAT_ARGB8888);
@@ -52,6 +74,7 @@ static int byPlugin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, in
 void Transition_captureLaunch(void) {
 	if (launchOldScreen) SDL_FreeSurface(launchOldScreen);
 	launchOldScreen = GFX_captureRendererToSurface();
+	launchOld = onScreen();
 }
 
 int Transition_launch(void) {
@@ -60,7 +83,7 @@ int Transition_launch(void) {
 	if (!old_frame) return 0;
 	SDL_Surface* black = blackFrame(old_frame->w, old_frame->h);
 	// stock shows nothing here: its fade starts from a frame it never kept
-	int drawn = black && byPlugin(MOSAIC_TRANSITION_LAUNCH, old_frame, black, 0);
+	int drawn = black && byPlugin(MOSAIC_TRANSITION_LAUNCH, old_frame, black, 0, &launchOld, NULL);
 	if (black) SDL_FreeSurface(black);
 	SDL_FreeSurface(old_frame);
 	return drawn;
@@ -92,7 +115,9 @@ void Transition_slide(SDL_Surface* oldScreen, int direction) {
 	int kind = direction == SLIDE_LEFT ? MOSAIC_TRANSITION_PUSH : MOSAIC_TRANSITION_POP;
 	int stock_ms = !CFG_getMenuTransitions() ? 0
 		: CFG_getMenuTransitions() == TRANSITION_COMFY ? TRANSITION_COMFY_DURATION : TRANSITION_SNAPPY_DURATION;
-	if (!byPlugin(kind, oldScreen, tmpNewScreen, stock_ms) && CFG_getMenuTransitions()) {
+	// the new frame is the game list just drawn
+	ListSelection new_sel = onScreen();
+	if (!byPlugin(kind, oldScreen, tmpNewScreen, stock_ms, &slideOld, &new_sel) && CFG_getMenuTransitions()) {
 		int _duration = (CFG_getMenuTransitions() == TRANSITION_COMFY)
 			? TRANSITION_COMFY_DURATION
 			: TRANSITION_SNAPPY_DURATION;
@@ -121,7 +146,7 @@ void Transition_showPreview(SDL_Surface* bmp, SDL_Rect dst, int from, int slide)
 		SDL_Surface *tmpNewScreen = GFX_captureRendererToSurface();
 		GFX_clearLayers(LAYER_ALL);
 		folderbgchanged=1;
-		int drawn = byPlugin(MOSAIC_TRANSITION_SCREEN, tmpOldScreen, tmpNewScreen, CFG_getMenuTransitions() ? 100:20);
+		int drawn = byPlugin(MOSAIC_TRANSITION_SCREEN, tmpOldScreen, tmpNewScreen, CFG_getMenuTransitions() ? 100:20, &slideOld, NULL);
 		GFX_drawOnLayer(tmpOldScreen,0,0,screen->w, screen->h,1.0f,0,LAYER_ALL);
 		// where stock's slide ends: the frame on the layer it slides on
 		if (drawn) GFX_drawOnLayer(tmpNewScreen,0,0,screen->w,screen->h,1.0f,0,LAYER_SCROLLTEXT);
@@ -149,7 +174,7 @@ void Transition_showPlaceholder(SDL_Surface* tmpsur, int from, int slide) {
 		GFX_animateSurfaceOpacity(tmpsur,0,0,screen->w,screen->h,255,0,CFG_getMenuTransitions() ? 150:20,LAYER_BACKGROUND);
 	} else if(from == SCREEN_GAMELIST) {
 		// a custom one ends where stock's does, on the layer it slides on
-		if (byPlugin(MOSAIC_TRANSITION_SCREEN, tmpOldScreen, tmpsur, CFG_getMenuTransitions() ? 100:20))
+		if (byPlugin(MOSAIC_TRANSITION_SCREEN, tmpOldScreen, tmpsur, CFG_getMenuTransitions() ? 100:20, &slideOld, NULL))
 			GFX_drawOnLayer(tmpsur,0,0,screen->w,screen->h,1.0f,0,LAYER_TRANSITION);
 		else GFX_animateSurface(tmpsur,0,0-screen->h,0,0,screen->w,screen->h,CFG_getMenuTransitions() ? 100:20,255,255,LAYER_ALL);
 	} else if(from == SCREEN_GAMESWITCHER) {

@@ -1,6 +1,6 @@
 // layoutmodel.c: the layout slot's state, the buttons a layout sees and
 // consumes, and where it draws, and where row decorators and header widgets
-// draw.
+// draw, and where the selection is for transitions.
 
 #include "check.h"
 #include "layoutmodel.h"
@@ -145,6 +145,43 @@ static void testListRow(void) {
 	CHECK(row.rect.w == 0 && row.name.w == 0);
 }
 
+static void testSelection(void) {
+	ListSelection sel;
+	// the built-in list's selected row and the pill on it, as decorators get them
+	ListSelection_row(&sel, 2, 15, 30, 90, 600, 200, 1);
+	CHECK(sel.row.x == 15 && sel.row.y == 30 + 2 * 90 && sel.row.w == 600 && sel.row.h == 90);
+	CHECK(sel.pill.x == 15 && sel.pill.y == sel.row.y && sel.pill.w == 200 && sel.pill.h == 90);
+	MosaicRow row;
+	ListRow_rects(2, 15, 30, 90, 600, 200, 1, &row);
+	CHECK(!memcmp(&sel.row, &row.rect, sizeof(sel.row)) && !memcmp(&sel.pill, &row.name, sizeof(sel.pill)));
+	// the pill never runs past the row
+	ListSelection_row(&sel, 0, 15, 30, 90, 100, 200, 1);
+	CHECK(sel.row.w == 100 && sel.pill.w == 100);
+	// with names hidden there's no pill, only the row
+	ListSelection_row(&sel, 1, 15, 30, 90, 600, 200, 0);
+	CHECK(sel.row.w == 600 && sel.pill.x == 0 && sel.pill.y == 0 && sel.pill.w == 0 && sel.pill.h == 0);
+	// a row with no room is unknown
+	ListSelection_row(&sel, 1, 15, 30, 90, -4, 200, 1);
+	CHECK(sel.row.w == 0 && sel.row.x == 0 && sel.pill.w == 0);
+	ListSelection_clear(&sel);
+	CHECK(sel.row.w == 0 && sel.pill.w == 0);
+
+	// a layout's cells: the selected one's part in the area, the last one winning
+	MosaicRect area = { 0, 0, 1024, 648 };
+	ListSelection_row(&sel, 1, 15, 30, 90, 600, 200, 1);
+	ListSelection_cell(&sel, 3, 4, &(MosaicRect){ 10, 10, 100, 100 }, &area);
+	CHECK(sel.row.y == 120 && sel.pill.w == 200);
+	ListSelection_cell(&sel, 4, 4, &(MosaicRect){ 10, 10, 100, 100 }, &area);
+	CHECK(sel.row.x == 10 && sel.row.y == 10 && sel.row.w == 100 && sel.row.h == 100 && sel.pill.w == 0);
+	ListSelection_cell(&sel, 4, 4, &(MosaicRect){ 900, 600, 200, 100 }, &area);
+	CHECK(sel.row.x == 900 && sel.row.y == 600 && sel.row.w == 124 && sel.row.h == 48);
+	// one outside the area, or no rect, changes nothing
+	ListSelection_cell(&sel, 4, 4, &(MosaicRect){ 2000, 0, 10, 10 }, &area);
+	CHECK(sel.row.x == 900 && sel.row.w == 124);
+	ListSelection_cell(&sel, 4, 4, NULL, &area);
+	CHECK(sel.row.x == 900 && sel.row.w == 124);
+}
+
 static void testHeader(void) {
 	// 1024 wide at scale 3: padding 30, gap 15, a 200 wide pill 90 tall
 	HeaderRow row;
@@ -257,6 +294,7 @@ int main(void) {
 	testArea();
 	testClip();
 	testListRow();
+	testSelection();
 	testHeader();
 	testTopRow();
 	testBackground();

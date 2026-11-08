@@ -46,6 +46,7 @@ static LayoutSlot layout = { LAYOUT_NONE, -1 };
 static int layout_rendering = 0; // while layout_render runs, which only draws
 static MosaicSurface* layout_lent = NULL; // the screen layout_render was lent
 static MosaicRect layout_area;            // and where it may draw
+static ListSelection layout_selected;     // and the last cell decorate_cell got for the selected entry
 static int decorating = 0; // while a decorate_row, header_width or header_widget runs, which only draw
 static int selecting = 0;  // while a selection_changed runs, which can't move the selection
 static TransitionSlots transitions = { -1, -1, 0, 0 };
@@ -1381,7 +1382,8 @@ void Plugins_layoutInput(const MosaicListView* view) {
 	pad.just_released &= ~taken;
 }
 
-int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view) {
+int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view, ListSelection* selected) {
+	if (selected) ListSelection_clear(selected);
 	if (!layoutReady(view)) return 0;
 	const MosaicPlugin* p = loaded[layout.owner].plugin;
 	SDL_Rect clip = { view->area.x, view->area.y, view->area.w, view->area.h };
@@ -1393,11 +1395,14 @@ int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view) {
 	layout_rendering = 1;
 	layout_lent = lent;
 	layout_area = view->area;
+	ListSelection_clear(&layout_selected);
 	int rc = p->layout_render(lent, view);
 	layout_rendering = 0;
 	layout_lent = NULL;
 	PluginDraw_unlend(lent);
-	return layoutResult("layout_render", rc);
+	int drawn = layoutResult("layout_render", rc);
+	if (drawn && selected) *selected = layout_selected;
+	return drawn;
 }
 
 ///////////////////////////////////////
@@ -1414,7 +1419,8 @@ static void transitionFailed(const char* hook, int rc) {
 	TransitionSlots_fail(&transitions, transition_owner);
 }
 
-int Plugins_transitionBegin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, int stock_ms, MosaicTransition* out) {
+int Plugins_transitionBegin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, int stock_ms,
+		const ListSelection* old_sel, const ListSelection* new_sel, MosaicTransition* out) {
 	int owner = TransitionSlots_owner(&transitions, kind);
 	if (owner < 0 || transition_owner >= 0 || !old_frame || !new_frame || old_frame == new_frame) return MOSAIC_STYLE_STOCK;
 	const MosaicSurface* old_lent = PluginDraw_lendReadOnly(old_frame);
@@ -1433,6 +1439,14 @@ int Plugins_transitionBegin(int kind, SDL_Surface* old_frame, SDL_Surface* new_f
 	transition.stock_ms = stock_ms;
 	transition.duration_ms = stock_ms;
 	transition.ease = MOSAIC_EASE_OUT;
+	if (old_sel) {
+		transition.old_row = old_sel->row;
+		transition.old_pill = old_sel->pill;
+	}
+	if (new_sel) {
+		transition.new_row = new_sel->row;
+		transition.new_pill = new_sel->pill;
+	}
 	transition_owner = owner;
 
 	const MosaicPlugin* p = loaded[owner].plugin;
@@ -1565,6 +1579,7 @@ static int hostDecorateCell(MosaicSurface* screen, int index, const MosaicRect* 
 	if (!state.top || index < 0 || index >= state.top->entries->count) return -1;
 	MosaicRect clip;
 	if (!LayoutRect_clip(rect, &layout_area, &clip)) return -1;
+	ListSelection_cell(&layout_selected, index, state.top->selected, rect, &layout_area);
 	if (!Plugins_hasDecorators()) return 0;
 	MosaicRow row = { sizeof(row), index, index == state.top->selected, *rect, { rect->x, rect->y, 0, rect->h } };
 	// a name is kept inside its cell

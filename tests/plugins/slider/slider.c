@@ -1,10 +1,14 @@
 // A plugin that owns the transition or launch slot, logging the
 // transitions it's asked about and the frames it draws. It adds a
-// <sd>/Slider folder holding an Inner folder to the root, and from tick
-// opens Slider and then Inner, so the launcher pushes twice, and then
-// launches the pak its pak setting names, if any. Its custom style slides
-// the old frame out to the left and fades the new one in with blit_alpha,
-// and it reads back what it drew, and what it was lent, along the way.
+// <sd>/Slider folder holding a Before game and an Inner folder to the root,
+// and from tick opens Slider, selects Inner and opens it, so the launcher
+// pushes twice, and then launches the pak its pak setting names, if any. It
+// waits a little before each so the selection pill has settled. Its custom
+// style slides the old frame out to the left and fades the new one in with
+// blit_alpha, and it reads back what it drew, and what it was lent, along
+// the way. It logs where the selection is in each frame, with a pixel on
+// and one beside each pill and one on each row, so the run can check the
+// pill or a layout's cell is there.
 //
 // Settings: style (custom, the default, off, stock, bad for an invalid
 // style, or noframe for custom without a transition_frame), duration (ms,
@@ -29,7 +33,8 @@ static const char* pak = "";
 static int duration = 200;
 static int ease = MOSAIC_EASE_LINEAR;
 static MosaicSurface* red = NULL;
-static int ticks = 0;
+static int step = 0;
+static long step_at = 0; // when the last step ran
 static int frames = 0;
 static int backwards = 0;
 static float last_progress = 0.0f;
@@ -74,6 +79,20 @@ static const char* pixel(const MosaicSurface* s, int x, int y) {
 	return text;
 }
 
+// where the selection is in frame: its row and pill, the pill's top middle
+// and a pixel just right of it, or "-" for an empty pill, and the row's top
+// middle, or "-" for an empty row
+static void rects(int kind, const char* which, const MosaicSurface* frame, const MosaicRect* row, const MosaicRect* pill) {
+	char on[12] = "-", beside[12] = "-", cell[12] = "-";
+	if (row->w > 0) snprintf(cell, sizeof(cell), "%s", pixel(frame, row->x + row->w / 2, row->y + 2));
+	if (pill->w > 0) {
+		snprintf(on, sizeof(on), "%s", pixel(frame, pill->x + pill->w / 2, pill->y + 2));
+		snprintf(beside, sizeof(beside), "%s", pixel(frame, pill->x + pill->w + 2, pill->y + 2));
+	}
+	say("begin %s %s row %i,%i %ix%i pill %i,%i %ix%i on %s beside %s cell %s", kindName(kind), which, row->x, row->y,
+		row->w, row->h, pill->x, pill->y, pill->w, pill->h, on, beside, cell);
+}
+
 static void rootEntries(MosaicList* root) {
 	host->list_push(root, host->entry_new(folder, MOSAIC_ENTRY_DIR, "Slider"));
 }
@@ -82,6 +101,9 @@ static MosaicList* virtualDir(const char* path) {
 	MosaicList* list = NULL;
 	if (!strcmp(path, folder)) {
 		list = host->list_new();
+		char before[620];
+		snprintf(before, sizeof(before), "%s/Before.gb", folder);
+		host->list_push(list, host->entry_new(before, MOSAIC_ENTRY_ROM, "Before"));
 		host->list_push(list, host->entry_new(inner, MOSAIC_ENTRY_DIR, "Inner"));
 	}
 	else if (!strcmp(path, inner)) {
@@ -104,6 +126,10 @@ static int transitionBegin(MosaicTransition* t) {
 		host->fill_rect((MosaicSurface*)t->old_frame, NULL, mosaic_color(0xFFFFFF, 255)),
 		host->blit((MosaicSurface*)t->new_frame, red, NULL, NULL),
 		host->surface_free(ID, (MosaicSurface*)t->old_frame), host->select_index(0));
+	if (MOSAIC_TRANSITION_HAS(t, new_pill)) {
+		rects(t->kind, "old", t->old_frame, &t->old_row, &t->old_pill);
+		rects(t->kind, "new", t->new_frame, &t->new_row, &t->new_pill);
+	}
 	old_kept = t->old_frame;
 	new_kept = t->new_frame;
 	frames = 0;
@@ -153,18 +179,22 @@ static int transitionFrame(MosaicSurface* screen, const MosaicTransition* t, flo
 static void tick(unsigned long now) {
 	(void)now;
 	if (!host->current_list()) return;
-	ticks++;
-	if (ticks == 2) say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
-	if (ticks == 4) {
+	// a push or launch waits until the pill has had time to settle where it rests
+	long settled = step_at + 300;
+	if (step == 0) step_at = ms();
+	else if (step == 1 && ms() >= settled) say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
+	else if (step == 2) {
 		// the frames went back when the transition ended
 		if (old_kept) say("after: old %s new %s", pixel(old_kept, 0, 0), pixel(new_kept, 0, 0));
 		old_kept = new_kept = NULL;
-		say("open inner %i", host->open_path(inner, MOSAIC_ENTRY_DIR));
+		say("select inner %i", host->select_index(1));
 	}
-	if (ticks == 6) {
-		say("done at %s", host->current_path());
-		if (pak[0]) say("open pak %i", host->open_path(pak, MOSAIC_ENTRY_PAK));
-	}
+	else if (step == 3 && ms() >= settled) say("open inner %i", host->open_path(inner, MOSAIC_ENTRY_DIR));
+	else if (step == 4) say("done at %s", host->current_path());
+	else if (step == 5 && pak[0] && ms() >= settled) say("open pak %i", host->open_path(pak, MOSAIC_ENTRY_PAK));
+	else return;
+	step++;
+	step_at = ms();
 }
 
 static MosaicPlugin plugin;

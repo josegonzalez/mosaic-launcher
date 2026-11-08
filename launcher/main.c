@@ -152,6 +152,7 @@ int main (int argc, char *argv[]) {
 				if(tmpOldScreen) SDL_FreeSurface(tmpOldScreen);
 				tmpOldScreen = GFX_captureRendererToSurface();
 				SDL_SetSurfaceBlendMode(tmpOldScreen,SDL_BLENDMODE_BLEND);
+				Transition_keepSelection();
 			}
 			// the launch slot's owner starts from what's on screen
 			if (state.startgame && !Screen_get(currentScreen)->rendersWhileLaunching && Plugins_hasTransition(MOSAIC_TRANSITION_LAUNCH))

@@ -903,10 +903,39 @@ grep -qF "status: showing scrape: Scraping 25%" "$log" || fail "the running stat
 rm -rf "$STATUS_DIR"
 grep -qE "status: (showing|pill|ignoring|none)" "$WORK/hello.log" && fail "a status pill showed with no status files"
 
+# rect_at <kind> <old|new> [log]: slider's line for where the selection is
+# in that frame of the first transition of kind in log ($log by default), as
+# "x y w h pill_x pill_y pill_w pill_h on beside cell", or another with
+# RECT_NTH (a sed line address, such as 2 or $)
+rect_at() {
+	grep "plugin slider: begin $1 $2 row " "${3:-$log}" | sed -n "${RECT_NTH:-1}p" \
+		| sed 's/.* row //; s/ pill / /; s/ on / /; s/ beside / /; s/ cell / /; s/[,x]/ /g'
+}
+
+# check_pill <what> <rect_at line>: the row is known and the pill is on it,
+# from its left and as tall, and what's under the pill isn't what's beside it
+check_pill() {
+	# shellcheck disable=SC2086
+	set -- "$1" $2
+	what=$1
+	shift
+	if [ "$#" -ne 11 ]; then
+		fail "slider didn't log where the selection is in $what"
+	elif [ "$3" -le 0 ] || [ "$4" -le 0 ] || [ "$7" -le 0 ] || [ "$7" -gt "$3" ]; then
+		fail "the selection in $what isn't on a row: $*"
+	elif [ "$5" -ne "$1" ] || [ "$6" -ne "$2" ] || [ "$8" -ne "$4" ]; then
+		fail "the pill in $what isn't on its row: $*"
+	elif [ "$9" = "-" ] || [ "$9" = "${10}" ]; then
+		fail "the pill isn't where $what says: $*"
+	fi
+}
+
 # slider owns the transition slot and draws both pushes into its folders,
 # opened with open_path from tick, with frames from progress 0 to exactly 1
 # on a lent screen that starts black, the old and new frames read-only and
-# taken back afterwards, and blit_alpha fading by half
+# taken back afterwards, and blit_alpha fading by half. Each says where the
+# selection is in both frames, and the pill is there: Before on the first
+# push's new frame, and Inner, the row under it, on the second's old one.
 build_plugin slider 'id=slider\nname=Slider\napi=1\nslots=transition\n'
 printf 'slider=on\n' >"$STATE/plugins.txt"
 run_launcher "$WORK/slider.log" "plugin slider: done at" || fail "the launcher exited early with slider loaded"
@@ -926,6 +955,36 @@ grep -qE "plugin slider: frame alpha 0 [78][0-9A-F]0000FF, none 0 000000FF, bad 
 expect "after: old - new -"
 expect "done at $CARD/Slider/Inner"
 grep -qF "transitions until the launcher restarts" "$log" && fail "slider's transitions were turned off"
+expect "select inner 0"
+check_pill "the first push's old frame" "$(rect_at push old)"
+check_pill "the first push's new frame" "$(rect_at push new)"
+check_pill "the second push's old frame" "$(RECT_NTH=2 rect_at push old)"
+check_pill "the second push's new frame" "$(RECT_NTH=2 rect_at push new)"
+# shellcheck disable=SC2046
+set -- $(rect_at push new) $(RECT_NTH=2 rect_at push old)
+if [ "$#" -ne 22 ] || [ "${13}" -ne $(($2 + $4)) ] || [ "${12}" -ne "$1" ]; then
+	fail "Inner isn't the row under Before: $(grep "plugin slider: begin push .* row " "$log")"
+fi
+
+# under a plugin layout, the row is the last cell gridder passed to
+# decorate_cell for the selected entry, the lit one, and there's no pill;
+# Inner is the cell beside Before
+build_plugin gridder 'id=gridder\nname=Gridder\napi=1\nslots=layout\n'
+printf 'slider=on\ngridder=on\n' >"$STATE/plugins.txt"
+run_launcher "$WORK/slider-layout.log" "plugin slider: done at" || fail "the launcher exited early with slider and gridder loaded"
+log="$WORK/slider-layout.log"
+expect "done at $CARD/Slider/Inner"
+grep "plugin slider: begin push \(old\|new\) row " "$log" | grep -v " pill 0,0 0x0 on - beside - cell FF0000FF$" \
+	&& fail "a push's selection under gridder isn't its lit cell"
+[ "$(grep -c "plugin slider: begin push \(old\|new\) row [0-9]*,[0-9]* [1-9][0-9]*x[1-9][0-9]* " "$log")" -ge 4 ] \
+	|| fail "slider wasn't told where gridder's cells are: $(grep "plugin slider: begin push .* row " "$log")"
+# shellcheck disable=SC2046
+set -- $(RECT_NTH='$' rect_at push new) $(RECT_NTH='$' rect_at push old)
+if [ "$#" -ne 22 ] || [ "${12}" -le "$1" ] || [ "${13}" -ne "$2" ]; then
+	fail "Inner isn't the cell beside Before under gridder: $(grep "plugin slider: begin push .* row " "$log")"
+fi
+rm -rf "$WORK/plugins/gridder.plugin" "$STATE/gridder.cfg"
+printf 'slider=on\n' >"$STATE/plugins.txt"
 
 # off: no frames, and the folders still open
 echo "style=off" >"$STATE/slider.cfg"
@@ -1002,6 +1061,13 @@ grep -qE "plugin slider: begin launch stock 0 duration 0 ease 2, size 1, old [1-
 grep -qE "plugin slider: frame alpha 0 [78][0-9A-F]0000FF, none 0 000000FF, bad -1 -1, new 000000FF$" "$log" \
 	|| fail "the launch's new frame isn't black: $(grep "plugin slider: frame alpha" "$log")"
 grep -qE "plugin slider: frame last launch progress 1.000 frames [0-9]+ backwards 0" "$log" || fail "slider's launch transition didn't end"
+# the launch starts from Inner's list with Game selected, where the
+# transition slot's second push left it; the black frame it goes into has
+# none
+check_pill "the launch's old frame" "$(rect_at launch old)"
+[ "$(rect_at launch old | cut -d' ' -f1-8)" = "$(RECT_NTH=2 rect_at push new "$WORK/slider.log" | cut -d' ' -f1-8)" ] \
+	|| fail "the launch's selection isn't Game's row: $(rect_at launch old)"
+expect "begin launch new row 0,0 0x0 pill 0,0 0x0 on - beside -"
 if [ -f "$WORK/recent.txt.saved" ]; then cp "$WORK/recent.txt.saved" "$RECENTS"; else rm -f "$RECENTS"; fi
 if [ -f "$WORK/next.saved" ]; then cp "$WORK/next.saved" /tmp/next; else rm -f /tmp/next; fi
 if [ -f "$WORK/last.txt.saved" ]; then cp "$WORK/last.txt.saved" /tmp/last.txt; else rm -f /tmp/last.txt; fi
