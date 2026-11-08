@@ -1,0 +1,17 @@
+id=collections-plus
+name=Collections plus
+api=1
+# collections to put on the root, comma-separated by name, eg. RPGs, Shooters, or * for all
+setting.promote=text|On the root|
+# the order collections go in, on the root and in Collections, comma-separated by name; the rest follow by name
+setting.order=text|Order|
+# leave the Collections folder off the root (the quick menu still has it)
+setting.hide_folder=toggle|Hide Collections folder|off
+# list a collection's games in the collection file's order, even when map.txt renames them
+setting.file_order=toggle|Keep file order|on
+# name a collection's games from Collections/.media/<name>.map.txt, or its folder's map.txt, first
+setting.own_map=toggle|Collection map.txt|on
+# a collection's art from Collections/.media/<name>.png or .jpg, as its thumbnail and box
+setting.art=toggle|Collection art|on
+# hide the quick menu's Games tile
+setting.hide_games=toggle|Hide Games tile|off
