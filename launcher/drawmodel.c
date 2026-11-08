@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "drawmodel.h"
@@ -76,6 +77,11 @@ const char* DrawReg_owner(const void* surface) {
 	return i >= 0 ? recorded[i].owner : NULL;
 }
 
+int DrawReg_mine(const void* surface, const char* owner) {
+	int i = surface && owner && strcmp(owner, DRAW_HOST) != 0 ? find(surface) : -1;
+	return i >= 0 && !recorded[i].read_only && !strcmp(recorded[i].owner, owner);
+}
+
 static void drop(int i) {
 	recorded[i] = recorded[--recorded_count];
 }
@@ -106,6 +112,31 @@ int DrawReg_take(const char* owner, void** out, int max) {
 	}
 	return taken;
 }
+
+///////////////////////////////////////
+// writing pixels
+
+static int coordOk(int v) {
+	return v >= -DRAW_COORD_MAX && v <= DRAW_COORD_MAX;
+}
+
+int Draw_writeArea(int sw, int sh, const MosaicRect* rect, int pitch, MosaicRect* area, size_t* offset) {
+	if (sw <= 0 || sh <= 0 || !area || !offset) return -1;
+	MosaicRect r = rect ? *rect : (MosaicRect){ 0, 0, sw, sh };
+	if (r.w < 0 || r.h < 0 || r.w > DRAW_COORD_MAX || r.h > DRAW_COORD_MAX || !coordOk(r.x) || !coordOk(r.y)) return -1;
+	if (pitch < 0 || (long long)pitch < (long long)r.w * 4) return -1;
+	long long x0 = r.x > 0 ? r.x : 0, y0 = r.y > 0 ? r.y : 0;
+	long long x1 = (long long)r.x + r.w, y1 = (long long)r.y + r.h;
+	if (x1 > sw) x1 = sw;
+	if (y1 > sh) y1 = sh;
+	if (x1 <= x0 || y1 <= y0) return 0;
+	unsigned long long skip = (unsigned long long)(y0 - r.y) * (unsigned long long)pitch + (unsigned long long)(x0 - r.x) * 4;
+	if (skip > SIZE_MAX) return -1;
+	*area = (MosaicRect){ (int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0) };
+	*offset = (size_t)skip;
+	return 1;
+}
+
 
 ///////////////////////////////////////
 // text

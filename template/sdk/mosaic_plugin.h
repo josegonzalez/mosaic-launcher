@@ -790,6 +790,22 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, achievements).
 	int (*achievements)(const char* path, MosaicAchievements* out);
 	int (*achievement_hash)(const char* path, char* out, size_t size);
+
+	// Copies pixels into rect of a surface the plugin made (NULL for all of
+	// it), replacing what's there, alpha included, rather than blending.
+	// pixels are RGBA8888: four bytes a pixel, r, g, b then a, with a 255
+	// for opaque and not premultiplied (ffmpeg's AV_PIX_FMT_RGBA), from
+	// rect's top left, with rows starting pitch bytes apart. The part of
+	// rect past the surface's edges is left out. Returns 0, also when none
+	// of rect is on the surface, or -1 for a NULL, a rect with a negative
+	// size, a pitch under rect's width times 4, or a surface the plugin
+	// didn't make or no longer owns: one a hook lent it, the art cache's,
+	// one it handed the launcher from art_surface, or another plugin's.
+	// Like every drawing call it's for the main thread only: convert
+	// decoded frames on a thread of your own and only copy them here.
+	// Check for it with MOSAIC_HOST_HAS(host, surface_write).
+	int (*surface_write)(const char* plugin_id, MosaicSurface* surface, const MosaicRect* rect, const void* pixels,
+		int pitch);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

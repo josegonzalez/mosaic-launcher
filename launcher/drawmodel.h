@@ -11,6 +11,7 @@
 #define DRAW_HOST ""                       // the owner of surfaces the launcher lends to hooks
 #define DRAW_MAX_SIDE 4096                 // the widest or tallest surface a plugin can make
 #define DRAW_PLUGIN_BYTES (32 * 1024 * 1024) // what one plugin's surfaces can take together
+#define DRAW_COORD_MAX (1 << 24)           // further out than any surface, short of overflowing
 
 // Records a surface for owner, a plugin id or DRAW_HOST, taking bytes of
 // owner's budget (DRAW_HOST has none). Returns 0, or -1 for a bad
@@ -30,6 +31,10 @@ int DrawReg_lock(const void* surface);
 
 // 1 when a recorded surface can be drawn on.
 int DrawReg_writable(const void* surface);
+
+// 1 when owner, a plugin id, made a recorded surface it can still draw on:
+// not DRAW_HOST's, another plugin's or one it gave away.
+int DrawReg_mine(const void* surface, const char* owner);
 
 // Forgets a surface owner recorded. Returns 0, or -1 when owner didn't.
 int DrawReg_remove(const void* surface, const char* owner);
@@ -66,5 +71,13 @@ int Draw_roundInset(int radius, int h, int row);
 // The part of a sw by sh source (src) to draw where in a dw by dh one
 // (dst) for an enum MosaicFit. Returns 0, or -1 for a bad argument.
 int Draw_fit(int sw, int sh, int dw, int dh, int fit, MosaicRect* src, MosaicRect* dst);
+
+// For writing pixels into a sw by sh surface: the part of rect (NULL for
+// all of it) inside the surface goes in *area, and how many bytes into the
+// pixels, whose top left is rect's and whose rows start pitch bytes apart,
+// its top left is in *offset. Returns 1, 0 when none of rect is inside, or
+// -1 for a bad argument, a rect with a negative size or past DRAW_COORD_MAX,
+// or a pitch under 4 bytes a pixel of rect's width.
+int Draw_writeArea(int sw, int sh, const MosaicRect* rect, int pitch, MosaicRect* area, size_t* offset);
 
 #endif

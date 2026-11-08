@@ -641,6 +641,10 @@ static MosaicSurface* hostSurfaceScale(const char* plugin_id, const MosaicSurfac
 	return isLoaded(plugin_id) ? PluginDraw_surfaceScale(plugin_id, src, w, h, fit) : NULL;
 }
 
+static int hostSurfaceWrite(const char* plugin_id, MosaicSurface* surface, const MosaicRect* rect, const void* pixels, int pitch) {
+	return isLoaded(plugin_id) ? PluginDraw_surfaceWrite(plugin_id, surface, rect, pixels, pitch) : -1;
+}
+
 static int hostArtFind(const MosaicEntry* entry, int kind, char* out, size_t size) {
 	return ArtLoader_find((const Entry*)entry, kind, out, size);
 }
@@ -754,6 +758,7 @@ static const MosaicHost host = {
 	.ask_pin = hostAskPin,
 	.achievements = hostAchievements,
 	.achievement_hash = hostAchievementHash,
+	.surface_write = hostSurfaceWrite,
 };
 
 ///////////////////////////////////////

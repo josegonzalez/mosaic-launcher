@@ -27,6 +27,7 @@ int PluginDraw_freeAll(const char* owner);
 
 int PluginDraw_surfaceSize(const MosaicSurface* surface, int* w, int* h);
 int PluginDraw_readPixel(const MosaicSurface* surface, int x, int y, MosaicColor* out);
+int PluginDraw_surfaceWrite(const char* owner, MosaicSurface* surface, const MosaicRect* rect, const void* pixels, int pitch);
 int PluginDraw_fillRect(MosaicSurface* target, const MosaicRect* rect, MosaicColor color);
 int PluginDraw_fillRoundRect(MosaicSurface* target, const MosaicRect* rect, int radius, MosaicColor color);
 int PluginDraw_blit(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect, const MosaicRect* dst_rect);

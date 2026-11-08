@@ -3,7 +3,7 @@
 #include "drawmodel.h"
 #include "plugindraw.h"
 
-#define COORD_MAX (1 << 24) // further out than any surface, short of overflowing
+#define COORD_MAX DRAW_COORD_MAX
 #define IMAGE_FILE_MAX (16 * 1024 * 1024)
 
 static SDL_Surface* known(const MosaicSurface* surface) {
@@ -175,6 +175,25 @@ int PluginDraw_readPixel(const MosaicSurface* surface, int x, int y, MosaicColor
 	if (SDL_MUSTLOCK(s)) SDL_UnlockSurface(s);
 	SDL_GetRGBA(pixel, s->format, &out->r, &out->g, &out->b, &out->a);
 	return 0;
+}
+
+// RGBA8888 pixels into a surface owner made. SDL converts them into the
+// surface's format (ARGB8888 for every plugin surface), and only copies
+// rows when that's RGBA32 already; both run near memcpy's speed.
+int PluginDraw_surfaceWrite(const char* owner, MosaicSurface* surface, const MosaicRect* rect, const void* pixels, int pitch) {
+	if (!owner || !owner[0] || !pixels || !DrawReg_mine(surface, owner)) return -1;
+	SDL_Surface* s = (SDL_Surface*)surface;
+	MosaicRect area;
+	size_t offset;
+	int found = Draw_writeArea(s->w, s->h, rect, pitch, &area, &offset);
+	if (found <= 0) return found;
+	if (SDL_MUSTLOCK(s) && SDL_LockSurface(s) != 0) return -1;
+	const Uint8* from = (const Uint8*)pixels + offset;
+	int bpp = s->format->BytesPerPixel;
+	Uint8* to = (Uint8*)s->pixels + (size_t)area.y * s->pitch + (size_t)area.x * bpp;
+	int result = SDL_ConvertPixels(area.w, area.h, SDL_PIXELFORMAT_RGBA32, from, pitch, s->format->format, to, s->pitch);
+	if (SDL_MUSTLOCK(s)) SDL_UnlockSurface(s);
+	return result == 0 ? 0 : -1;
 }
 
 ///////////////////////////////////////

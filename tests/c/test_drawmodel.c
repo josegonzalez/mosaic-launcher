@@ -1,6 +1,7 @@
 // drawmodel.c: who owns which surface, text truncation, rounded corners and
 // fitting, with a fake font one pixel per byte wide.
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "check.h"
@@ -293,6 +294,76 @@ static void testFit(void) {
 	CHECK(Draw_fit(100, 100, 50, 50, MOSAIC_FIT_CONTAIN, NULL, &dst) == -1);
 }
 
+static void testMine(void) {
+	static int made, other, lent, art, given, unknown;
+	CHECK(DrawReg_add(&made, "one", 10) == 0);
+	CHECK(DrawReg_add(&other, "two", 10) == 0);
+	CHECK(DrawReg_add(&lent, DRAW_HOST, 0) == 0);
+	CHECK(DrawReg_add(&art, DRAW_HOST, 0) == 0);
+	CHECK(DrawReg_lock(&art) == 0);
+	CHECK(DrawReg_add(&given, "one", 10) == 0);
+	CHECK(DrawReg_give(&given, "one") == 0);
+	CHECK(DrawReg_mine(&made, "one"));
+	// another plugin's, lent, the art cache's, given away, unknown
+	CHECK(!DrawReg_mine(&made, "two"));
+	CHECK(!DrawReg_mine(&other, "one"));
+	CHECK(!DrawReg_mine(&lent, "one") && !DrawReg_mine(&lent, DRAW_HOST));
+	CHECK(!DrawReg_mine(&art, "one") && !DrawReg_mine(&art, DRAW_HOST));
+	CHECK(!DrawReg_mine(&given, "one"));
+	CHECK(!DrawReg_mine(&unknown, "one"));
+	CHECK(!DrawReg_mine(NULL, "one") && !DrawReg_mine(&made, NULL));
+	// and no longer once freed
+	CHECK(DrawReg_remove(&made, "one") == 0);
+	CHECK(!DrawReg_mine(&made, "one"));
+	CHECK(DrawReg_remove(&other, "two") == 0);
+	CHECK(DrawReg_remove(&lent, DRAW_HOST) == 0);
+	CHECK(DrawReg_remove(&art, DRAW_HOST) == 0);
+	CHECK(DrawReg_remove(&given, DRAW_HOST) == 0);
+}
+
+static void testWriteArea(void) {
+	MosaicRect area;
+	size_t offset;
+	// all of it, with a NULL rect
+	CHECK(Draw_writeArea(40, 20, NULL, 160, &area, &offset) == 1);
+	CHECK(area.x == 0 && area.y == 0 && area.w == 40 && area.h == 20 && offset == 0);
+	CHECK(Draw_writeArea(40, 20, NULL, 159, &area, &offset) == -1);
+	// inside, with rows padded
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 5, 6, 10, 4 }, 64, &area, &offset) == 1);
+	CHECK(area.x == 5 && area.y == 6 && area.w == 10 && area.h == 4 && offset == 0);
+	// past the top left: the rows and pixels before the surface are skipped
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ -3, -2, 10, 5 }, 48, &area, &offset) == 1);
+	CHECK(area.x == 0 && area.y == 0 && area.w == 7 && area.h == 3 && offset == 2 * 48 + 3 * 4);
+	// past the bottom right
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 35, 18, 10, 5 }, 40, &area, &offset) == 1);
+	CHECK(area.x == 35 && area.y == 18 && area.w == 5 && area.h == 2 && offset == 0);
+	// over every edge
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ -1, -1, 42, 22 }, 168, &area, &offset) == 1);
+	CHECK(area.x == 0 && area.y == 0 && area.w == 40 && area.h == 20 && offset == 168 + 4);
+	// nothing on the surface, or nothing at all
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 40, 0, 5, 5 }, 20, &area, &offset) == 0);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, -5, 5, 5 }, 20, &area, &offset) == 0);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, 0, 5 }, 0, &area, &offset) == 0);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, 5, 0 }, 20, &area, &offset) == 0);
+	// refused: a pitch under the width, negative sizes, out of range
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, 5, 5 }, 19, &area, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, 5, 5 }, -20, &area, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, -1, 5 }, 20, &area, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, 5, -1 }, 20, &area, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, 1 << 30, 1 }, INT32_MAX, &area, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ INT32_MIN, 0, 5, 5 }, 20, &area, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, INT32_MAX, 5, 5 }, 20, &area, &offset) == -1);
+	// the widest rect pitch can hold, with no overflow
+	const int far = DRAW_COORD_MAX - 1;
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ -far, -far, DRAW_COORD_MAX, DRAW_COORD_MAX }, INT32_MAX, &area, &offset) == 1);
+	CHECK(area.w == 1 && area.h == 1 && offset == (size_t)far * INT32_MAX + (size_t)far * 4);
+	CHECK(Draw_writeArea(40, 20, &(MosaicRect){ 0, 0, DRAW_COORD_MAX + 1, 1 }, INT32_MAX, &area, &offset) == -1);
+	CHECK(Draw_writeArea(0, 20, NULL, 0, &area, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, NULL, 160, NULL, &offset) == -1);
+	CHECK(Draw_writeArea(40, 20, NULL, 160, &area, NULL) == -1);
+}
+
+
 static void testColor(void) {
 	MosaicColor c = mosaic_color(0x9B2257, 128);
 	CHECK(c.r == 0x9B && c.g == 0x22 && c.b == 0x57 && c.a == 128);
@@ -308,5 +379,7 @@ int main(void) {
 	testRound();
 	testFit();
 	testColor();
+	testMine();
+	testWriteArea();
 	CHECK_DONE();
 }
