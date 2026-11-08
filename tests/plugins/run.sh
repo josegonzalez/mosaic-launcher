@@ -10,8 +10,8 @@
 # draws, one that draws the game list as a grid, two that decorate rows and
 # add header widgets, two that supply art and load it through the art
 # cache, one that hears about the selection, one that reads .info
-# sidecars, and one that crashes during startup. It also checks the status
-# pill shell paks' status files show.
+# sidecars, one that picks transition styles, and one that crashes during
+# startup. It also checks the status pill shell paks' status files show.
 #
 # Each case waits up to PLUGIN_TEST_SECONDS (10 by default) for the log
 # lines it checks, and stops as soon as they're in, so a slow machine only
@@ -901,6 +901,112 @@ log="$WORK/status-done.log"
 grep -qF "status: showing scrape: Scraping 25%" "$log" || fail "the running status file didn't show"
 rm -rf "$STATUS_DIR"
 grep -qE "status: (showing|pill|ignoring|none)" "$WORK/hello.log" && fail "a status pill showed with no status files"
+
+# slider owns the transition slot and draws both pushes into its folders,
+# opened with open_path from tick, with frames from progress 0 to exactly 1
+# on a lent screen that starts black, the old and new frames read-only and
+# taken back afterwards, and blit_alpha fading by half
+build_plugin slider 'id=slider\nname=Slider\napi=1\nslots=transition\n'
+printf 'slider=on\n' >"$STATE/plugins.txt"
+run_launcher "$WORK/slider.log" "plugin slider: done at" || fail "the launcher exited early with slider loaded"
+log="$WORK/slider.log"
+plugin=slider
+grep -qF "plugins: slider picks the transition styles" "$log" || fail "slider didn't take the transition slot"
+[ "$(grep -c "plugin slider: begin push stock" "$log")" -eq 2 ] || fail "slider wasn't asked about both pushes"
+grep -qE "plugin slider: begin push stock [0-9]+ duration [0-9]+ ease 2, size 1, old [1-9][0-9]*x[1-9][0-9]* new [1-9][0-9]*x[1-9][0-9]*, max 1000$" "$log" \
+	|| fail "slider's transition is wrong: $(grep "plugin slider: begin push stock" "$log" | head -1)"
+expect "begin push read-only: fill -1, blit onto -1, free -1, select -1"
+[ "$(grep -c "plugin slider: frame first push progress 0.000 duration 200, screen 1024x768 000000FF, select -1" "$log")" -eq 2 ] \
+	|| fail "slider's first frames are wrong: $(grep "plugin slider: frame first" "$log" | head -1)"
+grep -qE "plugin slider: frame alpha 0 [78][0-9A-F]0000FF, none 0 000000FF, bad -1 -1, new [0-9A-F]{6}FF$" "$log" \
+	|| fail "blit_alpha didn't blend by half: $(grep "plugin slider: frame alpha" "$log" | head -1)"
+[ "$(grep -cE "plugin slider: frame last push progress 1.000 frames [0-9]+ backwards 0 took [0-9]+ ms" "$log")" -eq 2 ] \
+	|| fail "slider's transitions didn't end at progress 1: $(grep "plugin slider: frame last" "$log")"
+expect "after: old - new -"
+expect "done at $CARD/Slider/Inner"
+grep -qF "transitions until the launcher restarts" "$log" && fail "slider's transitions were turned off"
+
+# off: no frames, and the folders still open
+echo "style=off" >"$STATE/slider.cfg"
+run_launcher "$WORK/slider-off.log" "plugin slider: done at" || fail "the launcher exited early with slider's transitions off"
+log="$WORK/slider-off.log"
+[ "$(grep -c "plugin slider: begin push stock" "$log")" -eq 2 ] || fail "slider wasn't asked about both pushes with transitions off"
+grep -qF "plugin slider: frame" "$log" && fail "slider drew frames with its transitions off"
+expect "done at $CARD/Slider/Inner"
+
+# stock's own slide, with no frames from slider
+echo "style=stock" >"$STATE/slider.cfg"
+run_launcher "$WORK/slider-stock.log" "plugin slider: done at" || fail "the launcher exited early with slider choosing stock's"
+log="$WORK/slider-stock.log"
+grep -qF "plugin slider: frame" "$log" && fail "slider drew frames after choosing stock's"
+expect "done at $CARD/Slider/Inner"
+
+# a duration past the cap runs for the cap, logged once
+printf 'duration=5000\nease=3\n' >"$STATE/slider.cfg"
+run_launcher "$WORK/slider-cap.log" "plugin slider: done at" || fail "the launcher exited early with slider's long transition"
+log="$WORK/slider-cap.log"
+[ "$(grep -cF "plugins: slider asked for a 5000 ms transition, running it for 1000 ms" "$log")" -eq 1 ] || fail "the capped transition wasn't logged once"
+expect "frame first push progress 0.000 duration 1000"
+took=$(sed -n 's/.*plugin slider: frame last push progress 1.000 frames [0-9]* backwards 0 took \([0-9]*\) ms.*/\1/p' "$log" | head -1)
+if [ -z "$took" ]; then
+	fail "slider's capped transition didn't end"
+elif [ "$took" -lt 900 ] || [ "$took" -gt 2500 ]; then
+	fail "slider's capped transition took $took ms"
+fi
+
+# errors turn slider's transitions off for the run: the second push is stock's
+for mode in bad frame noframe; do
+	case "$mode" in
+	frame) printf 'fail=frame\n' >"$STATE/slider.cfg" ;;
+	*) printf 'style=%s\n' "$mode" >"$STATE/slider.cfg" ;;
+	esac
+	run_launcher "$WORK/slider-$mode.log" "plugin slider: done at" || fail "the launcher exited early with slider's $mode error"
+	log="$WORK/slider-$mode.log"
+	case "$mode" in
+	bad) want="plugins: slider's transition_begin returned 7, using stock's transitions until the launcher restarts" ;;
+	frame) want="plugins: slider's transition_frame returned -1, using stock's transitions until the launcher restarts" ;;
+	noframe) want="plugins: slider chose a custom transition but has no transition_frame, using stock's transitions until the launcher restarts" ;;
+	esac
+	grep -qF "$want" "$log" || fail "slider's $mode error wasn't logged"
+	[ "$(grep -c "plugin slider: begin push stock" "$log")" -eq 1 ] || fail "slider was asked again after its $mode error"
+	expect "done at $CARD/Slider/Inner"
+done
+rm -f "$STATE/slider.cfg"
+
+# without a slot it's never asked
+printf 'id=slider\nname=Slider\napi=1\n' >"$WORK/plugins/slider.plugin/plugin.txt"
+run_launcher "$WORK/slider-unslotted.log" "plugin slider: done at" || fail "the launcher exited early with slider unslotted"
+log="$WORK/slider-unslotted.log"
+grep -qF "plugins: slider has transitions but no slots=transition or slots=launch, so they won't be called" "$log" || fail "the missing transition slot wasn't reported"
+grep -qF "plugin slider: begin" "$log" && fail "slider was asked without a slot"
+
+# with only the launch slot, the pushes are stock's and the launch of a pak
+# is slider's, from the last frame into black; the launch quits the
+# launcher, and the card's recents, /tmp/next and /tmp/last.txt are put back
+SLIDE_PAK="$WORK/slider/Slid.pak"
+mkdir -p "$SLIDE_PAK"
+: >"$SLIDE_PAK/launch.sh"
+[ -f "$RECENTS" ] && cp "$RECENTS" "$WORK/recent.txt.saved"
+[ -f /tmp/next ] && cp /tmp/next "$WORK/next.saved"
+[ -f /tmp/last.txt ] && cp /tmp/last.txt "$WORK/last.txt.saved"
+printf 'id=slider\nname=Slider\napi=1\nslots=launch\n' >"$WORK/plugins/slider.plugin/plugin.txt"
+echo "pak=$SLIDE_PAK" >"$STATE/slider.cfg"
+run_launcher "$WORK/slider-launch.log" && fail "the launcher didn't quit to launch slider's pak"
+log="$WORK/slider-launch.log"
+grep -qF "plugins: slider picks the launch style" "$log" || fail "slider didn't take the launch slot"
+grep -qF "plugin slider: begin push" "$log" && fail "slider was asked about a push with only the launch slot"
+expect "open pak 1"
+grep -qE "plugin slider: begin launch stock 0 duration 0 ease 2, size 1, old [1-9][0-9]*x[1-9][0-9]* new [1-9][0-9]*x[1-9][0-9]*, max 1000$" "$log" \
+	|| fail "slider's launch transition is wrong: $(grep "plugin slider: begin launch" "$log")"
+grep -qE "plugin slider: frame alpha 0 [78][0-9A-F]0000FF, none 0 000000FF, bad -1 -1, new 000000FF$" "$log" \
+	|| fail "the launch's new frame isn't black: $(grep "plugin slider: frame alpha" "$log")"
+grep -qE "plugin slider: frame last launch progress 1.000 frames [0-9]+ backwards 0" "$log" || fail "slider's launch transition didn't end"
+if [ -f "$WORK/recent.txt.saved" ]; then cp "$WORK/recent.txt.saved" "$RECENTS"; else rm -f "$RECENTS"; fi
+if [ -f "$WORK/next.saved" ]; then cp "$WORK/next.saved" /tmp/next; else rm -f /tmp/next; fi
+if [ -f "$WORK/last.txt.saved" ]; then cp "$WORK/last.txt.saved" /tmp/last.txt; else rm -f /tmp/last.txt; fi
+rm -f "$WORK/recent.txt.saved" "$WORK/next.saved" "$WORK/last.txt.saved"
+rm -rf "$WORK/plugins/slider.plugin" "$WORK/slider" "$STATE/slider.cfg" "$STATE/plugins.txt"
+grep -q "plugin slider:\|transition styles\|launch style" "$WORK/hello.log" && fail "transitions were asked about with no plugin taking them"
 
 # /tmp/stay_awake holds off auto-sleep
 touch /tmp/stay_awake

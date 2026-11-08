@@ -24,6 +24,8 @@
 #define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
 #define ROOT_SLOT "root" // the exclusive slot root_replace belongs to
 #define LAYOUT_SLOT "layout" // the exclusive slot layout_init, layout_input and layout_render belong to
+#define TRANSITION_SLOT "transition" // the exclusive slot asked how folders push and pop and screens change
+#define LAUNCH_SLOT "launch" // the exclusive slot asked how a launch begins
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -118,6 +120,26 @@ void Plugins_decorateRow(struct SDL_Surface* surface, const Entry* entry, Mosaic
 // load order. One whose header_width or header_widget fails logs and is
 // left out from then on.
 void Plugins_header(struct SDL_Surface* surface, HeaderRow* row);
+
+// 1 while a slot's owner is asked about kind (an enum MosaicTransitionKind).
+int Plugins_hasTransition(int kind);
+
+// Asks the owner how to draw a kind of transition between two frames (a
+// stock_ms long animation for stock), lending it both read-only. Returns
+// MOSAIC_STYLE_STOCK (also with no owner or after an error, which logs and
+// turns its transitions off), MOSAIC_STYLE_OFF, or MOSAIC_STYLE_CUSTOM with
+// the transition, its duration capped, in *out. Custom then draws with
+// Plugins_transitionFrame and ends with Plugins_transitionEnd.
+int Plugins_transitionBegin(int kind, struct SDL_Surface* old_frame, struct SDL_Surface* new_frame, int stock_ms,
+	MosaicTransition* out);
+
+// The owner's transition_frame on surface, lent for the call, at progress.
+// Returns 0, or -1 after an error, which logs and turns its transitions
+// off; end it then too.
+int Plugins_transitionFrame(struct SDL_Surface* surface, float progress);
+
+// Takes the frames back.
+void Plugins_transitionEnd(void);
 
 void Plugins_tick(unsigned long now);
 

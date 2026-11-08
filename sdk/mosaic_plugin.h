@@ -229,6 +229,42 @@ typedef struct MosaicLaunch {
 	int type;         // MOSAIC_ENTRY_ROM or MOSAIC_ENTRY_PAK
 } MosaicLaunch;
 
+// The transitions a plugin can draw, as MosaicTransition's kind.
+enum MosaicTransitionKind {
+	MOSAIC_TRANSITION_PUSH,   // opening a folder: stock slides the new list in from the right
+	MOSAIC_TRANSITION_POP,    // backing out of one: stock slides the old list out to the right
+	MOSAIC_TRANSITION_SCREEN, // the game list to the game switcher: stock slides the switcher down over the list
+	MOSAIC_TRANSITION_LAUNCH, // a game or pak starting, into black: stock shows none
+};
+
+// What transition_begin returns.
+enum MosaicTransitionStyle {
+	MOSAIC_STYLE_STOCK,  // stock's animation, at the user's Menu transitions setting
+	MOSAIC_STYLE_OFF,    // none: the new frame shows at once
+	MOSAIC_STYLE_CUSTOM, // the plugin's transition_frame draws each frame
+};
+
+// How progress moves through a transition, as MosaicTransition's ease.
+enum MosaicEase {
+	MOSAIC_EASE_LINEAR,
+	MOSAIC_EASE_IN,     // starts slow, cubic
+	MOSAIC_EASE_OUT,    // ends slow, cubic, as stock's slides
+	MOSAIC_EASE_IN_OUT, // both
+};
+
+// One transition, for the transition and launch slots' owners. It begins
+// with its own size, and fields are only added at the end.
+typedef struct MosaicTransition {
+	size_t size;                    // sizeof(MosaicTransition) in the launcher
+	int kind;                       // an enum MosaicTransitionKind
+	const MosaicSurface* old_frame; // what was on screen, read-only
+	const MosaicSurface* new_frame; // what replaces it, read-only
+	int stock_ms;                   // how long stock's runs at the user's setting, 0 where it shows none
+	// transition_begin can change these two for MOSAIC_STYLE_CUSTOM
+	int duration_ms; // stock_ms on entry; cut to 0 to host->transition_max_ms
+	int ease;        // an enum MosaicEase, MOSAIC_EASE_OUT on entry; one the launcher doesn't know runs linear
+} MosaicTransition;
+
 ///////////////////////////////////////
 // What the launcher offers plugins.
 
@@ -589,6 +625,17 @@ typedef struct MosaicHost {
 	// and kept with the entry until its list is freed. Check for it with
 	// MOSAIC_HOST_HAS(host, entry_info).
 	int (*entry_info)(const MosaicEntry* entry, const char* key, char* out, size_t size);
+
+	// blit with src's alpha scaled by alpha, from 255 (as blit) to 0
+	// (nothing), for fades. Returns 0, or -1 for a bad argument or an alpha
+	// outside 0 to 255. Check for it with MOSAIC_HOST_HAS(host, blit_alpha).
+	int (*blit_alpha)(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect,
+		const MosaicRect* dst_rect, int alpha);
+
+	// Transition styles: the longest, in milliseconds, the launcher lets a
+	// plugin's transition run. Check for them with
+	// MOSAIC_HOST_HAS(host, transition_max_ms).
+	int transition_max_ms;
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
@@ -755,6 +802,30 @@ typedef struct MosaicPlugin {
 	// which the launcher logs it and stops calling this plugin's
 	// selection_changed until it restarts.
 	int (*selection_changed)(const MosaicEntry* entry);
+
+	// Transition styles. A plugin with slots=transition in its plugin.txt
+	// picks how folders push and pop and how the game switcher comes in,
+	// and one with slots=launch how a game or pak starts; one plugin can
+	// own both. Only the slot's owner is asked, each time one of its kinds
+	// runs. Input waits until a transition ends, as with stock's.
+	//
+	// transition_begin gets the old and new frames, lent read-only until
+	// the transition ends, and returns an enum MosaicTransitionStyle. For
+	// MOSAIC_STYLE_CUSTOM it can set duration_ms and ease first, and then
+	// transition_frame draws each frame on screen, a screen-sized surface
+	// lent for the call and filled with opaque black before it, at
+	// progress from 0 to 1 along the ease. The launcher keeps the time:
+	// frames come about 60 a second, until duration_ms has passed by the
+	// clock, however long each takes to draw, and the last has progress
+	// exactly 1. A duration_ms of 0 draws that one frame. They only draw:
+	// select_index returns -1 during them.
+	//
+	// Any other value from transition_begin, MOSAIC_STYLE_CUSTOM without a
+	// transition_frame, or a transition_frame that returns anything but 0
+	// is an error: the launcher logs it, draws stock's transition in its
+	// place, and stops asking this plugin until it restarts.
+	int (*transition_begin)(MosaicTransition* transition);
+	int (*transition_frame)(MosaicSurface* screen, const MosaicTransition* transition, float progress);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

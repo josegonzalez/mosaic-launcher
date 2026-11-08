@@ -634,5 +634,6 @@ void LaunchFade_render(void) {
 	GFX_clearLayers(LAYER_ALL);
 	GFX_clear(screen);
 	GFX_flipHidden();
+	if (Transition_launch()) return;
 	GFX_animateSurfaceOpacity(tmpOldScreen,0,0,screen->w,screen->h,255,0,CFG_getMenuTransitions() ? 150:20,LAYER_BACKGROUND);
 }

@@ -153,6 +153,9 @@ int main (int argc, char *argv[]) {
 				tmpOldScreen = GFX_captureRendererToSurface();
 				SDL_SetSurfaceBlendMode(tmpOldScreen,SDL_BLENDMODE_BLEND);
 			}
+			// the launch slot's owner starts from what's on screen
+			if (state.startgame && !Screen_get(currentScreen)->rendersWhileLaunching && Plugins_hasTransition(MOSAIC_TRANSITION_LAUNCH))
+				Transition_captureLaunch();
 
 			// clear only background layer on start
 			if(lastScreen==SCREEN_GAME || lastScreen==SCREEN_OFF) {
@@ -188,7 +191,8 @@ int main (int argc, char *argv[]) {
 			}
 
 			if(state.animationdirection != ANIM_NONE) {
-				if(CFG_getMenuTransitions()) Transition_slide(tmpOldScreen, state.animationdirection);
+				int kind = state.animationdirection == SLIDE_LEFT ? MOSAIC_TRANSITION_PUSH : MOSAIC_TRANSITION_POP;
+				if(CFG_getMenuTransitions() || Plugins_hasTransition(kind)) Transition_slide(tmpOldScreen, state.animationdirection);
 				// animation done
 				state.animationdirection = ANIM_NONE;
 			}

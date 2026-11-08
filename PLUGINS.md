@@ -35,7 +35,7 @@ conflicts=
 - `id` must match the `id` in the plugin's `MosaicPlugin`.
 - `setting.<key>=<type>|<label>|<default>[|<options>]` declares a setting the Launcher pak's Plugins page shows and edits. `type` is `toggle` (`on` or `off`), `choice` (one of the comma-separated `options`) or `text` (typed on the on-screen keyboard). The plugin reads the value with `host->cfg_get(id, key, default)`. Changes take effect the next time the launcher starts, which is when the user leaves the Launcher pak.
 - `api` is the `MOSAIC_API_VERSION` the plugin was built against. A plugin for a different version is skipped.
-- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace` or `layout` for the `layout_*` hooks. Only one plugin can own a slot.
+- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, or `transition` and `launch` for the `transition_*` hooks. Only one plugin can own a slot.
 - `requires` lists plugins that must also load. `conflicts` lists plugins that can't load alongside it.
 
 ## The entry point
@@ -132,7 +132,7 @@ if (MOSAIC_HOST_HAS(host, toast)) host->toast("Added to Favorites");
 Both dialogs return straight away and call back once they close, so open them from an action (a button press), not from a list hook.
 - `art_path` in `MosaicPlugin` lets a plugin pick the thumbnail, folder background or list background for an entry.
 - `root_replace()` in `MosaicPlugin` returns the whole root list in place of the stock one, or `NULL` to keep stock's. Only the owner of the `root` slot (`slots=root` in `plugin.txt`) is asked, and other plugins' `root_entries` aren't added to a replaced root unless it sets `root_with_entries`. Recents still load for the game switcher.
-- `open_path(path, type)` opens a game, pak or folder the way selecting it in the game list would, including `pre_launch` and recents. It returns 1 when it opened or the launch is queued, and 0 for a missing file, a cancelled launch, or a call from `init`, before the lists exist.
+- `open_path(path, type)` opens a game, pak or folder the way selecting it in the game list would, including `pre_launch` and recents, and a folder slides in as it does from the list. It returns 1 when it opened or the launch is queued, and 0 for a missing file, a cancelled launch, or a call from `init`, before the lists exist.
 - `recents_count()`, `recent_path(index)`, `recent_remove(index)` and `recents_clear()` read and change the recently played list, newest first. `recent_path` returns the full path, or `NULL` past the end. Changes are saved at once.
 - `reload_lists()` lists the open folders again from the card on the next frame, keeping each selection on the same entry where it can. Call it after deleting or renaming a game or clearing recents. A folder other than the root that the reload empties is closed, as if the user had backed out of it.
 - `sort_compare(a, b, dir_path)` in `MosaicPlugin` orders a list, such as pinned games first or by a number in the name. The launcher sorts a folder its own way first, then by every plugin's `sort_compare` in load order: for each pair, the first plugin to return non-zero decides (negative puts `a` first), and a pair no plugin has an opinion on keeps the launcher's order. Return 0 for lists you don't handle. Recents and collections are passed too, in their own order. The letter index L1 and R1 jump through follows the final order.
@@ -324,6 +324,29 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   // names a game by its sidecar
   static int displayName(const MosaicEntry* entry, char* out, size_t size) {
       return host->entry_info(entry, "name", out, size) == 1 && out[0];
+  }
+  ```
+- `blit_alpha(target, src, src_rect, dst_rect, alpha)` draws as `blit` does, with `src`'s alpha scaled by `alpha`, from 255 (the same as `blit`) to 0 (nothing), so a plugin can fade one surface over another, even an opaque one such as a transition's frame. It returns 0, or -1 for a bad argument or an `alpha` outside 0 to 255. Check for it with `MOSAIC_HOST_HAS(host, blit_alpha)`.
+- Transition styles let a plugin pick how the launcher moves from one frame to the next: its own animation and timing, stock's, or none. They're two exclusive slots, so only one plugin draws a given transition, picked like the layout (`slot.transition=<id>` or `slot.launch=<id>` in `plugins.txt`): a plugin with `slots=transition` is asked about pushes (`MOSAIC_TRANSITION_PUSH`, opening a folder, where stock slides the new list in), pops (`MOSAIC_TRANSITION_POP`, backing out of one) and screen changes (`MOSAIC_TRANSITION_SCREEN`, the game list to the game switcher, where stock slides the switcher down over the list), and one with `slots=launch` about launches (`MOSAIC_TRANSITION_LAUNCH`, a game or pak starting from the game list or game switcher, from the last frame into black, where stock shows nothing). One plugin can own both. A plugin with the hooks but neither slot is logged and never asked. The game switcher's slide between recents and the fades in after a game and after waking stay stock's. With no plugin owning a slot, its transitions are exactly stock's.
+
+  Each time one of its kinds runs, the owner's `transition_begin(transition)` in `MosaicPlugin` gets a `MosaicTransition`: `kind`, `old_frame` (what was on screen) and `new_frame` (what replaces it), both lent read-only until the transition ends, so they can be drawn and read but not drawn on or freed, `stock_ms` (how long stock's runs at the user's Menu transitions setting, 0 where it shows none), and `duration_ms` and `ease`, which start as `stock_ms` and `MOSAIC_EASE_OUT`. It returns `MOSAIC_STYLE_STOCK` for stock's transition, `MOSAIC_STYLE_OFF` to show the new frame at once, or `MOSAIC_STYLE_CUSTOM` to draw it, after setting `duration_ms` and `ease` (`MOSAIC_EASE_LINEAR`, `_IN`, `_OUT` or `_IN_OUT`, cubic; one the launcher doesn't know runs linear) if it wants other timing. For a custom transition, `transition_frame(screen, transition, progress)` draws each frame on `screen`, a screen-sized surface lent for the call and filled with opaque black before it, at `progress` from 0 to 1 along the ease. The launcher keeps the time: frames come about 60 a second until `duration_ms` has passed by the clock, however long each takes to draw, and the last has `progress` exactly 1. `duration_ms` is cut to 0 to `host->transition_max_ms` (1000), logged the first time, so a transition can't hold up input for longer; 0 draws one frame, at 1. Input waits until a transition ends, as with stock's. Both hooks only draw: `select_index` returns -1 during them. Check for transitions with `MOSAIC_HOST_HAS(host, transition_max_ms)`.
+
+  Any other value from `transition_begin`, `MOSAIC_STYLE_CUSTOM` without a `transition_frame`, or a `transition_frame` that returns anything but 0 is an error: the launcher logs it, draws stock's transition in its place, and stops asking the plugin, for every kind it owns, until it restarts. A plugin that only turns transitions off or picks stock's for some kinds needs no `transition_frame`.
+
+  ```c
+  // a crossfade, a little slower than stock's slides
+  static int transitionBegin(MosaicTransition* t) {
+      if (t->kind == MOSAIC_TRANSITION_LAUNCH) return MOSAIC_STYLE_STOCK;
+      t->duration_ms = 300;
+      t->ease = MOSAIC_EASE_IN_OUT;
+      return MOSAIC_STYLE_CUSTOM;
+  }
+
+  static int transitionFrame(MosaicSurface* screen, const MosaicTransition* t, float progress) {
+      int w = host->screen_width(), h = host->screen_height();
+      MosaicRect all = { 0, 0, w, h };
+      host->blit(screen, t->old_frame, NULL, &all);
+      return host->blit_alpha(screen, t->new_frame, NULL, &all, (int)(progress * 255));
   }
   ```
 

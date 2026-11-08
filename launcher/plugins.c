@@ -10,6 +10,7 @@
 #include "layoutmodel.h"
 #include "selmodel.h"
 #include "infomodel.h"
+#include "transmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -26,6 +27,9 @@ typedef struct LoadedPlugin {
 	Hash* cfg; // loaded on first cfg_get or cfg_set
 	int owns_root; // claims the root slot, so its root_replace is asked
 	int owns_layout; // claims the layout slot, so its layout_* hooks are called
+	int owns_transition; // claims the transition slot, so it's asked about pushes, pops and screen changes
+	int owns_launch;     // claims the launch slot, so it's asked about launches
+	int capped;          // asked for a transition past the cap, which was logged
 	int rows_off;    // its decorate_row failed, so it's no longer called
 	int header_off;  // its header_width or header_widget failed, so its widget is left out
 	int selection_off; // its selection_changed failed, so it's no longer called
@@ -41,6 +45,9 @@ static MosaicSurface* layout_lent = NULL; // the screen layout_render was lent
 static MosaicRect layout_area;            // and where it may draw
 static int decorating = 0; // while a decorate_row, header_width or header_widget runs, which only draw
 static int selecting = 0;  // while a selection_changed runs, which can't move the selection
+static TransitionSlots transitions = { -1, -1, 0, 0 };
+static int transition_owner = -1; // the plugin whose transition is running
+static MosaicTransition transition; // and the transition
 
 #define SCREEN_COUNT 3
 
@@ -387,7 +394,7 @@ static int hostSelectedIndex(void) {
 	return state.top->selected;
 }
 static int hostSelectIndex(int index) {
-	if (layout_rendering || decorating || selecting || !state.top || index < 0 || index >= state.top->entries->count) return -1;
+	if (layout_rendering || decorating || selecting || transition_owner >= 0 || !state.top || index < 0 || index >= state.top->entries->count) return -1;
 	Directory_select(state.top, index);
 	// main's copy for this frame, so the game list's input doesn't put it back
 	selected = index;
@@ -649,6 +656,8 @@ static const MosaicHost host = {
 	.decorate_cell = hostDecorateCell,
 	.selection_settle_ms = SEL_SETTLE_MS,
 	.entry_info = hostEntryInfo,
+	.blit_alpha = PluginDraw_blitAlpha,
+	.transition_max_ms = TRANSITION_MAX_MS,
 };
 
 ///////////////////////////////////////
@@ -696,6 +705,13 @@ static void load(const PluginManifest* m) {
 		|| (Plugin_has(plugin, layout_render) && plugin->layout_render);
 	if (!p->owns_layout && has_layout) {
 		LOG_warn("plugins: %s has a layout but no slots=" LAYOUT_SLOT ", so it won't be called\n", m->id);
+	}
+	p->owns_transition = csvHas(m->slots, TRANSITION_SLOT);
+	p->owns_launch = csvHas(m->slots, LAUNCH_SLOT);
+	int has_transitions = (Plugin_has(plugin, transition_begin) && plugin->transition_begin)
+		|| (Plugin_has(plugin, transition_frame) && plugin->transition_frame);
+	if (!p->owns_transition && !p->owns_launch && has_transitions) {
+		LOG_warn("plugins: %s has transitions but no slots=" TRANSITION_SLOT " or slots=" LAUNCH_SLOT ", so they won't be called\n", m->id);
 	}
 	int has_width = Plugin_has(plugin, header_width) && plugin->header_width;
 	int has_widget = Plugin_has(plugin, header_widget) && plugin->header_widget;
@@ -765,6 +781,29 @@ static void claimLayout(void) {
 	}
 }
 
+// The transition and launch slots' owners, once every plugin has loaded.
+static void claimTransitions(void) {
+	TransitionSlots_clear(&transitions);
+	for (int i = 0; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		int has_begin = Plugin_has(p, transition_begin) && p->transition_begin;
+		if (loaded[i].owns_transition && transitions.transition < 0) {
+			if (has_begin) {
+				transitions.transition = i;
+				LOG_info("plugins: %s picks the " TRANSITION_SLOT " styles\n", loaded[i].id);
+			}
+			else LOG_warn("plugins: %s owns the " TRANSITION_SLOT " slot but has no transition_begin, using stock's\n", loaded[i].id);
+		}
+		if (loaded[i].owns_launch && transitions.launch < 0) {
+			if (has_begin) {
+				transitions.launch = i;
+				LOG_info("plugins: %s picks the " LAUNCH_SLOT " style\n", loaded[i].id);
+			}
+			else LOG_warn("plugins: %s owns the " LAUNCH_SLOT " slot but has no transition_begin, using stock's\n", loaded[i].id);
+		}
+	}
+}
+
 void Plugins_init(void) {
 	if (exists(PAUSED_MARKER)) {
 		LOG_warn("plugins: paused after a crash; turn them back on from the Launcher pak\n");
@@ -799,6 +838,7 @@ void Plugins_init(void) {
 	if (loaded_count == 0) unlink(LOADING_MARKER);
 	logOverridden();
 	claimLayout();
+	claimTransitions();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
@@ -815,6 +855,7 @@ void Plugins_started(void) {
 
 void Plugins_quit(void) {
 	LayoutSlot_clear(&layout);
+	TransitionSlots_clear(&transitions);
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) p->plugin->quit();
@@ -1294,6 +1335,90 @@ int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view) {
 	layout_lent = NULL;
 	PluginDraw_unlend(lent);
 	return layoutResult("layout_render", rc);
+}
+
+///////////////////////////////////////
+// transition styles
+
+int Plugins_hasTransition(int kind) {
+	return TransitionSlots_owner(&transitions, kind) >= 0;
+}
+
+// After an error: stock's transitions for the rest of the run.
+static void transitionFailed(const char* hook, int rc) {
+	LOG_warn("plugins: %s's %s returned %i, using stock's transitions until the launcher restarts\n",
+		loaded[transition_owner].id, hook, rc);
+	TransitionSlots_fail(&transitions, transition_owner);
+}
+
+int Plugins_transitionBegin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, int stock_ms, MosaicTransition* out) {
+	int owner = TransitionSlots_owner(&transitions, kind);
+	if (owner < 0 || transition_owner >= 0 || !old_frame || !new_frame || old_frame == new_frame) return MOSAIC_STYLE_STOCK;
+	const MosaicSurface* old_lent = PluginDraw_lendReadOnly(old_frame);
+	const MosaicSurface* new_lent = PluginDraw_lendReadOnly(new_frame);
+	if (!old_lent || !new_lent) {
+		LOG_warn("plugins: a transition's frames are already lent, so %s can't draw it\n", loaded[owner].id);
+		if (old_lent) PluginDraw_unlend((MosaicSurface*)old_lent);
+		if (new_lent) PluginDraw_unlend((MosaicSurface*)new_lent);
+		return MOSAIC_STYLE_STOCK;
+	}
+	memset(&transition, 0, sizeof(transition));
+	transition.size = sizeof(transition);
+	transition.kind = kind;
+	transition.old_frame = old_lent;
+	transition.new_frame = new_lent;
+	transition.stock_ms = stock_ms;
+	transition.duration_ms = stock_ms;
+	transition.ease = MOSAIC_EASE_OUT;
+	transition_owner = owner;
+
+	const MosaicPlugin* p = loaded[owner].plugin;
+	int has_frame = Plugin_has(p, transition_frame) && p->transition_frame;
+	int rc = p->transition_begin(&transition);
+	int style = Transition_checkStyle(rc, has_frame);
+	if (style < 0) {
+		if (rc == MOSAIC_STYLE_CUSTOM) {
+			LOG_warn("plugins: %s chose a custom transition but has no transition_frame, using stock's transitions until the launcher restarts\n",
+				loaded[owner].id);
+			TransitionSlots_fail(&transitions, owner);
+		}
+		else transitionFailed("transition_begin", rc);
+		Plugins_transitionEnd();
+		return MOSAIC_STYLE_STOCK;
+	}
+	if (style != MOSAIC_STYLE_CUSTOM) {
+		Plugins_transitionEnd();
+		return style;
+	}
+	int capped = Transition_capDuration(transition.duration_ms, TRANSITION_MAX_MS);
+	if (capped != transition.duration_ms && !loaded[owner].capped) {
+		loaded[owner].capped = 1;
+		LOG_warn("plugins: %s asked for a %i ms transition, running it for %i ms\n", loaded[owner].id, transition.duration_ms, capped);
+	}
+	transition.duration_ms = capped;
+	*out = transition;
+	return style;
+}
+
+int Plugins_transitionFrame(SDL_Surface* surface, float progress) {
+	if (transition_owner < 0) return -1;
+	MosaicSurface* lent = PluginDraw_lend(surface, NULL);
+	if (!lent) {
+		LOG_warn("plugins: a transition's screen is already lent, so %s can't draw it\n", loaded[transition_owner].id);
+		return -1;
+	}
+	int rc = loaded[transition_owner].plugin->transition_frame(lent, &transition, progress);
+	PluginDraw_unlend(lent);
+	if (rc != 0) transitionFailed("transition_frame", rc);
+	return rc == 0 ? 0 : -1;
+}
+
+void Plugins_transitionEnd(void) {
+	if (transition_owner < 0) return;
+	PluginDraw_unlend((MosaicSurface*)transition.old_frame);
+	PluginDraw_unlend((MosaicSurface*)transition.new_frame);
+	memset(&transition, 0, sizeof(transition));
+	transition_owner = -1;
 }
 
 ///////////////////////////////////////

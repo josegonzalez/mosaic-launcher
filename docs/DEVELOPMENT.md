@@ -78,7 +78,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `quicktiles.c` | plugins' quick menu tiles, and the tiles plugins hide or relabel |
 | `tr.c` | `TR()`, which every piece of fixed UI text passes through where it's drawn |
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
-| `transitions.c` | the folder slide and the game switcher's entrance animations |
+| `transitions.c` | the folder slide and the game switcher's entrance animations, and handing those and the launch to the transition and launch slots' owners, drawing their frames |
 | `pluginset.c` | which discovered plugins load, and in what order |
 | `plugins.c` | finding and loading plugins, the host table they call, chained hooks such as row decorators and header widgets, selection events, and the crash guard |
 | `toast.c` | short messages shown over the current screen |
@@ -102,6 +102,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `statusmodel.c` | the SDL-free half of the status pill: parsing shell paks' status files, tracking the files in `status.d` between polls, which are stale, and the one the pill shows |
 | `statuspill.c` | the status pill over the card and SDL: looking at `status.d` once a second without following links, and drawing the pill through the header row before plugins' header widgets |
 | `infomodel.c` | parsing `.info` metadata sidecars and where an entry's is; `plugins.c` reads one for `entry_info` and keeps it with the entry |
+| `transmodel.c` | the SDL-free half of transition styles: which slot's owner is asked about each kind and when an error turns it off, checking its choice, the duration cap, easing, and stepping through frames by the clock |
 
 See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. `MOSAIC_LAUNCHER_ART_CACHE_BYTES` replaces the art cache's 32 MiB cap, which the eviction case uses to fill a small one. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log.
 

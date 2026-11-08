@@ -247,6 +247,23 @@ int PluginDraw_blit(MosaicSurface* target, const MosaicSurface* src, const Mosai
 	return result == 0 ? 0 : -1;
 }
 
+int PluginDraw_blitAlpha(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect, const MosaicRect* dst_rect, int alpha) {
+	SDL_Surface* s = known(src);
+	if (!s || alpha < 0 || alpha > 255) return -1;
+	if (alpha == 255) return PluginDraw_blit(target, src, src_rect, dst_rect);
+	// blended by alpha even from an opaque source, such as a captured frame
+	SDL_BlendMode mode;
+	Uint8 mod;
+	SDL_GetSurfaceBlendMode(s, &mode);
+	SDL_GetSurfaceAlphaMod(s, &mod);
+	SDL_SetSurfaceBlendMode(s, SDL_BLENDMODE_BLEND);
+	SDL_SetSurfaceAlphaMod(s, (Uint8)(mod * alpha / 255));
+	int result = PluginDraw_blit(target, src, src_rect, dst_rect);
+	SDL_SetSurfaceAlphaMod(s, mod);
+	SDL_SetSurfaceBlendMode(s, mode);
+	return result;
+}
+
 ///////////////////////////////////////
 // text
 
@@ -345,6 +362,12 @@ MosaicSurface* PluginDraw_lend(SDL_Surface* surface, const SDL_Rect* clip) {
 	if (!surface || DrawReg_add(surface, DRAW_HOST, 0) != 0) return NULL;
 	SDL_SetClipRect(surface, clip);
 	return (MosaicSurface*)surface;
+}
+
+const MosaicSurface* PluginDraw_lendReadOnly(SDL_Surface* surface) {
+	if (!surface || DrawReg_add(surface, DRAW_HOST, 0) != 0) return NULL;
+	DrawReg_lock(surface);
+	return (const MosaicSurface*)surface;
 }
 
 void PluginDraw_unlend(MosaicSurface* lent) {

@@ -414,6 +414,8 @@ int Entry_openPath(const char* path, int type) {
 	else if (type == ENTRY_DIR) {
 		openDirectory(buffer, 1);
 		opened = 1;
+		// slides in, as the game list's own open does
+		state.animationdirection = SLIDE_LEFT;
 		if (state.top->entries->count > 0) readyResume(state.top->entries->items[state.top->selected]);
 	}
 	if (!opened) state.startgame = 0;
