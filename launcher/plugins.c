@@ -6,6 +6,7 @@
 #include "stocktoggles.h"
 #include "leds.h"
 #include "bluetooth.h"
+#include "plugindraw.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -479,6 +480,29 @@ static void bluetoothLog(const char* message) {
 	LOG_info("plugins: %s", message);
 }
 
+// Surfaces belong to a loaded plugin, the one whose init is running included.
+static int isLoaded(const char* plugin_id) {
+	for (int i = 0; plugin_id && i < loaded_count; i++) {
+		if (!strcmp(loaded[i].id, plugin_id)) return 1;
+	}
+	return 0;
+}
+static MosaicSurface* hostSurfaceNew(const char* plugin_id, int w, int h) {
+	return isLoaded(plugin_id) ? PluginDraw_surfaceNew(plugin_id, w, h) : NULL;
+}
+static MosaicSurface* hostImageLoad(const char* plugin_id, const char* path) {
+	return isLoaded(plugin_id) ? PluginDraw_imageLoad(plugin_id, path) : NULL;
+}
+static MosaicSurface* hostSurfaceScale(const char* plugin_id, const MosaicSurface* src, int w, int h, int fit) {
+	return isLoaded(plugin_id) ? PluginDraw_surfaceScale(plugin_id, src, w, h, fit) : NULL;
+}
+
+// After a plugin's quit, or when its init declines: its surfaces go with it.
+static void freeSurfaces(const char* plugin_id) {
+	int freed = PluginDraw_freeAll(plugin_id);
+	if (freed) LOG_info("plugins: freed %i surface%s %s left\n", freed, freed == 1 ? "" : "s", plugin_id);
+}
+
 static const MosaicHost host = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -537,6 +561,22 @@ static const MosaicHost host = {
 	.bt_enabled = hostBtEnabled,
 	.bt_connected_address = hostBtConnectedAddress,
 	.bt_connect = hostBtConnect,
+	.screen_width = PluginDraw_screenWidth,
+	.screen_height = PluginDraw_screenHeight,
+	.screen_scale = PluginDraw_screenScale,
+	.surface_new = hostSurfaceNew,
+	.image_load = hostImageLoad,
+	.surface_scale = hostSurfaceScale,
+	.surface_free = PluginDraw_surfaceFree,
+	.surface_size = PluginDraw_surfaceSize,
+	.read_pixel = PluginDraw_readPixel,
+	.fill_rect = PluginDraw_fillRect,
+	.fill_round_rect = PluginDraw_fillRoundRect,
+	.blit = PluginDraw_blit,
+	.text_width = PluginDraw_textWidth,
+	.text_height = PluginDraw_textHeight,
+	.text_truncate = PluginDraw_textTruncate,
+	.draw_text = PluginDraw_drawText,
 };
 
 ///////////////////////////////////////
@@ -614,6 +654,7 @@ static void load(const PluginManifest* m) {
 		state.power_off = power_off;
 		hostInhibitSleep(m->id, 0);
 		hostLedClear(m->id);
+		freeSurfaces(m->id);
 		if (p->cfg) Hash_free(p->cfg);
 		dlclose(handle);
 		loaded_count--;
@@ -678,6 +719,7 @@ void Plugins_quit(void) {
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) p->plugin->quit();
 		// turning a plugin off, or a launch, gives the user's colour back
 		hostLedClear(p->id);
+		freeSurfaces(p->id);
 		if (p->cfg) Hash_free(p->cfg);
 		dlclose(p->handle);
 	}

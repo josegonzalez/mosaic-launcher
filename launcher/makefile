@@ -27,7 +27,8 @@ INCDIR = -I. -I../sdk -I$(NEXTUI)/all/common/ -I$(NEXTUI)/$(PLATFORM)/platform/
 MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	screens.c screen_gamelist.c screen_switcher.c screen_quickmenu.c art.c quickitems.c quicktiles.c tr.c actions.c transitions.c \
 	pluginset.c plugins.c toast.c awake.c power.c powerwatch.c pakhooks.c kbmodel.c modal.c \
-	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c
+	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c \
+	drawmodel.c plugindraw.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.

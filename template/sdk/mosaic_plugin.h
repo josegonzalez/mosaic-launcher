@@ -117,6 +117,43 @@ enum MosaicThemeColor {
 	MOSAIC_COLOR_BACKGROUND = 7,         // Background Color
 };
 
+// Drawing. A surface is something to draw on or draw from: one the plugin
+// made with surface_new, image_load or surface_scale, or one a render hook
+// hands it, such as the screen. Plugins never see its pixels directly.
+typedef struct MosaicSurface MosaicSurface;
+
+// In a surface's pixels, from its top left.
+typedef struct MosaicRect {
+	int x, y, w, h;
+} MosaicRect;
+
+// a is 255 for opaque and 0 for invisible.
+typedef struct MosaicColor {
+	unsigned char r, g, b, a;
+} MosaicColor;
+
+// A colour from 0xRRGGBB, such as theme_color returns, at alpha a.
+static inline MosaicColor mosaic_color(unsigned int rgb, unsigned char a) {
+	MosaicColor color = { (unsigned char)(rgb >> 16), (unsigned char)(rgb >> 8), (unsigned char)rgb, a };
+	return color;
+}
+
+// The launcher's fonts, at the sizes stock draws them.
+enum MosaicFont {
+	MOSAIC_FONT_LARGE,  // list rows and menus
+	MOSAIC_FONT_MEDIUM, // one-letter button labels
+	MOSAIC_FONT_SMALL,  // button hints
+	MOSAIC_FONT_TINY,   // longer button labels
+	MOSAIC_FONT_MICRO,  // text over icons
+};
+
+// How surface_scale fits a surface into its new size.
+enum MosaicFit {
+	MOSAIC_FIT_STRETCH, // fills it, changing the shape
+	MOSAIC_FIT_CONTAIN, // keeps the shape, centred, leaving the rest transparent
+	MOSAIC_FIT_COVER,   // keeps the shape and fills it, cropping the edges
+};
+
 typedef struct MosaicLaunch {
 	const char* path; // the rom or pak being launched
 	int type;         // MOSAIC_ENTRY_ROM or MOSAIC_ENTRY_PAK
@@ -372,6 +409,59 @@ typedef struct MosaicHost {
 	int (*bt_enabled)(void);
 	int (*bt_connected_address)(char* out, size_t size);
 	int (*bt_connect)(const char* address);
+
+	// Drawing; check for it with MOSAIC_HOST_HAS(host, draw_text). Every
+	// call checks its arguments: a NULL, a surface the launcher doesn't
+	// know (such as one already freed) or a size out of range is refused,
+	// with -1 or NULL, rather than drawn.
+	//
+	// The screen's size in pixels, and stock's FIXED_SCALE: how many pixels
+	// one unit of stock's layout is (2 or 3 on today's devices).
+	int (*screen_width)(void);
+	int (*screen_height)(void);
+	int (*screen_scale)(void);
+
+	// Surfaces a plugin makes are its own: free them with surface_free, and
+	// the launcher frees any left after the plugin's quit, or when its init
+	// declines. surface_new makes a transparent w by h surface. image_load
+	// reads a PNG or JPEG from a regular file. surface_scale makes a w by h
+	// copy of src, fitted by an enum MosaicFit. Each is up to 4096 pixels a
+	// side, and a plugin's surfaces together up to 32 MiB; past that, or
+	// for a bad argument or file, they return NULL. surface_free returns 0,
+	// or -1 for a surface this plugin didn't make.
+	MosaicSurface* (*surface_new)(const char* plugin_id, int w, int h);
+	MosaicSurface* (*image_load)(const char* plugin_id, const char* path);
+	MosaicSurface* (*surface_scale)(const char* plugin_id, const MosaicSurface* src, int w, int h, int fit);
+	int (*surface_free)(const char* plugin_id, MosaicSurface* surface);
+
+	// surface_size writes a surface's size. read_pixel writes the colour
+	// at a point in it. Both return 0, or -1 for a bad argument or a point
+	// outside it.
+	int (*surface_size)(const MosaicSurface* surface, int* w, int* h);
+	int (*read_pixel)(const MosaicSurface* surface, int x, int y, MosaicColor* out);
+
+	// Drawing on a surface, blending by alpha, and only inside the area a
+	// render hook allows on a surface it hands over. A NULL rect is the
+	// whole surface. fill_round_rect rounds the corners by radius, at most
+	// half the shorter side. blit draws src_rect of src (NULL for all of
+	// it) into dst_rect (NULL for the same size at 0,0), stretching it to
+	// fit. Each returns 0, or -1 for a bad argument.
+	int (*fill_rect)(MosaicSurface* target, const MosaicRect* rect, MosaicColor color);
+	int (*fill_round_rect)(MosaicSurface* target, const MosaicRect* rect, int radius, MosaicColor color);
+	int (*blit)(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect, const MosaicRect* dst_rect);
+
+	// Text, in the launcher's font (an enum MosaicFont), one line of UTF-8:
+	// anything after a newline is left out. text_width returns how wide
+	// text is and text_height how tall a line is, in pixels. text_truncate
+	// writes text to out, shortened with "..." when it's wider than
+	// max_width or longer than size, cutting only between characters, and
+	// returns its width. draw_text draws text with its top left at x, y,
+	// truncated the same way when max_width is above 0, and returns the
+	// width drawn. Each returns -1 for a bad argument.
+	int (*text_width)(int font, const char* text);
+	int (*text_height)(int font);
+	int (*text_truncate)(int font, const char* text, int max_width, char* out, size_t size);
+	int (*draw_text)(MosaicSurface* target, int font, const char* text, int x, int y, MosaicColor color, int max_width);
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
