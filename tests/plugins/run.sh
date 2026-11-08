@@ -2156,13 +2156,14 @@ rm -rf "$WORK/plugins/art-boxart.plugin" "$WORK/plugins/looker.plugin" "$BOX_DIR
 # is its thumbnail and box. Then with the defaults, the root and the
 # folder are stock's, and the file order and own map still hold.
 COLL_DIR="$CARD/Collections"
-COLL_GAMES="$CARD/Collector"
+# a system of its own, so stock keeps the collections in their folder
+COLL_GAMES="$CARD/Roms/Collector (GB)"
 [ -e "$COLL_DIR" ] && mv "$COLL_DIR" "$WORK/Collections.saved"
 mkdir -p "$COLL_DIR/.media" "$COLL_GAMES" "$STATE"
 for game in Zed Apple Mango Secret; do : >"$COLL_GAMES/$game.gb"; done
-printf '/Collector/Zed.gb\n/Collector/Apple.gb\n/Collector/Mango.gb\n/Collector/Secret.gb\n' >"$COLL_DIR/Alpha.txt"
-printf '/Collector/Apple.gb\n' >"$COLL_DIR/Beta.txt"
-printf '/Collector/Apple.gb\n' >"$COLL_DIR/Gamma.txt"
+for game in Zed Apple Mango Secret; do echo "/Roms/Collector (GB)/$game.gb"; done >"$COLL_DIR/Alpha.txt"
+echo "/Roms/Collector (GB)/Apple.gb" >"$COLL_DIR/Beta.txt"
+echo "/Roms/Collector (GB)/Apple.gb" >"$COLL_DIR/Gamma.txt"
 printf 'Beta.txt\tBee\nMango.gb\tMango Shared\n' >"$COLL_DIR/map.txt"
 printf 'Zed.gb\tZed Prime\nSecret.gb\t.secret\n' >"$COLL_DIR/.media/Alpha.map.txt"
 cp "$ROOT/tests/plugins/drawer/art.png" "$COLL_DIR/.media/Alpha.png"
@@ -2177,7 +2178,7 @@ plugin=collections-plus
 expect "order 2, promote all 0, hide folder on, file order on, own map on, art on, hide games on"
 plugin=collector
 expect "open root 1"
-grep -qE "plugin collector: root .*,Gamma,Bee,Alpha(,|$)" "$log" || fail "the collections aren't on the root in order: $(grep "plugin collector: root" "$log")"
+grep -qE "plugin collector: root .*Collector,Gamma,Bee,Alpha(,|$)" "$log" || fail "the collections aren't on the root in order: $(grep "plugin collector: root" "$log")"
 grep -qE "plugin collector: root (.*,)?Collections(,|$)" "$log" && fail "the Collections folder stayed on the root"
 expect "art Gamma thumbnail 0 box 0"
 expect "art Alpha thumbnail 1 box 1"
