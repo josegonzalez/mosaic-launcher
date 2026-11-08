@@ -3083,8 +3083,9 @@ rm -rf "$WORK/plugins/hold-lock.plugin" "$WORK/plugins/locker.plugin" "$WORK/plu
 # delay setting) after the selection settles, in place of the thumbnail,
 # with its sound through SDL's dummy driver, and stops when the selection
 # moves, going round again at each clip's end: Alpha's half-second clip
-# has sound, Bravo's has none, Charlie's isn't a clip and Delta has none. clipper walks the selection down the folder. Under a
-# plugin layout art_replace refuses, and the plugin waits to try again.
+# has sound, Bravo's has none, Charlie's isn't a clip and Delta has none.
+# clipper walks the selection down the folder. Under a plugin layout that
+# asks for it, the layout draws the clip in its own art spot.
 # Built without ffmpeg's libraries, it only says it's unavailable; the
 # clips are made with the ffmpeg command, and without it the cases that
 # play them are skipped
@@ -3144,19 +3145,23 @@ if [ "$vp_clips" -eq 1 ]; then
 	grep -qF "plugins: video-previews's" "$log" && fail "video-previews' hooks were turned off"
 	grep -qF "art_replace refused" "$log" && fail "art_replace refused video-previews on the game list"
 
-	# under a plugin layout there's no thumbnail to stand in for
+	# under a plugin layout that asks for it, the layout draws the clip in
+	# its own art spot: gridder with swap=1 draws it in the selected cell
 	mkdir -p "$CARD/Gridder/.videos"
 	cp "$VP_DIR/.videos/Alpha.mp4" "$CARD/Gridder/.videos/Apple.mp4"
 	cp "$VP_DIR/.videos/Alpha.mp4" "$CARD/Gridder/.videos/Banana.mp4"
 	build_plugin gridder 'id=gridder\nname=Gridder\napi=1\nslots=layout\n'
+	printf 'swap=1\n' >"$STATE/gridder.cfg"
 	printf 'gridder=on\nvideo-previews=on\n' >"$STATE/plugins.txt"
 	SDL_AUDIODRIVER=dummy run_launcher "$WORK/video-previews-grid.log" "plugin gridder: renders" \
-		"plugin video-previews: art_replace refused " || fail "the launcher exited early with video-previews under gridder"
+		"plugin video-previews: playing " || fail "the launcher exited early with video-previews under gridder"
 	log="$WORK/video-previews-grid.log"
-	grep -qE "plugin video-previews: art_replace refused .*\.gb; trying again in 1000 ms$" "$log" \
-		|| fail "video-previews didn't back off under a layout: $(grep "plugin video-previews: art_replace" "$log")"
-	grep -qF "plugin video-previews: playing" "$log" && fail "video-previews played under a layout"
-	grep -qF "plugins: video-previews opened audio" "$log" && fail "video-previews opened audio for a clip it couldn't show"
+	grep -qE "plugin video-previews: playing (Alpha|Apple|Banana).mp4: 64x48, with sound" "$log" \
+		|| fail "video-previews didn't play under a layout: $(grep "plugin video-previews: " "$log")"
+	grep -qE "plugin gridder: render replacement [A-Za-z]+ 1 " "$log" \
+		|| fail "gridder didn't draw video-previews' clip: $(grep "plugin gridder: render replacement" "$log")"
+	grep -qF "art_replace refused" "$log" && fail "art_replace refused video-previews under a layout that shows it"
+	grep -qF "plugins: gridder's" "$log" && fail "gridder's layout was turned off with video-previews"
 	rm -rf "$WORK/plugins/gridder.plugin" "$CARD/Gridder" "$STATE/gridder.cfg"
 fi
 rm -rf "$WORK/plugins/video-previews.plugin" "$WORK/plugins/clipper.plugin" "$VP_DIR" \

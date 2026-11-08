@@ -8,10 +8,11 @@
 // ffmpeg/build.sh) or the system's on desktop. A decoder thread of the
 // plugin's own reads the clip, converts its pictures to RGBA and queues
 // its sound; tick shows each new picture with surface_write and
-// art_replace, which redraws only the thumbnail. Where the launcher shows
-// no thumbnail (off the game list, under a plugin layout, with Show game
-// art off) art_replace refuses, and the plugin tries again later, waiting
-// longer each time.
+// art_replace, which redraws only the thumbnail on the built-in list, or
+// under a plugin layout the layout's area while the layout draws it in its
+// own art spot. Where the launcher shows no thumbnail (off the game list,
+// with Show game art off) art_replace refuses, and the plugin tries again
+// later, waiting longer each time.
 //
 // The audio device stays open on silence between clips, as closing it
 // clicks on some devices, and is closed after a few seconds with no clip.
