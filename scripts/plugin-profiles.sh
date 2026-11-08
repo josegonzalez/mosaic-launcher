@@ -1,23 +1,27 @@
 #!/bin/sh
 #
-# Runs the desktop build with the bundled plugins in two profiles built from
-# their plugin.txt files:
+# Runs the desktop build with the bundled plugins in profiles built from their
+# plugin.txt files. Profile N gives each exclusive slot its owner N mod the
+# number of owners (owners in name order), and every additive plugin is on. As
+# many profiles run as the largest slot has owners, so every owner of every
+# slot is loaded once:
 #
-#   all        every plugin on, with the first owner (by name) of each
-#              exclusive slot and every additive plugin
-#   alternate  the same, with each exclusive slot flipped to its next owner;
-#              a slot with one owner keeps it
+#   all          N=0, the first owner of each exclusive slot
+#   alternate    N=1, the next owner; a slot with one owner keeps it
+#   alternate-2  N=2, and so on (alternate-3, ...)
 #
 # Plugins whose requires can't be met, or that conflict with one already on,
-# are left off with a note. For each profile this writes plugins.txt on the
-# fake card, runs the desktop build for a few seconds and then the Launcher
-# pak's plugin settings, and fails if either exits on its own, doesn't stop on
-# SIGTERM, or the log shows a plugin refused for a reason the profile didn't
-# choose.
+# are left off with a note. For each profile this prints the owners it picks,
+# writes plugins.txt on the fake card, runs the desktop build for a few
+# seconds and then the Launcher pak's plugin settings, and fails if either
+# exits on its own, doesn't stop on SIGTERM, or the log shows a plugin refused
+# for a reason the profile didn't choose.
 #
-#   scripts/plugin-profiles.sh                       run both profiles
+#   scripts/plugin-profiles.sh                       run every profile
 #   scripts/plugin-profiles.sh print <profile> [dir] print a profile's
 #       plugins.txt for the plugins in dir (default plugins/), notes on stderr
+#   scripts/plugin-profiles.sh count [dir]           print how many profiles
+#       the plugins in dir need
 #
 # Running expects `make desktop plugins-desktop` first.
 
@@ -25,11 +29,16 @@ set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# profile <all|alternate> <dir>: plugins.txt on stdout, notes on stderr
+# profile <all|alternate|alternate-N> <dir>: plugins.txt on stdout, notes on
+# stderr
 profile() {
 	case "$1" in
 		all) alt=0 ;;
 		alternate) alt=1 ;;
+		alternate-[0-9]*)
+			alt="${1#alternate-}"
+			case "$alt" in *[!0-9]*) echo "unknown profile $1" >&2; return 1 ;; esac
+			;;
 		*) echo "unknown profile $1" >&2; return 1 ;;
 	esac
 	set -- "$2"/*/plugin.txt
@@ -70,13 +79,13 @@ profile() {
 				}
 			}
 
-			# exclusive slots: one owner each, the first or the next
+			# exclusive slots: one owner each, owner number alt modulo the count
 			for (k = 1; k <= slot_count; k++) {
 				s = slot[k]
 				owners = 0
 				for (i = 1; i <= n; i++) if (on[i] && has(slots[i], s)) owner[++owners] = i
 				if (!owners) continue
-				pick[s] = owner[alt && owners > 1 ? 2 : 1]
+				pick[s] = owner[alt % owners + 1]
 				for (j = 1; j <= owners; j++) {
 					if (owner[j] != pick[s]) off(owner[j], "the " s " slot goes to " id[pick[s]])
 				}
@@ -112,8 +121,44 @@ profile() {
 	' "$@"
 }
 
+# profile_count <dir>: how many profiles cover every owner of every slot,
+# which is the most owners any one slot has (at least 2, for all and alternate)
+profile_count() {
+	set -- "$1"/*/plugin.txt
+	[ -f "$1" ] || { echo 2; return 0; }
+	awk '
+		/^[ \t]*slots[ \t]*=/ {
+			value = substr($0, index($0, "=") + 1)
+			count = split(value, parts, ",")
+			for (k = 1; k <= count; k++) {
+				s = parts[k]
+				gsub(/[ \t\r]/, "", s)
+				if (s != "") { owners[s]++; if (owners[s] > max) max = owners[s] }
+			}
+		}
+		END { print (max < 2 ? 2 : max) }
+	' "$@"
+}
+
+# profile_names <dir>: all, alternate, alternate-2, ... one per profile
+profile_names() {
+	total="$(profile_count "$1")"
+	echo all
+	echo alternate
+	n=2
+	while [ "$n" -lt "$total" ]; do
+		echo "alternate-$n"
+		n=$((n + 1))
+	done
+}
+
 if [ "${1:-}" = print ]; then
-	profile "${2:?usage: $0 print <all|alternate> [plugins dir]}" "${3:-$ROOT/plugins}"
+	profile "${2:?usage: $0 print <profile> [plugins dir]}" "${3:-$ROOT/plugins}"
+	exit
+fi
+
+if [ "${1:-}" = count ]; then
+	profile_count "${2:-$ROOT/plugins}"
 	exit
 fi
 
@@ -163,11 +208,13 @@ mkdir -p "$WORK" "$STATE"
 saved=
 [ -f "$STATE/plugins.txt" ] && saved="$WORK/plugins.txt.saved" && cp "$STATE/plugins.txt" "$saved"
 
-for name in all alternate; do
+for name in $(profile_names "$ROOT/plugins"); do
 	txt="$WORK/$name.txt"
 	profile "$name" "$ROOT/plugins" >"$txt" 2>"$WORK/$name.notes" || fail "building the $name profile"
 	echo "profile $name:"
 	sed 's/^/  /' "$txt"
+	picks="$(sed -n 's/^slot\.//p' "$txt" | tr '\n' ' ')"
+	echo "  owners: ${picks:-none}"
 	sed 's/^/  note: /' "$WORK/$name.notes"
 
 	cp "$txt" "$STATE/plugins.txt"

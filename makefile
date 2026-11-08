@@ -104,9 +104,9 @@ smoke: desktop
 test-plugins: desktop
 	./tests/plugins/run.sh
 
-# Runs the bundled plugins together in two profiles built from their
-# plugin.txt files: everything on, then each exclusive slot flipped to its
-# next owner. Fails if the launcher or its plugin settings exit on their own,
+# Runs the bundled plugins together in profiles built from their plugin.txt
+# files: everything on, then each exclusive slot rotated through its owners,
+# until every owner has been loaded. Fails if the launcher or its plugin settings exit on their own,
 # or the loader refuses a plugin the profile didn't turn off.
 test-profiles: desktop plugins-desktop
 	./scripts/plugin-profiles.sh

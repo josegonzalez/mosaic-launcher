@@ -69,3 +69,44 @@ print_profile() {
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"favorites=on"* ]]
 }
+
+@test "profile N gives each slot its owner N mod the number of owners" {
+	manifest a slots=layout
+	manifest b slots=layout
+	manifest c slots=layout
+	manifest solo slots=home
+	[ "$(print_profile all 2>/dev/null | grep '^slot')" = "$(printf 'slot.layout=a\nslot.home=solo')" ]
+	[ "$(print_profile alternate 2>/dev/null | grep '^slot')" = "$(printf 'slot.layout=b\nslot.home=solo')" ]
+	[ "$(print_profile alternate-2 2>/dev/null | grep '^slot')" = "$(printf 'slot.layout=c\nslot.home=solo')" ]
+	[ "$(print_profile alternate-3 2>/dev/null | grep '^slot')" = "$(printf 'slot.layout=a\nslot.home=solo')" ]
+	[ "$(print_profile alternate-2 2>&1 >/dev/null)" = "$(printf 'a off: the layout slot goes to c\nb off: the layout slot goes to c')" ]
+}
+
+@test "as many profiles run as the largest slot has owners" {
+	manifest a slots=layout
+	manifest b slots=layout
+	manifest c slots=layout
+	manifest solo slots=home
+	run "$REPO_ROOT/scripts/plugin-profiles.sh" count "$DIR"
+	[ "$output" = 3 ]
+	manifest d slots=layout,home
+	run "$REPO_ROOT/scripts/plugin-profiles.sh" count "$DIR"
+	[ "$output" = 4 ]
+}
+
+@test "there are always at least the all and alternate profiles" {
+	manifest solo slots=home
+	run "$REPO_ROOT/scripts/plugin-profiles.sh" count "$DIR"
+	[ "$output" = 2 ]
+	rm -rf "$DIR"/*
+	run "$REPO_ROOT/scripts/plugin-profiles.sh" count "$DIR"
+	[ "$output" = 2 ]
+}
+
+@test "an unknown profile name is refused" {
+	manifest a slots=layout
+	run print_profile alternate-x
+	[ "$status" -ne 0 ]
+	run print_profile bogus
+	[ "$status" -ne 0 ]
+}
