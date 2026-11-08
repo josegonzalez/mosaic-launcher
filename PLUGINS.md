@@ -199,6 +199,26 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   int accent = host->theme_color(MOSAIC_COLOR_ACCENT);
   if (accent >= 0) host->led_set_color("led-status", (unsigned)accent);
   ```
+- `bt_supported()`, `bt_enabled()`, `bt_connected_address(out, size)` and `bt_connect(address)` let a plugin see and reconnect Bluetooth devices. `bt_supported()` returns 1 on a device with Bluetooth and 0 elsewhere, which today is desktop, where `bt_enabled` and `bt_connected_address` report nothing and `bt_connect` refuses. `bt_enabled()` returns the user's Bluetooth toggle from Settings or the quick menu, 1 or 0. It's read only: plugins can't turn Bluetooth on or off.
+
+  `bt_connected_address(out, size)` writes the address of the device connected now, as `XX:XX:XX:XX:XX:XX` in upper case, and returns 1, or writes `""` and returns 0 when none is, while Bluetooth is off, or before the launcher's first look. `size` must be at least 18. The launcher looks on a thread of its own, with `hcitool con` (or `bluetoothctl devices Connected` where there's no `hcitool`), every 5 seconds while Bluetooth is on and the device is awake, and once right after it wakes, so the call only copies the last answer and is cheap enough for `tick`. When more than one device is connected it's the first one listed. Nothing runs until a plugin first calls it or `bt_connect` with Bluetooth on, so a launcher without such a plugin behaves as stock.
+
+  `bt_connect(address)` asks a paired device to connect, as `bluetoothctl connect <address>`, and returns at once: 0 when the connect is queued, or -1 for an address not in `XX:XX:XX:XX:XX:XX` form (hex, either case), while Bluetooth is off or unsupported, or while another connect is queued or running, from any plugin. The launcher logs each refusal. The connect runs on the launcher's thread, never through a shell, and is stopped after 15 seconds; the launcher looks for the connected device again as soon as it ends, so watch `bt_connected_address` to see whether it took. When the launcher exits, as it does for every launch, a connect or look still running is stopped first, and plugins start again from `init` when it comes back. Stock never records which device was last connected, so a reconnect plugin saves the address itself, only when it changes:
+
+  ```c
+  if (!MOSAIC_HOST_HAS(host, bt_connect) || !host->bt_supported()) return 1;
+
+  // in tick: remember the device while it's connected
+  char address[18];
+  if (host->bt_connected_address(address, sizeof(address))
+      && strcmp(address, host->cfg_get("bt-reconnect", "last", "")) != 0) {
+      host->cfg_set("bt-reconnect", "last", address);
+  }
+
+  // in init and after_resume: ask for it back
+  const char* last = host->cfg_get("bt-reconnect", "last", "");
+  if (host->bt_enabled() && last[0]) host->bt_connect(last);
+  ```
 - `repair_path(missing, out, size)` in `MosaicPlugin` is asked about each line of `recent.txt` whose file is no longer on the card, which stock drops. It can write the full path the file moved to and return 1, or return 0; the first plugin in load order to answer wins. The new path is used only when it's on the card (a game or pak) and isn't already a recent, and recents are saved with it, keeping the line's place and name; the launcher logs both repairs and refusals. It runs whenever recents load: at start and when the lists reload. Lines whose file is there never reach it.
 - When a plugin's `init` declines to start, everything it registered goes with it: its actions (and an action it re-registered goes back to the earlier one), `bind_button` bindings, overrides, quick menu tiles, hidden and renamed tiles, `inhibit_sleep` hold, LED colour and a `power_off` request.
 - `before_sleep`, `after_resume` and `before_poweroff` follow what the device does. Holding the power button to shut down, or pressing a power-off button, runs `before_poweroff` instead of `before_sleep`, as the quick menu's Poweroff does. When stock powers off on its own after the suspend timeout, the device is already asleep, so `before_sleep` has run, and `before_poweroff` runs as the launcher exits, after stock's "Powering off" screen and with the display already shut down. The quick menu's Sleep runs `before_sleep` and `after_resume` too. `before_poweroff` runs at most once.

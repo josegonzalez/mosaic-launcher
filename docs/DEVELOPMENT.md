@@ -90,6 +90,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `launchcmd.c` | checking and quoting the command a plugin replaces a launch with |
 | `stocktoggles.c` | the stock settings plugins can read and set, through `CFG_get*` and `CFG_set*` |
 | `leds.c` | a plugin's LED colour, as stock's ambient LED override, and the theme colours |
+| `bluetooth.c` | plugins' Bluetooth: the worker thread that looks for the connected device and runs connects, each a bounded `fork` and `execvp` |
 
 See [PLUGINS.md](../PLUGINS.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build.
 

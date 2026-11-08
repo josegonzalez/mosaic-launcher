@@ -5,6 +5,7 @@
 #include "plugins.h"
 #include "stocktoggles.h"
 #include "leds.h"
+#include "bluetooth.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -437,6 +438,47 @@ static int hostThemeColor(int index) {
 	return Leds_themeColor(index);
 }
 
+// Stock's BT_* calls block for seconds and build shell strings from the
+// address, so plugins get bluetooth.c's worker instead. Desktop's stock
+// platform code has no Bluetooth.
+static int hostBtSupported(void) {
+	return BT_supported() ? 1 : 0;
+}
+static int hostBtEnabled(void) {
+	return BT_supported() && CFG_getBluetooth() ? 1 : 0;
+}
+static int hostBtConnectedAddress(char* out, size_t size) {
+	if (out && size) out[0] = '\0';
+	if (!BT_supported()) return 0;
+	Bluetooth_setEnabled(CFG_getBluetooth());
+	return Bluetooth_connectedAddress(out, size);
+}
+static int hostBtConnect(const char* address) {
+	// only a checked address goes in the log
+	const char* shown = Bluetooth_validAddress(address) ? address : "(not an address)";
+	const char* why = NULL;
+	if (!BT_supported()) why = "no Bluetooth";
+	else {
+		Bluetooth_setEnabled(CFG_getBluetooth());
+		switch (Bluetooth_connect(address)) {
+			case 0: break;
+			case BLUETOOTH_BAD_ADDRESS: why = "not an address"; break;
+			case BLUETOOTH_OFF: why = "Bluetooth is off"; break;
+			case BLUETOOTH_BUSY: why = "another connect is running"; break;
+			default: why = "no worker thread"; break;
+		}
+	}
+	if (why) {
+		LOG_warn("plugins: refused Bluetooth connect to %s: %s\n", shown, why);
+		return -1;
+	}
+	LOG_info("plugins: queued Bluetooth connect to %s\n", shown);
+	return 0;
+}
+static void bluetoothLog(const char* message) {
+	LOG_info("plugins: %s", message);
+}
+
 static const MosaicHost host = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -491,6 +533,10 @@ static const MosaicHost host = {
 	.led_set_color = hostLedSetColor,
 	.led_clear = hostLedClear,
 	.theme_color = hostThemeColor,
+	.bt_supported = hostBtSupported,
+	.bt_enabled = hostBtEnabled,
+	.bt_connected_address = hostBtConnectedAddress,
+	.bt_connect = hostBtConnect,
 };
 
 ///////////////////////////////////////
@@ -595,6 +641,7 @@ void Plugins_init(void) {
 
 	discover();
 	if (manifest_count == 0) return;
+	Bluetooth_setLog(bluetoothLog);
 
 	char* choices = readText(PLUGIN_CHOICES_PATH);
 	static PluginDecision decisions[PLUGIN_MAX];
@@ -635,6 +682,8 @@ void Plugins_quit(void) {
 		dlclose(p->handle);
 	}
 	loaded_count = 0;
+	// a refresh or connect still running is stopped and reaped first
+	Bluetooth_quit();
 }
 
 int Plugins_discover(const PluginManifest** out) {
@@ -984,14 +1033,20 @@ int Plugins_repairPath(const char* missing, char* out, size_t size) {
 }
 
 void Plugins_tick(unsigned long now) {
+	// the quick menu's Bluetooth tile may have changed it; the worker,
+	// when there is one, never reads stock's settings itself
+	if (loaded_count && BT_supported()) Bluetooth_setEnabled(CFG_getBluetooth());
 	EACH_PLUGIN_WITH(tick) p->tick(now);
 }
 
 void Plugins_beforeSleep(void) {
 	EACH_PLUGIN_WITH(before_sleep) p->before_sleep();
+	Bluetooth_pause(1);
 }
 
 void Plugins_afterResume(void) {
+	// so plugins' after_resume see a fresh address soon
+	Bluetooth_pause(0);
 	EACH_PLUGIN_WITH(after_resume) p->after_resume();
 }
 

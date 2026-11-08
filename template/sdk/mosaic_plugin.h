@@ -354,6 +354,24 @@ typedef struct MosaicHost {
 	// A stock theme colour, by an enum MosaicThemeColor, as 0xRRGGBB, or
 	// -1 for any other index.
 	int (*theme_color)(int index);
+
+	// Bluetooth. bt_supported returns 1 on a device with Bluetooth and 0
+	// elsewhere, including desktop, where the others refuse or report
+	// nothing. bt_enabled returns the user's Bluetooth toggle, 1 or 0;
+	// plugins can't change it. bt_connected_address writes the device
+	// connected now as "XX:XX:XX:XX:XX:XX" (upper case, size at least 18)
+	// and returns 1, or writes "" and returns 0 when none is, while
+	// Bluetooth is off, or before the host's first look. The host looks
+	// every few seconds off the main thread, so it's cheap enough for tick.
+	// bt_connect asks for a paired device to connect and returns at once:
+	// 0 when the connect is queued, or -1 for an address not in that form,
+	// while Bluetooth is off or unsupported, or while another connect is
+	// queued or running. The connect runs on a host thread for up to 15
+	// seconds; watch bt_connected_address to see whether it took.
+	int (*bt_supported)(void);
+	int (*bt_enabled)(void);
+	int (*bt_connected_address)(char* out, size_t size);
+	int (*bt_connect)(const char* address);
 } MosaicHost;
 
 // True when the launcher's host table has this field, so a plugin can use
