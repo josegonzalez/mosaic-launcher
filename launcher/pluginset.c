@@ -59,15 +59,24 @@ static void eachLine(const char* text, void (*fn)(const char* key, const char* v
 	}
 }
 
-// setting.<key>=<type>|<label>|<default>[|<options>]
+// The comma-separated flags field: protected and secret. Unknown words are
+// left for newer launchers, and secret only means something on text.
+static int settingFlags(const char* field, int type) {
+	int flags = 0;
+	if (csvHas(field, "protected")) flags |= SETTING_PROTECTED;
+	if (type == SETTING_TEXT && csvHas(field, "secret")) flags |= SETTING_SECRET;
+	return flags;
+}
+
+// setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]]
 static void manifestSetting(PluginManifest* m, const char* key, const char* value) {
 	if (m->setting_count >= PLUGIN_SETTINGS_MAX || !key[0]) return;
 	char fields[512];
 	copyField(fields, sizeof(fields), value);
-	char* parts[4] = { NULL, NULL, NULL, NULL };
+	char* parts[5] = { NULL, NULL, NULL, NULL, NULL };
 	int n = 0;
 	char* p = fields;
-	while (n < 4) {
+	while (n < 5) {
 		parts[n++] = p;
 		char* bar = strchr(p, '|');
 		if (!bar) break;
@@ -85,6 +94,7 @@ static void manifestSetting(PluginManifest* m, const char* key, const char* valu
 	copyField(s->label, sizeof(s->label), parts[1]);
 	copyField(s->fallback, sizeof(s->fallback), parts[2]);
 	copyField(s->options, sizeof(s->options), parts[3] ? parts[3] : "");
+	s->flags = parts[4] ? settingFlags(parts[4], s->type) : 0;
 	if (s->type == SETTING_CHOICE && !s->options[0]) return; // nothing to choose from
 	m->setting_count++;
 }
@@ -114,6 +124,13 @@ int Manifest_parse(const char* text, PluginManifest* out) {
 	eachLine(text, manifestField, out);
 	if (!out->id[0]) return -1;
 	if (!out->name[0]) copyField(out->name, sizeof(out->name), out->id);
+	return 0;
+}
+
+int Manifest_isProtected(const PluginManifest* m) {
+	for (int i = 0; i < m->setting_count; i++) {
+		if (m->settings[i].flags & SETTING_PROTECTED) return 1;
+	}
 	return 0;
 }
 

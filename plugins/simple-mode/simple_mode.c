@@ -6,8 +6,10 @@
 // default).
 //
 // A Simple mode tile on the quick menu turns it on, and off again: with
-// the "pin" setting set, only after typing that PIN, and otherwise after a
-// confirm. The PIN lives only in this plugin's own cfg. Turning the plugin
+// the launcher's PIN set (on the Launcher pak's Plugins page), only after
+// typing it, and otherwise after a confirm. The host keeps the PIN and
+// checks it; this plugin never sees it. On a launcher without ask_pin, the
+// old "pin" key in this plugin's cfg is used instead. Turning the plugin
 // or its "on" setting off in the Launcher pak, or editing simple-mode.cfg
 // on the card, leaves it too.
 
@@ -58,6 +60,12 @@ static void leave(void* data) {
 	setOn(0);
 }
 
+static void checkedPin(int result, void* data) {
+	(void)data;
+	if (result == MOSAIC_PIN_RIGHT) setOn(0);
+	else if (result == MOSAIC_PIN_WRONG) toast("Wrong PIN");
+}
+
 static void typedPin(const char* text, void* data) {
 	(void)data;
 	if (!text) return; // cancelled
@@ -70,7 +78,12 @@ static void toggle(void* data) {
 		setOn(1);
 		return;
 	}
-	if (Simple_leaveStep(host->cfg_get(ID, "pin", "")) == SIMPLE_LEAVE_PIN) {
+	if (MOSAIC_HOST_HAS(host, ask_pin)) {
+		if (host->has_pin()) host->ask_pin("PIN to leave simple mode", checkedPin, NULL);
+		else if (MOSAIC_HOST_HAS(host, confirm)) host->confirm("Leave simple mode?", "LEAVE", leave, NULL);
+		else setOn(0);
+	}
+	else if (Simple_leaveStep(host->cfg_get(ID, "pin", "")) == SIMPLE_LEAVE_PIN) {
 		if (MOSAIC_HOST_HAS(host, keyboard)) host->keyboard("PIN to leave simple mode", "", typedPin, NULL);
 		else host->log(ID, "this launcher has no keyboard to type the PIN on; turn simple mode off from the Launcher pak");
 	}

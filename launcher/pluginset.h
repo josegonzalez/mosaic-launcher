@@ -13,13 +13,20 @@ enum PluginSettingType {
 	SETTING_TEXT,
 };
 
-// One setting.<key>=<type>|<label>|<default>[|<options>] line.
+// Markers from a setting line's flags field.
+enum PluginSettingFlag {
+	SETTING_PROTECTED = 1 << 0, // the Plugins page asks for the launcher's PIN first, when one is set
+	SETTING_SECRET = 1 << 1,    // text only: never shown once set, only replaced
+};
+
+// One setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]] line.
 typedef struct PluginSetting {
 	char key[48];
 	int type;
 	char label[64];
 	char fallback[128]; // the default
 	char options[256];  // comma-separated, for SETTING_CHOICE
+	int flags;          // enum PluginSettingFlag bits
 } PluginSetting;
 
 typedef struct PluginManifest {
@@ -43,6 +50,9 @@ typedef struct PluginDecision {
 
 // Parses plugin.txt (key=value lines). Returns 0, or -1 when id is missing.
 int Manifest_parse(const char* text, PluginManifest* out);
+
+// True when any of the plugin's settings is protected.
+int Manifest_isProtected(const PluginManifest* m);
 
 // Decides, given the user's choices from plugins.txt:
 //

@@ -132,6 +132,36 @@ int main(void) {
 	CHECK(s.settings[1].type == SETTING_CHOICE);
 	CHECK_STR(s.settings[1].options, "newest,oldest");
 	CHECK(s.settings[2].type == SETTING_TOGGLE);
+	CHECK(s.settings[0].flags == 0 && s.settings[1].flags == 0 && s.settings[2].flags == 0);
+	CHECK(!Manifest_isProtected(&s));
+
+	// protected and secret markers, in a fifth field
+	PluginManifest g = { .bundled = 1 };
+	CHECK(Manifest_parse(
+		"id=guarded\n"
+		"setting.limit=choice|Limit|off|off,15,30|protected\n"
+		"setting.code=text|Code|||protected, secret\n"
+		"setting.note=text|Note|||secret\n"
+		"setting.badge=toggle|Badge|on||secret,protected\n"
+		"setting.later=toggle|Later|on||glow\n"
+		"setting.plain=choice|Plain|a|a,b\n"
+		"setting.extra=choice|Extra|a|a,b|protected|more\n", &g) == 0);
+	CHECK(g.setting_count == 7);
+	CHECK(g.settings[0].flags == SETTING_PROTECTED);
+	CHECK_STR(g.settings[0].options, "off,15,30");
+	CHECK(g.settings[1].flags == (SETTING_PROTECTED | SETTING_SECRET));
+	CHECK_STR(g.settings[1].fallback, "");
+	CHECK_STR(g.settings[1].options, "");
+	CHECK(g.settings[2].flags == SETTING_SECRET);
+	CHECK(g.settings[3].flags == SETTING_PROTECTED); // secret is for text only
+	CHECK(g.settings[4].flags == 0);                 // unknown markers are left for newer launchers
+	CHECK(g.settings[5].flags == 0);
+	CHECK(g.settings[6].flags == SETTING_PROTECTED); // a sixth field is ignored
+	CHECK_STR(g.settings[6].options, "a,b");
+	CHECK(Manifest_isProtected(&g));
+	PluginManifest only_secret = { .bundled = 1 };
+	CHECK(Manifest_parse("id=s\nsetting.note=text|Note|||secret\n", &only_secret) == 0);
+	CHECK(!Manifest_isProtected(&only_secret));
 
 	// on or off, by the same rule as loading
 	CHECK(!PluginSet_isOn(NULL, &s)); // bundled starts off

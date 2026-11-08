@@ -19,6 +19,10 @@ void Modal_message(const char* message);
 // the text, or with NULL if the user cancelled.
 void Modal_keyboard(const char* title, const char* initial, void (*on_done)(const char* text, void* data), void* data);
 
+// The keyboard for a PIN: it starts empty and shows a * for each character
+// typed instead of the text.
+void Modal_keyboardHidden(const char* title, void (*on_done)(const char* text, void* data), void* data);
+
 // Shows a list of choices under title, drawn like the Launcher pak's menus,
 // starting on selected. on_pick runs after it closes, with the index chosen
 // with A, or -1 if the user backed out with B. The strings are copied.

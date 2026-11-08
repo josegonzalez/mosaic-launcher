@@ -14,6 +14,7 @@
 #include "transmodel.h"
 #include "playhistory.h"
 #include "inputmodel.h"
+#include "pin.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -460,6 +461,39 @@ static int hostHoldSwitch(void) {
 	return GetMute() ? 1 : 0;
 }
 
+static int hostHasPin(void) {
+	return Pin_isSet(PIN_PATH);
+}
+
+// One PIN keyboard at a time, like the modal it opens.
+static void (*pin_done)(int result, void* data);
+static void* pin_data;
+
+static void pinTyped(const char* text, void* data) {
+	(void)data;
+	void (*done)(int, void*) = pin_done;
+	pin_done = NULL;
+	if (!done) return;
+	if (!text) done(MOSAIC_PIN_CANCELLED, pin_data);
+	else done(Pin_matches(PIN_PATH, text) ? MOSAIC_PIN_RIGHT : MOSAIC_PIN_WRONG, pin_data);
+}
+
+static void hostAskPin(const char* title, void (*on_done)(int result, void* data), void* data) {
+	if (!on_done) return;
+	if (!Pin_isSet(PIN_PATH)) {
+		on_done(MOSAIC_PIN_RIGHT, data);
+		return;
+	}
+	pin_done = on_done;
+	pin_data = data;
+	Modal_keyboardHidden(title && title[0] ? title : TR("PIN"), pinTyped, NULL);
+}
+
+void Plugins_adoptPin(void) {
+	// both files sit in PLUGIN_STATE_DIR, so there's nothing to move without it
+	if (Pin_adopt(PIN_PATH, PLUGIN_STATE_DIR "/simple-mode.cfg")) LOG_info("plugins: simple mode's PIN is the launcher's PIN now\n");
+}
+
 static int hostBatteryLevel(void) {
 	return HAS_BATTERY ? PWR_getBattery() : -1;
 }
@@ -691,6 +725,8 @@ static const MosaicHost host = {
 	.play_time_today = PlayHistory_today,
 	.decorate_art = hostDecorateArt,
 	.hold_switch = hostHoldSwitch,
+	.has_pin = hostHasPin,
+	.ask_pin = hostAskPin,
 };
 
 ///////////////////////////////////////
@@ -872,6 +908,7 @@ void Plugins_init(void) {
 
 	discover();
 	if (manifest_count == 0) return;
+	Plugins_adoptPin(); // before simple mode's cfg is read
 	Bluetooth_setLog(bluetoothLog);
 
 	char* choices = readText(PLUGIN_CHOICES_PATH);

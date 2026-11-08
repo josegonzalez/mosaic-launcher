@@ -13,6 +13,7 @@ static void (*keyboard_done)(const char* text, void* data);
 static void (*choice_pick)(int index, void* data);
 static void* callback_data;
 static KbModel kb;
+static int kb_hidden = 0; // the field shows a * for each character typed
 static char* choices[MODAL_CHOICES_MAX];
 static int choice_count = 0;
 static int choice_selected = 0;
@@ -50,9 +51,15 @@ void Modal_message(const char* text) {
 void Modal_keyboard(const char* heading, const char* initial, void (*on_done)(const char* text, void* data), void* data) {
 	snprintf(title, sizeof(title), "%s", heading ? heading : "");
 	Kb_reset(&kb, initial);
+	kb_hidden = 0;
 	keyboard_done = on_done;
 	callback_data = data;
 	openModal(MODAL_KEYBOARD);
+}
+
+void Modal_keyboardHidden(const char* heading, void (*on_done)(const char* text, void* data), void* data) {
+	Modal_keyboard(heading, "", on_done, data);
+	kb_hidden = 1;
 }
 
 static void freeChoices(void) {
@@ -97,10 +104,12 @@ static void messageInput(void) {
 static void keyboardFinish(int done) {
 	char text[KB_TEXT_MAX];
 	snprintf(text, sizeof(text), "%s", kb.text);
+	memset(kb.text, 0, sizeof(kb.text)); // a PIN shouldn't outlive its keyboard
 	void (*cb)(const char*, void*) = keyboard_done;
 	void* data = callback_data;
 	closeModal();
 	if (cb) cb(done ? text : NULL, data);
+	memset(text, 0, sizeof(text));
 }
 
 static void keyboardInput(void) {
@@ -200,7 +209,12 @@ static void keyboardRender(void) {
 	SDL_Rect field = { SCALE1(PADDING), SCALE1(PADDING) + cell + SCALE1(BUTTON_MARGIN), screen->w - SCALE1(PADDING * 2), cell };
 	GFX_blitPillDark(ASSET_WHITE_PILL, screen, &field);
 	char shown[KB_TEXT_MAX + 2];
-	snprintf(shown, sizeof(shown), "%s_", kb.text);
+	if (kb_hidden) {
+		size_t len = strlen(kb.text);
+		memset(shown, '*', len);
+		snprintf(shown + len, sizeof(shown) - len, "_");
+	}
+	else snprintf(shown, sizeof(shown), "%s_", kb.text);
 	drawCentered(font.large, FONT_LARGE, shown, picked, field);
 
 	// the keys

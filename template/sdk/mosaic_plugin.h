@@ -739,10 +739,27 @@ typedef struct MosaicHost {
 	// ask every frame. Check for it, and for input_filter and the MENU,
 	// POWER and FN buttons, with MOSAIC_HOST_HAS(host, hold_switch).
 	int (*hold_switch)(void);
+
+	// The launcher's PIN, the one the user sets on the Launcher pak's
+	// Plugins page, shared by simple mode and the Plugins page's protected
+	// settings. Plugins never see it: has_pin returns 1 when one is set,
+	// and ask_pin opens the keyboard under title, hiding what's typed, and
+	// checks it. on_done runs after the keyboard closes with
+	// MOSAIC_PIN_RIGHT, MOSAIC_PIN_WRONG or MOSAIC_PIN_CANCELLED; with no
+	// PIN set it runs right away, from inside ask_pin, with
+	// MOSAIC_PIN_RIGHT. Neither logs what's typed. Check for them with
+	// MOSAIC_HOST_HAS(host, ask_pin).
+	int (*has_pin)(void);
+	void (*ask_pin)(const char* title, void (*on_done)(int result, void* data), void* data);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
 #define MOSAIC_PLAY_UNKNOWN -1
+
+// What ask_pin's on_done gets.
+#define MOSAIC_PIN_RIGHT 1
+#define MOSAIC_PIN_WRONG 0
+#define MOSAIC_PIN_CANCELLED -1
 
 // True when the launcher's host table has this field, so a plugin can use
 // newer features when they're there and do without on older launchers.

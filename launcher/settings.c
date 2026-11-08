@@ -2,12 +2,19 @@
 #include <sys/wait.h>
 #include "launcher.h"
 #include "cfgfile.h"
+#include "pin.h"
 #include "settings.h"
 
 // Anything that mounts, unmounts or edits the boot hook goes through
 // Launcher.pak/bin/manage.sh, so the rules live in one place and stay
 // testable from shell. Plugin choices and settings are plain files, written
 // here.
+//
+// Settings a plugin marks protected ask for the launcher's PIN, when one is
+// set, before they're shown or changed, and so does turning off a plugin
+// with any (or the whole launcher, while one is on). The right PIN unlocks
+// them all until the user leaves the pak. A wrong one only says so: there's
+// no lockout. Secret text settings are never shown once set, only replaced.
 
 enum MenuKind { MENU_MAIN, MENU_PLUGINS, MENU_PLUGIN, MENU_CHOICE };
 
@@ -21,6 +28,7 @@ enum RowKind {
 	ROW_STATUS,    // the plugin's on/off
 	ROW_SETTING,   // arg: setting index
 	ROW_OPTION,    // a choice setting's option
+	ROW_PIN,       // the launcher's PIN
 };
 
 typedef struct Row {
@@ -50,6 +58,7 @@ static const PluginManifest* manifests;
 static int manifest_count = 0;
 static char pak[512];
 static int done = 0;
+static int unlocked = 0; // the PIN was typed since the pak opened
 
 ///////////////////////////////////////
 // the launcher's state, through manage.sh
@@ -149,6 +158,69 @@ static void setPluginOn(const PluginManifest* m, int on) {
 	free(next);
 }
 
+///////////////////////////////////////
+// the PIN
+
+// Whether protected things need the PIN first.
+static int locked(void) {
+	return !unlocked && Pin_isSet(PIN_PATH);
+}
+
+static int settingLocked(const PluginSetting* s) {
+	return (s->flags & SETTING_PROTECTED) && locked();
+}
+
+// Turning this plugin off needs the PIN first.
+static int offLocked(const PluginManifest* m) {
+	return Manifest_isProtected(m) && pluginOn(m) && locked();
+}
+
+// Turning the launcher off needs the PIN first: it turns every plugin off.
+static int launcherOffLocked(void) {
+	if (!locked()) return 0;
+	for (int i = 0; i < manifest_count; i++) {
+		if (Manifest_isProtected(&manifests[i]) && pluginOn(&manifests[i])) return 1;
+	}
+	return 0;
+}
+
+static void buildRows(void);
+static void activate(int step);
+
+// After the PIN, the press that asked for it goes ahead, on the same row.
+static void pinTyped(const char* text, void* data) {
+	if (!text) return; // cancelled
+	if (!Pin_matches(PIN_PATH, text)) {
+		Modal_message(TR("Wrong PIN"));
+		return;
+	}
+	unlocked = 1;
+	buildRows();
+	activate((int)(intptr_t)data);
+}
+
+static void askPin(int step) {
+	Modal_keyboardHidden(TR("PIN"), pinTyped, (void*)(intptr_t)step);
+}
+
+static void newPin(const char* text, void* data) {
+	(void)data;
+	if (!text) return; // cancelled
+	char pin[PIN_LEN];
+	Pin_clean(text, pin);
+	Plugins_ensureStateDir();
+	if (Pin_write(PIN_PATH, pin) != 0) {
+		LOG_warn("settings: couldn't save the PIN in %s\n", PIN_PATH);
+		Modal_message(TR("The PIN could not be saved."));
+	}
+	else {
+		unlocked = 1; // whoever set it knows it
+		Modal_message(pin[0] ? TR("PIN set.\nSimple mode and protected settings ask for it.") : TR("PIN removed."));
+	}
+	memset(pin, 0, sizeof(pin));
+	buildRows();
+}
+
 static void cfgPath(const PluginManifest* m, char* out, size_t size) {
 	snprintf(out, size, PLUGIN_STATE_DIR "/%s.cfg", m->id);
 }
@@ -223,6 +295,7 @@ static void buildRows(void) {
 		for (int i = 0; i < manifest_count; i++) {
 			addRow(ROW_PLUGIN, i, manifests[i].name, onOff(pluginOn(&manifests[i])));
 		}
+		addRow(ROW_PIN, 0, TR("PIN"), Pin_isSet(PIN_PATH) ? TR("Set") : TR("Not set"));
 	}
 	else if (m->kind == MENU_PLUGIN) {
 		const PluginManifest* p = &manifests[m->plugin];
@@ -232,8 +305,11 @@ static void buildRows(void) {
 			const PluginSetting* s = &p->settings[i];
 			char value[128];
 			settingValue(p, s, value, sizeof(value));
-			if (s->type == SETTING_TOGGLE) addRow(ROW_SETTING, i, s->label, onOff(!strcmp(value, "on")));
+			if (settingLocked(s)) addRow(ROW_SETTING, i, s->label, TR("Locked"));
+			else if (s->flags & SETTING_SECRET) addRow(ROW_SETTING, i, s->label, value[0] ? TR("Set") : TR("Not set"));
+			else if (s->type == SETTING_TOGGLE) addRow(ROW_SETTING, i, s->label, onOff(!strcmp(value, "on")));
 			else addRow(ROW_SETTING, i, s->label, value);
+			memset(value, 0, sizeof(value));
 		}
 	}
 	else if (m->kind == MENU_CHOICE) {
@@ -296,21 +372,48 @@ static void activate(int step) {
 		case ROW_TRY_AGAIN: if (!cycling) tryAgain(); break;
 		case ROW_PLUGINS: if (!cycling) push(MENU_PLUGINS, 0, 0); break;
 		case ROW_TURN_ON: if (!cycling) turnOn(); break;
-		case ROW_TURN_OFF: if (!cycling) turnOff(); break;
+		case ROW_TURN_OFF:
+			if (cycling) break;
+			if (launcherOffLocked()) {
+				askPin(step);
+				return;
+			}
+			turnOff();
+			break;
 		case ROW_PLUGIN: {
 			const PluginManifest* p = &manifests[r->arg];
 			if (p->setting_count && !cycling) push(MENU_PLUGIN, r->arg, 0);
+			else if (offLocked(p)) {
+				askPin(step);
+				return;
+			}
 			else setPluginOn(p, !pluginOn(p));
 			break;
 		}
 		case ROW_STATUS: {
 			const PluginManifest* p = &manifests[m->plugin];
+			if (offLocked(p)) {
+				askPin(step);
+				return;
+			}
 			setPluginOn(p, !pluginOn(p));
 			break;
 		}
+		case ROW_PIN:
+			if (cycling) break;
+			if (locked()) {
+				askPin(step);
+				return;
+			}
+			Modal_keyboard(TR("New PIN, empty for none"), "", newPin, NULL);
+			return;
 		case ROW_SETTING: {
 			const PluginManifest* p = &manifests[m->plugin];
 			const PluginSetting* s = &p->settings[r->arg];
+			if (settingLocked(s)) {
+				askPin(step);
+				return;
+			}
 			char value[128];
 			settingValue(p, s, value, sizeof(value));
 			if (s->type == SETTING_TOGGLE) setSetting(p, s, strcmp(value, "on") ? "on" : "off");
@@ -325,7 +428,10 @@ static void activate(int step) {
 				setSetting(p, s, next);
 			}
 			else if (!cycling) {
-				Modal_keyboard(s->label, value, typed, (void*)(intptr_t)(m->plugin * PLUGIN_SETTINGS_MAX + r->arg));
+				// a secret is replaced, never shown, so its keyboard starts empty
+				Modal_keyboard(s->label, s->flags & SETTING_SECRET ? "" : value, typed,
+					(void*)(intptr_t)(m->plugin * PLUGIN_SETTINGS_MAX + r->arg));
+				memset(value, 0, sizeof(value));
 				return;
 			}
 			break;
@@ -383,6 +489,7 @@ static const char* confirmLabel(void) {
 		case ROW_PLUGIN: return manifests[r->arg].setting_count ? TR("OPEN") : TR("CHANGE");
 		case ROW_STATUS: return TR("CHANGE");
 		case ROW_SETTING: return TR("CHANGE");
+		case ROW_PIN: return TR("CHANGE");
 		default: return TR("SELECT");
 	}
 }
@@ -440,6 +547,7 @@ int Settings_main(int argc, char* argv[]) {
 		return 1;
 	}
 	manifest_count = Plugins_discover(&manifests);
+	if (manifest_count) Plugins_adoptPin();
 
 	InitSettings();
 	screen = GFX_init(MODE_MAIN);

@@ -81,6 +81,17 @@ static void fakeConfirm(const char* message, const char* yes, void (*on_yes)(voi
 	confirm_yes = on_yes;
 }
 
+// the launcher's PIN, for a host with ask_pin
+static int host_pin = 0;
+static char asked_title[64];
+static void (*pin_done)(int, void*) = NULL;
+static int fakeHasPin(void) { return host_pin; }
+static void fakeAskPin(const char* title, void (*on_done)(int, void*), void* data) {
+	snprintf(asked_title, sizeof(asked_title), "%s", title);
+	if (!host_pin) on_done(MOSAIC_PIN_RIGHT, data);
+	else pin_done = on_done;
+}
+
 static const MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -234,8 +245,52 @@ static void testPlugin(void) {
 	CHECK(p->filter(&pak, CARD "/Tools/test") == 1);
 }
 
+// On a launcher with ask_pin, the host's PIN, never the cfg's.
+static void testHostPin(void) {
+	MosaicHost with_pin = fake;
+	with_pin.has_pin = fakeHasPin;
+	with_pin.ask_pin = fakeAskPin;
+	const MosaicPlugin* p = mosaic_plugin_get(&with_pin);
+	snprintf(cfg_on, sizeof(cfg_on), "on");
+	snprintf(cfg_pin, sizeof(cfg_pin), "4321"); // ignored
+	has_pin = 1;
+	CHECK(p->init(&with_pin) == 0);
+
+	// no PIN on the host: a confirm, as before, whatever the cfg says
+	keyboard_done = NULL;
+	confirm_yes = NULL;
+	action_run(NULL);
+	CHECK(keyboard_done == NULL);
+	CHECK(confirm_yes != NULL);
+	confirm_yes(NULL);
+	CHECK_STR(cfg_on, "off");
+
+	// a PIN on the host: wrong stays, cancelled stays, right leaves
+	action_run(NULL);
+	CHECK_STR(cfg_on, "on");
+	host_pin = 1;
+	confirm_yes = NULL;
+	action_run(NULL);
+	CHECK(confirm_yes == NULL);
+	CHECK(keyboard_done == NULL);
+	CHECK_STR(asked_title, "PIN to leave simple mode");
+	CHECK(pin_done != NULL);
+	toasted[0] = '\0';
+	pin_done(MOSAIC_PIN_WRONG, NULL);
+	CHECK_STR(toasted, "Wrong PIN");
+	CHECK_STR(cfg_on, "on");
+	toasted[0] = '\0';
+	pin_done(MOSAIC_PIN_CANCELLED, NULL);
+	CHECK_STR(toasted, "");
+	CHECK_STR(cfg_on, "on");
+	pin_done(MOSAIC_PIN_RIGHT, NULL);
+	CHECK_STR(cfg_on, "off");
+	has_pin = 0;
+}
+
 int main(void) {
 	testModel();
 	testPlugin();
+	testHostPin();
 	CHECK_DONE();
 }

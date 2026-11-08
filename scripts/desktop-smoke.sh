@@ -12,6 +12,10 @@
 # default) pass. If that doesn't happen in time it stops the launcher and
 # fails (exit 3).
 #
+# SMOKE_PRELOAD names a library to preload into nextui.elf alone (LD_PRELOAD,
+# or DYLD_INSERT_LIBRARIES on macOS, which drops DYLD_ variables on the way
+# through /bin/sh and env, so it's set here).
+#
 #   ./scripts/desktop-smoke.sh build/smoke.log [seconds] [args...]
 
 set -u
@@ -22,13 +26,20 @@ SECONDS_TO_RUN="${2:-4}"
 STOP_SECONDS=5
 UNTIL="${SMOKE_UNTIL:-}"
 UNTIL_GONE="${SMOKE_UNTIL_GONE:-}"
+PRELOAD="${SMOKE_PRELOAD:-}"
 SETTLE="${SMOKE_SETTLE:-1}"
 shift
 [ $# -gt 0 ] && shift
 
 case "$(uname -s)" in
-	Darwin) export DYLD_LIBRARY_PATH=/var/tmp/nextui/lib ;;
-	*) export LD_LIBRARY_PATH=/var/tmp/nextui/lib ;;
+	Darwin)
+		export DYLD_LIBRARY_PATH=/var/tmp/nextui/lib
+		PRELOAD_VAR=DYLD_INSERT_LIBRARIES
+		;;
+	*)
+		export LD_LIBRARY_PATH=/var/tmp/nextui/lib
+		PRELOAD_VAR=LD_PRELOAD
+		;;
 esac
 
 # missing: prints each SMOKE_UNTIL line the log doesn't have yet
@@ -46,7 +57,15 @@ ready() {
 
 bash "$ROOT/vendor/NextUI/workspace/desktop/prepare_fake_sd_root.sh" >/dev/null
 
-"$ROOT/build/desktop/nextui.elf" "$@" >"$LOG" 2>&1 &
+if [ -n "$PRELOAD" ]; then
+	# not through env, which macOS also strips DYLD_ variables from
+	(
+		export "$PRELOAD_VAR=$PRELOAD"
+		exec "$ROOT/build/desktop/nextui.elf" "$@"
+	) >"$LOG" 2>&1 &
+else
+	"$ROOT/build/desktop/nextui.elf" "$@" >"$LOG" 2>&1 &
+fi
 pid=$!
 
 # poll, so an early exit or a ready log ends the wait

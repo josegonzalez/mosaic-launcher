@@ -22,6 +22,7 @@
 
 #define PLUGIN_STATE_DIR USERDATA_PATH "/launcher"
 #define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
+#define PIN_PATH PLUGIN_STATE_DIR "/pin.txt" // the launcher's PIN; see pin.h
 #define ROOT_SLOT "root" // the exclusive slot root_replace belongs to
 #define LAYOUT_SLOT "layout" // the exclusive slot layout_init, layout_input and layout_render belong to
 #define TRANSITION_SLOT "transition" // the exclusive slot asked how folders push and pop and screens change
@@ -223,5 +224,8 @@ void Plugins_ensureStateDir(void);
 
 // How many plugins loaded.
 int Plugins_count(void);
+
+// Moves a PIN simple mode kept in its own cfg to PIN_PATH (Pin_adopt).
+void Plugins_adoptPin(void);
 
 #endif
