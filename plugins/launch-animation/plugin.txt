@@ -1,0 +1,8 @@
+id=launch-animation
+name=Launch animation
+api=1
+slots=launch
+# how long the selection pill takes to glide to the middle and fade, in ms
+setting.duration=choice|Duration|350|200,350,500
+# out slows as the pill reaches the middle
+setting.ease=choice|Ease|out|linear,in,out,in-out
