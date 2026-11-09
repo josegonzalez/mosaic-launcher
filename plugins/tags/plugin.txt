@@ -1,0 +1,9 @@
+id=tags
+name=Tags
+api=1
+# the game list button that opens the selected game's tag checklist, shared with other plugins' actions on it
+setting.button=choice|Tags button|Y|Y,L2,R2
+# a Tags folder on the root, with a folder per tag, shown while a tag has a game
+setting.root=toggle|Tags folder on the root|on
+# a quick menu tile per tag with games, as the launcher starts
+setting.tiles=toggle|Tag tiles on the quick menu|on
