@@ -1,0 +1,18 @@
+id=theme-plus
+name=Theme plus
+api=1
+slots=theme
+# the theme: a folder name in Themes, a bundled theme, a palette's name, or stock for no change
+setting.theme=text|Theme|stock
+# a Theme tile on the quick menu that lists the themes
+setting.tile=toggle|Quick menu tile|on
+# a game list button that lists the themes
+setting.button=choice|Theme button|none|none,Y,L2,R2,SELECT
+# the rest override the theme's values; theme keeps the theme's
+# the background colour as 0xRRGGBB
+setting.background=text|Background colour|theme
+setting.text_size=choice|Text size|theme|theme,small,stock,large,larger,largest
+# the least contrast ratio text keeps
+setting.contrast=choice|Contrast|theme|theme,off,3,4.5,7
+setting.ui_size=choice|UI size|theme|theme,stock,compact,large,larger
+setting.margins=choice|Screen margins|theme|theme,auto,2,5,8,10,15,20

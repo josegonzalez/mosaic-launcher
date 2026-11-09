@@ -1,0 +1,9 @@
+version=1
+name=Pocket Green
+color1=0x8BAC0F
+color2=0x306230
+color3=0x0F380F
+color4=0x9BBC0F
+color5=0x0F380F
+color6=0xE0F8D0
+color7=0x0F380F

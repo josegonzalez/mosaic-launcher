@@ -1,0 +1,9 @@
+version=1
+name=Nord
+color1=0x88C0D0
+color2=0x3B4252
+color3=0x2E3440
+color4=0xECEFF4
+color5=0x2E3440
+color6=0xD8DEE9
+color7=0x2E3440

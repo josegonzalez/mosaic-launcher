@@ -1,0 +1,9 @@
+version=1
+name=Solarized Dark
+color1=0x2AA198
+color2=0x073642
+color3=0x002B36
+color4=0x93A1A1
+color5=0x002B36
+color6=0xEEE8D5
+color7=0x002B36

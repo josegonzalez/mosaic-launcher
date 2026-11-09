@@ -1,0 +1,9 @@
+version=1
+name=Dracula
+color1=0xBD93F9
+color2=0x44475A
+color3=0x282A36
+color4=0xF8F8F2
+color5=0x282A36
+color6=0xF8F8F2
+color7=0x282A36
