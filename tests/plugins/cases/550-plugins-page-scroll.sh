@@ -101,6 +101,8 @@ row_pattern="Plugin [0-9]+|PIN"
 # on the bottom row, and A changes the selected row
 scroll_page scroll-down "down down down down down down down a"
 expect_page "Plugin 03,Plugin 04,Plugin 05,Plugin 06,Plugin 07,Plugin 08" "Plugin 08" 6
+# with no plugin claiming a slot there are no group headers
+grep -qx "[0-9a-f]\{6\} Other plugins" "$frame.txt" && fail "the page drew a header with no slot plugins"
 grep -qxF "s08=on" "$STATE/plugins.txt" || fail "A didn't turn on the selected plugin: $(tr '\n' ' ' <"$STATE/plugins.txt")"
 grep -qxF "s01=off" "$STATE/plugins.txt" || fail "A turned on a plugin it wasn't on"
 
@@ -123,5 +125,58 @@ row_pattern="Status|Toggle [0-9]|Pick"
 scroll_page scroll-settings "up up a up a up a"
 expect_page "Toggle 3,Toggle 4,Toggle 5,Toggle 6,Toggle 7,Pick" "Pick" 6
 grep -qxF "pick=o10" "$SCROLL_CFG" 2>/dev/null || fail "the option picked wasn't saved: $(cat "$SCROLL_CFG" 2>/dev/null)"
+rm -rf "$SCROLL_DIR"
+
+# plugins that claim a slot are grouped under a header for it, in the
+# slots' order, then the rest under Other plugins, each group A-Z whatever
+# order they're found in; one with two slots is under the first. Headers
+# are never selected: up and down skip them, and a group's first plugin
+# brings its header on screen. The rows are Layout, alpha, Zeta,
+# Transitions, Both, Launch animation, Liftoff, Theme, Dusk, Other plugins,
+# apple, Banana, Mango and PIN.
+scroll_path=""
+choices=""
+n=0
+for plugin in "g-mango|Mango|" "g-zeta|Zeta|layout" "g-odd|Banana|nonsense" "g-dusk|Dusk|theme" \
+	"g-both|Both|launch,transition" "g-alpha|alpha|layout" "g-apple|apple|" "g-lift|Liftoff|launch"; do
+	n=$((n + 1))
+	id=${plugin%%|*}
+	rest=${plugin#*|}
+	mkdir -p "$SCROLL_DIR/$n/$id.plugin"
+	printf 'id=%s\nname=%s\napi=1\nslots=%s\n' "$id" "${rest%%|*}" "${rest#*|}" >"$SCROLL_DIR/$n/$id.plugin/plugin.txt"
+	scroll_path="$scroll_path${scroll_path:+:}$SCROLL_DIR/$n"
+	choices="${choices}$id=off\n"
+done
+printf 'setting.t=toggle|Toggle|off\n' >>"$SCROLL_DIR/3/g-odd.plugin/plugin.txt"
+row_pattern="Layout|Transitions|Launch animation|Theme|Other plugins|alpha|Zeta|Both|Liftoff|Dusk|apple|Banana|Mango|PIN"
+first_page="Layout,alpha,Zeta,Transitions,Both,Launch animation"
+last_page="Dusk,Other plugins,apple,Banana,Mango,PIN"
+middle_page="Transitions,Both,Launch animation,Liftoff,Theme,Dusk"
+
+# it opens on the first plugin, under its header
+scroll_page groups "wait"
+expect_page "$first_page" "alpha" 2
+# down skips headers
+scroll_page groups-down "down down"
+expect_page "$first_page" "Both" 5
+scroll_page groups-scroll "down down down down"
+expect_page "$middle_page" "Dusk" 6
+# scrolling up onto a group's first plugin shows its header too
+scroll_page groups-scroll-up "down down down down down up up up"
+expect_page "$middle_page" "Both" 2
+# up from the first plugin skips its header and wraps to the last page,
+# and down from there comes back to the first page, header and all
+scroll_page groups-wrap "up"
+expect_page "$last_page" "PIN" 6
+scroll_page groups-wrap-back "up down"
+expect_page "$first_page" "alpha" 2
+# back from a plugin's settings, the same plugin is selected
+scroll_page groups-back "up up up a b"
+expect_page "$last_page" "Banana" 4
+grep -qxF "g-odd=off" "$STATE/plugins.txt" || fail "A on a plugin with settings changed it"
+# A changes the plugin it's on
+scroll_page groups-change "down a"
+grep -qxF "g-zeta=on" "$STATE/plugins.txt" || fail "A didn't turn on the selected plugin: $(tr '\n' ' ' <"$STATE/plugins.txt")"
+grep -qxF "g-alpha=off" "$STATE/plugins.txt" || fail "A turned on a plugin it wasn't on"
 rm -rf "$SCROLL_DIR" "$SCROLL_CFG" "$STATE/plugins.txt"
 case_log=""

@@ -162,7 +162,7 @@ Every hook in `MosaicPlugin` is optional; leave out what you don't use. The laun
 
 ## Turning plugins on and off
 
-On the device, open **Launcher** from Tools and choose **Plugins**. Each plugin shows as On or Off; selecting one flips it, and the change takes effect when you leave the Launcher screen.
+On the device, open **Launcher** from Tools and choose **Plugins**. Each plugin shows as On or Off; selecting one flips it, and the change takes effect when you leave the Launcher screen. Plugins that claim an exclusive slot are grouped under a header for it, in the order `slots` lists them above (a plugin with more than one is under the first), and the rest come last, under Other plugins when there's a group before them. Each group is A-Z by name, ignoring case and accents. This is only the page's order: plugins still load in the order below.
 
 Behind that, `.userdata/<platform>/launcher/plugins.txt` holds the user's choices:
 

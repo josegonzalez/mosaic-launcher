@@ -3,6 +3,7 @@
 #include "launcher.h"
 #include "cfgfile.h"
 #include "pin.h"
+#include "pluginorder.h"
 #include "settings.h"
 #include "drawmodel.h"
 
@@ -21,6 +22,7 @@ enum MenuKind { MENU_MAIN, MENU_PLUGINS, MENU_PLUGIN, MENU_CHOICE };
 
 enum RowKind {
 	ROW_INFO,      // can't be selected
+	ROW_HEADER,    // a group's name on the Plugins page; can't be selected
 	ROW_TRY_AGAIN,
 	ROW_PLUGINS,
 	ROW_TURN_ON,
@@ -48,7 +50,7 @@ typedef struct Menu {
 } Menu;
 
 #define MENU_DEPTH 4
-#define ROWS_MAX (PLUGIN_MAX + 4)
+#define ROWS_MAX (PLUGIN_MAX + PLUGIN_GROUP_COUNT + 5)
 
 static Menu stack[MENU_DEPTH];
 static int depth = 0;
@@ -274,6 +276,10 @@ static void addRow(int kind, int arg, const char* label, const char* value) {
 	Draw_copy(r->value, sizeof(r->value), value ? value : "");
 }
 
+static int selectable(const Row* r) {
+	return r->kind != ROW_INFO && r->kind != ROW_HEADER;
+}
+
 static const char* onOff(int on) {
 	return on ? TR("On") : TR("Off");
 }
@@ -293,8 +299,12 @@ static void buildRows(void) {
 	}
 	else if (m->kind == MENU_PLUGINS) {
 		snprintf(title, sizeof(title), "%s", TR("Plugins"));
-		for (int i = 0; i < manifest_count; i++) {
-			addRow(ROW_PLUGIN, i, manifests[i].name, onOff(pluginOn(&manifests[i])));
+		PluginPageRow order[PLUGIN_MAX + PLUGIN_GROUP_COUNT + 1];
+		int n = PluginOrder_rows(manifests, manifest_count, order, (int)(sizeof(order) / sizeof(order[0])));
+		for (int i = 0; i < n; i++) {
+			int at = order[i].plugin;
+			if (at < 0) addRow(ROW_HEADER, order[i].group, TR(PluginOrder_title(order[i].group)), NULL);
+			else addRow(ROW_PLUGIN, at, manifests[at].name, onOff(pluginOn(&manifests[at])));
 		}
 		addRow(ROW_PIN, 0, TR("PIN"), Pin_isSet(PIN_PATH) ? TR("Set") : TR("Not set"));
 	}
@@ -327,7 +337,7 @@ static void buildRows(void) {
 	// keep the selection on a row that can be selected
 	if (m->selected >= row_count) m->selected = row_count - 1;
 	if (m->selected < 0) m->selected = 0;
-	while (m->selected < row_count - 1 && rows[m->selected].kind == ROW_INFO) m->selected++;
+	while (m->selected < row_count - 1 && !selectable(&rows[m->selected])) m->selected++;
 	state.dirty = 1;
 }
 
@@ -454,7 +464,7 @@ static void move(int step) {
 	int at = m->selected;
 	for (int tries = 0; tries < row_count; tries++) {
 		at = (at + step + row_count) % row_count;
-		if (rows[at].kind != ROW_INFO) break;
+		if (selectable(&rows[at])) break;
 	}
 	m->selected = at;
 	state.dirty = 1;
@@ -487,6 +497,7 @@ static const char* confirmLabel(void) {
 	const Row* r = &rows[top()->selected];
 	switch (r->kind) {
 		case ROW_INFO: return NULL;
+		case ROW_HEADER: return NULL;
 		case ROW_PLUGIN: return manifests[r->arg].setting_count ? TR("OPEN") : TR("CHANGE");
 		case ROW_STATUS: return TR("CHANGE");
 		case ROW_SETTING: return TR("CHANGE");
@@ -514,12 +525,20 @@ static void render(int ow) {
 	int last_start = row_count > visible ? row_count - visible : 0;
 	if (m->selected < m->start) m->start = m->selected;
 	if (m->selected >= m->start + visible) m->start = m->selected - visible + 1;
+	// a group's first plugin brings its header along
+	if (m->start == m->selected && m->start > 0 && rows[m->start - 1].kind == ROW_HEADER) m->start--;
 	if (m->start > last_start) m->start = last_start;
 
 	for (int i = m->start, j = 1; i < row_count && j <= visible; i++, j++) {
 		const Row* r = &rows[i];
 		int y = SCALE1(PADDING + j * PILL_SIZE);
-		int selected = i == m->selected && r->kind != ROW_INFO;
+		if (r->kind == ROW_HEADER) {
+			char label[256];
+			int label_w = Text_truncate(font.small, r->label, label, sizeof(label), width, pad * 2);
+			blitRowText(font.small, label, normal, left + pad, y, label_w - pad * 2);
+			continue;
+		}
+		int selected = i == m->selected && selectable(r);
 
 		int value_w = 0;
 		char value[128] = "";

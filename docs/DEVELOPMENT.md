@@ -107,6 +107,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
 | `transitions.c` | the folder slide and the game switcher's entrance animations, and handing those and the launch to the transition and launch slots' owners, drawing their frames |
 | `pluginset.c` | which discovered plugins load, and in what order |
+| `pluginorder.c` | the Launcher pak's Plugins page order: plugins grouped by the exclusive slot they claim, then the rest, each group A-Z |
 | `plugins.c` | finding and loading plugins, the host table they call, chained hooks such as row decorators, header widgets and overlays, selection events, `art_replace` and `art_replacement`, opening and closing plugins' screens, opening the switcher slot's screen wherever the game switcher opens, and the crash guard |
 | `toast.c` | short messages shown over the current screen |
 | `awake.c` | stay-awake files and plugin requests that keep the device from sleeping |
