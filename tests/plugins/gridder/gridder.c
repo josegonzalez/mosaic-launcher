@@ -92,8 +92,10 @@ static int layoutInput(const MosaicInput* input, const MosaicListView* view, uns
 	if (!moved && folder_drawn && view->depth == 2 && !strcmp(view->path, folder)) {
 		moved = 1;
 		int target = view->selected + COLUMNS;
-		say("input move %i to %i: %i, bad %i, now %i", view->selected, target, host->select_index(target),
-			host->select_index(view->count), host->selected_index());
+		int to_target = host->select_index(target);
+		int to_count = host->select_index(view->count);
+		say("input move %i to %i: %i, bad %i, now %i", view->selected, target, to_target, to_count,
+			host->selected_index());
 		*consumed = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN);
 	}
 	return 0;

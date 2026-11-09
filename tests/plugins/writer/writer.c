@@ -108,7 +108,8 @@ static int init(const MosaicHost* h) {
 	MosaicSurface* all = host->surface_new(ID, 4, 2);
 	unsigned char whole[4 * 2 * 4];
 	for (int i = 0; i < 8; i++) put(whole + i * 4, 0x11223344);
-	say("whole %i, %s %s", host->surface_write(ID, all, NULL, whole, 16), pixel(all, 0, 0), pixel(all, 3, 1));
+	int wrote_all = host->surface_write(ID, all, NULL, whole, 16);
+	say("whole %i, %s %s", wrote_all, pixel(all, 0, 0), pixel(all, 3, 1));
 
 	// past the top left edge: the first row and column are left out
 	unsigned char three[3 * 3 * 4];

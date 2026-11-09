@@ -79,7 +79,8 @@ static int init(const MosaicHost* h) {
 	MosaicColor c;
 	int blended = host->fill_rect(s, &(MosaicRect){ 10, 5, 10, 10 }, mosaic_color(0x0000FF, 128));
 	host->read_pixel(s, 15, 10, &c);
-	say("blend %i, half %i, outside %s", blended, near(c.r, 0x7F) && near(c.b, 0x80) && c.a == 255, pixel(s, 9, 5));
+	// SDL2 blends the alpha to 254 here, SDL3 (sdl2-compat) to 255
+	say("blend %i, half %i, outside %s", blended, near(c.r, 0x7F) && near(c.b, 0x80) && c.a >= 254, pixel(s, 9, 5));
 	say("fill bad rect %i, null %i, unknown %i, clear %i",
 		host->fill_rect(s, &(MosaicRect){ 0, 0, -1, 5 }, red), host->fill_rect(NULL, NULL, red),
 		host->fill_rect((MosaicSurface*)&c, NULL, red), host->fill_rect(s, NULL, mosaic_color(0, 0)));

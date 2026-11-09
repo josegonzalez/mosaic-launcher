@@ -20,7 +20,9 @@
 // touch SDL.
 //
 // With mode=decline it opens the device in init and declines to start;
-// with mode=poweroff it opens it and powers off.
+// with mode=poweroff it opens it and powers off; with mode=launch it opens
+// it and launches pak=<path> straight away, opening it again after, for
+// drivers that open only one device, which stock's own takes after a sleep.
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -192,6 +194,15 @@ static void tick(unsigned long now) {
 		if (!strcmp(mode, "poweroff")) {
 			say("open %i, powering off", host->audio_open(ID, RATE, 2));
 			host->power_off(0);
+			stage = 100;
+			return;
+		}
+		if (!strcmp(mode, "launch")) {
+			int opened = host->audio_open(ID, RATE, 2);
+			int launched = host->open_path(pak, MOSAIC_ENTRY_PAK);
+			int queued = host->audio_queued(ID);
+			say("open %i, open pak %i, after launch queued %i", opened, launched, queued);
+			say("open after launch %i", host->audio_open(ID, RATE, 2));
 			stage = 100;
 			return;
 		}

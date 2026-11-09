@@ -914,7 +914,8 @@ rm -rf "$WORK/plugins/reeler.plugin" "$WORK/plugins/gridder.plugin" "$WORK/plugi
 # launcher closing the device itself before a sleep (once what's queued
 # plays out), before a launch and at quit; SDL's audio is started only
 # while the device is open (until a sleep, after which stock starts it
-# itself). hearer is refused the device meanwhile
+# itself). hearer is refused the device meanwhile. A case with no sleep
+# checks the launch and quit again, for SDL2's dummy driver
 SPEAK_DIR="$CARD/Speaker"
 SPEAK_PAK="$SPEAK_DIR/Spoken.pak"
 mkdir -p "$SPEAK_PAK" "$STATE"
@@ -946,10 +947,19 @@ expect "race cycles 1, calls 1, ok 1, refused 1"
 expect "queued for sleep 0"
 expect "before_sleep queued 1"
 expect "after_resume queued -1"
-expect "open after sleep 0"
+# SDL2's own dummy driver opens one device at a time (sdl2-compat's opens
+# any number), and stock opens its own on waking, so there speaker's reopen
+# is refused and the launch case below checks the closes instead
+one_device=0
+grep -qF "plugins: speaker can't open audio: Audio device already open" "$log" && one_device=1
+if [ "$one_device" -eq 1 ]; then
+	expect "open after sleep -1"
+else
+	expect "open after sleep 0"
+	expect "open after launch 0"
+fi
 expect "open pak 1"
 expect "after launch queued -1"
-expect "open after launch 0"
 expect "quit queued -1"
 plugin=hearer
 expect "open while taken -1, queue -1, queued -1, close -1"
@@ -966,17 +976,34 @@ if [ -z "$drained" ]; then
 elif [ "$drained" -lt 300 ] || [ "$drained" -gt 1100 ]; then
 	fail "the launcher waited $drained ms for speaker's audio to play out, not most of 0.6 s"
 fi
-launch_line=$(grep -nF "plugins: closed speaker's audio before a launch" "$log" | cut -d: -f1)
-cmd_line=$(grep -nF "cmd: '" "$log" | cut -d: -f1)
-if [ -z "$launch_line" ] || [ -z "$cmd_line" ] || [ "$launch_line" -gt "$cmd_line" ]; then
-	fail "the launcher didn't close speaker's audio before the launch"
-fi
-quit_line=$(grep -nF "plugin speaker: quit" "$log" | cut -d: -f1)
-closed_line=$(grep -nF "plugins: closed speaker's audio at quit" "$log" | cut -d: -f1)
-if [ -z "$quit_line" ] || [ -z "$closed_line" ] || [ "$closed_line" -gt "$quit_line" ]; then
-	fail "the launcher didn't close speaker's audio at quit, before its quit"
-fi
-grep -qi "audio" "$WORK/hello.log" && fail "audio was touched with no plugin asking"
+# speaker_closes: the launcher closed speaker's audio before the launch in
+# $log, and at quit before speaker's quit
+speaker_closes() {
+	launch_line=$(grep -nF "plugins: closed speaker's audio before a launch" "$log" | cut -d: -f1)
+	cmd_line=$(grep -nF "cmd: '" "$log" | cut -d: -f1)
+	if [ -z "$launch_line" ] || [ -z "$cmd_line" ] || [ "$launch_line" -gt "$cmd_line" ]; then
+		fail "the launcher didn't close speaker's audio before the launch"
+	fi
+	quit_line=$(grep -nF "plugin speaker: quit" "$log" | cut -d: -f1)
+	closed_line=$(grep -nF "plugins: closed speaker's audio at quit" "$log" | cut -d: -f1)
+	if [ -z "$quit_line" ] || [ -z "$closed_line" ] || [ "$closed_line" -gt "$quit_line" ]; then
+		fail "the launcher didn't close speaker's audio at quit, before its quit"
+	fi
+}
+[ "$one_device" -eq 1 ] || speaker_closes
+# (Linux's killall says so when stock stops an audiomon that isn't running)
+grep -i "audio" "$WORK/hello.log" | grep -qvF "audiomon.elf: no process found" && fail "audio was touched with no plugin asking"
+
+# with no sleep first, speaker opens, launches a pak, which closes its
+# device, opens it again, and the launcher's quit closes that
+printf 'speaker=on\n' >"$STATE/plugins.txt"
+printf 'mode=launch\npak=%s\n' "$SPEAK_PAK" >"$STATE/speaker.cfg"
+SDL_AUDIODRIVER=dummy run_launcher "$WORK/speaker-launch.log" && fail "the launcher didn't quit to launch speaker's pak"
+log="$WORK/speaker-launch.log"
+expect "open 0, open pak 1, after launch queued -1"
+expect "open after launch 0"
+expect "quit queued -1"
+speaker_closes
 
 # a plugin that declines to start has its device closed, and so does
 # powering off; /tmp/next and /tmp/last.txt are put back afterwards
