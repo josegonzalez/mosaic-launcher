@@ -75,4 +75,9 @@ int LG_move(int selected, int count, int cols, int dir, int fresh);
 // else its first character that isn't a space; "" for a name with none.
 void LG_letter(const char* name, char* out, size_t size);
 
+// Whether a cell draws its name: only while the launcher shows names, and
+// a name a plugin hides (hidden) not where the cell drew art (drew_art: a
+// file, generated art or a replacement), so a letter tile keeps its name.
+int LG_showName(int show_names, int hidden, int drew_art);
+
 #endif

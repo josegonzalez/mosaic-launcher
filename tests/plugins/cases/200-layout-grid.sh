@@ -40,4 +40,25 @@ grep -qF "plugin layout-grid: grid of 3x1 cells" "$log" || fail "layout-grid's s
 # the tiles are taller than the art now, so only their middles are art
 expect "cell Apple middle 00FF00 top"
 expect "cell Cherry middle 00FF00 top"
-rm -rf "$WORK/plugins/layout-grid.plugin" "$WORK/plugins/art-boxart.plugin" "$WORK/plugins/peeker.plugin" "$PEEK_DIR" "$STATE/layout-grid.cfg" "$STATE/plugins.txt"
+
+# with art-boxart's cover_name on and peeker's games as folders, Apple's
+# cover stands in for its name, and banana, whose cover.png isn't an
+# image, keeps its name on its letter tile though it's hidden, as does
+# Cherry, with no cover
+rm -rf "$PEEK_DIR" "$STATE/layout-grid.cfg"
+mkdir -p "$PEEK_DIR/Apple" "$PEEK_DIR/banana" "$PEEK_DIR/Cherry"
+cp "$ROOT/tests/plugins/peeker/art.png" "$PEEK_DIR/Apple/cover.png"
+printf 'not an image\n' >"$PEEK_DIR/banana/cover.png"
+printf 'cover_name=on\n' >"$STATE/art-boxart.cfg"
+printf 'dirs=on\n' >"$STATE/peeker.cfg"
+run_launcher "$WORK/layout-grid-hidden.log" "plugin peeker: cell Apple middle 00FF00" "plugin peeker: cell banana" \
+	"plugin peeker: cell Cherry" || fail "the launcher exited early with art-boxart hiding names under layout-grid"
+log="$WORK/layout-grid-hidden.log"
+expect "cell Apple middle 00FF00 top 00FF00, accent 0, ink 0, named 0, hidden 1"
+grep -qE "plugin peeker: cell banana middle [0-9A-F]{6} top [0-9A-F]{6}, accent 1, ink 1, named 1, hidden 1$" "$log" \
+	|| fail "banana lost its name on its letter tile: $(grep "plugin peeker: cell banana" "$log")"
+grep -qE "plugin peeker: cell Cherry middle [0-9A-F]{6} top [0-9A-F]{6}, accent 1, ink 1, named 1, hidden 0$" "$log" \
+	|| fail "Cherry lost its name: $(grep "plugin peeker: cell Cherry" "$log")"
+grep -qF "plugins: layout-grid's" "$log" && fail "layout-grid's layout was turned off"
+rm -rf "$WORK/plugins/layout-grid.plugin" "$WORK/plugins/art-boxart.plugin" "$WORK/plugins/peeker.plugin" "$PEEK_DIR" "$STATE/layout-grid.cfg" \
+	"$STATE/art-boxart.cfg" "$STATE/peeker.cfg" "$STATE/plugins.txt"

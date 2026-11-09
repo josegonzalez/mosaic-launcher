@@ -5,7 +5,9 @@
 // thumbnail or else its box, fitted inside the tile, and while there's
 // none (or it's still loading) the first letter of its name on a tile of
 // the theme's accent colour. Names show under the tiles when the launcher
-// shows names, and art only while Show game art is on. The selected tile
+// shows names, and art only while Show game art is on. A name a plugin
+// hides (MosaicListView's names_hidden) is left out of a tile that drew
+// art, its strip left blank, and shows on a letter tile. The selected tile
 // sits on a highlight in the theme's main colour.
 //
 // The d-pad moves the selection through the grid with select_index (see
@@ -168,6 +170,11 @@ static int nameHeight(const MosaicListView* view, int scale) {
 	return view->show_names ? host->text_height(MOSAIC_FONT_SMALL) + 4 * scale : 0;
 }
 
+static int hiddenName(const MosaicListView* view, int index) {
+	return MOSAIC_VIEW_HAS(view, names_hidden) && view->names_hidden && index >= 0 && index < view->count &&
+		view->names_hidden[index];
+}
+
 static int layoutGrid(const MosaicListView* view, LGGrid* grid) {
 	int scale = host->screen_scale();
 	MosaicRect header = view->size >= offsetof(MosaicListView, header) + sizeof(view->header)
@@ -268,16 +275,19 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 		LG_parts(&cell, 2 * scale, 3 * scale, name_h, &highlight, &tile, &art, &name);
 
 		if (selected) host->fill_round_rect(screen, &highlight, 6 * scale, main_color);
-		if (!view->show_art || !drawArt(screen, entry, index, &art, limit)) {
+		int drew = view->show_art && drawArt(screen, entry, index, &art, limit);
+		if (!drew) {
 			char letter[8];
 			LG_letter(host->entry_name(entry), letter, sizeof(letter));
 			host->fill_round_rect(screen, &art, 4 * scale, tile_color);
 			MosaicRect unused;
 			if (letter[0]) drawCentred(screen, MOSAIC_FONT_LARGE, letter, &art, text, &unused);
 		}
+		// a hidden name's strip stays blank under its art, so the tiles keep one size
+		int named = name_h > 0 && LG_showName(view->show_names, hiddenName(view, index), drew);
 		MosaicRect drawn = { 0, 0, 0, 0 };
-		if (name_h > 0) drawCentred(screen, MOSAIC_FONT_SMALL, host->entry_name(entry), &name, selected ? text_selected : text, &drawn);
-		host->decorate_cell(screen, index, &tile, name_h > 0 ? &drawn : NULL);
+		if (named) drawCentred(screen, MOSAIC_FONT_SMALL, host->entry_name(entry), &name, selected ? text_selected : text, &drawn);
+		host->decorate_cell(screen, index, &tile, named ? &drawn : NULL);
 	}
 	return 0;
 }

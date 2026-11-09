@@ -6,6 +6,10 @@
 // edge, whether the theme's accent colour is there, and whether anything
 // else is drawn across the art's middle, such as a letter. It logs a cell
 // each time what it reads changes, as art comes in.
+//
+// With dirs=on in its config, its three entries are folders,
+// <sd>/Peeker/<name>, and each cell's line ends with whether its name was
+// hidden.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -17,7 +21,8 @@
 static const MosaicHost* host;
 static char folder[512];
 static int ticks = 0;
-static char last[3][128]; // the last line logged for each game
+static int dirs = 0;
+static char last[3][160]; // the last line logged for each game
 
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
@@ -40,8 +45,8 @@ static MosaicList* virtualDir(const char* path) {
 	MosaicList* list = host->list_new();
 	for (int i = 0; i < 3; i++) {
 		char file[600];
-		snprintf(file, sizeof(file), "%s/%s.gb", folder, names[i]);
-		host->list_push(list, host->entry_new(file, MOSAIC_ENTRY_ROM, names[i]));
+		snprintf(file, sizeof(file), dirs ? "%s/%s" : "%s/%s.gb", folder, names[i]);
+		host->list_push(list, host->entry_new(file, dirs ? MOSAIC_ENTRY_DIR : MOSAIC_ENTRY_ROM, names[i]));
 	}
 	return list;
 }
@@ -70,9 +75,13 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 		if (pixel(screen, x, mid_y) != top) ink = 1;
 	}
 	int accent = host->theme_color(MOSAIC_COLOR_ACCENT);
-	char line[128];
-	snprintf(line, sizeof(line), "cell %s middle %06X top %06X, accent %i, ink %i, named %i", name, middle, top,
-		accent >= 0 && top == (unsigned int)accent, ink, row->name.w > 0);
+	char line[160];
+	int n = snprintf(line, sizeof(line), "cell %s middle %06X top %06X, accent %i, ink %i, named %i", name, middle,
+		top, accent >= 0 && top == (unsigned int)accent, ink, row->name.w > 0);
+	if (dirs && n > 0 && (size_t)n < sizeof(line)) {
+		snprintf(line + n, sizeof(line) - (size_t)n, ", hidden %i",
+			MOSAIC_ROW_HAS(row, name_hidden) ? row->name_hidden : -1);
+	}
 	if (strcmp(line, last[game]) != 0) {
 		snprintf(last[game], sizeof(last[game]), "%s", line);
 		say("%s", line);
@@ -92,6 +101,7 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Peeker", host->sdcard_path);
+	dirs = !strcmp(host->cfg_get(ID, "dirs", "off"), "on");
 	return 0;
 }
 

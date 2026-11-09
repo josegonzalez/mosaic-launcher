@@ -176,6 +176,18 @@ static void testLetter(void) {
 	CHECK_STR(out, "Z");
 }
 
+static void testShowName(void) {
+	CHECK(LG_showName(1, 0, 0) == 1);
+	CHECK(LG_showName(1, 0, 1) == 1);
+	// a hidden name goes only where there's art
+	CHECK(LG_showName(1, 1, 1) == 0);
+	CHECK(LG_showName(1, 1, 0) == 1);
+	// names off: none
+	CHECK(LG_showName(0, 0, 0) == 0);
+	CHECK(LG_showName(0, 1, 0) == 0);
+	CHECK(LG_showName(0, 0, 1) == 0);
+}
+
 ///////////////////////////////////////
 // the plugin against a fake host
 
@@ -204,6 +216,7 @@ static MosaicRect view_area = { 0, 0, 1024, 663 };
 static MosaicRect view_status = { 794, 30, 200, 90 };
 static int tiles = 0; // letter tiles: rounded fills in the accent colour
 static char letters[16];
+static char names_drawn[128]; // the names under the tiles, each followed by a comma
 static int blits = 0, blits_of_image = 0;
 static const char* columns_cfg = "auto";
 static MosaicSurface video = { 720, 480, 0 }; // another plugin's art_replace surface
@@ -246,6 +259,10 @@ static int fakeTextTruncate(int font, const char* text, int max_width, char* out
 static int fakeDrawText(MosaicSurface* t, int font, const char* text, int x, int y, MosaicColor c, int max_width) {
 	(void)t; (void)x; (void)y; (void)c; (void)max_width;
 	if (font == MOSAIC_FONT_LARGE && strlen(letters) + strlen(text) < sizeof(letters)) strcat(letters, text);
+	if (font == MOSAIC_FONT_SMALL && strlen(names_drawn) + strlen(text) + 1 < sizeof(names_drawn)) {
+		strcat(names_drawn, text);
+		strcat(names_drawn, ",");
+	}
 	return 0;
 }
 static int fakeFillRoundRect(MosaicSurface* t, const MosaicRect* r, int radius, MosaicColor c) {
@@ -376,6 +393,7 @@ static void resetCounts(void) {
 	decorated = decorated_outside = decorated_named = 0;
 	tiles = 0;
 	letters[0] = '\0';
+	names_drawn[0] = '\0';
 	blits = blits_of_image = 0;
 	scales = 0;
 	replacement_asks = blits_of_video = 0;
@@ -544,6 +562,68 @@ static void testReplacement(void) {
 	p->quit();
 }
 
+static void testHiddenNames(void) {
+	setUp();
+	fake_host.art_replacement = fakeArtReplacement;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	cacheClear();
+	copy_count = 0;
+
+	// Apple, Banana, Cherry and Date hidden: Apple's thumbnail and Date's
+	// box stand in for their names, and Banana (no art) and Cherry
+	// (loading) keep theirs on their letter tiles
+	unsigned char hidden[10] = { 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
+	resetCounts();
+	MosaicListView v = makeView(0);
+	v.names_hidden = hidden;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK_STR(names_drawn, "Banana,Cherry,elder,Fig,Grape,Hops,");
+	CHECK(decorated == 8 && decorated_named == 6);
+	CHECK(tiles == 6 && blits == 2);
+	// the art keeps its size, with the strip left blank
+	CHECK(copies[0].w == 220 && copies[0].h == 193);
+
+	// selected, the same: Apple's name stays hidden and Banana's shows
+	resetCounts();
+	v = makeView(1);
+	v.names_hidden = hidden;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK_STR(names_drawn, "Banana,Cherry,elder,Fig,Grape,Hops,");
+
+	// a replacement is art: Banana's video stands in for its name
+	replaced_index = 1;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_of_video == 1);
+	CHECK_STR(names_drawn, "Cherry,elder,Fig,Grape,Hops,");
+	replaced_index = -1;
+
+	// art off: letter tiles everywhere, so every name shows
+	resetCounts();
+	v.show_art = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(decorated_named == 8);
+	CHECK_STR(names_drawn, "Apple,Banana,Cherry,Date,elder,Fig,Grape,Hops,");
+
+	// names off: none, hidden or not
+	resetCounts();
+	v = makeView(0);
+	v.names_hidden = hidden;
+	v.show_names = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(decorated_named == 0 && names_drawn[0] == '\0');
+
+	// a view from before names_hidden, too short to have it, hides nothing
+	resetCounts();
+	v = makeView(0);
+	v.names_hidden = hidden;
+	v.size = offsetof(MosaicListView, names_hidden);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(decorated_named == 8);
+	p->quit();
+}
+
 static void testCacheLimit(void) {
 	setUp();
 	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
@@ -579,8 +659,10 @@ int main(void) {
 	testWindow();
 	testMove();
 	testLetter();
+	testShowName();
 	testPlugin();
 	testReplacement();
+	testHiddenNames();
 	testCacheLimit();
 	CHECK_DONE();
 }
