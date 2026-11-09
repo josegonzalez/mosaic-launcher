@@ -1,0 +1,9 @@
+id=save-state-manager
+name=Save state manager
+api=1
+# a Save states tile on the quick menu listing every game with states, shown while there are any
+setting.tile=toggle|Quick menu tile|on
+# the game list button that opens the selected game's states, shared with other plugins' actions on it
+setting.button=choice|Save states button|Y|none,Y,L2,R2,SELECT
+# Y deletes the selected state, after a confirm
+setting.delete=toggle|Delete with Y|on
