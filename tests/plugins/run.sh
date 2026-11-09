@@ -111,7 +111,7 @@ start_launcher() {
 			"$ROOT/scripts/desktop-smoke.sh" "$case_log" "$WAIT" >/dev/null 2>"$WORK/smoke.err"
 		status=$?
 		tries=$((tries + 1))
-		[ "$status" -eq 3 ] && [ "$tries" -eq 1 ] && [ "$had_marker" -eq 0 ] || break
+		if [ "$status" -ne 3 ] || [ "$tries" -gt 1 ] || [ "$had_marker" -eq 1 ]; then break; fi
 		grep -q '^  still there: ' "$WORK/smoke.err" || break
 		grep -q '^  missing line: ' "$WORK/smoke.err" && break
 		stalled="${case_log%.log}-stalled.log"
