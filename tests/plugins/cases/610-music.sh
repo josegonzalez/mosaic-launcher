@@ -175,7 +175,7 @@ sed 's/^pos=.*/pos=20000/' "$MU_RESUME" >"$MU_WORK/resume.txt" && mv "$MU_WORK/r
 
 # the next start shows it paused on the pill and the player without
 # starting the daemon, and X plays on from the place
-rm -rf "$WORK/plugins/powerer.plugin" "$STATE/powerer.cfg"
+rm -rf "$WORK/plugins/powerer.plugin" "$WORK/plugins/screener.plugin" "$STATE/powerer.cfg"
 printf 'music=on\n' >"$STATE/plugins.txt"
 log="$WORK/music-resume.log"
 PRESSER_KEYS="wait wait y wait x wait wait"
