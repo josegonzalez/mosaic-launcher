@@ -117,7 +117,7 @@ fake_gdb() {
 	# the launcher, then its child indented under it, with its command line
 	launcher=$(sed -n '/^processes:$/{n;p;}' "$LOG")
 	case "$launcher" in [0-9]*" $ROOT/build/desktop/nextui.elf"*) ;; *) false ;; esac
-	grep -q "^  $child [0-9]* [^ ]*  *sleep 300\$" "$LOG"
+	grep -q "^  $child [0-9]* [^ ]* sleep 300\$" "$LOG"
 	[ "$(sed -n '/^stacks:$/{n;p;}' "$LOG")" = "Thread 1 (main)" ]
 	grep -q -- "-p [0-9]" "$BATS_TEST_TMPDIR/gdb-calls"
 	[ ! -e "$LOG.stopping" ]

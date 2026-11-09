@@ -73,13 +73,19 @@ stacks() {
 # tree: the launcher and every process under it, indented under its parent
 tree() {
 	ps -e -o pid= -o ppid= -o stat= -o args= | awk -v root="$pid" '
-		{ sub(/^[ \t]+/, ""); line[$1] = $0; kids[$2] = kids[$2] " " $1 }
-		function show(p, depth,    list, count, i) {
-			printf "%*s%s\n", depth * 2, "", line[p]
-			count = split(kids[p], list, " ")
-			for (i = 1; i <= count; i++) show(list[i], depth + 1)
+		{
+			# pid ppid stat command line, one space apart
+			args = $0
+			sub(/^[ \t]*[^ \t]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+/, "", args)
+			line[$1] = $1 " " $2 " " $3 " " args
+			kids[$2] = kids[$2] " " $1
 		}
-		END { if (root in line) show(root, 0); else print root " is gone" }
+		function show(p, indent,    list, count, i) {
+			print indent line[p]
+			count = split(kids[p], list, " ")
+			for (i = 1; i <= count; i++) show(list[i], indent "  ")
+		}
+		END { if (root in line) show(root, ""); else print root " is gone" }
 	'
 }
 
