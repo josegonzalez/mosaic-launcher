@@ -3,9 +3,10 @@
 # audio, as the launcher does (from pkg-config, the toolchain's on
 # devices), and decodes with the dr_libs headers copied into
 # vendor/dr_libs (see VERSION.txt there), whose code is compiled on its
-# own with its warnings off. The plugin itself is only music.c and
-# music_model.c; the daemon's sources are in daemon/, which the plugins'
-# own rule doesn't compile.
+# own with its warnings off. The plugin itself is music.c, music_model.c
+# and music_tags.c, with a thread of its own for reading tags; the
+# daemon's sources are in daemon/, which the plugins' own rule doesn't
+# compile.
 
 MUSIC_DR := $(abspath ../vendor/dr_libs)
 MUSIC_OBJ := $(abspath ../build/music/$(ARCH))
@@ -32,3 +33,5 @@ $(MUSIC_LICENSE): $(MUSIC_DR)/LICENSE
 
 music: $(MUSICD) $(MUSIC_LICENSE)
 music: PLUGIN_SHIP = $(MUSICD) $(MUSIC_LICENSE)
+music: PLUGIN_CFLAGS = -pthread
+music: PLUGIN_LIBS = -pthread

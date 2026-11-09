@@ -48,7 +48,7 @@ print(s.makefile().readline().rstrip())' "$MU_SOCK" "$1" 2>/dev/null
 }
 
 mu_stop
-rm -rf "$MU_WORK" "$STATE/music"
+rm -rf "$MU_WORK" "$STATE/music" /tmp/mosaic-music-art
 mkdir -p "$MU_WORK" "$STATE" "$MU_PAK"
 [ -e "$MU_DIR" ] && mv "$MU_DIR" "$MU_WORK/Music.saved"
 [ -f "$RECENTS" ] && cp "$RECENTS" "$MU_WORK/recent.txt.saved"
@@ -69,11 +69,26 @@ for path, seconds in zip(sys.argv[1::2], sys.argv[2::2]):
 ' "$MU_ALBUM/01 One.wav" 40 "$MU_ALBUM/02 Two.wav" 40 "$MU_DIR/Loose.wav" 2 || fail "making the test tracks"
 cp "$MU_DIR/Loose.wav" "$MU_ALBUM/._01 One.wav"
 : >"$MU_ALBUM/notes.txt"
+# the folder's cover, an 8 by 8 PNG
+python3 -I -c '
+import struct, sys, zlib
+def chunk(kind, data):
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+rows = b"".join(b"\0" + b"\xc0\x40\x40" * 8 for _ in range(8))
+png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 8, 8, 8, 2, 0, 0, 0)) \
+    + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+open(sys.argv[1], "wb").write(png)
+' "$MU_ALBUM/cover.png" || fail "making the cover"
 MU_TRACKS=2
+MU_TAGGED=""
 if command -v ffmpeg >/dev/null; then
 	ffmpeg -v error -f lavfi -i sine=frequency=440:duration=2 "$MU_ALBUM/03 Three.flac" || fail "making the FLAC track"
-	ffmpeg -v error -f lavfi -i sine=frequency=440:duration=2 "$MU_ALBUM/10 Ten.mp3" || fail "making the MP3 track"
+	# tagged, with its own cover embedded
+	ffmpeg -v error -f lavfi -i sine=frequency=440:duration=20 -i "$MU_ALBUM/cover.png" -map 0 -map 1 -c:v copy \
+		-id3v2_version 3 -metadata title="Tenth Song" -metadata artist="Test Artist" -metadata album="Test Album" \
+		-metadata:s:v comment="Cover (front)" "$MU_ALBUM/10 Ten.mp3" || fail "making the MP3 track"
 	MU_TRACKS=4
+	MU_TAGGED=1
 fi
 rm -f "$MU_LOG"
 
@@ -114,6 +129,15 @@ expect "pill over gamelist: Playing: 02 Two"
 [ "$(grep -c "plugin music: showing $MU_DIR: 1 of 2, Album/" "$log")" = 2 ] \
 	|| fail "B didn't go back up to the music folder with Album selected"
 grep -qF "Locked: SELECT then START to unlock" "$MU_WORK/player.texts" || fail "the lock screen didn't show"
+# untagged tracks keep their file names, with the folder's cover
+expect "tags of $MU_ALBUM/01 One.wav: title \"\", artist \"\", art $MU_ALBUM/cover.png"
+expect "showing the art $MU_ALBUM/cover.png"
+grep -qxF "01 One" "$MU_WORK/player.texts" || fail "the untagged track's file name didn't show"
+if [ -n "$MU_TAGGED" ]; then
+	# the tagged track's title in the list, in file name order
+	expect "read the tags of $MU_TRACKS tracks in $MU_ALBUM, 1 with titles"
+	grep -qxF "Tenth Song" "$MU_WORK/player.texts" || fail "the tagged track's title didn't show in the list"
+fi
 grep -qF "musicd: playing $MU_ALBUM/01 One.wav (8000 Hz, 1 channels, 0:40), 1 of $MU_TRACKS" "$MU_LOG" \
 	|| fail "the daemon didn't play the first track: $(cat "$MU_LOG")"
 grep -qF "musicd: paused at" "$MU_LOG" || fail "the daemon didn't pause"
@@ -203,6 +227,24 @@ if [ "${mu_pos:-0}" -lt 20000 ] || [ "$mu_pos" -ge 40000 ]; then
 	fail "it didn't play on from the place: $mu_status"
 fi
 
+# the tagged track: its title and artist on the player and the pill, and
+# its embedded cover
+if [ -n "$MU_TAGGED" ]; then
+	log="$WORK/music-tags.log"
+	PRESSER_KEYS="y down down a wait wait b wait wait"
+	PRESSER_LOG="$MU_WORK/tags.texts" SMOKE_PRELOAD="$PRESSER"
+	export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+	run_launcher "$log" "presser: done" || fail "the launcher exited early with the tagged track"
+	unset PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+	expect "playing $MU_ALBUM/10 Ten.mp3"
+	expect "tags of $MU_ALBUM/10 Ten.mp3: title \"Tenth Song\", artist \"Test Artist\", art /tmp/mosaic-music-art/art-"
+	expect "(embedded)"
+	expect "showing the art /tmp/mosaic-music-art/art-"
+	grep -qxF "Tenth Song" "$MU_WORK/tags.texts" || fail "the player didn't show the tagged title"
+	grep -qxF "Test Artist" "$MU_WORK/tags.texts" || fail "the player didn't show the artist"
+	grep -qF "Playing: Tenth Song - Test Artist" "$MU_WORK/tags.texts" || fail "the pill didn't show the title and artist"
+fi
+
 mu_stop
 unset SDL_AUDIODRIVER
 rm -rf "$MU_DIR" "$CARD/Music Test"
@@ -212,6 +254,7 @@ for f in next last.txt; do
 	if [ -f "$MU_WORK/$f.saved" ]; then cp "$MU_WORK/$f.saved" "/tmp/$f"; else rm -f "/tmp/$f"; fi
 done
 rm -f /tmp/mosaic-launcher-launched "$MU_LOG"
+rm -rf /tmp/mosaic-music-art
 rm -rf "$MU_WORK" "$PRESSER" "$WORK/plugins/music.plugin" "$WORK/plugins/screener.plugin" "$WORK/plugins/powerer.plugin" \
 	"$STATE/music.cfg" "$STATE/powerer.cfg" "$STATE/plugins.txt" "$STATE/music"
 case_log=""

@@ -22,6 +22,11 @@
 // launcher comes back, unless the games setting is play. Before a sleep
 // the music pauses; before a power-off the daemon quits.
 //
+// Tracks show their title tag where they have one (music_tags.h reads
+// them), on a thread of the plugin's own, and the playing track shows its
+// artist and cover art: its embedded picture, written to ART_DIR for the
+// launcher's art_load, or else its folder's cover file.
+//
 // The daemon saves the queue and the track's place in the resume file (see
 // musicd.c). At start, with no daemon running and the resume setting on,
 // the plugin reads it and shows its track paused, on the player and the
@@ -29,9 +34,11 @@
 // on from there.
 
 #define _GNU_SOURCE // dladdr
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -47,6 +54,7 @@
 #include <unistd.h>
 #include "mosaic_plugin.h"
 #include "music_model.h"
+#include "music_tags.h"
 
 #define ID "music"
 #define PLAYER_ID ID ".player"
@@ -65,6 +73,7 @@
 #define POLL_IDLE_MS 5000    // while the daemon runs with nothing queued
 #define SEEK_MS 10000
 #define DIM 140 // the lock screen's alpha over black
+#define ART_DIR "/tmp/mosaic-music-art" // embedded cover art, written out for art_load
 
 extern char** environ;
 
@@ -102,9 +111,41 @@ static int lock_open = 0, unlock_due = 0;
 static MuUnlock unlock;
 static char lock_clock[16];
 
+// Tags are read on a thread of their own, so a big folder doesn't hold up
+// a frame: the listing's track titles one at a time, and the playing
+// track's title, artist and cover art first. What's under tag_lock is
+// shared with it; the rest is the main thread's.
+typedef struct Label {
+	char title[MU_TAG_TEXT_MAX]; // "" until it's read, or without a title tag
+} Label;
+static pthread_t tag_thread;
+static int tag_thread_up = 0;
+static pthread_mutex_t tag_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t tag_wake = PTHREAD_COND_INITIALIZER;
+static int tag_quit = 0;
+// the listing's tracks to read, list items from job_dirs on, and their titles
+static char (*job_paths)[MU_PATH_MAX] = NULL;
+static int job_count = 0, job_next = 0, job_dirs = 0, job_titled = 0, job_done = 0;
+static unsigned int job_gen = 0;
+static Label* labels = NULL; // list.count of them
+static int labels_dirty = 0;
+// the playing track's tags: asked for, and the answer
+static char now_want[MU_PATH_MAX];
+static int now_pending = 0, now_dirty = 0;
+static char now_track[MU_PATH_MAX], now_title[MU_TAG_TEXT_MAX], now_artist[MU_TAG_TEXT_MAX], now_art[MU_PATH_MAX];
+static int now_embedded = 0;
+
+// the main thread's copy of the playing track's tags
+static char np_asked[MU_PATH_MAX]; // the track they were asked for
+static char np_track[MU_PATH_MAX], np_title[MU_TAG_TEXT_MAX], np_artist[MU_TAG_TEXT_MAX], np_art[MU_PATH_MAX];
+// its art, scaled once for where it's drawn
+static MosaicSurface* art_scaled = NULL;
+static char art_scaled_path[MU_PATH_MAX], art_failed[MU_PATH_MAX], art_logged[MU_PATH_MAX];
+static int art_scaled_size = 0;
+
 static void say(const char* format, ...) __attribute__((format(printf, 1, 2)));
 static void say(const char* format, ...) {
-	char text[MU_PATH_MAX + 256];
+	char text[2 * MU_PATH_MAX + 2 * MU_TAG_TEXT_MAX + 64]; // a track, its art and two tags
 	va_list args;
 	va_start(args, format);
 	vsnprintf(text, sizeof(text), format, args);
@@ -393,6 +434,245 @@ static void readResume(void) {
 }
 
 ///////////////////////////////////////
+// tags
+
+// Removes the embedded art files left from before, keeping keep ("" for none).
+static void removeArt(const char* keep) {
+	DIR* d = opendir(ART_DIR);
+	if (!d) return;
+	struct dirent* e;
+	while ((e = readdir(d))) {
+		if (strncmp(e->d_name, "art-", 4) != 0 || !strcmp(e->d_name, keep)) continue;
+		char path[MU_PATH_MAX];
+		struct stat sb;
+		if (MU_childPath(ART_DIR, e->d_name, path, sizeof(path)) && lstat(path, &sb) == 0 && S_ISREG(sb.st_mode)) {
+			unlink(path);
+		}
+	}
+	closedir(d);
+}
+
+// On the tag thread: the track's cover art, its embedded picture written
+// out to ART_DIR (by a name of its own, kept while it's the one playing),
+// or else its folder's cover file. Writes "" for none.
+static int trackArt(const char* track, const MuTags* tags, char* out, size_t size) {
+	out[0] = '\0';
+	struct stat sb;
+	if (tags->picture && stat(track, &sb) == 0 && MU_artDir(ART_DIR) == 0) {
+		char name[64];
+		MU_artName(track, (unsigned long long)sb.st_size, (long long)sb.st_mtime, tags->picture_kind, name, sizeof(name));
+		removeArt(name);
+		char path[MU_PATH_MAX];
+		struct stat ab;
+		if (MU_childPath(ART_DIR, name, path, sizeof(path))
+			&& ((lstat(path, &ab) == 0 && S_ISREG(ab.st_mode) && (size_t)ab.st_size == tags->picture_size)
+				|| MU_writeArt(ART_DIR, name, tags->picture, tags->picture_size) == 0)) {
+			snprintf(out, size, "%s", path);
+			return 1;
+		}
+	}
+	removeArt("");
+	char dir_path[MU_PATH_MAX];
+	const char* slash = strrchr(track, '/');
+	if (!slash) return 0;
+	snprintf(dir_path, sizeof(dir_path), "%.*s", (int)(slash - track), track);
+	MU_folderCover(dir_path, out, size);
+	return 0;
+}
+
+static void* tagWorker(void* data) {
+	(void)data;
+	pthread_mutex_lock(&tag_lock);
+	while (!tag_quit) {
+		if (now_pending) {
+			char track[MU_PATH_MAX], art[MU_PATH_MAX];
+			snprintf(track, sizeof(track), "%s", now_want);
+			now_pending = 0;
+			pthread_mutex_unlock(&tag_lock);
+			MuTags tags;
+			art[0] = '\0';
+			int embedded = 0;
+			if (track[0]) {
+				MU_readTagsFile(track, 1, &tags);
+				embedded = trackArt(track, &tags, art, sizeof(art));
+			} else MuTags_init(&tags);
+			pthread_mutex_lock(&tag_lock);
+			if (!now_pending) {
+				snprintf(now_track, sizeof(now_track), "%s", track);
+				snprintf(now_title, sizeof(now_title), "%s", tags.title);
+				snprintf(now_artist, sizeof(now_artist), "%s", tags.artist);
+				snprintf(now_art, sizeof(now_art), "%s", art);
+				now_embedded = embedded;
+				now_dirty = 1;
+			}
+			MuTags_free(&tags);
+		} else if (job_next < job_count) {
+			int i = job_next++;
+			unsigned int gen = job_gen;
+			char path[MU_PATH_MAX];
+			snprintf(path, sizeof(path), "%s", job_paths[i]);
+			pthread_mutex_unlock(&tag_lock);
+			MuTags tags;
+			MU_readTagsFile(path, 0, &tags);
+			pthread_mutex_lock(&tag_lock);
+			if (gen == job_gen && labels) {
+				snprintf(labels[job_dirs + i].title, sizeof(labels[0].title), "%s", tags.title);
+				if (tags.title[0]) job_titled++;
+				if (job_next == job_count) job_done = 1;
+				labels_dirty = 1;
+			}
+			MuTags_free(&tags);
+		} else pthread_cond_wait(&tag_wake, &tag_lock);
+	}
+	pthread_mutex_unlock(&tag_lock);
+	return NULL;
+}
+
+static void startTags(void) {
+	if (tag_thread_up) return;
+	tag_quit = 0;
+	if (pthread_create(&tag_thread, NULL, tagWorker, NULL) == 0) tag_thread_up = 1;
+	else say("couldn't start the tag thread; showing file names");
+}
+
+static void stopTags(void) {
+	if (!tag_thread_up) return;
+	pthread_mutex_lock(&tag_lock);
+	tag_quit = 1;
+	pthread_cond_broadcast(&tag_wake);
+	pthread_mutex_unlock(&tag_lock);
+	pthread_join(tag_thread, NULL);
+	tag_thread_up = 0;
+}
+
+// Drops the listing's titles and what's left to read of them.
+static void clearJob(void) {
+	pthread_mutex_lock(&tag_lock);
+	free(job_paths);
+	free(labels);
+	job_paths = NULL;
+	labels = NULL;
+	job_count = job_next = job_dirs = job_titled = job_done = 0;
+	labels_dirty = 0;
+	job_gen++;
+	pthread_mutex_unlock(&tag_lock);
+}
+
+// Reads the titles of the listing's tracks.
+static void readTitles(void) {
+	clearJob();
+	int tracks = list.count - list.dirs;
+	if (tracks <= 0) return;
+	startTags();
+	if (!tag_thread_up) return;
+	Label* l = calloc((size_t)list.count, sizeof(Label));
+	char (*paths)[MU_PATH_MAX] = malloc((size_t)tracks * sizeof(*paths));
+	if (!l || !paths) {
+		free(l);
+		free(paths);
+		return;
+	}
+	for (int i = 0; i < tracks; i++) {
+		if (!MU_childPath(dir, list.items[list.dirs + i].name, paths[i], MU_PATH_MAX)) paths[i][0] = '\0';
+	}
+	pthread_mutex_lock(&tag_lock);
+	labels = l;
+	job_paths = paths;
+	job_count = tracks;
+	job_dirs = list.dirs;
+	pthread_cond_signal(&tag_wake);
+	pthread_mutex_unlock(&tag_lock);
+}
+
+// Asks for the playing track's tags when it's changed, and takes the
+// answers in. Returns 1 when something to show changed.
+static int updateTags(void) {
+	int changed = 0;
+	const char* track = st.state != MU_STOPPED ? st.track : "";
+	if (strcmp(track, np_asked) != 0) {
+		snprintf(np_asked, sizeof(np_asked), "%s", track);
+		np_track[0] = np_title[0] = np_artist[0] = np_art[0] = '\0';
+		changed = 1;
+		if (track[0]) startTags();
+		if (tag_thread_up) {
+			pthread_mutex_lock(&tag_lock);
+			snprintf(now_want, sizeof(now_want), "%s", track);
+			now_pending = 1;
+			pthread_cond_signal(&tag_wake);
+			pthread_mutex_unlock(&tag_lock);
+		}
+	}
+	if (!tag_thread_up) return changed;
+	int got_now = 0, got_list = 0, count = 0, titled = 0;
+	pthread_mutex_lock(&tag_lock);
+	if (now_dirty) {
+		now_dirty = 0;
+		if (!strcmp(now_track, np_asked) && now_track[0]) {
+			snprintf(np_track, sizeof(np_track), "%s", now_track);
+			snprintf(np_title, sizeof(np_title), "%s", now_title);
+			snprintf(np_artist, sizeof(np_artist), "%s", now_artist);
+			snprintf(np_art, sizeof(np_art), "%s", now_art);
+			got_now = 1;
+			changed = 1;
+		}
+	}
+	int embedded = now_embedded;
+	if (labels_dirty) {
+		labels_dirty = 0;
+		changed = 1;
+		if (job_done == 1) {
+			job_done = 2;
+			got_list = 1;
+			count = job_count;
+			titled = job_titled;
+		}
+	}
+	pthread_mutex_unlock(&tag_lock);
+	if (got_now) {
+		say("tags of %s: title \"%s\", artist \"%s\", art %s%s", np_track, np_title, np_artist, np_art[0] ? np_art : "none",
+			embedded ? " (embedded)" : "");
+	}
+	if (got_list) say("read the tags of %i tracks in %s, %i with titles", count, dir, titled);
+	return changed;
+}
+
+// The playing track's title (its tag's, or its file name) and artist.
+static void nowTitle(char* out, size_t size) {
+	if (np_title[0] && !strcmp(np_track, st.track)) snprintf(out, size, "%s", np_title);
+	else MU_trackTitle(st.track, out, size);
+}
+
+static const char* nowArtist(void) {
+	return np_artist[0] && !strcmp(np_track, st.track) ? np_artist : "";
+}
+
+// The playing track's art, scaled to size by size once it's loaded, or
+// NULL while it loads or when there's none.
+static const MosaicSurface* nowArt(int size) {
+	if (!np_art[0] || size <= 0 || strcmp(np_track, st.track) != 0 || !MOSAIC_HOST_HAS(host, art_load)) return NULL;
+	if (art_scaled && art_scaled_size == size && !strcmp(art_scaled_path, np_art)) return art_scaled;
+	if (!strcmp(art_failed, np_art)) return NULL;
+	const MosaicSurface* image = NULL;
+	int rc = host->art_load(np_art, &image);
+	if (rc == MOSAIC_ART_LOADING) return NULL;
+	MosaicSurface* scaled = rc == MOSAIC_ART_READY ? host->surface_scale(ID, image, size, size, MOSAIC_FIT_CONTAIN) : NULL;
+	if (!scaled) {
+		snprintf(art_failed, sizeof(art_failed), "%s", np_art);
+		say("can't show the art %s", np_art);
+		return NULL;
+	}
+	if (art_scaled) host->surface_free(ID, art_scaled);
+	art_scaled = scaled;
+	art_scaled_size = size;
+	snprintf(art_scaled_path, sizeof(art_scaled_path), "%s", np_art);
+	if (strcmp(art_logged, np_art) != 0) {
+		snprintf(art_logged, sizeof(art_logged), "%s", np_art);
+		say("showing the art %s", np_art);
+	}
+	return art_scaled;
+}
+
+///////////////////////////////////////
 // drawing
 
 static MosaicColor themeColor(int index, unsigned int fallback, unsigned char alpha) {
@@ -487,16 +767,32 @@ static int playerRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 
 	// what's playing, above the hints
 	int hints_top = area.y + area.h - pad - pill;
-	int panel_h = st.state != MU_STOPPED ? large + small + 3 * gap + gap : 0;
+	const char* artist = nowArtist();
+	int artist_h = artist[0] ? small + gap : 0;
+	int panel_h = st.state != MU_STOPPED ? large + small + artist_h + 3 * gap + gap : 0;
 	int panel_y = hints_top - gap - panel_h;
 	if (panel_h) {
 		MosaicRect box = { area.x + pad, panel_y, area.w - 2 * pad, panel_h };
-		char title[MU_NAME_MAX], line[128];
-		MU_trackTitle(st.track, title, sizeof(title));
-		textCentred(screen, MOSAIC_FONT_LARGE, title, &box, panel_y, fg);
+		// the cover art at the left, its room kept while it loads
+		if (np_art[0] && !strcmp(np_track, st.track)) {
+			const MosaicSurface* art = nowArt(panel_h);
+			MosaicRect at = { box.x, panel_y, panel_h, panel_h };
+			if (art) host->blit(screen, art, NULL, &at);
+			box.x += panel_h + pad;
+			box.w -= panel_h + pad;
+		}
+		char title[MU_TAG_TEXT_MAX], line[128];
+		nowTitle(title, sizeof(title));
+		int y = panel_y;
+		textCentred(screen, MOSAIC_FONT_LARGE, title, &box, y, fg);
+		y += large + gap;
+		if (artist[0]) {
+			textCentred(screen, MOSAIC_FONT_SMALL, artist, &box, y, fg);
+			y += small + gap;
+		}
 		stateLine(line, sizeof(line));
-		textCentred(screen, MOSAIC_FONT_SMALL, line, &box, panel_y + large + gap, hint);
-		MosaicRect bar = { box.x, panel_y + large + small + 2 * gap, box.w, gap };
+		textCentred(screen, MOSAIC_FONT_SMALL, line, &box, y, hint);
+		MosaicRect bar = { box.x, y + small + gap, box.w, gap };
 		host->fill_round_rect(screen, &bar, gap / 2, themeColor(MOSAIC_COLOR_HINT, 0x999999, 80));
 		if (st.len_ms > 0) {
 			long long pos = st.pos_ms > st.len_ms ? st.len_ms : st.pos_ms;
@@ -519,10 +815,12 @@ static int playerRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 	} else {
 		if (selected >= list.count) selected = list.count - 1;
 		first_row = MU_window(selected, list.count, visible_rows, first_row);
+		pthread_mutex_lock(&tag_lock);
 		for (int r = 0; r < visible_rows && first_row + r < list.count; r++) {
 			int i = first_row + r;
-			char label[MU_NAME_MAX + 2], cut[MU_NAME_MAX + 2];
+			char label[MU_TAG_TEXT_MAX + 2], cut[MU_TAG_TEXT_MAX + 2];
 			if (list.items[i].is_dir) snprintf(label, sizeof(label), "%s/", list.items[i].name);
+			else if (labels && labels[i].title[0]) snprintf(label, sizeof(label), "%s", labels[i].title);
 			else MU_trackTitle(list.items[i].name, label, sizeof(label));
 			int y = list_top + r * pill;
 			int max = area.w - 4 * pad;
@@ -540,6 +838,7 @@ static int playerRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 			host->draw_text(screen, MOSAIC_FONT_LARGE, cut, area.x + 2 * pad, y + (pill - large) / 2,
 				i == selected ? text_on : playing ? accent : text, 0);
 		}
+		pthread_mutex_unlock(&tag_lock);
 	}
 
 	if (MOSAIC_HOST_HAS(host, draw_hints)) {
@@ -566,14 +865,29 @@ static int lockRender(MosaicSurface* screen, const MosaicScreenView* view, void*
 	MosaicColor hint = themeColor(MOSAIC_COLOR_HINT, 0x999999, DIM);
 	MosaicRect box = { area.x + 10 * s, area.y, area.w - 20 * s, area.h };
 	int y = area.y + area.h / 2 - large * 2;
+	// the cover art above the clock, dim, when there's room for it
+	int art_size = y - 10 * s - (area.y + 10 * s);
+	if (art_size > area.w / 3) art_size = area.w / 3;
+	if (st.state != MU_STOPPED && art_size >= 32 * s) {
+		const MosaicSurface* art = nowArt(art_size);
+		MosaicRect at = { area.x + (area.w - art_size) / 2, y - 10 * s - art_size, art_size, art_size };
+		if (art && MOSAIC_HOST_HAS(host, blit_alpha)) host->blit_alpha(screen, art, NULL, &at, DIM);
+		else if (art) host->blit(screen, art, NULL, &at);
+	}
 	textCentred(screen, MOSAIC_FONT_LARGE, lock_clock, &box, y, fg);
 	y += large * 2;
 	if (st.state != MU_STOPPED) {
-		char title[MU_NAME_MAX], line[128];
-		MU_trackTitle(st.track, title, sizeof(title));
+		char title[MU_TAG_TEXT_MAX], line[128];
+		nowTitle(title, sizeof(title));
 		textCentred(screen, MOSAIC_FONT_LARGE, title, &box, y, fg);
+		y += large + 4 * s;
+		const char* artist = nowArtist();
+		if (artist[0]) {
+			textCentred(screen, MOSAIC_FONT_SMALL, artist, &box, y, fg);
+			y += small + 4 * s;
+		}
 		stateLine(line, sizeof(line));
-		textCentred(screen, MOSAIC_FONT_SMALL, line, &box, y + large + 4 * s, hint);
+		textCentred(screen, MOSAIC_FONT_SMALL, line, &box, y, hint);
 	}
 	textCentred(screen, MOSAIC_FONT_SMALL, "Locked: SELECT then START to unlock", &box,
 		area.y + area.h - 10 * s - small, hint);
@@ -587,10 +901,12 @@ static int overlayRender(MosaicSurface* surface, const MosaicScreenView* view) {
 	int s = scale();
 	int pad = 10 * s, pill = 30 * s;
 	int h = host->text_height(MOSAIC_FONT_SMALL);
-	char title[MU_NAME_MAX], text[MU_NAME_MAX + 16], cut[MU_NAME_MAX + 16];
-	MU_trackTitle(st.track, title, sizeof(title));
-	snprintf(text, sizeof(text), "%s: %s", st.state == MU_PLAYING ? "Playing" : "Paused", title);
-	int w = host->text_truncate(MOSAIC_FONT_SMALL, text, area.w / 3 - 2 * pad, cut, sizeof(cut));
+	char title[MU_TAG_TEXT_MAX], text[2 * MU_TAG_TEXT_MAX + 16], cut[sizeof(text)];
+	nowTitle(title, sizeof(title));
+	const char* artist = nowArtist();
+	snprintf(text, sizeof(text), "%s: %s%s%s", st.state == MU_PLAYING ? "Playing" : "Paused", title, artist[0] ? " - " : "",
+		artist);
+	int w = host->text_truncate(MOSAIC_FONT_SMALL, text, area.w / 2 - 2 * pad, cut, sizeof(cut));
 	if (w <= 0) return 0;
 	MosaicRect rect = { area.x + (area.w - w - 2 * pad) / 2, area.y + area.h - pad - pill, w + 2 * pad, pill };
 	host->fill_round_rect(surface, &rect, pill / 2, mosaic_color(0x000000, 200));
@@ -609,6 +925,7 @@ static int overlayRender(MosaicSurface* surface, const MosaicScreenView* view) {
 static void listDir(const char* path, const char* select_name) {
 	snprintf(dir, sizeof(dir), "%s", path);
 	MU_scan(dir, &list, 1);
+	readTitles();
 	selected = first_row = 0;
 	for (int i = 0; select_name && i < list.count; i++) {
 		if (!strcmp(list.items[i].name, select_name)) selected = i;
@@ -642,6 +959,7 @@ static int playerEnter(void* data) {
 static void playerExit(void* data) {
 	(void)data;
 	player_open = 0;
+	clearJob();
 	MU_listFree(&list);
 }
 
@@ -805,6 +1123,7 @@ static void tick(unsigned long now) {
 		overlay_shown = 0;
 		host->request_redraw();
 	}
+	if (updateTags()) host->request_redraw();
 	if (lock_open) {
 		char clock[16];
 		clockText(clock, sizeof(clock));
@@ -876,6 +1195,13 @@ static int init(const MosaicHost* h) {
 	player_open = lock_open = unlock_due = awake_held = 0;
 	next_poll = last_now = 0;
 	logged_now[0] = logged_view[0] = '\0';
+	np_asked[0] = np_track[0] = np_title[0] = np_artist[0] = np_art[0] = '\0';
+	art_scaled = NULL;
+	art_scaled_path[0] = art_failed[0] = art_logged[0] = '\0';
+	art_scaled_size = 0;
+	tag_thread_up = 0;
+	// embedded art left from a run before; the playing track's is written again
+	removeArt("");
 	if (!MOSAIC_HOST_HAS(host, open_screen) || !MOSAIC_HOST_HAS(host, hold_switch) || !MOSAIC_HOST_HAS(host, draw_text)) {
 		say("this launcher has no plugin screens, overlays or input filters");
 		return 1;
@@ -973,7 +1299,11 @@ static int init(const MosaicHost* h) {
 
 static void quit(void) {
 	// the daemon plays on; the launcher is only going away for a while
+	stopTags();
+	clearJob();
 	MU_listFree(&list);
+	if (art_scaled) host->surface_free(ID, art_scaled);
+	art_scaled = NULL;
 }
 
 static const MosaicPlugin plugin = {

@@ -1,7 +1,7 @@
 // The music plugin's model: which files are tracks and how they sort,
 // listing a folder, the queue with shuffle and repeat, its resume file,
 // the socket protocol's commands and status line, and the plugin's pill
-// timing, unlock press and folder browsing.
+// timing, unlock press and folder browsing; and its tag readers.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include "check.h"
 #include "../../plugins/music/music_model.h"
+#include "../../plugins/music/music_tags.h"
 
 static void testKinds(void) {
 	CHECK(MU_trackKind("Song.mp3") == MU_KIND_MP3);
@@ -626,6 +627,442 @@ static void testPaths(void) {
 	CHECK(!MU_parentPath("/sd/Music", "/sd/Music/", out, sizeof(out)));
 }
 
+///////////////////////////////////////
+// tags
+
+// a growing buffer of test bytes
+typedef struct Buf {
+	unsigned char data[1 << 16];
+	size_t len;
+} Buf;
+
+static void add(Buf* b, const void* p, size_t n) {
+	memcpy(b->data + b->len, p, n);
+	b->len += n;
+}
+
+static void addStr(Buf* b, const char* s) {
+	add(b, s, strlen(s));
+}
+
+static void addByte(Buf* b, int c) {
+	b->data[b->len++] = (unsigned char)c;
+}
+
+static void addBe32(Buf* b, unsigned int v) {
+	addByte(b, (int)(v >> 24));
+	addByte(b, (int)(v >> 16 & 0xFF));
+	addByte(b, (int)(v >> 8 & 0xFF));
+	addByte(b, (int)(v & 0xFF));
+}
+
+static void addLe32(Buf* b, unsigned int v) {
+	addByte(b, (int)(v & 0xFF));
+	addByte(b, (int)(v >> 8 & 0xFF));
+	addByte(b, (int)(v >> 16 & 0xFF));
+	addByte(b, (int)(v >> 24));
+}
+
+static void addSyncsafe(Buf* b, unsigned int v) {
+	addByte(b, (int)(v >> 21 & 0x7F));
+	addByte(b, (int)(v >> 14 & 0x7F));
+	addByte(b, (int)(v >> 7 & 0x7F));
+	addByte(b, (int)(v & 0x7F));
+}
+
+static const unsigned char jpeg[] = { 0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4 };
+static const unsigned char png[] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 9, 9 };
+
+static int readBuf(const Buf* b, int kind, int want_picture, MuTags* tags) {
+	MuSource src;
+	MuMemory mem;
+	MU_memorySource(&src, &mem, b->data, b->len);
+	return MU_readTags(&src, kind, want_picture, tags);
+}
+
+static void testTagText(void) {
+	char out[64];
+	CHECK(MU_tagText(0, (const unsigned char*)"Caf\xe9", 4, out, sizeof(out)) == 5);
+	CHECK_STR(out, "Caf\xc3\xa9");
+	MU_tagText(0, (const unsigned char*)"  a\tb\n\x01 c   \0junk", 17, out, sizeof(out));
+	CHECK_STR(out, "a b c");
+	// UTF-16 with either byte order mark, without one (little-endian), and big-endian
+	MU_tagText(1, (const unsigned char*)"\xFF\xFEH\0i\0", 6, out, sizeof(out));
+	CHECK_STR(out, "Hi");
+	MU_tagText(1, (const unsigned char*)"\xFE\xFF\0H\0i", 6, out, sizeof(out));
+	CHECK_STR(out, "Hi");
+	MU_tagText(1, (const unsigned char*)"H\0i\0", 4, out, sizeof(out));
+	CHECK_STR(out, "Hi");
+	MU_tagText(2, (const unsigned char*)"\0H\0i\0\0\0x", 8, out, sizeof(out));
+	CHECK_STR(out, "Hi");
+	// a surrogate pair, a lone one and an odd last byte
+	MU_tagText(1, (const unsigned char*)"\xFF\xFE\x3D\xD8\x00\xDE", 6, out, sizeof(out));
+	CHECK_STR(out, "\xF0\x9F\x98\x80");
+	MU_tagText(1, (const unsigned char*)"\xFF\xFE\x3D\xD8" "a\0", 6, out, sizeof(out));
+	CHECK_STR(out, "\xEF\xBF\xBD" "a");
+	MU_tagText(1, (const unsigned char*)"\xFF\xFE" "a\0b", 5, out, sizeof(out));
+	CHECK_STR(out, "a");
+	// UTF-8: bad bytes, an overlong, a surrogate, a cut sequence, C1 controls
+	MU_tagText(3, (const unsigned char*)"a\xFF" "b\xC0\xAF" "c\xED\xA0\x80" "d\xE2\x82", 13, out, sizeof(out));
+	CHECK_STR(out, "a\xEF\xBF\xBD" "b\xEF\xBF\xBD\xEF\xBF\xBD" "c\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD" "d\xEF\xBF\xBD\xEF\xBF\xBD");
+	MU_tagText(3, (const unsigned char*)"x\xC2\x85y\xE2\x82\xAC", 7, out, sizeof(out));
+	CHECK_STR(out, "xy\xE2\x82\xAC");
+	// cut at a character's end
+	CHECK(MU_tagText(3, (const unsigned char*)"ab\xE2\x82\xAC", 5, out, 5) == 2);
+	CHECK_STR(out, "ab");
+	CHECK(MU_tagText(3, (const unsigned char*)"ab\xE2\x82\xAC", 5, out, 6) == 5);
+	CHECK(MU_tagText(9, (const unsigned char*)"ab", 2, out, sizeof(out)) == 0);
+	CHECK(MU_tagText(0, NULL, 4, out, sizeof(out)) == 0);
+
+	unsigned char raw[16];
+	CHECK(MU_base64Decode("aGVsbG8=", 8, raw, sizeof(raw)) == 5 && !memcmp(raw, "hello", 5));
+	CHECK(MU_base64Decode("aGVs\nbG8", 8, raw, sizeof(raw)) == 5);
+	CHECK(MU_base64Decode("aGVsbG8=", 8, raw, 4) == -1);
+	CHECK(MU_base64Decode("aG!s", 4, raw, sizeof(raw)) == -1);
+	CHECK(MU_base64Decode("aG=s", 4, raw, sizeof(raw)) == -1);
+
+	CHECK(MU_pictureKind(jpeg, sizeof(jpeg)) == MU_PICTURE_JPEG);
+	CHECK(MU_pictureKind(png, sizeof(png)) == MU_PICTURE_PNG);
+	CHECK(MU_pictureKind(png, 4) == MU_PICTURE_NONE);
+	CHECK_STR(MU_pictureExt(MU_PICTURE_PNG), "png");
+}
+
+// An ID3v2.3 or 2.4 frame.
+static void id3Frame(Buf* b, int ver, const char* id, int flags, const void* body, size_t len) {
+	addStr(b, id);
+	if (ver == 4) addSyncsafe(b, (unsigned int)len);
+	else addBe32(b, (unsigned int)len);
+	addByte(b, flags >> 8);
+	addByte(b, flags & 0xFF);
+	add(b, body, len);
+}
+
+static void id3Header(Buf* b, int ver, int flags, unsigned int size) {
+	addStr(b, "ID3");
+	addByte(b, ver);
+	addByte(b, 0);
+	addByte(b, flags);
+	addSyncsafe(b, size);
+}
+
+// Puts a tag's size in its header, once its frames are in.
+static void id3Size(Buf* b, size_t start) {
+	unsigned int size = (unsigned int)(b->len - start - 10);
+	b->data[start + 6] = (unsigned char)(size >> 21 & 0x7F);
+	b->data[start + 7] = (unsigned char)(size >> 14 & 0x7F);
+	b->data[start + 8] = (unsigned char)(size >> 7 & 0x7F);
+	b->data[start + 9] = (unsigned char)(size & 0x7F);
+}
+
+static void testId3(void) {
+	static Buf b;
+	MuTags t;
+
+	// 2.3: Latin-1 and UTF-16 text, a picture that isn't the cover then the cover
+	b.len = 0;
+	id3Header(&b, 3, 0, 0);
+	id3Frame(&b, 3, "TIT2", 0, "\0Caf\xe9", 5);
+	id3Frame(&b, 3, "TPE1", 0, "\x01\xFF\xFEW\0h\0o\0", 9);
+	id3Frame(&b, 3, "TALB", 0, "\0LP", 3);
+	id3Frame(&b, 3, "TXXX", 0, "\0x", 2);
+	{
+		Buf* pic = malloc(sizeof(Buf));
+		pic->len = 0;
+		addStr(pic, "\x01image/png");
+		addByte(pic, 0);
+		addByte(pic, 4); // the back cover
+		add(pic, "\xFF\xFEx\0\0\0", 6);
+		add(pic, png, sizeof(png));
+		id3Frame(&b, 3, "APIC", 0, pic->data, pic->len);
+		pic->len = 0;
+		add(pic, "\0image/jpeg", 11);
+		addByte(pic, 0);
+		addByte(pic, 3);
+		addStr(pic, "front");
+		addByte(pic, 0);
+		add(pic, jpeg, sizeof(jpeg));
+		id3Frame(&b, 3, "APIC", 0, pic->data, pic->len);
+		free(pic);
+	}
+	add(&b, "\0\0\0\0\0\0\0\0\0\0\0\0", 12); // padding
+	id3Size(&b, 0);
+	add(&b, "audio", 5);
+	CHECK(readBuf(&b, MU_KIND_MP3, 1, &t) == 1);
+	CHECK_STR(t.title, "Caf\xc3\xa9");
+	CHECK_STR(t.artist, "Who");
+	CHECK_STR(t.album, "LP");
+	CHECK(t.picture_kind == MU_PICTURE_JPEG && t.picture_front && t.picture_size == sizeof(jpeg));
+	CHECK(t.picture && !memcmp(t.picture, jpeg, sizeof(jpeg)));
+	MuTags_free(&t);
+	// without the picture
+	CHECK(readBuf(&b, MU_KIND_MP3, 0, &t) == 1 && !t.picture);
+	CHECK_STR(t.title, "Caf\xc3\xa9");
+	MuTags_free(&t);
+	// a frame running past the tag ends it: here the first, so nothing is read
+	b.data[10 + 6] = 0x7F;
+	CHECK(readBuf(&b, MU_KIND_MP3, 1, &t) == 0);
+	MuTags_free(&t);
+	// and the second, keeping the first
+	b.data[10 + 6] = 0;
+	b.data[10 + 10 + 5 + 6] = 0x7F;
+	CHECK(readBuf(&b, MU_KIND_MP3, 1, &t) == 1 && !t.artist[0] && !t.picture);
+	CHECK_STR(t.title, "Caf\xc3\xa9");
+	MuTags_free(&t);
+	// a tag running past the file is refused
+	b.len = 40;
+	CHECK(readBuf(&b, MU_KIND_MP3, 1, &t) == 0 && !t.title[0]);
+	MuTags_free(&t);
+
+	// 2.4: UTF-8 and UTF-16BE, several strings, an extended header, a frame
+	// of its own unsynchronised with a data length, TPE2 for the artist
+	b.len = 0;
+	id3Header(&b, 4, 0x40, 0);
+	addSyncsafe(&b, 6);
+	add(&b, "\x01\0", 2);
+	id3Frame(&b, 4, "TIT2", 0, "\x03" "\xE2\x82\xAC" "uro\0Second", 14);
+	id3Frame(&b, 4, "TPE2", 0, "\x02\0B\0a\0n\0d", 9);
+	{
+		unsigned char body[] = { 0, 0, 0, 4, 0x03, 'A', 0xFF, 0x00 };
+		id3Frame(&b, 4, "TALB", 0x0003, body, sizeof(body));
+	}
+	id3Size(&b, 0);
+	CHECK(readBuf(&b, MU_KIND_MP3, 0, &t) == 1);
+	CHECK_STR(t.title, "\xE2\x82\xACuro");
+	CHECK_STR(t.artist, "Band");
+	CHECK_STR(t.album, "A\xEF\xBF\xBD");
+	MuTags_free(&t);
+
+	// 2.3, the whole tag unsynchronised, with an extended header
+	b.len = 0;
+	id3Header(&b, 3, 0xC0, 0);
+	addBe32(&b, 6);
+	add(&b, "\0\0\0\0\0\0", 6);
+	// TIT2, 4 bytes: 0 'x' 0xFF 'y', written with 0xFF 0x00 before the 'y'
+	add(&b, "TIT2\0\0\0\x04\0\0\0x\xFF\0y", 15);
+	id3Size(&b, 0);
+	CHECK(readBuf(&b, MU_KIND_MP3, 0, &t) == 1);
+	CHECK_STR(t.title, "x\xC3\xBFy");
+	MuTags_free(&t);
+	// an extended header past the tag
+	b.data[13] = 0x7F;
+	CHECK(readBuf(&b, MU_KIND_MP3, 0, &t) == 0);
+	MuTags_free(&t);
+
+	// 2.2, with PIC, and compressed frames skipped in 2.3
+	b.len = 0;
+	id3Header(&b, 2, 0, 0);
+	add(&b, "TT2\0\0\x04\0Two", 10);
+	add(&b, "TP1\0\0\x03\0Me", 9);
+	{
+		unsigned char pic[64];
+		size_t n = 0;
+		memcpy(pic, "\0PNG\x03\0", 6);
+		n = 6;
+		memcpy(pic + n, png, sizeof(png));
+		n += sizeof(png);
+		add(&b, "PIC\0\0", 5);
+		addByte(&b, (int)n);
+		add(&b, pic, n);
+	}
+	id3Size(&b, 0);
+	CHECK(readBuf(&b, MU_KIND_MP3, 1, &t) == 1);
+	CHECK_STR(t.title, "Two");
+	CHECK_STR(t.artist, "Me");
+	CHECK(t.picture_kind == MU_PICTURE_PNG);
+	MuTags_free(&t);
+	b.len = 0;
+	id3Header(&b, 3, 0, 0);
+	id3Frame(&b, 3, "TIT2", 0x0080, "\0\0\0\x09zzz", 8);
+	id3Size(&b, 0);
+	CHECK(readBuf(&b, MU_KIND_MP3, 0, &t) == 0);
+	MuTags_free(&t);
+
+	// ID3v1 at the end, for what ID3v2 doesn't have
+	b.len = 0;
+	id3Header(&b, 3, 0, 0);
+	id3Frame(&b, 3, "TIT2", 0, "\0New", 4);
+	id3Size(&b, 0);
+	add(&b, "audio", 5);
+	{
+		unsigned char v1[128];
+		memset(v1, 0, sizeof(v1));
+		memcpy(v1, "TAGOld title", 12);
+		memcpy(v1 + 33, "Old artist    ", 14);
+		memcpy(v1 + 63, "Old \xe9", 5);
+		add(&b, v1, sizeof(v1));
+	}
+	CHECK(readBuf(&b, MU_KIND_MP3, 0, &t) == 1);
+	CHECK_STR(t.title, "New");
+	CHECK_STR(t.artist, "Old artist");
+	CHECK_STR(t.album, "Old \xC3\xA9");
+	MuTags_free(&t);
+	// nothing at all
+	b.len = 0;
+	add(&b, "\xFF\xFB\x90\x00", 4);
+	CHECK(readBuf(&b, MU_KIND_MP3, 1, &t) == 0);
+	CHECK(readBuf(&b, MU_KIND_WAV, 1, &t) == 0);
+	CHECK(readBuf(&b, MU_KIND_FLAC, 1, &t) == 0);
+	MuTags_free(&t);
+}
+
+// A Vorbis comment header's body.
+static void vorbisComment(Buf* b, const char** comments, int count) {
+	addLe32(b, 6);
+	addStr(b, "vendor");
+	addLe32(b, (unsigned int)count);
+	for (int i = 0; i < count; i++) {
+		addLe32(b, (unsigned int)strlen(comments[i]));
+		addStr(b, comments[i]);
+	}
+}
+
+static void flacPictureBody(Buf* b, unsigned int type, const unsigned char* data, size_t len) {
+	addBe32(b, type);
+	addBe32(b, 9);
+	addStr(b, "image/png");
+	addBe32(b, 0);
+	for (int i = 0; i < 4; i++) addBe32(b, 1);
+	addBe32(b, (unsigned int)len);
+	add(b, data, len);
+}
+
+static void flacBlock(Buf* b, int type, int last, const Buf* body) {
+	addByte(b, (last ? 0x80 : 0) | type);
+	addByte(b, (int)(body->len >> 16));
+	addByte(b, (int)(body->len >> 8 & 0xFF));
+	addByte(b, (int)(body->len & 0xFF));
+	add(b, body->data, body->len);
+}
+
+static void testFlac(void) {
+	static Buf b, body;
+	MuTags t;
+	const char* comments[] = { "tracknumber=1", "title=Fl\xC3\xA9", "ALBUMARTIST=Group", "Album=Disc", "=", "TITLE=Second" };
+	b.len = 0;
+	addStr(&b, "fLaC");
+	body.len = 0;
+	add(&body, "streaminfo........................", 34);
+	flacBlock(&b, 0, 0, &body);
+	body.len = 0;
+	vorbisComment(&body, comments, 6);
+	flacBlock(&b, 4, 0, &body);
+	body.len = 0;
+	flacPictureBody(&body, 3, png, sizeof(png));
+	flacBlock(&b, 6, 1, &body);
+	add(&b, "frames", 6);
+	CHECK(readBuf(&b, MU_KIND_FLAC, 1, &t) == 1);
+	CHECK_STR(t.title, "Fl\xC3\xA9");
+	CHECK_STR(t.artist, "Group");
+	CHECK_STR(t.album, "Disc");
+	CHECK(t.picture_kind == MU_PICTURE_PNG && t.picture_size == sizeof(png));
+	MuTags_free(&t);
+
+	// behind an ID3v2 tag some writers put first
+	static Buf with;
+	with.len = 0;
+	id3Header(&with, 3, 0, 4);
+	add(&with, "\0\0\0\0", 4);
+	add(&with, b.data, b.len);
+	CHECK(readBuf(&with, MU_KIND_FLAC, 0, &t) == 1);
+	CHECK_STR(t.title, "Fl\xC3\xA9");
+	MuTags_free(&t);
+
+	// a comment count far past the block, and a comment length past it
+	size_t count_at = 4 + 4 + 34 + 4 + 4 + 6;
+	b.data[count_at + 3] = 0x7F;
+	CHECK(readBuf(&b, MU_KIND_FLAC, 0, &t) == 1);
+	CHECK_STR(t.title, "Fl\xC3\xA9");
+	MuTags_free(&t);
+	b.data[count_at + 3] = 0;
+	b.data[count_at + 4 + 4 + 13 + 3] = 0x40; // the title's length
+	CHECK(readBuf(&b, MU_KIND_FLAC, 0, &t) == 0);
+	MuTags_free(&t);
+	// a block past the file
+	b.len = 4 + 4 + 20;
+	CHECK(readBuf(&b, MU_KIND_FLAC, 0, &t) == 0);
+	MuTags_free(&t);
+}
+
+static void testTagFiles(void) {
+	char dir[] = "/tmp/test_music_tags.XXXXXX";
+	CHECK(mkdtemp(dir) != NULL);
+	char path[MU_PATH_MAX], cover[MU_PATH_MAX];
+	MuTags t;
+
+	// a tagged MP3 on disk
+	static Buf b;
+	b.len = 0;
+	id3Header(&b, 3, 0, 0);
+	id3Frame(&b, 3, "TIT2", 0, "\0On disk", 8);
+	id3Size(&b, 0);
+	snprintf(path, sizeof(path), "%s/a.mp3", dir);
+	FILE* f = fopen(path, "wb");
+	CHECK(f && fwrite(b.data, 1, b.len, f) == b.len);
+	if (f) fclose(f);
+	CHECK(MU_readTagsFile(path, 1, &t) == 1);
+	CHECK_STR(t.title, "On disk");
+	MuTags_free(&t);
+	snprintf(path, sizeof(path), "%s/a.txt", dir);
+	CHECK(MU_readTagsFile(path, 1, &t) == 0);
+	snprintf(path, sizeof(path), "%s/missing.mp3", dir);
+	CHECK(MU_readTagsFile(path, 1, &t) == 0);
+
+	// folder covers: none, then folder.jpg, then Cover.PNG over it, then cover.jpg
+	CHECK(!MU_folderCover(dir, cover, sizeof(cover)));
+	CHECK_STR(cover, "");
+	snprintf(path, sizeof(path), "%s/folder.jpg", dir);
+	f = fopen(path, "wb");
+	if (f) {
+		fwrite(jpeg, 1, sizeof(jpeg), f);
+		fclose(f);
+	}
+	CHECK(MU_folderCover(dir, cover, sizeof(cover)) && !strcmp(cover, path));
+	snprintf(path, sizeof(path), "%s/Cover.PNG", dir);
+	f = fopen(path, "wb");
+	if (f) {
+		fwrite(png, 1, sizeof(png), f);
+		fclose(f);
+	}
+	CHECK(MU_folderCover(dir, cover, sizeof(cover)) && !strcmp(cover, path));
+	snprintf(path, sizeof(path), "%s/cover.jpg", dir);
+	CHECK(mkdir(path, 0755) == 0); // a folder isn't a cover
+	CHECK(MU_folderCover(dir, cover, sizeof(cover)) && strstr(cover, "Cover.PNG"));
+	rmdir(path);
+	CHECK(!MU_folderCover("/nonexistent/folder", cover, sizeof(cover)));
+
+	// embedded art files
+	char name[64], name2[64], art[256];
+	MU_artName("/M/a.mp3", 10, 20, MU_PICTURE_JPEG, name, sizeof(name));
+	MU_artName("/M/a.mp3", 10, 21, MU_PICTURE_JPEG, name2, sizeof(name2));
+	CHECK(strncmp(name, "art-", 4) == 0 && strstr(name, ".jpg") && strcmp(name, name2) != 0);
+	snprintf(art, sizeof(art), "%s/art", dir);
+	CHECK(MU_artDir(art) == 0);
+	CHECK(MU_artDir(art) == 0);
+	CHECK(MU_writeArt(art, name, jpeg, sizeof(jpeg)) == 0);
+	snprintf(path, sizeof(path), "%s/%s", art, name);
+	struct stat st;
+	CHECK(stat(path, &st) == 0 && st.st_size == (off_t)sizeof(jpeg) && (st.st_mode & 0777) == 0600);
+	CHECK(MU_writeArt(art, name, png, sizeof(png)) == 0);
+	CHECK(stat(path, &st) == 0 && st.st_size == (off_t)sizeof(png));
+	CHECK(MU_writeArt(art, "../x", png, sizeof(png)) == -1);
+	CHECK(MU_writeArt(art, "", png, sizeof(png)) == -1);
+	// a link in the art folder's place isn't taken
+	char link[MU_PATH_MAX];
+	snprintf(link, sizeof(link), "%s/link", dir);
+	CHECK(symlink(art, link) == 0);
+	CHECK(MU_artDir(link) == -1);
+	unlink(link);
+	unlink(path);
+	rmdir(art);
+	snprintf(path, sizeof(path), "%s/a.mp3", dir);
+	unlink(path);
+	snprintf(path, sizeof(path), "%s/folder.jpg", dir);
+	unlink(path);
+	snprintf(path, sizeof(path), "%s/Cover.PNG", dir);
+	unlink(path);
+	CHECK(rmdir(dir) == 0);
+}
+
 int main(void) {
 	testKinds();
 	testCompare();
@@ -638,5 +1075,9 @@ int main(void) {
 	testUnlock();
 	testList();
 	testPaths();
+	testTagText();
+	testId3();
+	testFlac();
+	testTagFiles();
 	CHECK_DONE();
 }
