@@ -1,0 +1,3 @@
+# title-disambiguation
+
+When titles collide in a list, adds what tells them apart, and only then. Games from different systems, as in Recently Played, collections and Favorites, get the system's tag, eg. "Tetris (GB)" and "Tetris (GBC)". Games from one system get the region tags or extension the name leaves out, eg. "Tetris (USA)" or "Tetris.gbc", then the folder they're in, and the whole file name when nothing else differs. Unlike stock, which only marks neighbours with the same name, it finds collisions anywhere in the list. Turn the `same_system` setting off to rename only games from different systems and leave the rest to stock. From Ru_UI and casualducko.

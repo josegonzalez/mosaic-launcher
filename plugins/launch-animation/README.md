@@ -1,0 +1,3 @@
+# launch-animation
+
+As a game or pak starts from the game list, the selection pill glides from its row to the middle of the screen while the rest of the screen dims to black, then fades out, finishing on the black the launch goes into. It owns the `launch` slot. Under a plugin layout, which draws its own highlight, the selected cell glides instead. When the launcher doesn't know where the selection is, such as a launch from the game switcher, the screen fades to black with no glide. The `duration` setting is how long it takes, 200, 350 (the default) or 500 ms, and `ease` how the glide moves: `linear`, `in`, `out` (the default, slowing as it reaches the middle) or `in-out`. Launches from the quick menu aren't animated. From hp7hao.

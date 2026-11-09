@@ -1,0 +1,3 @@
+# path-repair
+
+Keeps recents and collections pointing at games after they're renamed. When an entry's file is gone, it looks in the same folder for the one file whose name matches with accents, case, spaces and punctuation left out, eg. "Pokémon Red.gb" renamed to "Pokemon Red.gb", and points the entry at it; a renamed folder below the system folder, such as a multi-disc game's, is matched the same way. When nothing matches, or more than one file does, the entry is left alone. Collections, favorites included, are repaired at start (the `collections` setting), and recents as the launcher loads them (the `recents` setting); both are on by default. Only the folders a broken entry is in are listed. From UnuOS.

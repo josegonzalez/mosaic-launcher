@@ -18,7 +18,10 @@ Rules for agents working on mosaic-launcher.
 - Plugins include only `sdk/mosaic_plugin.h`, plus libc. They never link launcher or NextUI code.
 - Plugins in `plugins/<name>/` and new SDK code are written fresh (MIT-style, no NextUI code). Don't port fork code; reimplement it from the described behavior.
 - Keep plugin model logic (filters, sort, pick, parse) in its own SDL-free file with host unit tests under `tests/c/`. See `tests/c/test_favorites.c` for how a plugin is tested.
-- Each new plugin gets a `plugin.txt` (with settings, `slots`, `requires` and `conflicts` as needed), a row in PLUGINS.md's "Bundled plugins" table crediting the forks the idea came from, and its tests.
+- Each new plugin gets a `plugin.txt` (with settings, `slots`, `requires` and `conflicts` as needed), a row in PLUGINS.md's "Bundled plugins" table crediting the forks the idea came from, and its tests. A new plugin only adds files, so parallel plugin PRs don't conflict:
+  - its row's text goes in `plugins/<name>/README.md` (a `# <name>` heading, a blank line, then the text); run `./scripts/plugin-table.sh` to regenerate the table, which `make lint` checks;
+  - its unit test is `tests/c/test_<name>.c`, found by the makefile's wildcard, with a `tests/c/<name>.mk` holding its rule when it needs more than its own source and the SDK header;
+  - its desktop cases go in `tests/plugins/cases/<number>-<name>.sh`, after the last case number and before `990-crash.sh`, with a `# shard: <1-3>` line picking the CI shard with the least time (each case prints its time in the CI log).
 - SDK changes:
   - fields are only ever added at the end of `MosaicHost` and `MosaicPlugin`;
   - `MOSAIC_API_VERSION` stays 1;
@@ -29,7 +32,7 @@ Rules for agents working on mosaic-launcher.
 
 - Quick, while working: `make lint` and `make -C tests/c`, plus any single test you touched.
 - Full, before opening a PR and after rebasing onto a changed main: `make lint`, `make test`, `make desktop` and `make plugins-desktop`.
-- CI runs `make smoke`, `make test-plugins` and `make test-profiles` on every PR, so they don't run locally before a PR. A PR is ready once CI passes. When it fails, the job's `desktop-logs` artifact has the logs; fix it with a new commit.
+- CI runs `make smoke`, `make test-plugins` and `make test-profiles` on every PR, so they don't run locally before a PR. A PR is ready once CI passes. When it fails, the job's `desktop-logs-<shard>` artifact has the logs; fix it with a new commit.
 - Device builds: run `make devices` (Docker) only when you changed launcher or plugin C code that might not build for aarch64, and say whether you did.
 - When main moves, rerun the full tier only if the new commits touched files your change depends on.
 - `make test-plugins`, `make smoke`, `make test-profiles` and `tests/plugins/run.sh` all use the one shared fake card at `/var/tmp/nextui/sdcard`, so run them locally only to look into a CI failure, and never two at once.

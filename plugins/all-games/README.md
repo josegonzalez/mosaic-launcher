@@ -1,0 +1,3 @@
+# all-games
+
+The root is one list of every game across systems, by name, named as each system's list names them (`map.txt` aliases included). A Systems folder and other plugins' root folders come first; Recents, Collections and Tools stay on the quick menu. Subfolders are flattened two levels deep, and a folder with a `.cue` or `.m3u` named after it is one game. Games from different systems with the same name show their system's tag, eg. "Tetris (GB)" and "Tetris (GBC)"; turn the `tags` setting off to leave that to stock or `title-disambiguation`. The card is scanned once per start, and again only when a folder it read changes. Owns the `root` slot, so it can't be on with `focus-mode`. Until a game is on the card the root is stock's. From Xisrith.

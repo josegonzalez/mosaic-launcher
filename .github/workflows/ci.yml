@@ -32,9 +32,19 @@ jobs:
         run: xvfb-run -a make test-profiles
 
   # the desktop build on its own and with the test plugins, on a virtual
-  # display; ffmpeg and sqlite3 make the clips and play history some cases use
+  # display; ffmpeg and sqlite3 make the clips and play history some cases use.
+  # The plugin cases are split into 3 shards by the "# shard:" line in each
+  # tests/plugins/cases file, each with its own fake card; the first also
+  # runs smoke
   desktop:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - 1
+          - 2
+          - 3
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -45,16 +55,19 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb ffmpeg libavformat-dev libavcodec-dev libavutil-dev sqlite3
 
       - name: Smoke
+        if: matrix.shard == 1
         run: xvfb-run -a make smoke
 
       - name: Plugin tests
         run: xvfb-run -a make test-plugins
+        env:
+          SHARD: ${{ matrix.shard }}/3
 
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: desktop-logs
+          name: desktop-logs-${{ matrix.shard }}
           path: |
             build/*.log
             build/tests/plugins/

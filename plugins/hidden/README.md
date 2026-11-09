@@ -1,0 +1,3 @@
+# hidden
+
+Drops the games you hide from every list. **Y** on the game list hides the selected game or pak (the `button` setting picks another), and a Hidden folder on the root, shown while something is hidden, lists them so the same button unhides them. The list is `.userdata/<platform>/launcher/hidden.txt`, one full path per line. From MyMinUI.

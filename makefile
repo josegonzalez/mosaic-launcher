@@ -112,7 +112,8 @@ smoke: desktop
 		MOSAIC_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/plugins \
 		./scripts/desktop-smoke.sh build/smoke-settings.log 4 --settings
 
-# Loads test plugins (one good, one crashing) into the desktop build.
+# Loads test plugins (one good, one crashing) into the desktop build. With
+# SHARD=<i>/<n>, runs only that shard's cases.
 test-plugins: desktop
 	./tests/plugins/run.sh
 
@@ -125,6 +126,10 @@ test-profiles: desktop plugins-desktop
 
 lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh
+	@# the cases set variables run.sh's helpers read, such as plugin and log, and read ones it sets
+	shellcheck -x -e SC2034,SC2153,SC2154 tests/plugins/cases/*.sh
+	@# PLUGINS.md's bundled plugins table is made from plugins/*/README.md
+	./scripts/plugin-table.sh --check
 	@# the template ships its own copy of the SDK; it must match
 	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h
 	cmp sdk/LICENSE template/sdk/LICENSE
