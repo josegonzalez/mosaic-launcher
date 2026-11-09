@@ -27,10 +27,12 @@
 #include <stdarg.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "mosaic_plugin.h"
 #include "names_model.h"
 #include "po_model.h"
@@ -339,16 +341,31 @@ static void planFolder(const char* system, const char* name, const NmNames* name
 	say("%s: %s map.txt, %i to add", name, existed ? "its" : "a new", added);
 }
 
+// Writes a map.txt through a new <path>.tmp, renamed into place. Returns 0,
+// 1 when something is already at the temporary name (a file or a link,
+// left alone), or -1.
 static int writeOne(const MapWrite* w) {
 	char tmp[720];
 	if (!w->path[0] || !FITS(tmp, "%s.tmp", w->path)) return -1;
-	FILE* f = fopen(tmp, "wb");
-	if (!f) return -1;
-	size_t len = strlen(w->text);
-	int ok = fwrite(w->text, 1, len, f) == len;
-	ok = fclose(f) == 0 && ok;
+	int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
+	if (fd < 0) return errno == EEXIST || errno == ELOOP ? 1 : -1;
+	const char* p = w->text;
+	size_t left = strlen(w->text);
+	int ok = 1;
+	while (ok && left) {
+		ssize_t n = write(fd, p, left);
+		if (n < 0 && errno == EINTR) continue;
+		if (n <= 0) ok = 0;
+		else {
+			p += n;
+			left -= (size_t)n;
+		}
+	}
+	ok = close(fd) == 0 && ok;
 	if (!ok || rename(tmp, w->path) != 0) {
-		remove(tmp);
+		int saved = errno;
+		unlink(tmp);
+		errno = saved;
 		return -1;
 	}
 	return 0;
@@ -358,7 +375,12 @@ static void writeMaps(void* data) {
 	(void)data;
 	int folders = 0, added = 0;
 	for (int i = 0; i < write_count; i++) {
-		if (writeOne(&writes[i]) != 0) {
+		int wrote = writeOne(&writes[i]);
+		if (wrote == 1) {
+			say("%s.tmp is already there, so map.txt isn't written", writes[i].path);
+			continue;
+		}
+		if (wrote != 0) {
 			say("couldn't write %s: %s", writes[i].path, strerror(errno));
 			continue;
 		}

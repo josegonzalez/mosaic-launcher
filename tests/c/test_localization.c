@@ -711,6 +711,46 @@ static void testPlugin(void) {
 	writeFile(CARD "/Roms/Game Boy Color (GBC)/map.txt", "Wario Land 3.gbc\tMy Wario\nZelda, The (USA).gbc\tZ\n");
 	action_run(NULL);
 	CHECK_STR(asked, "X1 1?");
+
+	// a file already at map.txt.tmp is left alone, and so is map.txt
+	writeFile(CARD "/Roms/Game Boy (GB)/map.txt.tmp", "someone's\n");
+	CHECK(answer_yes != NULL);
+	answer_yes(NULL);
+	CHECK(saidLine(CARD "/Roms/Game Boy (GB)/map.txt.tmp is already there, so map.txt isn't written"));
+	CHECK(stat(CARD "/Roms/Game Boy (GB)/map.txt", &st) != 0);
+	char* tmp = slurp(CARD "/Roms/Game Boy (GB)/map.txt.tmp");
+	CHECK(tmp && !strcmp(tmp, "someone's\n"));
+	free(tmp);
+	CHECK_STR(toasted, "Added names to map.txt in 0 folders");
+	unlink(CARD "/Roms/Game Boy (GB)/map.txt.tmp");
+
+	// a link at map.txt.tmp isn't followed, and the map.txt stays as it was
+	writeFile(CARD "/Roms/Game Boy (GB)/map.txt", "Unknown.gb\tU\n");
+	writeFile(TEST_DIR "/outside.txt", "outside\n");
+	CHECK(symlink(TEST_DIR "/outside.txt", CARD "/Roms/Game Boy (GB)/map.txt.tmp") == 0);
+	logged[0] = '\0';
+	action_run(NULL);
+	CHECK_STR(asked, "X1 1?\nLines already in a map.txt are kept.");
+	answer_yes(NULL);
+	CHECK(saidLine(CARD "/Roms/Game Boy (GB)/map.txt.tmp is already there"));
+	char* outside = slurp(TEST_DIR "/outside.txt");
+	CHECK(outside && !strcmp(outside, "outside\n"));
+	free(outside);
+	CHECK(lstat(CARD "/Roms/Game Boy (GB)/map.txt.tmp", &st) == 0 && S_ISLNK(st.st_mode));
+	gb = slurp(CARD "/Roms/Game Boy (GB)/map.txt");
+	CHECK(gb && !strcmp(gb, "Unknown.gb\tU\n"));
+	free(gb);
+	CHECK_STR(toasted, "Added names to map.txt in 0 folders");
+
+	// with the name free again, the write goes ahead
+	unlink(CARD "/Roms/Game Boy (GB)/map.txt.tmp");
+	action_run(NULL);
+	answer_yes(NULL);
+	gb = slurp(CARD "/Roms/Game Boy (GB)/map.txt");
+	CHECK(gb && !strcmp(gb, "Unknown.gb\tU\nTetris (World).gb\tテトリス\n"));
+	free(gb);
+	CHECK(stat(CARD "/Roms/Game Boy (GB)/map.txt.tmp", &st) != 0);
+	CHECK_STR(toasted, "Added names to map.txt in 1 folder");
 	quit();
 }
 
