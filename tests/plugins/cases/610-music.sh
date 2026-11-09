@@ -175,6 +175,7 @@ sed 's/^pos=.*/pos=20000/' "$MU_RESUME" >"$MU_WORK/resume.txt" && mv "$MU_WORK/r
 
 # the next start shows it paused on the pill and the player without
 # starting the daemon, and X plays on from the place
+rm -rf "$WORK/plugins/powerer.plugin" "$STATE/powerer.cfg"
 printf 'music=on\n' >"$STATE/plugins.txt"
 log="$WORK/music-resume.log"
 PRESSER_KEYS="wait wait y wait x wait wait"
@@ -189,14 +190,18 @@ expect "pill over gamelist: Paused: 02 Two"
 expect "playing on from $MU_ALBUM/02 Two.wav at 20000 ms"
 mu_pill=$(grep -n "plugin music: pill over gamelist: Paused: 02 Two" "$log" | head -n 1 | cut -d: -f1)
 mu_started=$(grep -n "plugin music: started the daemon" "$log" | head -n 1 | cut -d: -f1)
-[ -n "$mu_started" ] && [ "$mu_pill" -lt "$mu_started" ] || fail "the daemon started before X"
+if [ -z "$mu_started" ] || [ -z "$mu_pill" ] || [ "$mu_pill" -gt "$mu_started" ]; then
+	fail "the daemon started before X"
+fi
 grep -qF "Paused  0:20 / 0:40" "$MU_WORK/resume.texts" || fail "the player didn't show the place paused"
 grep -qF "musicd: playing on from $MU_ALBUM/02 Two.wav at 20000 ms, 2 of $MU_TRACKS" "$MU_LOG" \
 	|| fail "the daemon didn't play on from the place: $(cat "$MU_LOG")"
 mu_status=$(mu_send status)
 printf '%s\n' "$mu_status" | grep -q "state=playing.*track=$MU_ALBUM/02 Two.wav$" || fail "it isn't playing on: $mu_status"
 mu_pos=$(printf '%s\n' "$mu_status" | tr '\t' '\n' | sed -n 's/^pos=//p')
-[ "${mu_pos:-0}" -ge 20000 ] && [ "$mu_pos" -lt 40000 ] || fail "it didn't play on from the place: $mu_status"
+if [ "${mu_pos:-0}" -lt 20000 ] || [ "$mu_pos" -ge 40000 ]; then
+	fail "it didn't play on from the place: $mu_status"
+fi
 
 mu_stop
 unset SDL_AUDIODRIVER
