@@ -149,19 +149,19 @@ static int screenRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 	int total = clock_h + body_h + gap * 2 + large + small;
 	int y = area.y + (area.h - total) / 2;
 
-	MosaicColor main = dim(MOSAIC_COLOR_MAIN);
+	MosaicColor fg = dim(MOSAIC_COLOR_MAIN);
 	MosaicColor hint = dim(MOSAIC_COLOR_HINT);
 	if (want_clock[0]) {
 		int w = host->text_width(MOSAIC_FONT_LARGE, want_clock);
-		host->draw_text(screen, MOSAIC_FONT_LARGE, want_clock, area.x + (area.w - w) / 2, y, main, 0);
+		host->draw_text(screen, MOSAIC_FONT_LARGE, want_clock, area.x + (area.w - w) / 2, y, fg, 0);
 		y += clock_h;
 	}
 
 	MosaicRect body = { area.x + (area.w - body_w - nub_w) / 2, y, body_w, body_h };
 	MosaicRect nub = { body.x + body.w, body.y + (body_h - nub_h) / 2, nub_w, nub_h };
 	MosaicRect inner = { body.x + line, body.y + line, body.w - 2 * line, body.h - 2 * line };
-	host->fill_round_rect(screen, &body, 4 * scale, main);
-	host->fill_rect(screen, &nub, main);
+	host->fill_round_rect(screen, &body, 4 * scale, fg);
+	host->fill_rect(screen, &nub, fg);
 	host->fill_round_rect(screen, &inner, 2 * scale, mosaic_color(0x000000, 255));
 	MosaicRect bar = { inner.x + line, inner.y + line, 0, inner.h - 2 * line };
 	bar.w = CS_fillWidth(level, inner.w - 2 * line);
@@ -170,7 +170,7 @@ static int screenRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 
 	if (want_level[0]) {
 		int w = host->text_width(MOSAIC_FONT_LARGE, want_level);
-		host->draw_text(screen, MOSAIC_FONT_LARGE, want_level, area.x + (area.w - w) / 2, y, main, 0);
+		host->draw_text(screen, MOSAIC_FONT_LARGE, want_level, area.x + (area.w - w) / 2, y, fg, 0);
 	}
 	y += large;
 	int w = host->text_width(MOSAIC_FONT_SMALL, want_state);
