@@ -49,8 +49,10 @@
 #define LOCK_ACTION ID ".lock"
 #define TOGGLE_ACTION ID ".toggle"
 #define DAEMON_NAME "musicd"
-#define REQUEST_MS 300       // a command's wait for its answer
-#define PLAY_REQUEST_MS 3000 // play opens the file and the device first
+#define REQUEST_MS 300 // the status line's wait for its answer
+// other commands' wait: the daemon opens or closes the audio device before
+// it answers, which can take a while
+#define DEVICE_REQUEST_MS 3000
 #define START_WAIT_MS 2000   // a started daemon's wait to answer
 #define POLL_SCREEN_MS 500   // asking for the status while a screen shows
 #define POLL_PLAYING_MS 1000 // while something plays or is paused
@@ -299,14 +301,14 @@ static void playPath(const char* path) {
 	}
 	sendCommand(MU_CMD_REPEAT, MU_repeatName(repeat), REQUEST_MS);
 	sendCommand(MU_CMD_SHUFFLE, shuffle ? "on" : "off", REQUEST_MS);
-	if (sendCommand(MU_CMD_PLAY, path, PLAY_REQUEST_MS) == 0) say("playing %s", path);
+	if (sendCommand(MU_CMD_PLAY, path, DEVICE_REQUEST_MS) == 0) say("playing %s", path);
 	else if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play that");
 	askStatus(last_now);
 }
 
 static void command(int cmd, const char* arg) {
 	if (!daemon_up) return;
-	sendCommand(cmd, arg, REQUEST_MS);
+	sendCommand(cmd, arg, DEVICE_REQUEST_MS);
 	askStatus(last_now);
 }
 
@@ -735,20 +737,21 @@ static void tick(unsigned long now) {
 static int preLaunch(const MosaicLaunch* launch) {
 	(void)launch;
 	if (games_play || !daemon_up || st.state != MU_PLAYING) return MOSAIC_LAUNCH_CONTINUE;
-	if (sendCommand(MU_CMD_HOLD, NULL, REQUEST_MS) == 0) say("paused for the launch");
+	if (sendCommand(MU_CMD_HOLD, NULL, DEVICE_REQUEST_MS) == 0) say("paused for the launch");
+	else say("the daemon didn't answer the pause for the launch");
 	return MOSAIC_LAUNCH_CONTINUE;
 }
 
 static void postReturn(void) {
 	if (games_play) return;
 	if (!daemon_up) askStatus(last_now);
-	if (daemon_up && st.held && sendCommand(MU_CMD_RELEASE, NULL, REQUEST_MS) == 0) say("playing on after the launch");
+	if (daemon_up && st.held && sendCommand(MU_CMD_RELEASE, NULL, DEVICE_REQUEST_MS) == 0) say("playing on after the launch");
 	askStatus(last_now);
 }
 
 static void beforeSleep(void) {
 	if (!daemon_up) return;
-	if (sendCommand(MU_CMD_SLEEP, NULL, REQUEST_MS) == 0) say("paused for sleep");
+	if (sendCommand(MU_CMD_SLEEP, NULL, DEVICE_REQUEST_MS) == 0) say("paused for sleep");
 }
 
 static void afterResume(void) {
@@ -759,7 +762,7 @@ static void afterResume(void) {
 // that pid.
 static void beforePoweroff(void) {
 	int pid = daemonPid();
-	if (sendCommand(MU_CMD_QUIT, NULL, REQUEST_MS) == 0) {
+	if (sendCommand(MU_CMD_QUIT, NULL, DEVICE_REQUEST_MS) == 0) {
 		say("stopped the daemon for the power-off");
 		return;
 	}
