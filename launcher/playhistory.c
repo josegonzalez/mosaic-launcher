@@ -19,6 +19,9 @@
 
 #define BUSY_TIMEOUT_MS 250
 
+// Days back whose totals are kept once worked out, about a year's chart.
+#define DAY_CACHE 400
+
 typedef struct sqlite3 sqlite3;
 typedef struct sqlite3_stmt sqlite3_stmt;
 
@@ -39,6 +42,8 @@ static struct {
 static char db_path[512];
 static char roms_path[512];
 static void (*say)(const char* message);
+static int games_max = PLAY_GAMES_MAX;
+static int sessions_max = PLAY_SESSIONS_MAX;
 
 static int loaded = 0;   // read, or found unreadable, since the last invalidate
 static int readable = 0; // and the answers are in table
@@ -46,6 +51,12 @@ static PlayTable table;
 static long long today = 0;        // seconds today, as of the day below
 static long long today_start = 0;  // the day today was summed for
 static long long today_end = 0;
+
+static int days_loaded = 0;   // every session read, or found unreadable, since the last invalidate
+static int days_readable = 0; // and they're in days
+static PlayDays days;
+static long long day_cache[DAY_CACHE]; // each day back's total
+static char day_cached[DAY_CACHE];     // once it's worked out
 
 __attribute__((format(printf, 1, 2)))
 static void note(const char* fmt, ...) {
@@ -65,12 +76,26 @@ void PlayHistory_configure(const char* db, const char* roms, void (*log)(const c
 	say = log;
 }
 
+void PlayHistory_setCaps(int games, int sessions) {
+	PlayHistory_invalidate();
+	games_max = games > 0 ? games : PLAY_GAMES_MAX;
+	sessions_max = sessions > 0 ? sessions : PLAY_SESSIONS_MAX;
+}
+
+static void forgetDays(void) {
+	memset(day_cached, 0, sizeof(day_cached));
+}
+
 void PlayHistory_invalidate(void) {
 	PlayTable_free(&table);
 	loaded = 0;
 	readable = 0;
 	today = 0;
 	today_start = today_end = 0;
+	PlayDays_free(&days);
+	days_loaded = 0;
+	days_readable = 0;
+	forgetDays();
 }
 
 void PlayHistory_quit(void) {
@@ -81,6 +106,10 @@ void PlayHistory_quit(void) {
 
 int PlayHistory_loaded(void) {
 	return loaded;
+}
+
+int PlayHistory_daysLoaded(void) {
+	return days_loaded;
 }
 
 #define BIND(field, name) \
@@ -136,34 +165,55 @@ static const char* text(sqlite3_stmt* stmt, int col) {
 	return (const char*)sql.column_text(stmt, col);
 }
 
-// Every game's totals. A session still open (gametimectl stop_all hasn't
-// closed it yet) counts up to now, as stop_all would close it.
+static long long timeOrZero(sqlite3_stmt* stmt, int col) {
+	return sql.column_type(stmt, col) == SQL_NULL ? 0 : sql.column_int64(stmt, col);
+}
+
+// One number, or -1.
+static long long single(sqlite3* db, const char* query) {
+	sqlite3_stmt* stmt = NULL;
+	if (sql.prepare_v2(db, query, -1, &stmt, NULL) != SQL_OK) return -1;
+	long long value = sql.step(stmt) == SQL_ROW ? sql.column_int64(stmt, 0) : -1;
+	sql.finalize(stmt);
+	return value;
+}
+
+// Every game's totals, up to the most played games_max of them, in rom
+// order so the first of two rows for one path wins as in gametimectl. A
+// session still open (gametimectl stop_all hasn't closed it yet) counts up
+// to now, as stop_all would close it. Picking the most played costs a
+// sort, so it's only done past the cap.
 static int readGames(sqlite3* db, long long now) {
-	char query[640];
+	long long all = single(db, "SELECT COUNT(*) FROM rom;");
+	if (all < 0) return 0;
+	char most[80] = "";
+	if (all > games_max) snprintf(most, sizeof(most), " ORDER BY total DESC, last DESC, rom.id LIMIT %i", games_max);
+	char query[1024];
 	snprintf(query, sizeof(query),
-		"SELECT rom.file_path, rom.name, rom.type, COUNT(pa.rom_id), "
+		"SELECT file_path, name, type, sessions, total, first, last FROM ("
+		"SELECT rom.id AS id, rom.file_path AS file_path, rom.name AS name, rom.type AS type, "
+		"COUNT(pa.rom_id) AS sessions, "
 		"SUM(CASE WHEN pa.play_time IS NULL THEN MAX(%lld - pa.created_at, 0) "
-		"WHEN pa.play_time > 0 THEN pa.play_time ELSE 0 END), MAX(pa.created_at) "
+		"WHEN pa.play_time > 0 THEN pa.play_time ELSE 0 END) AS total, "
+		"MIN(pa.created_at) AS first, MAX(pa.created_at) AS last "
 		"FROM rom LEFT JOIN play_activity AS pa ON pa.rom_id = rom.id "
-		"GROUP BY rom.id ORDER BY rom.id;",
-		now);
+		"GROUP BY rom.id%s) ORDER BY id;",
+		now, most);
 	sqlite3_stmt* stmt = NULL;
 	if (sql.prepare_v2(db, query, -1, &stmt, NULL) != SQL_OK) return 0;
 	int rc;
 	while ((rc = sql.step(stmt)) == SQL_ROW) {
-		const char* path = text(stmt, 0);
-		const char* name = text(stmt, 1);
 		const char* type = text(stmt, 2);
 		int orphan = type && !strcmp(type, "ORPHAN");
-		long long last = sql.column_type(stmt, 5) == SQL_NULL ? 0 : sql.column_int64(stmt, 5);
-		long long seconds = sql.column_int64(stmt, 4);
 		int count = (int)sql.column_int64(stmt, 3);
-		if (PlayTable_addGame(&table, path, 0, seconds, last, count)) break;
-		if (orphan && PlayTable_addGame(&table, name, 1, seconds, last, count)) break;
+		long long seconds = sql.column_int64(stmt, 4);
+		if (PlayTable_addRom(&table, text(stmt, 0), text(stmt, 1), orphan, seconds, timeOrZero(stmt, 5),
+			timeOrZero(stmt, 6), count)) break;
 	}
 	sql.finalize(stmt);
 	if (rc != SQL_DONE) return 0;
 	PlayTable_finish(&table);
+	if (all > games_max) note("play history: kept the %i most played of %lld games", games_max, all);
 	return 1;
 }
 
@@ -187,23 +237,30 @@ static int readSessions(sqlite3* db, long long since, long long now) {
 	return rc == SQL_DONE;
 }
 
-static void load(void) {
-	if (loaded) return;
-	loaded = 1;
+// Logs why it's unknown, and returns NULL, when it can't be opened.
+static sqlite3* openDatabase(void) {
 	struct stat st;
 	if (!db_path[0] || stat(db_path, &st) != 0 || !S_ISREG(st.st_mode)) {
 		note("play history: unknown, no %s", db_path[0] ? db_path : "database");
-		return;
+		return NULL;
 	}
-	if (!loadLibrary()) return;
+	if (!loadLibrary()) return NULL;
 
 	sqlite3* db = NULL;
 	if (sql.open_v2(db_path, &db, SQL_OPEN_READONLY, NULL) != SQL_OK) {
 		note("play history: unknown, can't open %s: %s", db_path, db ? sql.errmsg(db) : "out of memory");
 		if (db) sql.close(db);
-		return;
+		return NULL;
 	}
 	sql.busy_timeout(db, BUSY_TIMEOUT_MS);
+	return db;
+}
+
+static void load(void) {
+	if (loaded) return;
+	loaded = 1;
+	sqlite3* db = openDatabase();
+	if (!db) return;
 	long long now = (long long)time(NULL);
 	long long start, end;
 	Play_dayBounds(now, &start, &end);
@@ -217,6 +274,55 @@ static void load(void) {
 	readable = 1;
 	note("play history: read %i game%s and %i session%s since midnight from %s", table.count,
 		table.count == 1 ? "" : "s", table.session_count, table.session_count == 1 ? "" : "s", db_path);
+}
+
+// Every session, newest first up to sessions_max: one more says there
+// were more.
+static int readDays(sqlite3* db, long long now) {
+	char query[256];
+	snprintf(query, sizeof(query),
+		"SELECT created_at, play_time FROM play_activity WHERE created_at IS NOT NULL "
+		"ORDER BY created_at DESC LIMIT %i;",
+		sessions_max + 1);
+	sqlite3_stmt* stmt = NULL;
+	if (sql.prepare_v2(db, query, -1, &stmt, NULL) != SQL_OK) return 0;
+	int rc;
+	int capped = 0;
+	while ((rc = sql.step(stmt)) == SQL_ROW) {
+		if (days.count == sessions_max) {
+			capped = 1;
+			continue;
+		}
+		long long start = sql.column_int64(stmt, 0);
+		long long seconds = sql.column_type(stmt, 1) == SQL_NULL ? now - start : sql.column_int64(stmt, 1);
+		if (PlayDays_add(&days, start, seconds)) break;
+	}
+	sql.finalize(stmt);
+	if (rc != SQL_DONE) return 0;
+	PlayDays_finish(&days, capped);
+	return 1;
+}
+
+// Only after the rest read: what's unknown there is unknown here, and
+// logged once.
+static void loadDays(void) {
+	if (days_loaded) return;
+	days_loaded = 1;
+	if (!readable) return;
+	sqlite3* db = openDatabase();
+	if (!db) return;
+	int ok = readDays(db, (long long)time(NULL));
+	if (!ok) {
+		note("play history: unknown days, can't read %s: %s", db_path, sql.errmsg(db));
+		PlayDays_free(&days);
+	}
+	sql.close(db);
+	if (!ok) return;
+	days_readable = 1;
+	if (days.capped) {
+		note("play history: days from the newest %i sessions in %s, days from before them unknown", days.count, db_path);
+	}
+	else note("play history: days from %i session%s in %s", days.count, days.count == 1 ? "" : "s", db_path);
 }
 
 // After known(path).
@@ -250,16 +356,56 @@ int PlayHistory_count(const char* path) {
 	return game ? game->count : 0;
 }
 
-// Summed once a day: the sessions are fixed until the next read, so only
-// midnight passing changes the answer. time() reads no files, unlike
-// working out the day.
+// The day now is in, worked out again only once midnight passes: the
+// sessions are fixed until the next read, so only that changes the
+// answers. time() reads no files, unlike working out the day.
+static void rollDay(long long now) {
+	if (now >= today_start && now < today_end) return;
+	Play_dayBounds(now, &today_start, &today_end);
+	today = Play_secondsBetween(table.sessions, table.session_count, today_start, today_end);
+	forgetDays();
+}
+
 long long PlayHistory_today(void) {
 	load();
 	if (!readable) return PLAY_UNKNOWN;
-	long long now = (long long)time(NULL);
-	if (now < today_start || now >= today_end) {
-		Play_dayBounds(now, &today_start, &today_end);
-		today = Play_secondsBetween(table.sessions, table.session_count, today_start, today_end);
-	}
+	rollDay((long long)time(NULL));
 	return today;
+}
+
+int PlayHistory_gameCount(void) {
+	load();
+	if (!readable) return PLAY_UNKNOWN;
+	return PlayTable_list(&table);
+}
+
+const PlayGame* PlayHistory_game(int index) {
+	if (PlayHistory_gameCount() <= 0) return NULL;
+	return PlayTable_listed(&table, index);
+}
+
+int PlayHistory_gamePath(const PlayGame* game, char* out, size_t size) {
+	if (!out || !size) return 0;
+	out[0] = '\0';
+	if (!game || game->orphan) return 0;
+	return Play_fullPath(roms_path, game->key, out, size);
+}
+
+long long PlayHistory_day(int days_ago) {
+	if (days_ago < 0) return PLAY_UNKNOWN;
+	load();
+	loadDays();
+	if (!days_readable) return PLAY_UNKNOWN;
+	long long now = (long long)time(NULL);
+	rollDay(now);
+	if (days_ago < DAY_CACHE && day_cached[days_ago]) return day_cache[days_ago];
+	long long start = today_start, end = today_end;
+	if (days_ago) Play_dayBoundsAgo(today_start, days_ago, &start, &end);
+	long long seconds = PlayDays_seconds(&days, start, end);
+	if (seconds < 0) seconds = PLAY_UNKNOWN;
+	if (days_ago < DAY_CACHE) {
+		day_cache[days_ago] = seconds;
+		day_cached[days_ago] = 1;
+	}
+	return seconds;
 }

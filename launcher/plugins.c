@@ -587,6 +587,25 @@ void Plugins_adoptPin(void) {
 	if (Pin_adopt(PIN_PATH, PLUGIN_STATE_DIR "/simple-mode.cfg")) LOG_info("plugins: simple mode's PIN is the launcher's PIN now\n");
 }
 
+static int hostPlayGameInfo(int index, MosaicPlayGame* out) {
+	if (!out || out->size < sizeof(out->size)) return -1;
+	const PlayGame* game = PlayHistory_game(index);
+	if (!game) return -1;
+	MosaicPlayGame full;
+	memset(&full, 0, sizeof(full));
+	full.size = out->size;
+	PlayHistory_gamePath(game, full.path, sizeof(full.path));
+	if (game->name) snprintf(full.name, sizeof(full.name), "%s", game->name);
+	full.seconds = game->seconds;
+	full.first_played = game->first;
+	full.last_played = game->last;
+	full.count = game->count;
+	full.orphan = game->orphan;
+	// only the fields the plugin knows about
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return 0;
+}
+
 static int hostAchievements(const char* path, MosaicAchievements* out) {
 	RASummary summary;
 	int rc = RAProgress_get(path, &summary);
@@ -967,6 +986,9 @@ static const MosaicHost host = {
 	.recent_info = hostRecentInfo,
 	.recent_open = hostRecentOpen,
 	.draw_hints = hostDrawHints,
+	.play_games_count = PlayHistory_gameCount,
+	.play_game_info = hostPlayGameInfo,
+	.play_time_on = PlayHistory_day,
 };
 
 ///////////////////////////////////////

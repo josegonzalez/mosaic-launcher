@@ -153,14 +153,217 @@ static void testSecondsBetween(void) {
 	CHECK(Play_secondsBetween(sessions, count, to, from) == 0);
 }
 
+static void testList(void) {
+	PlayTable table;
+	PlayTable_init(&table);
+	// rows as gametimectl's rom table has them, in rom order
+	CHECK(PlayTable_addRom(&table, "GB (GB)/Tetris.gb", "Tetris", 0, 600, 100, 900, 3) == 0);
+	CHECK(PlayTable_addRom(&table, "GBA (MGBA)/Zelda.gba", "Zelda", 0, 3600, 200, 800, 2) == 0);
+	// an orphan known only by name
+	CHECK(PlayTable_addRom(&table, NULL, "Metroid", 1, 120, 50, 60, 2) == 0);
+	// an orphan with a path too: looked up both ways, listed once
+	CHECK(PlayTable_addRom(&table, "NES/Kirby.nes", "Kirby", 1, 600, 10, 950, 1) == 0);
+	// a second row for Tetris's path: found and listed as the first
+	CHECK(PlayTable_addRom(&table, "GB (GB)/Tetris.gb", "Tetris", 0, 9999, 1, 999, 9) == 0);
+	// no sessions: looked up, not listed
+	CHECK(PlayTable_addRom(&table, "NES/Unplayed.nes", "Unplayed", 0, 0, 0, 0, 0) == 0);
+	// neither a path nor a name
+	CHECK(PlayTable_addRom(&table, NULL, NULL, 1, 5, 5, 5, 1) == 0);
+	CHECK(PlayTable_addRom(&table, "", "", 0, 5, 5, 5, 1) == 0);
+	CHECK(table.count == 7);
+	// not until it's finished
+	CHECK(PlayTable_list(&table) == 0);
+	PlayTable_finish(&table);
+
+	CHECK(PlayTable_list(&table) == 4);
+	CHECK(PlayTable_list(&table) == 4);
+	const PlayGame* game = PlayTable_listed(&table, 0);
+	CHECK(game && !strcmp(game->key, "GBA (MGBA)/Zelda.gba") && game->seconds == 3600 && game->first == 200);
+	CHECK(game && game->name && !strcmp(game->name, "Zelda"));
+	// 600 each: the latest played first
+	game = PlayTable_listed(&table, 1);
+	CHECK(game && !strcmp(game->key, "NES/Kirby.nes") && !game->orphan && game->last == 950);
+	game = PlayTable_listed(&table, 2);
+	CHECK(game && !strcmp(game->key, "GB (GB)/Tetris.gb") && game->seconds == 600 && game->count == 3);
+	game = PlayTable_listed(&table, 3);
+	CHECK(game && !strcmp(game->key, "Metroid") && game->orphan && game->first == 50 && game->last == 60);
+	CHECK(PlayTable_listed(&table, 4) == NULL);
+	CHECK(PlayTable_listed(&table, -1) == NULL);
+	CHECK(PlayTable_listed(NULL, 0) == NULL);
+
+	// the orphan with a path is found by its name as well
+	game = PlayTable_find(&table, "SNES/Kirby.sfc");
+	CHECK(game && game->orphan && game->alias && game->seconds == 600);
+	game = PlayTable_find(&table, "NES/Unplayed.nes");
+	CHECK(game && game->count == 0);
+
+	// adding again drops the list until it's finished again
+	CHECK(PlayTable_addRom(&table, "GB (GB)/Mario.gb", "Mario", 0, 7200, 1, 2, 1) == 0);
+	CHECK(PlayTable_listed(&table, 0) == NULL);
+	PlayTable_finish(&table);
+	CHECK(PlayTable_list(&table) == 5);
+	game = PlayTable_listed(&table, 0);
+	CHECK(game && !strcmp(game->key, "GB (GB)/Mario.gb"));
+	PlayTable_free(&table);
+	CHECK(table.list == NULL && table.list_count == 0 && !table.listed);
+
+	// an empty history lists nothing
+	PlayTable_init(&table);
+	PlayTable_finish(&table);
+	CHECK(PlayTable_list(&table) == 0);
+	CHECK(PlayTable_listed(&table, 0) == NULL);
+	PlayTable_free(&table);
+	CHECK(PlayTable_list(NULL) == 0);
+}
+
+// A path whose first row has no sessions isn't listed by a later one.
+static void testListFirstRow(void) {
+	PlayTable table;
+	PlayTable_init(&table);
+	CHECK(PlayTable_addRom(&table, "GB/A.gb", "A", 0, 0, 0, 0, 0) == 0);
+	CHECK(PlayTable_addRom(&table, "GB/A.gb", "A", 0, 50, 1, 1, 1) == 0);
+	PlayTable_finish(&table);
+	CHECK(PlayTable_list(&table) == 0);
+	const PlayGame* game = PlayTable_find(&table, "GB/A.gb");
+	CHECK(game && game->count == 0);
+	PlayTable_free(&table);
+}
+
+static void testFullPath(void) {
+	char out[64];
+	CHECK(Play_fullPath("/mnt/SDCARD/Roms", "GB (GB)/Tetris.gb", out, sizeof(out)) == 1);
+	CHECK_STR(out, "/mnt/SDCARD/Roms/GB (GB)/Tetris.gb");
+	CHECK(Play_fullPath("/mnt/SDCARD/Roms/", "GB/T.gb", out, sizeof(out)) == 1);
+	CHECK_STR(out, "/mnt/SDCARD/Roms/GB/T.gb");
+	// and back
+	char rel[64];
+	CHECK(Play_relPath("/mnt/SDCARD/Roms", out, rel, sizeof(rel)) == 1);
+	CHECK_STR(rel, "GB/T.gb");
+	CHECK(Play_fullPath("/r", "0123456789", out, 8) == 0);
+	CHECK_STR(out, "");
+	CHECK(Play_fullPath("/r", "", out, sizeof(out)) == 0);
+	CHECK(Play_fullPath("/r", NULL, out, sizeof(out)) == 0);
+	CHECK(Play_fullPath(NULL, "a", out, sizeof(out)) == 0);
+	CHECK(Play_fullPath("/r", "a", NULL, 0) == 0);
+}
+
+static void testDayBoundsAgo(const char* tz) {
+	setenv("TZ", tz, 1);
+	tzset();
+	long long start, end;
+	long long now = at(2026, 11, 8, 14, 30);
+	Play_dayBoundsAgo(now, 0, &start, &end);
+	CHECK(start == at(2026, 11, 8, 0, 0) && end == at(2026, 11, 9, 0, 0));
+	Play_dayBoundsAgo(now, 1, &start, &end);
+	CHECK(start == at(2026, 11, 7, 0, 0) && end == at(2026, 11, 8, 0, 0));
+	// back over a month and a year
+	Play_dayBoundsAgo(now, 8, &start, &end);
+	CHECK(start == at(2026, 10, 31, 0, 0) && end == at(2026, 11, 1, 0, 0));
+	Play_dayBoundsAgo(at(2026, 1, 2, 9, 0), 2, &start, &end);
+	CHECK(start == at(2025, 12, 31, 0, 0) && end == at(2026, 1, 1, 0, 0));
+	Play_dayBoundsAgo(now, 365, &start, &end);
+	CHECK(start == at(2025, 11, 8, 0, 0));
+	// from a day's own midnight
+	Play_dayBoundsAgo(at(2026, 11, 8, 0, 0), 1, &start, &end);
+	CHECK(start == at(2026, 11, 7, 0, 0) && end == at(2026, 11, 8, 0, 0));
+}
+
+static void testDstAgo(void) {
+	setenv("TZ", "America/New_York", 1);
+	tzset();
+	long long start, end;
+	// back from 2026-11-03 to the 25 hour day
+	Play_dayBoundsAgo(at(2026, 11, 3, 12, 0), 2, &start, &end);
+	CHECK(start == at(2026, 11, 1, 0, 0) && end - start == 25 * 3600);
+	Play_dayBoundsAgo(at(2026, 3, 10, 0, 30), 2, &start, &end);
+	CHECK(start == at(2026, 3, 8, 0, 0) && end - start == 23 * 3600);
+}
+
+static void testDays(void) {
+	PlayDays days;
+	PlayDays_init(&days);
+	long long day = 86400, d0 = 100 * day;
+	// not until it's finished
+	CHECK(PlayDays_seconds(&days, d0, d0 + day) == -1);
+	CHECK(PlayDays_add(&days, d0 + 3 * day + 100, 600) == 0);  // day 3
+	CHECK(PlayDays_add(&days, d0 + 100, 60) == 0);             // day 0
+	CHECK(PlayDays_add(&days, d0 + day - 300, 500) == 0);      // day 0 into day 1: 300 and 200
+	CHECK(PlayDays_add(&days, d0 + 2 * day + 10, -5) == 0);    // clamps to 0
+	// a week long, as a crash leaves one: from day 3 into day 10
+	CHECK(PlayDays_add(&days, d0 + 3 * day + 5000, 7 * day) == 0);
+	PlayDays_finish(&days, 0);
+	CHECK(days.count == 5 && days.longest == 7 * day && !days.capped);
+	CHECK(days.sessions[0].start == d0 + 100);
+	CHECK(PlayDays_seconds(&days, d0, d0 + day) == 60 + 300);
+	CHECK(PlayDays_seconds(&days, d0 + day, d0 + 2 * day) == 200);
+	CHECK(PlayDays_seconds(&days, d0 + 2 * day, d0 + 3 * day) == 0);
+	CHECK(PlayDays_seconds(&days, d0 + 3 * day, d0 + 4 * day) == 600 + day - 5000);
+	CHECK(PlayDays_seconds(&days, d0 + 7 * day, d0 + 8 * day) == day);
+	CHECK(PlayDays_seconds(&days, d0 + 10 * day, d0 + 11 * day) == 5000);
+	CHECK(PlayDays_seconds(&days, d0 + 11 * day, d0 + 12 * day) == 0);
+	// before any of them
+	CHECK(PlayDays_seconds(&days, d0 - day, d0) == 0);
+	CHECK(PlayDays_seconds(NULL, d0, d0 + day) == -1);
+	PlayDays_free(&days);
+
+	// capped: the oldest read is the cut, and a day up to it is unknown
+	PlayDays_init(&days);
+	CHECK(PlayDays_add(&days, d0 + day + 100, 50) == 0);
+	CHECK(PlayDays_add(&days, d0 + 2 * day + 100, 70) == 0);
+	PlayDays_finish(&days, 1);
+	CHECK(days.capped && days.cut == d0 + day + 100);
+	CHECK(PlayDays_seconds(&days, d0 + 2 * day, d0 + 3 * day) == 70);
+	CHECK(PlayDays_seconds(&days, d0 + day, d0 + 2 * day) == -1);
+	CHECK(PlayDays_seconds(&days, d0, d0 + day) == -1);
+	PlayDays_free(&days);
+	CHECK(days.count == 0 && days.sessions == NULL);
+
+	// none at all
+	PlayDays_init(&days);
+	PlayDays_finish(&days, 0);
+	CHECK(PlayDays_seconds(&days, d0, d0 + day) == 0);
+	PlayDays_free(&days);
+}
+
+// Many sessions: each day's total matches a plain sum over all of them.
+static void testDaysMany(void) {
+	PlayDays days;
+	PlayDays_init(&days);
+	long long day = 86400, d0 = 1000 * day;
+	unsigned seed = 7;
+	for (int i = 0; i < 5000; i++) {
+		seed = seed * 1103515245u + 12345u;
+		long long start = d0 + (long long)(seed >> 8) % (365 * day);
+		long long seconds = (long long)(seed >> 4) % 7200;
+		CHECK(PlayDays_add(&days, start, seconds) == 0);
+	}
+	PlayDays_finish(&days, 0);
+	int same = 0;
+	for (int d = 0; d < 366; d++) {
+		long long from = d0 + d * day, to = from + day;
+		if (PlayDays_seconds(&days, from, to) == Play_secondsBetween(days.sessions, days.count, from, to)) same++;
+	}
+	CHECK(same == 366);
+	PlayDays_free(&days);
+}
+
 int main(void) {
 	testFind();
 	testMany();
+	testList();
+	testListFirstRow();
+	testFullPath();
+	testDays();
+	testDaysMany();
 	testRelPath();
 	testDayBounds("UTC");
 	testDayBounds("America/Los_Angeles");
 	testDayBounds("Asia/Kolkata");
 	testDst();
+	testDayBoundsAgo("UTC");
+	testDayBoundsAgo("America/Los_Angeles");
+	testDayBoundsAgo("Asia/Kolkata");
+	testDstAgo();
 	testSecondsBetween();
 	CHECK_DONE();
 }

@@ -327,6 +327,20 @@ typedef struct MosaicRecent {
 	char preview[512]; // that state's preview image, for art_load, or "" when there's none
 } MosaicRecent;
 
+// A game in the play history, for host->play_game_info. The plugin sets
+// size to sizeof(MosaicPlayGame) before asking, and the launcher fills in
+// only the fields that fit in it, so fields are only added at the end.
+typedef struct MosaicPlayGame {
+	size_t size;            // sizeof(MosaicPlayGame) in the plugin
+	char path[512];         // its full path on the card, as entry_path returns it (it may no longer be there), or "" for an orphan
+	char name[256];         // the name the tracker keeps for it: the file's name without its extension, or "" when it has none
+	long long seconds;      // played in all, as play_time returns it
+	long long first_played; // when its first session started, as a Unix time
+	long long last_played;  // when its latest session started, as last_played returns it
+	int count;              // sessions, as play_count returns it
+	int orphan;             // 1 for a game carried over from Onion, known only by its name
+} MosaicPlayGame;
+
 // A game's local RetroAchievements progress, for host->achievements. The
 // plugin sets size to sizeof(MosaicAchievements) before asking, and the
 // launcher fills in only the fields that fit in it, so fields are only
@@ -1043,6 +1057,26 @@ typedef struct MosaicHost {
 	// the pills already drawn this frame. Check for it with
 	// MOSAIC_HOST_HAS(host, draw_hints).
 	int (*draw_hints)(MosaicSurface* screen, int group, const MosaicHint* hints, int count, MosaicRect* drawn);
+
+	// The whole play history, from the same read as play_time.
+	// play_games_count returns how many games it lists: every game with a
+	// session, each path once, and orphans by name, up to the 10000 most
+	// played (the rest aren't read, and get 0 from play_time too).
+	// play_game_info fills out (see MosaicPlayGame) for the game at index,
+	// most played first, then the latest played, and returns 0, or -1 for an
+	// index past the end or a NULL out. play_time_on returns the seconds
+	// played across every game on the local day days_ago days before today
+	// (0 is today, as play_time_today), counting the part of each session
+	// that falls in it; every session is read the first time a plugin asks
+	// for a day, up to the newest 100000, and a day from before those gets
+	// MOSAIC_PLAY_UNKNOWN. Each returns MOSAIC_PLAY_UNKNOWN when the history
+	// can't be read, as play_time does, and play_time_on for a negative
+	// days_ago too. The answers are kept until a game or pak returns, and
+	// days move on by themselves at midnight. Check for them with
+	// MOSAIC_HOST_HAS(host, play_time_on).
+	int (*play_games_count)(void);
+	int (*play_game_info)(int index, MosaicPlayGame* out);
+	long long (*play_time_on)(int days_ago);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

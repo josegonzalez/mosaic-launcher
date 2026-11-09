@@ -645,6 +645,19 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   }
   ```
 
+- The whole play history, for stats across every game rather than one path at a time: `play_games_count()`, `play_game_info(index, out)` and `play_time_on(days_ago)` read the same database as `play_time` above. `play_games_count` returns how many games the history lists: every game with at least one session, each path once (a second row `gametimectl` has for the same path is left out, as `play_time` answers from the first), and games carried over from Onion as orphans, which have no path. `play_game_info` fills `out`, a `MosaicPlayGame` whose `size` the plugin sets to `sizeof(MosaicPlayGame)` (the launcher fills only the fields that fit), for the game at `index`, most played first, then the latest played: `path`, its full path on the card as `entry_path` returns it (the game may no longer be there), or `""` for an orphan; `name`, the name the tracker keeps for it; `seconds`, `last_played` and `count`, as `play_time`, `last_played` and `play_count` return them; `first_played`, when its first session started; and `orphan`, 1 for an orphan. It returns 0, or -1 for an index past the end, a `NULL` `out` or a history that can't be read. `play_time_on` returns the seconds played across every game on the local day `days_ago` days before today, 0 being today (as `play_time_today`), counting the part of each session that falls in that day, so a session over midnight counts on both. Each returns `MOSAIC_PLAY_UNKNOWN` when the history can't be read, as `play_time` does, and `play_time_on` for a negative `days_ago` too. The list comes from the read `play_time` makes; at most the 10000 most played games are read (the rest aren't listed, and `play_time` answers 0 for them), which the log notes. Every session is read only when a plugin first asks for a day, in a read of its own, at most the newest 100000 of them; past that, a day from before the oldest one read gets `MOSAIC_PLAY_UNKNOWN`, and the log says so. Both are kept until a game or pak returns, like the rest, and days move on by themselves at midnight, so a chart can ask for every day each frame. On a desktop history of 5000 games and 100000 sessions over a year the first read takes about 60 ms, the sessions about 40 ms and a year of days under 2 ms the first time, and then microseconds. Check for them with `MOSAIC_HOST_HAS(host, play_time_on)`.
+
+  ```c
+  // the five most played games, and this week's total
+  MosaicPlayGame game = { .size = sizeof(game) };
+  for (int i = 0; i < 5 && host->play_game_info(i, &game) == 0; i++) show(game.path[0] ? game.path : game.name, game.seconds);
+  long long week = 0;
+  for (int d = 0; d < 7; d++) {
+      long long seconds = host->play_time_on(d);
+      if (seconds > 0) week += seconds;
+  }
+  ```
+
 ## Without writing C
 
 Shell paks can hook into the launcher too:
