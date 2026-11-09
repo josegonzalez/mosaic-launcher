@@ -1,0 +1,17 @@
+id=screensaver
+name=Screensaver
+api=1
+# how long the game list or home is left alone before the screensaver shows
+setting.idle=choice|Show after idle (seconds)|30|off,15,30,45,60,120,300,600
+# where the images come from: recent and favorite games' art, the Screenshots folder, or the folder setting's folder
+setting.source=choice|Images|games|games,screenshots,folder
+# which of the games' art: box art (else the thumbnail) or screenshots
+setting.art=choice|Game art|box|box,screenshot
+# a folder on the card, for the folder source
+setting.folder=text|Image folder|Screensaver
+# how long each image shows
+setting.interval=choice|Seconds per image|10|5,10,20,30,60,120
+# how one image changes to the next
+setting.effect=choice|Change|fade|fade,slide
+# a dim clock in the bottom right corner
+setting.clock=choice|Clock|off|off,24h,12h
