@@ -43,6 +43,9 @@
 #define MAP_MAX (4 * 1024 * 1024)
 #define FOLDER_FILES_MAX 20000
 
+// snprintf into the array buf, 1 when it fit: a path cut short is never used
+#define FITS(buf, ...) (snprintf((buf), sizeof(buf), __VA_ARGS__) < (int)sizeof(buf))
+
 static const MosaicHost* host;
 static char code[CODE_MAX]; // the language in use, or "" for off
 static char folder[512];    // the user's packs, a full path
@@ -77,7 +80,7 @@ static void findRes(void) {
 		if (!slash) return;
 		*slash = '\0';
 	}
-	snprintf(res_dir, sizeof(res_dir), "%s/res", path);
+	if (!FITS(res_dir, "%s/res", path)) res_dir[0] = '\0';
 #endif
 }
 
@@ -131,7 +134,7 @@ static PoCatalog* loadPack(const char* dir, const char* where) {
 	int count = candidates(code, names);
 	for (int i = 0; i < count; i++) {
 		char path[700];
-		snprintf(path, sizeof(path), "%s/%s.po", dir, names[i]);
+		if (!FITS(path, "%s/%s.po", dir, names[i])) continue;
 		size_t len = 0;
 		int missing;
 		char* text = readFile(path, PACK_MAX, &len, &missing);
@@ -183,8 +186,7 @@ static void findFont(void) {
 	for (int i = 0; i < count; i++) {
 		for (int j = 0; j < 2; j++) {
 			struct stat st;
-			snprintf(font, sizeof(font), "%s/%s.%s", folder, names[i], extensions[j]);
-			if (stat(font, &st) == 0 && S_ISREG(st.st_mode)) {
+			if (FITS(font, "%s/%s.%s", folder, names[i], extensions[j]) && stat(font, &st) == 0 && S_ISREG(st.st_mode)) {
 				say("fallback font %s, beside the language's pack", font);
 				return;
 			}
@@ -265,8 +267,7 @@ static void planFolder(const char* system, const char* name, const NmNames* name
 		if (de->d_name[0] == '.' || !strcmp(de->d_name, "map.txt")) continue;
 		char path[1024];
 		struct stat st;
-		snprintf(path, sizeof(path), "%s/%s", system, de->d_name);
-		if (stat(path, &st) != 0) continue;
+		if (!FITS(path, "%s/%s", system, de->d_name) || stat(path, &st) != 0) continue;
 		if (count >= cap) {
 			int next = cap ? cap * 2 : 64;
 			FolderFile* grown = realloc(found, (size_t)next * sizeof(FolderFile));
@@ -291,7 +292,13 @@ static void planFolder(const char* system, const char* name, const NmNames* name
 	}
 
 	char map[700];
-	snprintf(map, sizeof(map), "%s/map.txt", system);
+	if (!FITS(map, "%s/map.txt", system)) {
+		for (int i = 0; i < found_count; i++) free(found[i].name);
+		free(found);
+		free(files);
+		free(dirs);
+		return;
+	}
 	struct stat st;
 	int existed = lstat(map, &st) == 0;
 	char* existing = NULL;
@@ -325,7 +332,7 @@ static void planFolder(const char* system, const char* name, const NmNames* name
 	}
 	writes = w;
 	MapWrite* out = &writes[write_count++];
-	snprintf(out->path, sizeof(out->path), "%s", map);
+	if (!FITS(out->path, "%s", map)) out->path[0] = '\0';
 	out->text = text;
 	out->existed = existed;
 	out->added = added;
@@ -334,7 +341,7 @@ static void planFolder(const char* system, const char* name, const NmNames* name
 
 static int writeOne(const MapWrite* w) {
 	char tmp[720];
-	snprintf(tmp, sizeof(tmp), "%s.tmp", w->path);
+	if (!w->path[0] || !FITS(tmp, "%s.tmp", w->path)) return -1;
 	FILE* f = fopen(tmp, "wb");
 	if (!f) return -1;
 	size_t len = strlen(w->text);
@@ -392,10 +399,10 @@ static void runMap(void* data) {
 	while ((de = readdir(d))) {
 		char tag[64], system[1024], list[1024];
 		if (de->d_name[0] == '.' || Nm_tag(de->d_name, tag, sizeof(tag)) < 0) continue;
-		snprintf(system, sizeof(system), "%s/%s", roms, de->d_name);
+		if (!FITS(system, "%s/%s", roms, de->d_name)) continue;
 		struct stat st;
 		if (stat(system, &st) != 0 || !S_ISDIR(st.st_mode)) continue;
-		snprintf(list, sizeof(list), "%s/%s.txt", dir, tag);
+		if (!FITS(list, "%s/%s.txt", dir, tag)) continue;
 		int missing;
 		char* text = readFile(list, NAMES_MAX, NULL, &missing);
 		if (!text) continue;
@@ -415,8 +422,7 @@ static void runMap(void* data) {
 	char message[512];
 	char first[256];
 	snprintf(first, sizeof(first), trPlural("Add names to map.txt in %d folder?", "Add names to map.txt in %d folders?", (unsigned long)write_count), write_count);
-	if (replaced) snprintf(message, sizeof(message), "%s\n%s", first, tr("Lines already in a map.txt are kept."));
-	else snprintf(message, sizeof(message), "%s", first);
+	if (!replaced || !FITS(message, "%s\n%s", first, tr("Lines already in a map.txt are kept."))) snprintf(message, sizeof(message), "%s", first);
 	say("asking to write %i map.txt files, %i of them already there", write_count, replaced);
 	host->confirm(message, tr("WRITE"), writeMaps, NULL);
 }
