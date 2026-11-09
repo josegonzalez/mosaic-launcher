@@ -10,7 +10,8 @@
 # most it waits: it stops once the log has every line, and the file named by
 # SMOKE_UNTIL_GONE (if any) is gone, then SMOKE_SETTLE more seconds (1 by
 # default) pass. If that doesn't happen in time it stops the launcher and
-# fails (exit 3).
+# fails (exit 3). With SMOKE_STACKS set too, it first writes every thread's
+# stack to <log file>.stacks with gdb, which needs permission to attach.
 #
 # SMOKE_PRELOAD names a library to preload into nextui.elf alone (LD_PRELOAD,
 # or DYLD_INSERT_LIBRARIES on macOS, which drops DYLD_ variables on the way
@@ -28,6 +29,7 @@ UNTIL="${SMOKE_UNTIL:-}"
 UNTIL_GONE="${SMOKE_UNTIL_GONE:-}"
 PRELOAD="${SMOKE_PRELOAD:-}"
 SETTLE="${SMOKE_SETTLE:-1}"
+STACKS="${SMOKE_STACKS:-}"
 shift
 [ $# -gt 0 ] && shift
 
@@ -82,6 +84,11 @@ while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt $((SECONDS_TO_RUN * 10)) ]; 
 done
 
 if kill -0 "$pid" 2>/dev/null; then
+	# where a start that isn't ready waits, before the SIGTERM ends it
+	stacks=0
+	if [ -n "$STACKS" ] && [ "$is_ready" -eq 0 ] && [ -n "$UNTIL" ] && ! ready; then
+		gdb -p "$pid" -batch -ex "set pagination off" -ex "thread apply all bt" >"$LOG.stacks" 2>&1 </dev/null && stacks=1
+	fi
 	kill "$pid"
 	# a launcher that doesn't stop on SIGTERM would hold up whoever runs this
 	tries=0
@@ -105,6 +112,7 @@ if kill -0 "$pid" 2>/dev/null; then
 		echo "not ready after ${SECONDS_TO_RUN}s; log in $LOG" >&2
 		missing | sed 's/^/  missing line: /' >&2
 		[ -n "$UNTIL_GONE" ] && [ -e "$UNTIL_GONE" ] && echo "  still there: $UNTIL_GONE" >&2
+		[ "$stacks" -eq 1 ] && echo "  stacks in $LOG.stacks" >&2
 		exit 3
 	fi
 	echo "still running after ${SECONDS_TO_RUN}s; log in $LOG"

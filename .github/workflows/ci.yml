@@ -52,7 +52,11 @@ jobs:
           submodules: true
 
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb ffmpeg libavformat-dev libavcodec-dev libavutil-dev sqlite3
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb ffmpeg libavformat-dev libavcodec-dev libavutil-dev sqlite3 gdb
+
+      # so a start that stalls can have its stacks taken (SMOKE_STACKS)
+      - name: Allow attaching gdb
+        run: sudo sysctl -w kernel.yama.ptrace_scope=0
 
       - name: Smoke
         if: matrix.shard == 1
@@ -62,6 +66,7 @@ jobs:
         run: xvfb-run -a make test-plugins
         env:
           SHARD: ${{ matrix.shard }}/3
+          SMOKE_STACKS: 1
 
       - name: Upload logs
         if: failure()

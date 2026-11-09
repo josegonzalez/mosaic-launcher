@@ -66,7 +66,9 @@ Each bundled plugin's row in PLUGINS.md's "Bundled plugins" table comes from its
 
 CI runs `make lint`, `make test` and `make test-profiles` in one job, and `make test-plugins` in three more, one per shard (the first also runs `make smoke`), all on Linux under `xvfb-run`. The shards install ffmpeg and sqlite3 so the video preview and play history cases run, and each keeps its logs as the `desktop-logs-<shard>` artifact when it fails.
 
-`scripts/desktop-smoke.sh` can also wait for log lines instead of a fixed time: with `SMOKE_UNTIL` set to fixed strings, one per line, the seconds are the most it waits, and it stops once the log has every line and the file named by `SMOKE_UNTIL_GONE` (if set) is gone, then `SMOKE_SETTLE` more seconds (1 by default) pass. It fails with exit 3 if that doesn't happen in time.
+`scripts/desktop-smoke.sh` can also wait for log lines instead of a fixed time: with `SMOKE_UNTIL` set to fixed strings, one per line, the seconds are the most it waits, and it stops once the log has every line and the file named by `SMOKE_UNTIL_GONE` (if set) is gone, then `SMOKE_SETTLE` more seconds (1 by default) pass. It fails with exit 3 if that doesn't happen in time. With `SMOKE_STACKS` set too, it first writes every thread's stack to `<log>.stacks` with gdb; CI sets it for the plugin tests, with gdb installed and allowed to attach.
+
+In `tests/plugins/run.sh`, a start that logged every line it waited for but never drew its first frame (the loading marker is still there) is started once more, with a warning, its log kept as `<log>-stalled.log` and its main thread's stack printed. That stall was seen once in CI, on a job's first start under `xvfb-run`, and not in about 2,000 starts since, locally or in CI (#233); a second stall in a row fails the case.
 
 ## Updating NextUI
 

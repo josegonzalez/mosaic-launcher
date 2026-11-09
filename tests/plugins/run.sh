@@ -96,13 +96,33 @@ clear_guard() {
 # exits or $WAIT seconds pass. 0 if it ran until stopped, 1 if it exited on
 # its own, 2 (also a failure here) if it had to be killed after ignoring
 # SIGTERM. Not getting the lines in time is a failure too, and returns 0.
+# A start that logged every line but never drew its first frame gets one
+# more try, with a warning: CI's xvfb rarely stalls a job's first start
+# like that (#233).
 start_launcher() {
 	case_log="$1"
 	shift
 	until=$(printf '%s\n' "$@")
-	MOSAIC_LAUNCHER_PLUGIN_PATH="$WORK/plugins" SMOKE_UNTIL="$until" SMOKE_UNTIL_GONE="$STATE/loading" \
-		"$ROOT/scripts/desktop-smoke.sh" "$case_log" "$WAIT" >/dev/null 2>"$WORK/smoke.err"
-	status=$?
+	had_marker=0
+	[ -e "$STATE/loading" ] && had_marker=1
+	tries=0
+	while :; do
+		MOSAIC_LAUNCHER_PLUGIN_PATH="$WORK/plugins" SMOKE_UNTIL="$until" SMOKE_UNTIL_GONE="$STATE/loading" \
+			"$ROOT/scripts/desktop-smoke.sh" "$case_log" "$WAIT" >/dev/null 2>"$WORK/smoke.err"
+		status=$?
+		tries=$((tries + 1))
+		[ "$status" -eq 3 ] && [ "$tries" -eq 1 ] && [ "$had_marker" -eq 0 ] || break
+		grep -q '^  still there: ' "$WORK/smoke.err" || break
+		grep -q '^  missing line: ' "$WORK/smoke.err" && break
+		stalled="${case_log%.log}-stalled.log"
+		cp "$case_log" "$stalled"
+		[ -f "$case_log.stacks" ] && mv "$case_log.stacks" "$stalled.stacks"
+		echo "WARN: $(basename "$case_log" .log): no first frame after ${WAIT}s, starting it again; log in $stalled" >&2
+		# the main thread's stack, so a passing retry still says where it waited
+		[ -f "$stalled.stacks" ] && sed -n '/^Thread 1 /,/^$/p' "$stalled.stacks" | head -n 25 >&2
+		# this start's marker, which would pause plugins on the next
+		rm -f "$STATE/loading"
+	done
 	[ "$status" -eq 2 ] && fail "the launcher ignored SIGTERM and was killed"
 	if [ "$status" -eq 3 ]; then
 		why=$(sed -n 's/^  //p' "$WORK/smoke.err" | tr '\n' ',')

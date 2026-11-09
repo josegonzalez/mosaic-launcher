@@ -75,6 +75,34 @@ smoke() {
 	[ "${#lines[@]}" -eq 2 ]
 }
 
+# fake_gdb: a gdb on PATH that logs how it was run
+fake_gdb() {
+	mkdir -p "$BATS_TEST_TMPDIR/bin"
+	printf '#!/bin/sh\necho "gdb $*" >>"%s"\necho "Thread 1 (main)"\n' "$BATS_TEST_TMPDIR/gdb-calls" >"$BATS_TEST_TMPDIR/bin/gdb"
+	chmod +x "$BATS_TEST_TMPDIR/bin/gdb"
+	PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+@test "with SMOKE_STACKS a launcher that isn't ready has its stacks taken" {
+	fake_gdb
+	fake_launcher 'trap "exit 0" TERM; echo one; while :; do sleep 0.1; done'
+	SMOKE_UNTIL="$(printf 'one\ntwo')" SMOKE_STACKS=1 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 1
+	[ "$status" -eq 3 ]
+	[ "${lines[1]}" = "  missing line: two" ]
+	[ "${lines[2]}" = "  stacks in $LOG.stacks" ]
+	[ "$(cat "$LOG.stacks")" = "Thread 1 (main)" ]
+	grep -q -- "-p [0-9]" "$BATS_TEST_TMPDIR/gdb-calls"
+}
+
+@test "with SMOKE_STACKS a ready launcher has no stacks taken" {
+	fake_gdb
+	fake_launcher 'trap "exit 0" TERM; echo one; while :; do sleep 0.1; done'
+	SMOKE_UNTIL=one SMOKE_STACKS=1 SMOKE_SETTLE=0 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30
+	[ "$status" -eq 0 ]
+	[ ! -e "$LOG.stacks" ]
+	[ ! -e "$BATS_TEST_TMPDIR/gdb-calls" ]
+}
+
 @test "with SMOKE_UNTIL a launcher that exits after the lines fails" {
 	fake_launcher 'echo one; sleep 0.3; exit 3'
 	SMOKE_UNTIL=one SMOKE_SETTLE=2 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30
