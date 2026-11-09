@@ -19,7 +19,11 @@ jobs:
           submodules: true # the C tests build against vendor/NextUI's headers
 
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y bats shellcheck gettext libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb
+        run: sudo apt-get update && sudo apt-get install -y bats shellcheck gettext libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb gdb
+
+      # so a launcher that doesn't stop on SIGTERM can have its stacks taken (SMOKE_STACKS)
+      - name: Allow attaching gdb
+        run: sudo sysctl -w kernel.yama.ptrace_scope=0
 
       - name: Lint
         run: make lint
@@ -30,6 +34,16 @@ jobs:
       # the bundled plugins together, in both slot profiles, on a virtual display
       - name: Plugin profiles
         run: xvfb-run -a make test-profiles
+        env:
+          SMOKE_STACKS: 1
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: profile-logs
+          path: build/profiles/
+          if-no-files-found: ignore
 
   # the desktop build on its own and with the test plugins, on a virtual
   # display; ffmpeg and sqlite3 make the clips and play history some cases use.
@@ -54,13 +68,16 @@ jobs:
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb ffmpeg libavformat-dev libavcodec-dev libavutil-dev sqlite3 gdb
 
-      # so a start that stalls can have its stacks taken (SMOKE_STACKS)
+      # so a start that stalls, or a launcher that doesn't stop on SIGTERM,
+      # can have its stacks taken (SMOKE_STACKS)
       - name: Allow attaching gdb
         run: sudo sysctl -w kernel.yama.ptrace_scope=0
 
       - name: Smoke
         if: matrix.shard == 1
         run: xvfb-run -a make smoke
+        env:
+          SMOKE_STACKS: 1
 
       - name: Plugin tests
         run: xvfb-run -a make test-plugins

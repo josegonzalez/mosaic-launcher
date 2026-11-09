@@ -15,7 +15,9 @@
 # writes plugins.txt on the fake card, runs the desktop build for a few
 # seconds and then the Launcher pak's plugin settings, and fails if either
 # exits on its own, doesn't stop on SIGTERM, or the log shows a plugin refused
-# for a reason the profile didn't choose.
+# for a reason the profile didn't choose. For a run that doesn't stop, it
+# prints whether the first frame was up, the log's last lines, and with
+# SMOKE_STACKS the processes and main thread's stack desktop-smoke.sh logs.
 #
 #   scripts/plugin-profiles.sh                       run every profile
 #   scripts/plugin-profiles.sh print <profile> [dir] print a profile's
@@ -198,6 +200,15 @@ check_log() {
 	fi
 }
 
+# stuck <log>: for a run that didn't stop on SIGTERM, its last lines, then
+# the processes and main thread's stack desktop-smoke.sh added to its log
+# (with SMOKE_STACKS), so the CI log says where it was
+stuck() {
+	echo "  its last lines:" >&2
+	sed '/^--- still running/,$d' "$1" | tail -n 5 | sed 's/^/    /' >&2
+	sed -n '/^--- still running/,$p' "$1" | sed -n '/^processes:$/,/^$/p; /^Thread 1 /,/^$/p' | head -n 60 >&2
+}
+
 [ -x "$ROOT/build/desktop/nextui.elf" ] || { echo "run make desktop first" >&2; exit 1; }
 [ -d "$PLUGINS" ] || { echo "run make plugins-desktop first" >&2; exit 1; }
 
@@ -219,15 +230,30 @@ for name in $(profile_names "$ROOT/plugins"); do
 
 	cp "$txt" "$STATE/plugins.txt"
 	rm -f "$STATE/loading" "$STATE/plugins_paused"
-	MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" "$ROOT/scripts/desktop-smoke.sh" "$WORK/$name.log" 4 >/dev/null ||
+	MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" "$ROOT/scripts/desktop-smoke.sh" "$WORK/$name.log" 4 >/dev/null
+	status=$?
+	if [ "$status" -ne 0 ]; then
 		fail "the launcher failed in the $name profile"
+		if [ "$status" -eq 2 ]; then
+			if [ -e "$STATE/loading" ]; then
+				echo "  it hadn't drawn its first frame (the loading marker is still there)" >&2
+			else
+				echo "  it had drawn its first frame" >&2
+			fi
+			stuck "$WORK/$name.log"
+		fi
+	fi
 	check_log "$WORK/$name.log" "$txt"
 
 	SDCARD_PATH=$CARD USERDATA_PATH=$CARD/.userdata/desktop SYSTEM_PATH=$CARD/.system/desktop \
 		PLATFORM=desktop MOSAIC_LAUNCHER_PAK_DIR="$ROOT/pak" MOSAIC_LAUNCHER_RUN_DIR="$ROOT/build/run" \
 		MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" \
-		"$ROOT/scripts/desktop-smoke.sh" "$WORK/$name-settings.log" 4 --settings plugins >/dev/null ||
+		"$ROOT/scripts/desktop-smoke.sh" "$WORK/$name-settings.log" 4 --settings plugins >/dev/null
+	status=$?
+	if [ "$status" -ne 0 ]; then
 		fail "the plugin settings failed in the $name profile"
+		[ "$status" -eq 2 ] && stuck "$WORK/$name-settings.log"
+	fi
 done
 
 rm -f "$STATE/plugins.txt" "$STATE/loading" "$STATE/plugins_paused"
