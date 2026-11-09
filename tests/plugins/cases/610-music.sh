@@ -1,0 +1,174 @@
+# shellcheck shell=sh
+# shard: 2
+
+# the bundled music plugin and its daemon, with SDL's dummy audio driver:
+# the player opens from its button and lists the music folder (folders
+# first, no dot files or other files), A opens a folder and plays a track,
+# which starts the daemon; X pauses and plays on, R1 goes to the next
+# track; Y locks, the lock screen takes A, and SELECT then START unlocks;
+# B backs out to the list, where the now playing pill shows. The daemon
+# plays on after the launcher stops, pauses for a pak's launch and plays on
+# when the launcher comes back, and quits before a power-off. The card's
+# Music folder, recents and the launch's /tmp files are put back, and any
+# daemon left is stopped by its pid
+MU_DIR="$CARD/Music"
+MU_ALBUM="$MU_DIR/Album"
+MU_PAK="$CARD/Music Test/Tool.pak"
+MU_LOG="$CARD/.userdata/desktop/logs/music.txt"
+MU_WORK="$WORK/music"
+MU_SOCK=/tmp/mosaic-music.sock
+MU_PIDFILE=/tmp/mosaic-music.pid
+
+# mu_stop: stops a daemon left running, by the pid it wrote
+mu_stop() {
+	if [ -f "$MU_PIDFILE" ]; then
+		mu_pid=$(cat "$MU_PIDFILE")
+		kill "$mu_pid" 2>/dev/null
+		i=0
+		while kill -0 "$mu_pid" 2>/dev/null && [ "$i" -lt 30 ]; do
+			sleep 0.1
+			i=$((i + 1))
+		done
+	fi
+	rm -f "$MU_SOCK" "$MU_PIDFILE"
+}
+
+# mu_send <line>: the daemon's answer to a command
+mu_send() {
+	python3 -I -c '
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(3)
+s.connect(sys.argv[1])
+s.sendall((sys.argv[2] + "\n").encode())
+print(s.makefile().readline().rstrip())' "$MU_SOCK" "$1" 2>/dev/null
+}
+
+mu_stop
+rm -rf "$MU_WORK"
+mkdir -p "$MU_WORK" "$STATE" "$MU_PAK"
+[ -e "$MU_DIR" ] && mv "$MU_DIR" "$MU_WORK/Music.saved"
+[ -f "$RECENTS" ] && cp "$RECENTS" "$MU_WORK/recent.txt.saved"
+for f in next last.txt; do
+	[ -f "/tmp/$f" ] && cp "/tmp/$f" "$MU_WORK/$f.saved"
+done
+: >"$MU_PAK/launch.sh"
+mkdir -p "$MU_ALBUM"
+python3 -I -c '
+import math, struct, sys, wave
+for path, seconds in zip(sys.argv[1::2], sys.argv[2::2]):
+    w = wave.open(path, "wb")
+    w.setnchannels(1)
+    w.setsampwidth(2)
+    w.setframerate(8000)
+    w.writeframes(b"".join(struct.pack("<h", int(6000 * math.sin(i * 0.1))) for i in range(8000 * int(seconds))))
+    w.close()
+' "$MU_ALBUM/01 One.wav" 40 "$MU_ALBUM/02 Two.wav" 40 "$MU_DIR/Loose.wav" 2 || fail "making the test tracks"
+cp "$MU_DIR/Loose.wav" "$MU_ALBUM/._01 One.wav"
+: >"$MU_ALBUM/notes.txt"
+MU_TRACKS=2
+if command -v ffmpeg >/dev/null; then
+	ffmpeg -v error -f lavfi -i sine=frequency=440:duration=2 "$MU_ALBUM/03 Three.flac" || fail "making the FLAC track"
+	ffmpeg -v error -f lavfi -i sine=frequency=440:duration=2 "$MU_ALBUM/10 Ten.mp3" || fail "making the MP3 track"
+	MU_TRACKS=4
+fi
+rm -f "$MU_LOG"
+
+PRESSER="$WORK/presser.so"
+if [ "$(uname -s)" = Darwin ]; then
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -undefined dynamic_lookup "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" \
+		|| fail "building presser"
+else
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" -ldl || fail "building presser"
+fi
+make -s -C "$ROOT/plugins" music ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building music"
+printf 'music=on\n' >"$STATE/plugins.txt"
+printf 'button=Y\noverlay=10\n' >"$STATE/music.cfg"
+SDL_AUDIODRIVER=dummy
+export SDL_AUDIODRIVER
+plugin=music
+
+# the player, the daemon starting, pause, next, the lock screen and the pill
+log="$WORK/music.log"
+PRESSER_KEYS="y a a wait wait x wait x r1 wait y a select start wait b b wait wait wait wait"
+PRESSER_LOG="$MU_WORK/player.texts" SMOKE_PRELOAD="$PRESSER"
+export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+run_launcher "$log" "presser: done" || fail "the launcher exited early with music"
+unset PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+expect "music from $MU_DIR, daemon $WORK/plugins/music.plugin/lib/$ARCH/musicd, games pause, pill 10, shuffle off, repeat off"
+expect "the daemon isn't running"
+expect "showing $MU_DIR: 1 of 2, Album/"
+expect "showing $MU_ALBUM: 1 of $MU_TRACKS, 01 One.wav"
+expect "started the daemon, pid "
+expect "playing $MU_ALBUM/01 One.wav"
+expect "now: 01 One, playing of 0:40"
+expect "now: 01 One, paused of 0:40"
+expect "now: 02 Two, playing of 0:40"
+expect "locked"
+expect "unlocked"
+expect "pill over gamelist: Playing: 02 Two"
+[ "$(grep -c "plugin music: playing " "$log")" = 1 ] || fail "the lock screen's A reached the player: $(grep "plugin music: playing " "$log")"
+[ "$(grep -c "plugin music: showing $MU_DIR: 1 of 2, Album/" "$log")" = 2 ] \
+	|| fail "B didn't go back up to the music folder with Album selected"
+grep -qF "Locked: SELECT then START to unlock" "$MU_WORK/player.texts" || fail "the lock screen didn't show"
+grep -qF "musicd: playing $MU_ALBUM/01 One.wav (8000 Hz, 1 channels, 0:40), 1 of $MU_TRACKS" "$MU_LOG" \
+	|| fail "the daemon didn't play the first track: $(cat "$MU_LOG")"
+grep -qF "musicd: paused at" "$MU_LOG" || fail "the daemon didn't pause"
+grep -qF "musicd: playing on at" "$MU_LOG" || fail "the daemon didn't play on"
+grep -qF "musicd: playing $MU_ALBUM/02 Two.wav" "$MU_LOG" || fail "the daemon didn't go to the next track"
+
+# it plays on with the launcher gone
+mu_pid=$(cat "$MU_PIDFILE" 2>/dev/null)
+kill -0 "$mu_pid" 2>/dev/null || fail "the daemon didn't outlive the launcher"
+mu_send status | grep -q "state=playing.*track=$MU_ALBUM/02 Two.wav$" || fail "the daemon isn't playing on: $(mu_send status)"
+
+# a pak's launch pauses it, holding it for the launcher's return
+build_plugin screener 'id=screener\nname=Screener\napi=1\nslots=transition\n'
+printf 'steps=pak:%s\n' "$MU_PAK" >"$STATE/screener.cfg"
+printf 'music=on\nscreener=on\n' >"$STATE/plugins.txt"
+log="$WORK/music-launch.log"
+run_launcher "$log" && fail "the launcher didn't quit to launch the pak"
+expect "the daemon is running"
+expect "now: 02 Two, playing of 0:40"
+expect "paused for the launch"
+mu_send status | grep -q "state=paused.*held=1" || fail "the launch didn't hold the music: $(mu_send status)"
+grep -qF "musicd: closed the audio device: held for a game" "$MU_LOG" || fail "the hold kept the audio device"
+
+# and it plays on once the launcher is back
+rm -f "$STATE/screener.cfg"
+printf 'music=on\n' >"$STATE/plugins.txt"
+log="$WORK/music-return.log"
+run_launcher "$log" "plugin music: playing on after the launch" || fail "the launcher exited early after the launch"
+expect "now: 02 Two, paused of 0:40, held"
+mu_send status | grep -q "state=playing.*held=0" || fail "the music didn't play on after the launch: $(mu_send status)"
+rm -f /tmp/mosaic-launcher-launched
+
+# a power-off stops it
+build_plugin powerer 'id=powerer\nname=Powerer\napi=1\n'
+printf 'power=off\n' >"$STATE/powerer.cfg"
+printf 'music=on\npowerer=on\n' >"$STATE/plugins.txt"
+log="$WORK/music-poweroff.log"
+run_launcher "$log" && fail "power_off didn't quit the launcher with music"
+expect "stopped the daemon for the power-off"
+i=0
+while kill -0 "$mu_pid" 2>/dev/null && [ "$i" -lt 30 ]; do
+	sleep 0.1
+	i=$((i + 1))
+done
+kill -0 "$mu_pid" 2>/dev/null && fail "the daemon didn't quit for the power-off"
+[ -e "$MU_SOCK" ] && fail "the daemon left its socket"
+[ -e "$MU_PIDFILE" ] && fail "the daemon left its pid file"
+grep -qF "musicd: quit" "$MU_LOG" || fail "the daemon didn't log its quit"
+
+mu_stop
+unset SDL_AUDIODRIVER
+rm -rf "$MU_DIR" "$CARD/Music Test"
+[ -e "$MU_WORK/Music.saved" ] && mv "$MU_WORK/Music.saved" "$MU_DIR"
+if [ -f "$MU_WORK/recent.txt.saved" ]; then cp "$MU_WORK/recent.txt.saved" "$RECENTS"; else rm -f "$RECENTS"; fi
+for f in next last.txt; do
+	if [ -f "$MU_WORK/$f.saved" ]; then cp "$MU_WORK/$f.saved" "/tmp/$f"; else rm -f "/tmp/$f"; fi
+done
+rm -f /tmp/mosaic-launcher-launched "$MU_LOG"
+rm -rf "$MU_WORK" "$PRESSER" "$WORK/plugins/music.plugin" "$WORK/plugins/screener.plugin" "$WORK/plugins/powerer.plugin" \
+	"$STATE/music.cfg" "$STATE/powerer.cfg" "$STATE/plugins.txt"
+case_log=""

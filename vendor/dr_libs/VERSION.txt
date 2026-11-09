@@ -1,0 +1,9 @@
+dr_libs, copied unchanged from https://github.com/mackron/dr_libs
+Commit b55a0d9a30b91ad8901f89ecf05f76a33186c185 (master, 2026-08-20):
+dr_mp3 0.7.4, dr_flac 0.13.4 and dr_wav 0.14.6 (their unreleased next
+versions, marked TBD).
+
+Only the three decoders the music plugin's daemon uses are here, with
+LICENSE (public domain, or MIT No Attribution). Nothing but
+plugins/music/plugin.mk compiles them. To update, copy those from a newer
+commit and change this note.

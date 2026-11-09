@@ -1,0 +1,18 @@
+id=music
+name=Music
+api=1
+# the folder on the card the player lists, with its folders; MP3, FLAC and WAV files
+setting.folder=text|Music folder|Music
+# pause the music before a game or pak and play on after it, or keep it playing through it
+setting.games=choice|During games|pause|pause,play
+# how long the now playing pill shows over other screens after a track starts
+setting.overlay=choice|Now playing pill (seconds)|5|off,3,5,10,always
+# hold off auto-sleep while music plays; the power button still sleeps and pauses it
+setting.awake=toggle|Stay awake while playing|on
+# the queue's order and what happens at its end; SELECT and START on the player change them too
+setting.shuffle=toggle|Shuffle|off
+setting.repeat=choice|Repeat|off|off,all,one
+# a Music tile on the quick menu
+setting.tile=toggle|Quick menu tile|on
+# a game list button that opens the player
+setting.button=choice|Music button|none|none,Y,L2,R2,SELECT

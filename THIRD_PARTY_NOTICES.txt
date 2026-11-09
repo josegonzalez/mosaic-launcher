@@ -31,6 +31,14 @@ sources copied unchanged from https://www.bearssl.org/git/BearSSL at commit
 plugin alone. MIT License. Its licence also ships beside the plugin as
 BearSSL-LICENSE.txt in its lib folder.
 
+The bundled music plugin's daemon, musicd, decodes MP3, FLAC and WAV with
+dr_mp3, dr_flac and dr_wav (vendor/dr_libs, copied unchanged from
+https://github.com/mackron/dr_libs at commit
+b55a0d9a30b91ad8901f89ecf05f76a33186c185, 2026-08-20), built into that
+daemon alone. They're public domain or MIT No Attribution, at the user's
+option; their licence ships beside the daemon as dr_libs-LICENSE.txt in the
+plugin's lib folder.
+
 ========================================================================
 rcheevos
 
