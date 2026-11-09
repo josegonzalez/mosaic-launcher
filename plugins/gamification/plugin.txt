@@ -1,0 +1,19 @@
+id=gamification
+name=Gamification
+api=1
+# a Quests tile on the quick menu
+setting.tile=toggle|Quick menu tile|on
+# a game list button that opens the quests
+setting.button=choice|Quests button|none|none,Y,L2,R2,SELECT
+# the daily quest to play for this long
+setting.daily_minutes=choice|Daily play (minutes)|30|15,30,45,60,90,120
+# the daily quest to play this many different games
+setting.daily_games=choice|Daily games|3|2,3,4,5
+# the weekly quest to play on this many days
+setting.week_days=choice|Days a week|5|3,4,5,6,7
+# the weekly quest to play for this long
+setting.week_hours=choice|Weekly play (hours)|5|2,3,5,7,10,14,20
+# a day counts towards the streak and the days a week once it has this much play
+setting.streak_minutes=choice|Streak day (minutes)|5|1,5,10,15,30
+# a toast when a game's return completes a quest or extends the streak
+setting.toasts=toggle|Toasts|on
