@@ -31,6 +31,35 @@ jobs:
       - name: Plugin profiles
         run: xvfb-run -a make test-profiles
 
+  # the desktop build on its own and with the test plugins, on a virtual
+  # display; ffmpeg and sqlite3 make the clips and play history some cases use
+  desktop:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          submodules: true
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb ffmpeg libavformat-dev libavcodec-dev libavutil-dev sqlite3
+
+      - name: Smoke
+        run: xvfb-run -a make smoke
+
+      - name: Plugin tests
+        run: xvfb-run -a make test-plugins
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: desktop-logs
+          path: |
+            build/*.log
+            build/tests/plugins/
+          if-no-files-found: ignore
+
   build:
     runs-on: ubuntu-24.04-arm
     strategy:
@@ -79,6 +108,7 @@ jobs:
   package:
     needs:
       - check
+      - desktop
       - build
       - plugins
     runs-on: ubuntu-24.04

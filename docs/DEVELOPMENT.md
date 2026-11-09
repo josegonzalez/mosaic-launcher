@@ -58,6 +58,8 @@ The bats tests run the pak scripts against a fake SD card, with a fake `mount` t
 
 `make test-profiles` does the same with the bundled plugins together, in profiles built from their `plugin.txt` files: everything on with the first owner of each exclusive slot (`all`), then each slot given its next owner (`alternate`), and so on (`alternate-2`, ...). Profile N gives each slot its owner N mod the number of owners, and as many profiles run as the largest slot has owners, so every owner is loaded once. Each profile prints the owners it picks. Plugins whose `requires` can't be met are left off with a note. It fails if the launcher exits on its own or the loader refuses a plugin the profile didn't turn off; logs are in `build/profiles/`.
 
+CI runs `make lint`, `make test` and `make test-profiles` in one job, and `make smoke` and `make test-plugins` in another, both on Linux under `xvfb-run`. The second installs ffmpeg and sqlite3 so the video preview and play history cases run, and keeps its logs as the `desktop-logs` artifact when it fails.
+
 `scripts/desktop-smoke.sh` can also wait for log lines instead of a fixed time: with `SMOKE_UNTIL` set to fixed strings, one per line, the seconds are the most it waits, and it stops once the log has every line and the file named by `SMOKE_UNTIL_GONE` (if set) is gone, then `SMOKE_SETTLE` more seconds (1 by default) pass. It fails with exit 3 if that doesn't happen in time.
 
 ## Updating NextUI

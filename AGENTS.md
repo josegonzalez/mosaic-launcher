@@ -28,16 +28,17 @@ Rules for agents working on mosaic-launcher.
 ## Tests
 
 - Quick, while working: `make lint` and `make -C tests/c`, plus any single test you touched.
-- Full, before opening a PR and after rebasing onto a changed main, in this order: `make lint`, `make test`, `make plugins-desktop`, `make test-plugins`, `make smoke`, `make test-profiles`.
+- Full, before opening a PR and after rebasing onto a changed main: `make lint`, `make test`, `make desktop` and `make plugins-desktop`.
+- CI runs `make smoke`, `make test-plugins` and `make test-profiles` on every PR, so they don't run locally before a PR. A PR is ready once CI passes. When it fails, the job's `desktop-logs` artifact has the logs; fix it with a new commit.
 - Device builds: run `make devices` (Docker) only when you changed launcher or plugin C code that might not build for aarch64, and say whether you did.
 - When main moves, rerun the full tier only if the new commits touched files your change depends on.
-- `make test-plugins`, `make smoke`, `make test-profiles` and `tests/plugins/run.sh` all use the one shared fake card at `/var/tmp/nextui/sdcard`, so never run two of them at once.
+- `make test-plugins`, `make smoke`, `make test-profiles` and `tests/plugins/run.sh` all use the one shared fake card at `/var/tmp/nextui/sdcard`, so run them locally only to look into a CI failure, and never two at once.
 - There are no device tests. Don't ssh to a device.
 
 ## Git and PRs
 
 - Branches are named `feat/<issue>-...`, `fix/<issue>-...`, `test/<issue>-...` or `docs/<issue>-...`.
-- Rebase onto origin/main, never merge main into a branch. Main is merged by fast-forwarding it to the branch, so a branch must be rebased onto the latest origin/main before it can merge.
+- Rebase onto origin/main, never merge main into a branch. Main is merged by fast-forwarding it to the branch, so a branch must be rebased onto the latest origin/main before it can merge. The exception is a PR that only adds files, rebases onto main cleanly and passed CI: it doesn't need a rebase from you, since it's rebased onto main when it merges.
 - Force-push only feature branches, with `git push --force-with-lease`. Never force-push main.
 - Never amend. To change a PR after review, add a commit on top.
 - Commits are semantic, with no scope and at most 60 characters, and optionally one terse paragraph body. No bullets, headers, manual line breaks, test plans or attribution lines.
