@@ -1000,6 +1000,7 @@ printf 'speaker=on\n' >"$STATE/plugins.txt"
 printf 'mode=launch\npak=%s\n' "$SPEAK_PAK" >"$STATE/speaker.cfg"
 SDL_AUDIODRIVER=dummy run_launcher "$WORK/speaker-launch.log" && fail "the launcher didn't quit to launch speaker's pak"
 log="$WORK/speaker-launch.log"
+plugin=speaker
 expect "open 0, open pak 1, after launch queued -1"
 expect "open after launch 0"
 expect "quit queued -1"
