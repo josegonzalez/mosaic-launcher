@@ -1,0 +1,7 @@
+id=activity-stats
+name=Activity stats
+api=1
+# an Activity tile on the quick menu
+setting.tile=toggle|Quick menu tile|on
+# a game list button that opens the stats
+setting.button=choice|Activity button|none|none,Y,L2,R2,SELECT
