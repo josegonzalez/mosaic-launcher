@@ -1,6 +1,6 @@
 ###########################################################
-# romm: HTTPS with BearSSL, from the vendor/BearSSL submodule at its v0.6
-# tag, compiled with its own flags (none of the plugins') into an archive
+# romm: HTTPS with BearSSL, its sources copied into vendor/BearSSL (see
+# VERSION.txt there), compiled with its own flags (none of the plugins') into an archive
 # that only romm's plugin.so links. Its licence goes beside the plugin.
 
 BEARSSL := $(abspath ../vendor/BearSSL)
