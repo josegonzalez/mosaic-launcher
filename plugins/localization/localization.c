@@ -14,6 +14,11 @@
 // folder's map.txt from names lists in <folder>/<code>/<TAG>.txt, matching
 // file names loosely (names_model.c). It asks before writing anything, and
 // only adds lines: a map.txt's own lines stay as they are.
+//
+// The fallback font, for characters the UI font has no glyphs for, is the
+// "font" setting's file (relative to the card, or a full path), or with it
+// empty <folder>/<code>.ttf or .otf beside the user's pack, when there's
+// one. The launcher checks it's a font on the card; a theme's wins.
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE // dladdr
@@ -45,6 +50,7 @@ static char res_dir[600];   // the bundled packs
 static PoCatalog* user_pack;
 static PoCatalog* bundled_pack;
 static int tile_on = 0;
+static char font[700]; // the fallback font, or "" for none
 
 static void say(const char* format, ...) __attribute__((format(printf, 1, 2)));
 static void say(const char* format, ...) {
@@ -158,6 +164,37 @@ static const char* translatePlural(const char* context, const char* singular, co
 	const char* got = user_pack ? Po_findPlural(user_pack, context, singular, n) : NULL;
 	if (!got && bundled_pack) got = Po_findPlural(bundled_pack, context, singular, n);
 	return got;
+}
+
+// Works out the fallback font from the settings and the language.
+static void findFont(void) {
+	font[0] = '\0';
+	const char* f = host->cfg_get(ID, "font", "");
+	if (f[0]) {
+		if (f[0] == '/') snprintf(font, sizeof(font), "%s", f);
+		else snprintf(font, sizeof(font), "%s/%s", host->sdcard_path, f);
+		say("fallback font %s, from the font setting", font);
+		return;
+	}
+	if (!code[0]) return;
+	char names[2][CODE_MAX];
+	int count = candidates(code, names);
+	static const char* const extensions[] = { "ttf", "otf" };
+	for (int i = 0; i < count; i++) {
+		for (int j = 0; j < 2; j++) {
+			struct stat st;
+			snprintf(font, sizeof(font), "%s/%s.%s", folder, names[i], extensions[j]);
+			if (stat(font, &st) == 0 && S_ISREG(st.st_mode)) {
+				say("fallback font %s, beside the language's pack", font);
+				return;
+			}
+		}
+	}
+	font[0] = '\0';
+}
+
+static const char* fallbackFont(void) {
+	return font[0] ? font : NULL;
 }
 
 ///////////////////////////////////////
@@ -405,13 +442,16 @@ static int init(const MosaicHost* h) {
 	if (!strcmp(language, "other")) language = host->cfg_get(ID, "code", "");
 	if (!language[0] || !strcmp(language, "off")) {
 		say("language off, so nothing is translated");
+		findFont();
 		return 0;
 	}
 	if (!validCode(language)) {
 		say("\"%.40s\" isn't a language code, so nothing is translated", language);
+		findFont();
 		return 0;
 	}
 	snprintf(code, sizeof(code), "%s", language);
+	findFont();
 	user_pack = loadPack(folder, "user");
 	bundled_pack = loadPack(res_dir, "bundled");
 	if (!user_pack && !bundled_pack) say("no pack for %s in %s or %s, so nothing is translated", code, folder, res_dir);
@@ -459,6 +499,7 @@ static const MosaicPlugin plugin = {
 	.quit = quit,
 	.translate = translate,
 	.translate_plural = translatePlural,
+	.fallback_font = fallbackFont,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

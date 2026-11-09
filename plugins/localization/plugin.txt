@@ -8,6 +8,8 @@ setting.language=choice|Language|off|off,other,ca,cs,da,de,el,es,fi,fr,hu,it,ja,
 setting.code=text|Other language code|
 # the folder on the card with your own packs (<code>.po) and names lists (<code>/<TAG>.txt)
 setting.folder=text|Language pack folder|Languages
+# a font for the characters the UI font has no glyphs for, such as CJK, relative to the card or a full path; empty uses <folder>/<code>.ttf or .otf when there's one
+setting.font=text|Fallback font|
 # a game list button that writes display names into each system's map.txt
 setting.button=choice|Write map.txt names button|none|none,Y,L2,R2,SELECT
 # a Write map.txt names tile on the quick menu

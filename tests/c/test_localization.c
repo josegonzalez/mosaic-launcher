@@ -431,7 +431,7 @@ static void testNames(void) {
 ///////////////////////////////////////
 // the plugin
 
-static char cfg_language[64], cfg_code[64], cfg_folder[256], cfg_button[16], cfg_tile[8];
+static char cfg_language[64], cfg_code[64], cfg_folder[256], cfg_button[16], cfg_tile[8], cfg_font[256];
 static char logged[16384];
 static char toasted[256];
 static char asked[512];
@@ -455,6 +455,7 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	if (!strcmp(key, "folder") && cfg_folder[0]) return cfg_folder;
 	if (!strcmp(key, "button") && cfg_button[0]) return cfg_button;
 	if (!strcmp(key, "tile") && cfg_tile[0]) return cfg_tile;
+	if (!strcmp(key, "font") && cfg_font[0]) return cfg_font;
 	return fallback;
 }
 static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
@@ -603,6 +604,36 @@ static void testPlugin(void) {
 	mkdir(LANGS "/qq.po", 0755);
 	start("qq", NULL);
 	CHECK(saidLine("isn't a regular file"));
+
+	// the fallback font: none by default, the setting's on or off the
+	// language, or else one beside the language's pack
+	start("xx", NULL);
+	CHECK(fallbackFont() == NULL);
+	snprintf(cfg_font, sizeof(cfg_font), "Fonts/cjk.ttf");
+	start(NULL, NULL);
+	CHECK_STR(fallbackFont(), CARD "/Fonts/cjk.ttf");
+	CHECK(saidLine("fallback font " CARD "/Fonts/cjk.ttf, from the font setting"));
+	snprintf(cfg_font, sizeof(cfg_font), "/elsewhere/cjk.otf");
+	start("xx", NULL);
+	CHECK_STR(fallbackFont(), "/elsewhere/cjk.otf");
+	cfg_font[0] = '\0';
+	writeFile(LANGS "/xx.ttf", "");
+	start("xx", NULL);
+	CHECK_STR(fallbackFont(), LANGS "/xx.ttf");
+	CHECK(saidLine("fallback font " LANGS "/xx.ttf, beside the language's pack"));
+	start(NULL, NULL);
+	CHECK(fallbackFont() == NULL);
+	writeFile(LANGS "/pt.otf", "");
+	start("pt_BR", NULL);
+	CHECK_STR(fallbackFont(), LANGS "/pt.otf");
+	writeFile(LANGS "/pt_BR.ttf", "");
+	start("pt_BR", NULL);
+	CHECK_STR(fallbackFont(), LANGS "/pt_BR.ttf");
+	mkdir(LANGS "/yy.ttf", 0755);
+	start("yy", NULL);
+	CHECK(fallbackFont() == NULL);
+	unlink(LANGS "/xx.ttf");
+	CHECK(plugin.fallback_font == fallbackFont);
 
 	// the button and the tile
 	snprintf(cfg_button, sizeof(cfg_button), "L2");
