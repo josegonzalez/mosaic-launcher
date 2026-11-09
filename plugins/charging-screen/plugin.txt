@@ -1,7 +1,7 @@
 id=charging-screen
 name=Charging screen (unsupported on desktop)
 api=1
-# how long the game list is left alone on a charger before the screen shows
+# how long the game list or home is left alone on a charger before the screen shows
 setting.idle=choice|Show after idle on a charger (seconds)|60|off,30,60,120,300
 # the clock above the battery
 setting.clock=choice|Clock|24h|off,24h,12h

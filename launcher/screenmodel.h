@@ -110,6 +110,10 @@ int ScreenSet_homeReady(const ScreenSet* set);
 // 1 while the home screen is open, anywhere on the stack.
 int ScreenSet_homeOpen(const ScreenSet* set);
 
+// The home screen's id while it's ready, or NULL: with no home screen, or
+// after it failed.
+const char* ScreenSet_homeId(const ScreenSet* set);
+
 // What the launcher starts on, given whether the home screen is ready,
 // what the last launch left in the home file (NULL without one), and the
 // kind of screen it would start on.

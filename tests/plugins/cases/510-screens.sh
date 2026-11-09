@@ -165,6 +165,9 @@ log="$WORK/layerer-fail.log"
 	|| fail "layerer's failing overlay wasn't logged once"
 rm -f "$STATE/layerer.cfg"
 
+# what home_screen said, from the first tick on
+homes() { sed -n 's/.*plugin screener: home //p' "$log" | tr '\n' ' '; }
+
 # the home slot: a screen marked home without slots=home is an ordinary one
 [ -f "$HOME_LEFT" ] && cp "$HOME_LEFT" "$WORK/home-left.saved"
 rm -f "$HOME_LEFT"
@@ -174,6 +177,7 @@ log="$WORK/home-noslot.log"
 grep -qF "plugins: screener's screen screener.main is marked home but screener has no slots=home, so it's an ordinary screen" "$log" \
 	|| fail "the home flag without the slot wasn't logged"
 grep -qF "plugin screener: enter screener.main" "$log" && fail "screener.main opened as home without the slot"
+[ "$(homes)" = "none " ] || fail "home_screen wasn't NULL with no home slot owner: $(homes)"
 [ -f "$HOME_LEFT" ] && fail "the home file was written without a home screen"
 
 # the slot with no screen marked home keeps the root list
@@ -184,6 +188,7 @@ log="$WORK/home-none.log"
 grep -qF "plugins: screener owns the home slot but registered no MOSAIC_SCREEN_HOME screen, using the root list" "$log" \
 	|| fail "the home slot with no home screen wasn't logged"
 grep -qF "plugin screener: enter screener.main" "$log" && fail "a screen opened as home with none marked"
+[ "$(homes)" = "none " ] || fail "home_screen wasn't NULL with no screen marked home: $(homes)"
 
 # the home screen shows first, with no slide; closing it goes on to the
 # root list as a push, B at the root goes back to it as a pop, and closing
@@ -200,6 +205,9 @@ expect "enter screener.main over gamelist"
 [ "$(sed -n 's/.*plugin screener: transition \([a-z]*\) .*/\1/p' "$log" | tr '\n' ' ')" = "push pop push " ] \
 	|| fail "home's slides weren't push, pop, push: $(grep "plugin screener: transition" "$log")"
 expect "run from init -1"
+# home_screen names it from the first tick, open or not, and is NULL from init
+expect "home_screen from init none"
+[ "$(homes)" = "screener.main " ] || fail "home_screen didn't stay screener.main: $(homes)"
 
 # run_action opens the quick menu and the game switcher from the home
 # screen, closing it, and B on them goes back to it; unknown and
@@ -272,6 +280,7 @@ grep -qF "plugins: using the root list in place of the home screen until the lau
 	|| fail "the failing home screen's fallback wasn't logged"
 expect "exit screener.fail"
 [ "$(grep -cF "plugin screener: enter screener.fail" "$log")" -eq 1 ] || fail "B at the root opened the failed home screen again"
+[ "$(homes)" = "screener.fail none " ] || fail "home_screen wasn't NULL after the home screen failed: $(homes)"
 
 # the switcher slot: recents for it (one with a save state and its
 # preview, one without, one whose emulator isn't installed), put back after

@@ -810,6 +810,11 @@ static void wifiLog(const char* message) {
 	LOG_info("plugins: %s", message);
 }
 
+// home is claimed once every plugin has loaded, so it's NULL from init
+static const char* hostHomeScreen(void) {
+	return ScreenSet_homeId(&screens);
+}
+
 // Surfaces belong to a loaded plugin, the one whose init is running included.
 static int isLoaded(const char* plugin_id) {
 	for (int i = 0; plugin_id && i < loaded_count; i++) {
@@ -1067,6 +1072,7 @@ static const MosaicHost host = {
 	.wifi_supported = hostWifiSupported,
 	.wifi_enabled = hostWifiEnabled,
 	.wifi_connection = hostWifiConnection,
+	.home_screen = hostHomeScreen,
 };
 
 ///////////////////////////////////////

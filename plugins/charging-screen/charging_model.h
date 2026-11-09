@@ -41,10 +41,16 @@ void CsIdle_init(CsIdle* idle, unsigned long idle_ms);
 void CsIdle_reset(CsIdle* idle, unsigned long now);
 
 // 1 when the screen should open now: it's on (idle_ms above 0), the device
-// is charging (charging 1, as is_charging returns it), the list has been
-// showing (on_list), and nothing has happened for idle_ms. The first call
-// starts the count.
+// is charging (charging 1, as is_charging returns it), the list or home has
+// been showing (on_list), and nothing has happened for idle_ms. The first
+// call starts the count.
 int CsIdle_due(CsIdle* idle, unsigned long now, int charging, int on_list);
+
+// Where the screen opens over: 1 for current, as current_screen returns it,
+// being the game list or home, the home slot's screen as home_screen
+// returns it (NULL without one). The quick menu, the game switcher and other
+// plugins' screens are what the user was looking at.
+int CS_idleScreen(const char* current, const char* home);
 
 // Which buttons the screen takes while it shows and until they're let go
 // after it closes, so the press that closes it doesn't also act on the

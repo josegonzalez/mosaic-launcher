@@ -112,6 +112,10 @@ int ScreenSet_homeOpen(const ScreenSet* set) {
 	return set->home >= 0 && ScreenSet_position(set, set->home) >= 0;
 }
 
+const char* ScreenSet_homeId(const ScreenSet* set) {
+	return ScreenSet_homeReady(set) ? set->screens[set->home].id : NULL;
+}
+
 int Home_start(int ready, const char* left, int kind) {
 	if (!ready) return HOME_START_NONE;
 	// a launch from the game list comes back to it, as stock does

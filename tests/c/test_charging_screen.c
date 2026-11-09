@@ -62,6 +62,19 @@ static void testIdle(void) {
 	CHECK(!CsIdle_due(&idle, 10000000, 1, 1));
 }
 
+static void testIdleScreen(void) {
+	CHECK(CS_idleScreen("gamelist", NULL));
+	CHECK(CS_idleScreen("gamelist", "home.main"));
+	CHECK(CS_idleScreen("home.main", "home.main"));
+	CHECK(!CS_idleScreen("home.main", NULL)); // no home, or it failed
+	CHECK(!CS_idleScreen("home.main", ""));
+	CHECK(!CS_idleScreen("home.other", "home.main"));
+	CHECK(!CS_idleScreen("quickmenu", "home.main"));
+	CHECK(!CS_idleScreen("switcher", NULL));
+	CHECK(!CS_idleScreen("dialog", NULL));
+	CHECK(!CS_idleScreen(NULL, "home.main"));
+}
+
 static void testFilter(void) {
 	CsFilter f = {0};
 	int shut = 0;
@@ -157,6 +170,7 @@ static int fake_level = 73, fake_charging = 1;
 static MosaicScreenHooks screen;
 static int registered = 0, is_open = 0, redraws = 0, opens = 0, open_result = 0;
 static const char* top = "gamelist";
+static const char* home = NULL;
 
 static void fakeLog(const char* id, const char* message) {
 	(void)id;
@@ -193,6 +207,7 @@ static int fakeClose(const char* id) {
 	return 0;
 }
 static const char* fakeCurrent(void) { return is_open ? SCREEN_ID : top; }
+static const char* fakeHome(void) { return home; }
 static void fakeRedraw(void) { redraws++; }
 static int fakeScale(void) { return 3; }
 static int fakeSwitch(void) { return -1; }
@@ -236,6 +251,7 @@ static MosaicHost fakeHost(void) {
 		.close_screen = fakeClose,
 		.current_screen = fakeCurrent,
 		.hold_switch = fakeSwitch,
+		.home_screen = fakeHome,
 	};
 }
 
@@ -273,7 +289,7 @@ static void testPlugin(void) {
 	snprintf(cfg_idle, sizeof(cfg_idle), "30");
 	CHECK(plugin.init(&host_table) == 0);
 	CHECK(registered);
-	CHECK_STR(last_log, "opens after 30s idle on the list while charging, clock off");
+	CHECK_STR(last_log, "opens after 30s idle on the list or home while charging, clock off");
 
 	unsigned int a = BIT(MOSAIC_BUTTON_A);
 	frame(1000, buttons(0, 0, 0));
@@ -370,11 +386,40 @@ static void testPlugin(void) {
 	open_result = 0;
 	frame(320200, buttons(0, 0, 0));
 	CHECK(opens == 5);
+	fakeClose(SCREEN_ID);
+
+	// over home too, but not over another plugin's screen
+	top = "home.main";
+	frame(400000, buttons(0, 0, 0)); // home isn't the list, so the count starts
+	frame(500000, buttons(0, 0, 0));
+	CHECK(opens == 5);
+	home = "home.main";
+	frame(500100, buttons(0, 0, 0));
+	frame(529999, buttons(0, 0, 0));
+	CHECK(opens == 5);
+	frame(530000, buttons(0, 0, 0));
+	CHECK(opens == 6);
+	CHECK_STR(last_log, "opened after 30s idle on home: 100%, Charged");
+	CHECK(frame(531000, buttons(a, a, 0)) == ~POWER); // home doesn't get it
+	CHECK(!is_open);
+	top = "other.screen";
+	frame(600000, buttons(0, 0, 0));
+	frame(700000, buttons(0, 0, 0));
+	CHECK(opens == 6);
+	// an older launcher without home_screen: the list only
+	top = "home.main";
+	host_table.size = offsetof(MosaicHost, home_screen);
+	frame(800000, buttons(0, 0, 0));
+	frame(900000, buttons(0, 0, 0));
+	CHECK(opens == 6);
+	top = "gamelist";
+	home = NULL;
 }
 
 int main(void) {
 	testSettings();
 	testIdle();
+	testIdleScreen();
 	testFilter();
 	testFormat();
 	testPlugin();

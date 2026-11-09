@@ -170,6 +170,7 @@ static void testHome(void) {
 	ScreenSet set;
 	ScreenSet_clear(&set);
 	CHECK(set.home == -1 && !ScreenSet_homeReady(&set) && !ScreenSet_homeOpen(&set));
+	CHECK(ScreenSet_homeId(&set) == NULL);
 	MosaicScreenHooks plain = hooks();
 	MosaicScreenHooks home = hooks();
 	home.flags = MOSAIC_SCREEN_HOME | MOSAIC_SCREEN_FULL;
@@ -181,8 +182,11 @@ static void testHome(void) {
 	// only the owner's, its first with the flag
 	CHECK(ScreenSet_claimHome(&set, 2) == -1);
 	CHECK(!ScreenSet_homeReady(&set));
+	CHECK(ScreenSet_homeId(&set) == NULL); // an owner with no screen flagged
 	CHECK(ScreenSet_claimHome(&set, 1) == 2);
 	CHECK(set.home == 2 && ScreenSet_homeReady(&set) && !ScreenSet_homeOpen(&set));
+	// its id whether or not it's open
+	CHECK(ScreenSet_homeId(&set) && !strcmp(ScreenSet_homeId(&set), "b.home"));
 
 	// open anywhere on the stack
 	CHECK(ScreenSet_push(&set, 1, 0) == SCREEN_OPENS);
@@ -191,6 +195,7 @@ static void testHome(void) {
 	CHECK(ScreenSet_push(&set, 2, 0) == SCREEN_OPENS);
 	CHECK(ScreenSet_homeOpen(&set));
 	CHECK(!strcmp(ScreenSet_leftFrom(&set), "home"));
+	CHECK(!strcmp(ScreenSet_homeId(&set), "b.home"));
 
 	// a dialog or another plugin screen over it keeps the stack
 	CHECK(!ScreenSet_coveredBy(&set, SCREENKIND_DIALOG));
@@ -223,9 +228,11 @@ static void testHome(void) {
 	set.under = 1;
 	set.screens[2].off = 1;
 	CHECK(!ScreenSet_homeReady(&set));
+	CHECK(ScreenSet_homeId(&set) == NULL); // the list stands in for it
 	CHECK(!ScreenSet_backToHome(&set));
 	CHECK(!set.under);
 	set.screens[2].off = 0;
+	CHECK(!strcmp(ScreenSet_homeId(&set), "b.home"));
 
 	// where the launcher starts
 	CHECK(Home_start(0, NULL, SCREENKIND_LIST) == HOME_START_NONE);

@@ -51,6 +51,11 @@ int CsIdle_due(CsIdle* idle, unsigned long now, int charging, int on_list) {
 	return now - idle->last_input >= idle->idle_ms;
 }
 
+int CS_idleScreen(const char* current, const char* home) {
+	if (!current) return 0;
+	return !strcmp(current, "gamelist") || (home && home[0] && !strcmp(current, home));
+}
+
 unsigned int CsFilter_frame(CsFilter* f, int open, unsigned int pressed, unsigned int held,
 	unsigned int released, unsigned int keep, int* close) {
 	(void)released;

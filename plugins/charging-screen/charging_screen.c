@@ -1,19 +1,18 @@
-// Charging screen: while the device charges and the game list has been
-// left alone for the idle setting's time, a full screen with the battery
-// level, whether it's charging or charged, and the clock, drawn dim on
-// black.
+// Charging screen: while the device charges and the game list or home has
+// been left alone for the idle setting's time, a full screen with the
+// battery level, whether it's charging or charged, and the clock, drawn dim
+// on black.
 //
 // It keeps its own idle time, from input_filter, which sees every button
 // on every screen: any button down, another screen showing, or the device
-// waking starts the count again. It opens only over the game list. The
-// home screen is next once the launcher can say which screen is home
-// (#220). It's drawn only when what it shows changes, the level, the state
-// or the clock's minute, never animating.
+// waking starts the count again. It opens only over the game list or the
+// home slot's screen. It's drawn only when what it shows changes, the
+// level, the state or the clock's minute, never animating.
 //
-// Any button closes it, back to the list, and is taken until it's let go,
-// so that press doesn't also act on the list. The power button is left to
-// the launcher, so it still sleeps; waking closes the screen. It closes by
-// itself when the device stops charging.
+// Any button closes it, back to the list or home, and is taken until it's
+// let go, so that press doesn't also act on the screen under it. The power
+// button is left to the launcher, so it still sleeps; waking closes the
+// screen. It closes by itself when the device stops charging.
 //
 // It never holds off sleep. Stock's launcher already never turns the
 // screen off or sleeps on its own while charging (PWR_update counts
@@ -205,10 +204,12 @@ static int inputFilter(const MosaicInput* input, unsigned int* consumed) {
 	return 0;
 }
 
-// Where it opens over. The home screen joins the game list once the
-// launcher can say which screen is home (#220).
+// Where it opens over: the game list or home.
+static const char* homeScreen(void) {
+	return MOSAIC_HOST_HAS(host, home_screen) ? host->home_screen() : NULL;
+}
 static int onIdleScreen(void) {
-	return !strcmp(host->current_screen(), "gamelist");
+	return CS_idleScreen(host->current_screen(), homeScreen());
 }
 
 static void closeScreen(const char* why) {
@@ -240,6 +241,7 @@ static void tick(unsigned long now) {
 
 	if (!CsIdle_due(&idle, now, charging, onIdleScreen())) return;
 	unsigned long waited = now - idle.last_input;
+	const char* over = strcmp(host->current_screen(), "gamelist") ? "home" : "the list";
 	wanted();
 	next_check = now + CHECK_MS;
 	if (host->open_screen(SCREEN_ID) != 0) {
@@ -248,7 +250,7 @@ static void tick(unsigned long now) {
 		return;
 	}
 	char message[96];
-	snprintf(message, sizeof(message), "opened after %lus idle on the list: %s, %s", waited / 1000,
+	snprintf(message, sizeof(message), "opened after %lus idle on %s: %s, %s", waited / 1000, over,
 		want_level[0] ? want_level : "no level", want_state);
 	say(message);
 }
@@ -297,7 +299,7 @@ static int init(const MosaicHost* h) {
 	}
 	supported = 1;
 	char message[128];
-	snprintf(message, sizeof(message), "opens after %lus idle on the list while charging, clock %s%s", idle_ms / 1000,
+	snprintf(message, sizeof(message), "opens after %lus idle on the list or home while charging, clock %s%s", idle_ms / 1000,
 		clock_mode == CS_CLOCK_OFF ? "off" : clock_mode == CS_CLOCK_12H ? "12h" : "24h",
 		fake_path ? ", with the test battery" : "");
 	say(message);

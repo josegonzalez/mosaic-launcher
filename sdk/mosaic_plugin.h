@@ -1105,6 +1105,14 @@ typedef struct MosaicHost {
 	int (*wifi_supported)(void);
 	int (*wifi_enabled)(void);
 	int (*wifi_connection)(MosaicWifi* out);
+
+	// The home slot's screen (see MOSAIC_SCREEN_HOME): home_screen returns
+	// its id, which current_screen returns too while it's on top, or NULL
+	// with no home slot owner, when the owner registered no screen marked
+	// home, after the home screen failed and the root list took its place
+	// for the run, and from init, before the slot is settled. Check for it
+	// with MOSAIC_HOST_HAS(host, home_screen).
+	const char* (*home_screen)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

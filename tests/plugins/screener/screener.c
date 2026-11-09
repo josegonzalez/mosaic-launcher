@@ -28,8 +28,9 @@
 // confirm dialog, recents logs recents_count and each recent_info,
 // play:<index>:<resume> calls recent_open and remove:<index>
 // recent_remove. It logs what each
-// returns, what current_screen says whenever it changes, and "done" 40
-// ticks after the last step.
+// returns, what current_screen says whenever it changes, what home_screen
+// says from init and whenever it changes ("none" for NULL), and
+// "done" 40 ticks after the last step.
 //
 // Its hints setting has every screen draw button hints with draw_hints
 // over the blue: switcher draws the stock switcher's ("B BACK" on the
@@ -77,6 +78,7 @@ static int ticks = 0;
 static int step_count = 0;
 static int key_up_at = 0, key_scancode = 0;
 static char last_screen[80] = "";
+static char last_home[80] = "";
 static int done = 0;
 static const char* hints = "";
 static int hinted = 0;        // renders that drew hints
@@ -293,6 +295,11 @@ static void registerScreen(Screen* s, int flags, int with_input) {
 	if (host->register_screen(s->id, &hooks) != 0) say("can't register %s", s->id);
 }
 
+static const char* homeName(void) {
+	const char* home = host->home_screen();
+	return home ? home : "none";
+}
+
 static int canOpen(void* data) { (void)data; return 1; }
 static void openMain(void* data) {
 	(void)data;
@@ -334,6 +341,7 @@ static int init(const MosaicHost* h) {
 		host->register_screen("", &good), host->register_screen("screener.none", &none),
 		host->open_screen("screener.main"), host->close_screen("screener.main"));
 	say("run from init %i", host->run_action("gamelist.quick_menu"));
+	if (MOSAIC_HOST_HAS(host, home_screen)) say("home_screen from init %s", homeName());
 	host->register_action("screener.open", "Open", canOpen, openMain, NULL);
 	host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "screener.open");
 	return 0;
@@ -413,6 +421,10 @@ static void tick(unsigned long now) {
 	if (strcmp(current, last_screen)) {
 		snprintf(last_screen, sizeof(last_screen), "%s", current);
 		say("now %s", current);
+	}
+	if (MOSAIC_HOST_HAS(host, home_screen) && strcmp(homeName(), last_home)) {
+		snprintf(last_home, sizeof(last_home), "%s", homeName());
+		say("home %s", last_home);
 	}
 	if (key_up_at && ticks >= key_up_at) {
 		key(key_scancode, 0);
