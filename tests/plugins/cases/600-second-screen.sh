@@ -5,9 +5,20 @@
 # by its own second-screen-display program: clipper opens a folder and
 # moves from Apple (green art and a .info sidecar) to Banana (neither),
 # and the program saves each frame it shows, read back from its window,
-# to $MOSAIC_SECOND_SCREEN_SHOT, so the art's middle can be checked there
+# to $MOSAIC_SECOND_SCREEN_SHOT, so the art's middle can be checked there.
+# The program logs to its own file, not the launcher's log, and it's
+# started without the launcher's preloaded presser (which presses nothing
+# here) or any of its other open files.
 SS_DIR="$CARD/Roms/Second Screen (SST)"
 SS_SHOTS="$WORK/second-screen-shots"
+SS_LOG="$CARD/.userdata/desktop/logs/second-screen.txt"
+PRESSER="$WORK/presser.so"
+if [ "$(uname -s)" = Darwin ]; then
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -undefined dynamic_lookup "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" \
+		|| fail "building presser"
+else
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" -ldl || fail "building presser"
+fi
 mkdir -p "$SS_DIR/.media" "$STATE"
 : >"$SS_DIR/Apple.gb"
 : >"$SS_DIR/Banana.gb"
@@ -47,7 +58,7 @@ ss_check() {
 		fail "second-screen drew no frame for $1 as \"$2\": $(grep -F "plugin second-screen: frame " "$log")"
 		return
 	fi
-	grep -qF "second-screen-display: showing frame $n, " "$log" || fail "the display didn't show $1's frame $n"
+	grep -qF "second-screen-display: showing frame $n, " "$SS_LOG" || fail "the display didn't show $1's frame $n"
 	shot="$SS_SHOTS/frame-$n.bmp"
 	if [ ! -s "$shot" ]; then
 		fail "the display saved no frame $n for $1"
@@ -62,16 +73,35 @@ ss_check() {
 	esac
 }
 
-# 640x480 by default: the art in a square on the left, the text beside it
-rm -rf "$SS_SHOTS"
+# ss_display <log>: the display wrote its own log, not to the launcher's
+# log, and started without the launcher's preload or other files
+ss_display() {
+	if [ ! -s "$SS_LOG" ]; then
+		fail "the display wrote nothing to $SS_LOG"
+		return
+	fi
+	grep -qF "second-screen-display: started with 0 other open files, preloading nothing" "$SS_LOG" \
+		|| fail "the display didn't start clean: $(grep -F "second-screen-display: started" "$SS_LOG")"
+	grep -qF "second-screen-display: " "$1" && fail "the display wrote to the launcher's log: $(grep -F "second-screen-display: " "$1" | head -n 3)"
+	grep -qF "presser: " "$SS_LOG" && fail "the launcher's preload was loaded into the display"
+}
+
+# 640x480 by default: the art in a square on the left, the text beside it,
+# with presser preloaded into the launcher
+rm -rf "$SS_SHOTS" "$SS_LOG"
 mkdir -p "$SS_SHOTS"
 frame_w=640
+PRESSER_KEYS=wait SMOKE_PRELOAD="$PRESSER"
+export PRESSER_KEYS SMOKE_PRELOAD
 MOSAIC_SECOND_SCREEN_SHOT="$SS_SHOTS" run_launcher "$WORK/second-screen.log" "plugin clipper: done" \
-	"second-screen-display: showing frame 2," || fail "the launcher exited early with second-screen loaded"
+	"Banana: no art, 1 title line, Game, 0 info lines, read in " || fail "the launcher exited early with second-screen loaded"
+unset PRESSER_KEYS SMOKE_PRELOAD
 log="$WORK/second-screen.log"
 plugin=second-screen
 expect "showing the selection in a 640x480 window, experimental, frames in /tmp/mosaic-second-screen-"
-grep -qF "second-screen-display: opened a 640x480 window with " "$log" || fail "the display didn't open its window"
+grep -qF "presser: " "$log" || fail "presser wasn't preloaded into the launcher"
+ss_display "$log"
+grep -qF "second-screen-display: opened a 640x480 window with " "$SS_LOG" || fail "the display didn't open its window"
 ss_check Apple "art 8x8 at 24,98 284x284, 1 title line, Game, 3 info lines" 166 240 "0 255 0"
 ss_check Banana "no art, 1 title line, Game, 0 info lines" 166 240 "not 0 255 0"
 grep -qF "plugins: second-screen" "$log" && fail "the launcher turned second-screen off: $(grep -F "plugins: second-screen" "$log")"
@@ -82,16 +112,17 @@ sleep 1
 [ -n "$ss_file" ] && [ -e "$ss_file" ] && fail "the display left $ss_file behind"
 
 # a narrower window has the art on top and the text under it
-rm -rf "$SS_SHOTS"
+rm -rf "$SS_SHOTS" "$SS_LOG"
 mkdir -p "$SS_SHOTS"
 frame_w=480
 printf 'size=480x640\n' >"$STATE/second-screen.cfg"
 MOSAIC_SECOND_SCREEN_SHOT="$SS_SHOTS" run_launcher "$WORK/second-screen-tall.log" "plugin clipper: done" \
-	"second-screen-display: showing frame 2," || fail "the launcher exited early with second-screen's size set"
+	"Banana: no art, 1 title line, Game, 0 info lines, read in " || fail "the launcher exited early with second-screen's size set"
 log="$WORK/second-screen-tall.log"
 expect "showing the selection in a 480x640 window, experimental"
-grep -qF "second-screen-display: opened a 480x640 window with " "$log" || fail "the display didn't open its tall window"
+ss_display "$log"
+grep -qF "second-screen-display: opened a 480x640 window with " "$SS_LOG" || fail "the display didn't open its tall window"
 ss_check Apple "art 8x8 at 98,24 284x284, 1 title line, Game, 3 info lines" 240 166 "0 255 0"
 
-rm -rf "$WORK/plugins/clipper.plugin" "$WORK/plugins/second-screen.plugin" "$SS_DIR" "$SS_SHOTS" \
+rm -rf "$WORK/plugins/clipper.plugin" "$WORK/plugins/second-screen.plugin" "$SS_DIR" "$SS_SHOTS" "$SS_LOG" \
 	"$STATE/clipper.cfg" "$STATE/second-screen.cfg" "$STATE/plugins.txt"

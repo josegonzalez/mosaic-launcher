@@ -211,5 +211,31 @@ int main(void) {
 	SS_frameHeader(frame, 1, 4096, 4096);
 	CHECK(!SS_frameParse(frame, sizeof(frame), &number, &w, &h));
 
+	// the display program's environment: what SDL needs, never a preload
+	CHECK(SS_keepEnv("DISPLAY=:99"));
+	CHECK(SS_keepEnv("XAUTHORITY=/tmp/xvfb-run.x/Xauthority"));
+	CHECK(SS_keepEnv("WAYLAND_DISPLAY=wayland-0"));
+	CHECK(SS_keepEnv("XDG_RUNTIME_DIR=/run/user/1000"));
+	CHECK(SS_keepEnv("HOME=/home/a"));
+	CHECK(SS_keepEnv("PATH=/usr/bin:/bin"));
+	CHECK(SS_keepEnv("PATH="));
+	CHECK(SS_keepEnv("SDL_VIDEODRIVER=x11"));
+	CHECK(SS_keepEnv("LC_ALL=C"));
+	CHECK(SS_keepEnv("LD_LIBRARY_PATH=/var/tmp/nextui/lib"));
+	CHECK(SS_keepEnv("MOSAIC_SECOND_SCREEN_SHOT=/tmp/shots"));
+	CHECK(!SS_keepEnv("LD_PRELOAD=/tmp/presser.so"));
+	CHECK(!SS_keepEnv("DYLD_INSERT_LIBRARIES=/tmp/presser.so"));
+	CHECK(!SS_keepEnv("LD_AUDIT=/tmp/a.so"));
+	CHECK(!SS_keepEnv("MOSAIC_LAUNCHER_PLUGIN_PATH=/tmp/plugins"));
+	CHECK(!SS_keepEnv("PRESSER_KEYS=wait"));
+	// a name has to match whole, and a prefix needs more after it
+	CHECK(!SS_keepEnv("DISPLAYS=:99"));
+	CHECK(!SS_keepEnv("PATHX=/bin"));
+	CHECK(!SS_keepEnv("XDG_=x"));
+	CHECK(!SS_keepEnv("HOME"));
+	CHECK(!SS_keepEnv("=HOME"));
+	CHECK(!SS_keepEnv(""));
+	CHECK(!SS_keepEnv(NULL));
+
 	CHECK_DONE();
 }

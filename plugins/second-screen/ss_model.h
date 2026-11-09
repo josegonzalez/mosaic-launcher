@@ -74,4 +74,11 @@ void SS_frameHeader(unsigned char out[SS_FRAME_HEADER], unsigned int number, int
 // matches, the size is in range and len holds every pixel, or 0.
 int SS_frameParse(const unsigned char* data, size_t len, unsigned int* number, int* w, int* h);
 
+// Whether the display program gets entry ("NAME=value") from the
+// launcher's environment: only what SDL needs to open a window on the
+// desktop, and the test's MOSAIC_SECOND_SCREEN_SHOT. Never LD_PRELOAD,
+// DYLD_INSERT_LIBRARIES or any other LD_ or DYLD_ variable but the
+// library paths SDL may be found on.
+int SS_keepEnv(const char* entry);
+
 #endif

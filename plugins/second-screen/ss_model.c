@@ -183,3 +183,18 @@ int SS_frameParse(const unsigned char* data, size_t len, unsigned int* number, i
 	if (h) *h = (int)fh;
 	return 1;
 }
+
+int SS_keepEnv(const char* entry) {
+	static const char* const names[] = { "DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "HOME",
+		"PATH", "USER", "LOGNAME", "TMPDIR", "TZ", "LANG", "LANGUAGE", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH",
+		"MOSAIC_SECOND_SCREEN_SHOT" };
+	static const char* const prefixes[] = { "XDG_", "LC_", "SDL_" };
+	const char* eq = entry ? strchr(entry, '=') : NULL;
+	if (!eq || eq == entry) return 0;
+	size_t n = (size_t)(eq - entry);
+	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+		if (strlen(names[i]) == n && !strncmp(entry, names[i], n)) return 1;
+	for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++)
+		if (n > strlen(prefixes[i]) && !strncmp(entry, prefixes[i], strlen(prefixes[i]))) return 1;
+	return 0;
+}

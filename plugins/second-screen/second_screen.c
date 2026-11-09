@@ -10,7 +10,10 @@
 // launcher's fonts and theme, reads it back a few rows a tick, writes it
 // to a file and pokes the program through a socket that's its stdin. The
 // program shows the newest frame, and quits when the socket closes, as it
-// does when the launcher quits or is killed.
+// does when the launcher quits or is killed. It's started by PLUGINS.md's
+// helper rules: by its path, with no preloaded libraries, none of the
+// launcher's other files open, and its output in .userdata/<platform>/
+// logs/second-screen.txt.
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE // dladdr
@@ -117,9 +120,45 @@ static void closeDisplay(void) {
 	display_pid = -1;
 }
 
+// the launcher's environment with only what the display program needs
+// (SS_keepEnv), so no preloaded library is loaded into it; NULL without
+// memory
+static char** displayEnv(void) {
+	int count = 0;
+	while (environ[count]) count++;
+	char** env = malloc((size_t)(count + 1) * sizeof(char*));
+	if (!env) return NULL;
+	int n = 0;
+	for (int i = 0; i < count; i++)
+		if (SS_keepEnv(environ[i])) env[n++] = environ[i];
+	env[n] = NULL;
+	return env;
+}
+
+// The display program's stdout and stderr: .userdata/<platform>/logs/
+// second-screen.txt, or /dev/null when that can't be opened.
+static int openLog(void) {
+	char path[1024];
+	int fd = -1;
+	if (host->userdata_path && snprintf(path, sizeof(path), "%s/logs", host->userdata_path) < (int)sizeof(path)) {
+		mkdir(path, 0755);
+		if (snprintf(path, sizeof(path), "%s/logs/" ID ".txt", host->userdata_path) < (int)sizeof(path))
+			fd = open(path, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0644);
+		if (fd < 0) say("can't open %s for the display's log: %s", path, strerror(errno));
+	}
+	if (fd < 0) fd = open("/dev/null", O_WRONLY | O_CLOEXEC);
+	return fd;
+}
+
+// Starts the display program with a socket as its stdin, its log as its
+// stdout and stderr, and none of the launcher's other open files.
 static int openDisplay(const char* program) {
 	int fds[2];
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) return 0;
+	int type = SOCK_STREAM;
+#ifdef SOCK_CLOEXEC
+	type |= SOCK_CLOEXEC;
+#endif
+	if (socketpair(AF_UNIX, type, 0, fds) != 0) return 0;
 	fcntl(fds[0], F_SETFD, FD_CLOEXEC);
 	fcntl(fds[1], F_SETFD, FD_CLOEXEC);
 	fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
@@ -131,12 +170,48 @@ static int openDisplay(const char* program) {
 	snprintf(size_w, sizeof(size_w), "%i", frame_w);
 	snprintf(size_h, sizeof(size_h), "%i", frame_h);
 	char* argv[] = { (char*)program, frame_path, size_w, size_h, NULL };
+	char** env = displayEnv();
+	int out = openLog();
+
 	posix_spawn_file_actions_t actions;
 	posix_spawn_file_actions_init(&actions);
 	posix_spawn_file_actions_adddup2(&actions, fds[1], 0);
+	if (out >= 0) {
+		posix_spawn_file_actions_adddup2(&actions, out, 1);
+		posix_spawn_file_actions_adddup2(&actions, out, 2);
+	}
+	posix_spawnattr_t attr;
+	posix_spawnattr_init(&attr);
+	short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+	// nothing open in it past stdin, stdout and stderr, even files the
+	// launcher opened without O_CLOEXEC; display.c closes the rest too
+#if defined(POSIX_SPAWN_CLOEXEC_DEFAULT)
+	flags |= POSIX_SPAWN_CLOEXEC_DEFAULT;
+#elif defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 34))
+	posix_spawn_file_actions_addclosefrom_np(&actions, 3);
+#else
+	long max_fd = sysconf(_SC_OPEN_MAX);
+	if (max_fd < 0 || max_fd > 4096) max_fd = 4096;
+	for (int fd = 3; fd < max_fd; fd++)
+		if (fcntl(fd, F_GETFD) >= 0) posix_spawn_file_actions_addclose(&actions, fd);
+#endif
+	posix_spawnattr_setflags(&attr, flags);
+	sigset_t none, defaults;
+	sigemptyset(&none);
+	posix_spawnattr_setsigmask(&attr, &none);
+	sigemptyset(&defaults);
+	sigaddset(&defaults, SIGHUP);
+	sigaddset(&defaults, SIGINT);
+	sigaddset(&defaults, SIGQUIT);
+	sigaddset(&defaults, SIGTERM);
+	posix_spawnattr_setsigdefault(&attr, &defaults);
+
 	pid_t pid;
-	int rc = posix_spawn(&pid, program, &actions, NULL, argv, environ);
+	int rc = env ? posix_spawn(&pid, program, &actions, &attr, argv, env) : ENOMEM;
+	posix_spawnattr_destroy(&attr);
 	posix_spawn_file_actions_destroy(&actions);
+	free(env);
+	if (out >= 0) close(out);
 	close(fds[1]);
 	if (rc != 0) {
 		close(fds[0]);

@@ -3,7 +3,8 @@
 // socket the plugin writes a byte to each time a new frame is in the
 // file. It shows the newest frame, fitted to the window, and quits when
 // its stdin closes (the launcher quit or died) or its window is closed,
-// removing the frame file.
+// removing the frame file. Its stdout and stderr are the plugin's log
+// file, .userdata/<platform>/logs/second-screen.txt.
 //
 // With MOSAIC_SECOND_SCREEN_SHOT set to a folder, each frame shown is
 // also read back from the window and saved there as frame-<n>.bmp, for
@@ -66,7 +67,16 @@ int main(int argc, char** argv) {
 		say("bad window size %ix%i", w, h);
 		return 2;
 	}
-	// nothing of the launcher's but stdin, stdout and stderr
+	// the plugin starts it with nothing of the launcher's but stdin,
+	// stdout and stderr, and no preloaded libraries; say so for the tests,
+	// and close anything left open anyway
+	int inherited = 0;
+	for (int fd = 3; fd < 1024; fd++)
+		if (fcntl(fd, F_GETFD) >= 0) inherited++;
+	const char* preload = getenv("LD_PRELOAD");
+	if (!preload || !preload[0]) preload = getenv("DYLD_INSERT_LIBRARIES");
+	say("started with %i other open file%s, preloading %s", inherited, inherited == 1 ? "" : "s",
+		preload && preload[0] ? preload : "nothing");
 	for (int fd = 3; fd < 1024; fd++) close(fd);
 	signal(SIGPIPE, SIG_IGN);
 	fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
