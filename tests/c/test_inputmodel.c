@@ -149,10 +149,11 @@ static void testTap(void) {
 	CHECK(hold.taken_at == 0 && hold.passed == 0);
 }
 
-// At time 0, and with the clock going backwards (a 32-bit tick count
-// wrapping), it never powers off early.
+// At time 0 (a wake just before the 32-bit tick count wrapped), and with
+// the clock going backwards, it never powers off early.
 static void testClock(void) {
-	hold = (PowerHold){ 0, 0 };
+	hold = (PowerHold){ 0, 0, 0 };
+	PowerHold_woke(&hold, 4294966000UL);
 	CHECK(step(0, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
 	CHECK(hold.taken_at != 0);
 	CHECK(step(999, 0, 0, PAD_POWER, PAD_POWER) == 0);
@@ -160,6 +161,54 @@ static void testClock(void) {
 	hold = (PowerHold){ 0, 0 };
 	CHECK(step(5000, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
 	CHECK(step(10, 0, 0, PAD_POWER, PAD_POWER) == 0);
+}
+
+// As stock, a taken press in the clock's first second isn't timed, however
+// long it's held, and its release stays taken, so it doesn't sleep either.
+static void testStart(void) {
+	hold = (PowerHold){ 0, 0, 0 };
+	CHECK(step(500, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(hold.taken_at == 0 && hold.passed == 0);
+	CHECK(step(1500, 0, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(3000, 0, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(3100, 0, PAD_POWER, 0, PAD_POWER) == 0);
+	CHECK(taken == PAD_POWER);
+	CHECK(step(999, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(2500, 0, 0, PAD_POWER, PAD_POWER) == 0);
+	// from a second on it's timed
+	hold = (PowerHold){ 0, 0, 0 };
+	CHECK(step(1000, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(2000, 0, 0, PAD_POWER, PAD_POWER) == 1);
+}
+
+// And in the first second after a wake.
+static void testWoke(void) {
+	hold = (PowerHold){ 0, 0, 0 };
+	PowerHold_woke(&hold, 60000);
+	CHECK(step(60200, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(61200, 0, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(62500, 0, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(62600, 0, PAD_POWER, 0, PAD_POWER) == 0);
+	CHECK(taken == PAD_POWER);
+	CHECK(step(60999, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(62000, 0, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(62100, 0, 0, 0, 0) == 0);
+	CHECK(step(61000, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(61999, 0, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(step(62000, 0, 0, PAD_POWER, PAD_POWER) == 1);
+	// a press that gets through is stock's, which ignores it itself
+	CHECK(step(62100, 0, PAD_POWER, 0, PAD_POWER) == 0);
+	PowerHold_woke(&hold, 70000);
+	CHECK(step(70100, PAD_POWER, 0, PAD_POWER, 0) == 0);
+	CHECK(hold.passed == 1);
+	CHECK(step(70300, 0, PAD_POWER, 0, PAD_POWER) == 0);
+	CHECK(taken == 0);
+	// a wake just before the 32-bit tick count wrapped
+	hold = (PowerHold){ 0, 0, 0 };
+	PowerHold_woke(&hold, 4294967000UL);
+	CHECK(step(200, PAD_POWER, 0, PAD_POWER, PAD_POWER) == 0);
+	CHECK(hold.taken_at == 0);
+	CHECK(step(1500, 0, 0, PAD_POWER, PAD_POWER) == 0);
 }
 
 int main(void) {
@@ -174,5 +223,7 @@ int main(void) {
 	testReset();
 	testTap();
 	testClock();
+	testStart();
+	testWoke();
 	CHECK_DONE();
 }

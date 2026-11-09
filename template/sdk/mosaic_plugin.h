@@ -1395,9 +1395,10 @@ typedef struct MosaicPlugin {
 	// MOSAIC_BUTTON_BIT masks, which are taken off pressed, repeated and
 	// released for the rest of the frame; held stays
 	// as the pad has it. A taken power press doesn't sleep, but held for a
-	// second it still powers off, as with stock, whatever filters take. Take
-	// the power button on its press: once a press has got through, its
-	// release does too. The volume keys, and MENU with them for brightness,
+	// second it still powers off, as with stock, whatever filters take
+	// (and, as stock, not for a press in the first second after the
+	// launcher starts or wakes). Take the power button on its press: once
+	// a press has got through, its release does too. The volume keys, and MENU with them for brightness,
 	// are stock's keymon's, which changes them outside the launcher, so no
 	// filter can stop those. The Launcher pak's settings screen loads no
 	// plugins. Return 0, or anything else for an error, after which the

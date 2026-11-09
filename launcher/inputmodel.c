@@ -6,9 +6,18 @@ void InputMask_take(int* pressed, int* repeated, int* released, int taken) {
 	*released &= ~taken;
 }
 
+void PowerHold_woke(PowerHold* hold, unsigned long now) {
+	hold->woke_at = now;
+}
+
 int PowerHold_step(PowerHold* hold, unsigned long now, int power, int pressed, int released, int held, int* taken) {
 	if (pressed & power) {
-		if (*taken & power) {
+		// stock's tick count, which this follows, is 32 bits
+		if ((*taken & power) && (unsigned int)(now - hold->woke_at) < POWERWAKE_MS) {
+			hold->taken_at = 0;
+			hold->passed = 0;
+		}
+		else if (*taken & power) {
 			hold->taken_at = now ? now : 1;
 			hold->passed = 0;
 		}

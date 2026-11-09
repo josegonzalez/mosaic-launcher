@@ -11,21 +11,28 @@
 void InputMask_take(int* pressed, int* repeated, int* released, int taken);
 
 #define POWERHOLD_MS 1000 // stock powers off when power is held this long
+#define POWERWAKE_MS 1000 // stock ignores a power press this soon after it starts or wakes
 
 // Follows the power button across frames while filters take some of it.
 typedef struct PowerHold {
 	unsigned long taken_at; // when a press the filters took went down, while it's held, else 0
 	int passed;             // a press the filters left alone is held, so stock is timing it
+	unsigned long woke_at;  // when the last sleep ended, or 0, the clock's start, before one
 } PowerHold;
+
+// After a sleep, with the time it ended, as stock's resume_tick.
+void PowerHold_woke(PowerHold* hold, unsigned long now);
 
 // Each frame after the filters. power is the power button's pad bit;
 // pressed and released are the frame's presses and releases before the
 // filters took anything, held what's down now, and *taken what they took.
 // A release whose press got through isn't taken (power is dropped from
 // *taken), since stock is timing that press and, without the release,
-// would power off once it had been a second. Returns
-// 1 on the frame a press the filters took has been held POWERHOLD_MS, when
-// stock would have powered off, so the caller can power off in its place.
+// would power off once it had been a second. A taken press less than
+// POWERWAKE_MS after the clock's start or the last wake isn't timed, as
+// stock ignores such a press as a spurious one. Returns 1 on the frame a
+// press the filters took has been held POWERHOLD_MS, when stock would have
+// powered off, so the caller can power off in its place.
 int PowerHold_step(PowerHold* hold, unsigned long now, int power, int pressed, int released, int held, int* taken);
 
 #endif

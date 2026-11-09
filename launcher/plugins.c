@@ -1804,7 +1804,12 @@ void Plugins_beforeSleep(void) {
 	Wifi_pause(1);
 }
 
+// input filters' power button (see Plugins_inputFilter)
+static PowerHold power_hold;
+
 void Plugins_afterResume(void) {
+	// stock's resume_tick, which PWR_sleep has just set
+	PowerHold_woke(&power_hold, SDL_GetTicks());
 	// so plugins' after_resume see a fresh address soon
 	Bluetooth_pause(0);
 	Wifi_pause(0);
@@ -1872,8 +1877,6 @@ void Plugins_layoutInput(const MosaicListView* view) {
 
 ///////////////////////////////////////
 // input filters
-
-static PowerHold power_hold;
 
 static int filters(int i) {
 	const MosaicPlugin* p = loaded[i].plugin;
