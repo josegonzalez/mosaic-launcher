@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# shard: 2
+# shard: 1
 
 # swapper shows surfaces of its own in place of the built-in list's
 # thumbnail with art_replace: placed as a thumbnail of their size, with its

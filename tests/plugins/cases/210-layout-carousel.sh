@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# shard: 2
+# shard: 1
 
 # the bundled layout-carousel draws peeker's folder as a carousel: Apple,
 # selected, in the middle with its thumbnail from .media filling its cover

@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# shard: 2
+# shard: 1
 
 # shell paks' status files show as a pill in the header: the newest valid
 # one that isn't stale, with files that are rejected logged once, and links,

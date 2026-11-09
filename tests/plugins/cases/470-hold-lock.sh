@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# shard: 2
+# shard: 3
 
 # the bundled hold-lock: holding SELECT and START locks every button, so
 # locker's down doesn't move the selection and its own filter, after
