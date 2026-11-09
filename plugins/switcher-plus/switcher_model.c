@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "switcher_model.h"
 
 // stock's sizes, at scale 1
@@ -250,4 +251,224 @@ int SP_list(const MosaicRect* area, const MosaicRect* hole, int scale, SPList* o
 	MosaicRect panel = { px, room.y, room.x + room.w - px, room.h };
 	if (!empty(&panel)) out->panel = panel;
 	return 0;
+}
+
+///////////////////////////////////////
+// play time captions, as playtime-captions' captions_model.c has them
+
+#define BUTTON_SIZE 20
+#define BUTTON_MARGIN 5
+#define SEPARATOR " \xC2\xB7 " // " · "
+#define CAPTION_MAX 160
+
+static const char* months[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+	"Dec" };
+
+static int isOn(const char* value) {
+	return value && strcmp(value, "on") == 0;
+}
+
+SPCaptions SP_captions(const char* time, const char* last, const char* sessions, const char* format,
+	const char* never, const char* achievements) {
+	SPCaptions c;
+	c.parts = (isOn(time) ? SP_PART_TIME : 0) | (isOn(last) ? SP_PART_LAST : 0) |
+		(isOn(sessions) ? SP_PART_SESSIONS : 0) | (isOn(achievements) ? SP_PART_ACHIEVEMENTS : 0);
+	c.format = SP_FORMAT_RELATIVE;
+	if (format && strcmp(format, "compact") == 0) c.format = SP_FORMAT_COMPACT;
+	if (format && strcmp(format, "date") == 0) c.format = SP_FORMAT_DATE;
+	c.never = isOn(never);
+	return c;
+}
+
+static void duration(long long seconds, int format, char* out, size_t size) {
+	if (seconds < 60) {
+		snprintf(out, size, "<1m");
+		return;
+	}
+	long long hours = seconds / 3600, minutes = seconds / 60 % 60;
+	if (!hours) snprintf(out, size, "%lldm", minutes);
+	else if (format == SP_FORMAT_COMPACT || !minutes) snprintf(out, size, "%lldh", hours);
+	else snprintf(out, size, "%lldh %lldm", hours, minutes);
+}
+
+// Days since 1970-01-01 of a date in the proleptic Gregorian calendar.
+static long long civilDays(int year, int month, int day) {
+	year -= month <= 2;
+	long long era = (year >= 0 ? year : year - 399) / 400;
+	long long yoe = year - era * 400;
+	long long doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+	long long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+	return era * 146097 + doe - 719468;
+}
+
+static int localDate(long long when, struct tm* out) {
+	time_t t = (time_t)when;
+	return localtime_r(&t, out) != NULL;
+}
+
+// local calendar days from when to now, 0 when when is after now
+static int daysBetween(long long when, long long now) {
+	struct tm a, b;
+	if (!localDate(when, &a) || !localDate(now, &b)) return 0;
+	long long days = civilDays(b.tm_year + 1900, b.tm_mon + 1, b.tm_mday) -
+		civilDays(a.tm_year + 1900, a.tm_mon + 1, a.tm_mday);
+	return days > 0 ? (int)days : 0;
+}
+
+// "1 week ago" or "2 weeks ago"
+static void ago(int n, const char* unit, char* out, size_t size) {
+	snprintf(out, size, "%i %s%s ago", n, unit, n == 1 ? "" : "s");
+}
+
+static void lastPlayed(long long when, long long now, int format, char* out, size_t size) {
+	int days = daysBetween(when, now);
+	if (days == 0) {
+		snprintf(out, size, "today");
+		return;
+	}
+	if (format == SP_FORMAT_COMPACT) {
+		if (days < 7) snprintf(out, size, "%id", days);
+		else if (days < 30) snprintf(out, size, "%iw", days / 7);
+		else if (days < 365) snprintf(out, size, "%imo", days / 30);
+		else snprintf(out, size, "%iy", days / 365);
+		return;
+	}
+	if (days == 1) {
+		snprintf(out, size, "yesterday");
+		return;
+	}
+	if (format == SP_FORMAT_DATE) {
+		struct tm then, today;
+		if (!localDate(when, &then) || !localDate(now, &today)) {
+			out[0] = '\0';
+			return;
+		}
+		if (then.tm_year == today.tm_year) snprintf(out, size, "%s %i", months[then.tm_mon], then.tm_mday);
+		else snprintf(out, size, "%s %i, %i", months[then.tm_mon], then.tm_mday, then.tm_year + 1900);
+		return;
+	}
+	if (days < 7) ago(days, "day", out, size);
+	else if (days < 30) ago(days / 7, "week", out, size);
+	else if (days < 365) ago(days / 30, "month", out, size);
+	else ago(days / 365, "year", out, size);
+}
+
+static void sessions(int count, int format, char* out, size_t size) {
+	if (format == SP_FORMAT_COMPACT) snprintf(out, size, "%ix", count);
+	else snprintf(out, size, "%i session%s", count, count == 1 ? "" : "s");
+}
+
+static void achievements(int unlocked, int total, int format, char* out, size_t size) {
+	if (format == SP_FORMAT_COMPACT) snprintf(out, size, "%i/%i", unlocked, total);
+	else snprintf(out, size, "%i/%i achievements", unlocked, total);
+}
+
+int SP_captionBuild(const SPPlay* play, long long now, int parts, int format, int never, int max_parts, char* out,
+	size_t size) {
+	if (!out || !size) return 0;
+	out[0] = '\0';
+	if (!play) return 0;
+	int known = play->time >= 0 && play->last >= 0 && play->count >= 0;
+	int unseen = known && play->count == 0 && play->time == 0 && play->last == 0;
+	if (!known || unseen) parts &= SP_PART_ACHIEVEMENTS;
+	if (play->cheevos_total <= 0 || play->cheevos < 0) parts &= ~SP_PART_ACHIEVEMENTS;
+	int written = 0;
+	size_t used = 0;
+	if (unseen && never && max_parts >= 1) {
+		int n = snprintf(out, size, "Never played");
+		if (n < 0 || (size_t)n >= size) {
+			out[0] = '\0';
+			return 0;
+		}
+		used = (size_t)n;
+		written = 1;
+	}
+	static const int order[] = { SP_PART_TIME, SP_PART_LAST, SP_PART_SESSIONS, SP_PART_ACHIEVEMENTS };
+	for (int i = 0; i < 4 && written < max_parts; i++) {
+		if (!(parts & order[i])) continue;
+		char part[64];
+		if (order[i] == SP_PART_TIME) duration(play->time, format, part, sizeof(part));
+		else if (order[i] == SP_PART_ACHIEVEMENTS)
+			achievements(play->cheevos, play->cheevos_total, format, part, sizeof(part));
+		else if (order[i] == SP_PART_LAST) {
+			// a session that hasn't got a start time says nothing about when
+			if (play->last <= 0) continue;
+			lastPlayed(play->last, now, format, part, sizeof(part));
+		}
+		else sessions(play->count, format, part, sizeof(part));
+		if (!part[0]) continue;
+		int n = snprintf(out + used, size - used, "%s%s", written ? SEPARATOR : "", part);
+		if (n < 0 || (size_t)n >= size - used) {
+			out[used] = '\0';
+			break;
+		}
+		used += (size_t)n;
+		written++;
+	}
+	return written;
+}
+
+int SP_captionFit(const SPPlay* play, long long now, const SPCaptions* captions, int max_width,
+	int (*measure)(const char* text, void* ctx), void* ctx, char* out, size_t size) {
+	if (!out || !size) return 0;
+	out[0] = '\0';
+	if (!captions || !measure || max_width <= 0) return 0;
+	int formats[2] = { captions->format, SP_FORMAT_COMPACT };
+	int tries = captions->format == SP_FORMAT_COMPACT ? 1 : 2;
+	char text[CAPTION_MAX];
+	int all = SP_captionBuild(play, now, captions->parts, captions->format, captions->never, 4, text, sizeof(text));
+	for (int n = all; n > 0; n--) {
+		for (int f = 0; f < tries; f++) {
+			SP_captionBuild(play, now, captions->parts, formats[f], captions->never, n, text, sizeof(text));
+			int w = measure(text, ctx);
+			if (w > 0 && w <= max_width) {
+				snprintf(out, size, "%s", text);
+				return w;
+			}
+		}
+	}
+	return 0;
+}
+
+int SP_mute(int fg, int bg, int percent) {
+	if (percent < 0) percent = 0;
+	if (percent > 100) percent = 100;
+	int rgb = 0;
+	for (int shift = 16; shift >= 0; shift -= 8) {
+		int a = fg >> shift & 0xFF, b = bg >> shift & 0xFF;
+		rgb |= (a + (b - a) * percent / 100) << shift;
+	}
+	return rgb;
+}
+
+MosaicRect SP_titleCaption(const MosaicRect* area, const MosaicRect* hole, const MosaicRect* title, int scale,
+	int text_h) {
+	if (scale < 1) scale = 1;
+	MosaicRect none = { title ? title->x : 0, title ? bottom(title) : 0, 0, 0 };
+	if (empty(area) || empty(title)) return none;
+	int pad = PADDING * scale;
+	int h = BUTTON_SIZE * scale > text_h ? BUTTON_SIZE * scale : text_h;
+	int y = bottom(title) + BUTTON_MARGIN * scale;
+	if (y + h > bottom(area) - pad - PILL_SIZE * scale - pad) return none;
+	int right = area->x + area->w - pad;
+	if (!empty(hole) && hole->y < y + h && bottom(hole) > y && hole->x < right) right = hole->x;
+	if (right <= title->x) return none;
+	return (MosaicRect){ title->x, y, right - title->x, h };
+}
+
+MosaicRect SP_stripCaption(const SPStrip* strip, int pill_h, int scale, int text_h) {
+	if (scale < 1) scale = 1;
+	int y = strip->name.y + pill_h + BUTTON_MARGIN * scale;
+	if (empty(&strip->name) || text_h <= 0 || y + text_h > bottom(&strip->name)) return (MosaicRect){ 0, 0, 0, 0 };
+	return (MosaicRect){ strip->name.x, y, strip->name.w, text_h };
+}
+
+MosaicRect SP_panelCaption(const MosaicRect* panel, int scale, int text_h, MosaicRect* preview) {
+	if (scale < 1) scale = 1;
+	if (preview) *preview = panel ? *panel : (MosaicRect){ 0, 0, 0, 0 };
+	if (empty(panel) || text_h <= 0) return (MosaicRect){ 0, 0, 0, 0 };
+	int above = panel->h - BUTTON_MARGIN * scale - text_h;
+	if (above < panel->h / 2) return (MosaicRect){ 0, 0, 0, 0 };
+	if (preview) preview->h = above;
+	return (MosaicRect){ panel->x, bottom(panel) - text_h, panel->w, text_h };
 }

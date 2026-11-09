@@ -1,8 +1,8 @@
 // Game switcher plus, without the host: its style setting, where the
 // d-pad and a removal leave the selection, the button hints, the recents
-// it keeps until they change, and where each style puts the title, the
-// previews and the rows. No SDL and no file access, so it's tested on the
-// host.
+// it keeps until they change, where each style puts the title, the
+// previews and the rows, and the play time captions and where they go. No
+// SDL and no file access, so it's tested on the host.
 
 #ifndef SWITCHER_MODEL_H
 #define SWITCHER_MODEL_H
@@ -141,5 +141,87 @@ typedef struct SPList {
 // the panel in the rest of room (see SP_room) right of it, a PADDING
 // between them. Returns 0, or -1 when not even a row fits.
 int SP_list(const MosaicRect* area, const MosaicRect* hole, int scale, SPList* out);
+
+
+///////////////////////////////////////
+// play time captions, written as playtime-captions writes them: a copy of
+// its formatter, as plugins can't share code
+
+// How the parts read, as playtime-captions' format setting picks.
+enum SPFormat {
+	SP_FORMAT_RELATIVE, // "2h 15m · 3 days ago · 4 sessions"
+	SP_FORMAT_COMPACT,  // "2h · 3d · 4x"
+	SP_FORMAT_DATE,     // "2h 15m · Nov 5 · 4 sessions"
+};
+
+// The parts a caption can have, as bits, shown in this order.
+enum SPPart {
+	SP_PART_TIME = 1,
+	SP_PART_LAST = 2,
+	SP_PART_SESSIONS = 4,
+	SP_PART_ACHIEVEMENTS = 8,
+};
+
+// What the play history says about a recent, as the host's play_time,
+// last_played and play_count return it, and its RetroAchievements
+// progress (cheevos_total 0 for none).
+typedef struct SPPlay {
+	long long time;
+	long long last;
+	int count;
+	int cheevos;
+	int cheevos_total;
+} SPPlay;
+
+// The parts (SP_PART_* bits), the format (an enum SPFormat) and whether
+// games the history hasn't seen say "Never played".
+typedef struct SPCaptions {
+	int parts;
+	int format;
+	int never;
+} SPCaptions;
+
+// playtime-captions' settings, as its cfg has them: "on" or anything else
+// for each part and never, and the format's name ("relative", "compact"
+// or "date", relative for anything else).
+SPCaptions SP_captions(const char* time, const char* last, const char* sessions, const char* format,
+	const char* never, const char* achievements);
+
+// The first max_parts of parts, in format, joined with " · ", as
+// playtime-captions' PC_build: a recent with unknown history gets no play
+// parts, and one the history hasn't seen "Never played" in their place
+// when never is set, or none; the achievements part follows either way
+// when it's picked and the game has a total. Returns how many parts it
+// wrote, 0 (writing "") for nothing.
+int SP_captionBuild(const SPPlay* play, long long now, int parts, int format, int never, int max_parts, char* out,
+	size_t size);
+
+// The caption that fits max_width, as playtime-captions' PC_fit: every
+// part in the picked format, then compact, then fewer parts, dropping them
+// from the end. Returns its width, or 0 (writing "") when nothing fits.
+int SP_captionFit(const SPPlay* play, long long now, const SPCaptions* captions, int max_width,
+	int (*measure)(const char* text, void* ctx), void* ctx, char* out, size_t size);
+
+// fg moved toward bg by percent, from 0 (fg) to 100 (bg), as 0xRRGGBB.
+int SP_mute(int fg, int bg, int percent);
+
+// The most room for the full style's caption pill under the title pill
+// (see SP_title): from its left, BUTTON_MARGIN under it, as tall as
+// BUTTON_SIZE or text_h when that's taller, and as wide as the title's
+// widest, PADDING short of the area's right or of hole where they're
+// level; above the hint pills. w 0 for an empty title or no room.
+MosaicRect SP_titleCaption(const MosaicRect* area, const MosaicRect* hole, const MosaicRect* title, int scale,
+	int text_h);
+
+// The strip style's caption line, text_h tall, BUTTON_MARGIN under the
+// name pill, pill_h tall at the top of strip->name, across it. w 0 when
+// strip->name has no room for it.
+MosaicRect SP_stripCaption(const SPStrip* strip, int pill_h, int scale, int text_h);
+
+// The list style's caption line, text_h tall along the bottom of panel
+// (see SP_list), with what's left above it, less BUTTON_MARGIN, written
+// to preview for the selected recent's preview. w 0, and preview the whole
+// panel, when that would leave the preview less than half of it.
+MosaicRect SP_panelCaption(const MosaicRect* panel, int scale, int text_h, MosaicRect* preview);
 
 #endif

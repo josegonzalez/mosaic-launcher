@@ -1,10 +1,12 @@
 // The game switcher plus plugin: its model on its own, then the plugin
 // against a fake host, for its screen, the buttons, the recents it keeps,
-// the hints and what each style draws.
+// the hints, what each style draws and the play time captions, which are
+// checked against playtime-captions' own model.
 
 #include <stdlib.h>
 #include "check.h"
 #include "../../plugins/switcher-plus/switcher_plus.c"
+#include "../../plugins/playtime-captions/captions_model.h"
 
 static int rectIs(MosaicRect r, int x, int y, int w, int h) {
 	return r.x == x && r.y == y && r.w == w && r.h == h;
@@ -256,6 +258,142 @@ static void testList(void) {
 	CHECK(SP_list(&tiny, &NONE, 3, &l) == -1);
 }
 
+// 6 pixels a byte, as playtime-captions' tests measure
+static int bytes(const char* text, void* ctx) {
+	(void)ctx;
+	return 6 * (int)strlen(text);
+}
+
+// The copy of playtime-captions' formatter writes what it writes, for
+// every part, format and never setting over a spread of histories.
+static void testCaptionsCopy(void) {
+	SPCaptions c = SP_captions("on", "on", "off", "relative", "off", "off");
+	CHECK(c.parts == (SP_PART_TIME | SP_PART_LAST) && c.format == SP_FORMAT_RELATIVE && c.never == 0);
+	c = SP_captions("off", "off", "on", "compact", "on", "on");
+	CHECK(c.parts == (SP_PART_SESSIONS | SP_PART_ACHIEVEMENTS) && c.format == SP_FORMAT_COMPACT && c.never == 1);
+	CHECK(SP_captions(NULL, NULL, NULL, "date", NULL, NULL).format == SP_FORMAT_DATE);
+	CHECK(SP_captions(NULL, NULL, NULL, "fancy", NULL, NULL).format == SP_FORMAT_RELATIVE);
+	CHECK(SP_captions("yes", NULL, NULL, NULL, NULL, NULL).parts == 0);
+	CHECK((int)SP_PART_TIME == (int)PC_PART_TIME && (int)SP_PART_LAST == (int)PC_PART_LAST &&
+		(int)SP_PART_SESSIONS == (int)PC_PART_SESSIONS && (int)SP_PART_ACHIEVEMENTS == (int)PC_PART_ACHIEVEMENTS);
+	CHECK((int)SP_FORMAT_RELATIVE == (int)PC_FORMAT_RELATIVE && (int)SP_FORMAT_COMPACT == (int)PC_FORMAT_COMPACT &&
+		(int)SP_FORMAT_DATE == (int)PC_FORMAT_DATE);
+	CHECK(SP_mute(0xFFFFFF, 0x000000, 40) == PC_mute(0xFFFFFF, 0x000000, 40));
+	CHECK(SP_mute(0x123456, 0xABCDEF, 75) == PC_mute(0x123456, 0xABCDEF, 75));
+	CHECK(SP_mute(0x123456, 0xABCDEF, 150) == 0xABCDEF && SP_mute(0x123456, 0xABCDEF, -5) == 0x123456);
+
+	static const char* zones[] = { "UTC0", "TST-11" };
+	static const long long times[] = { -1, 0, 30, 60, 3600, 8100, 360000 };
+	static const long long agos[] = { -2, -1, 0, 3600, 86400, 3 * 86400, 10 * 86400, 40 * 86400, 400 * 86400 };
+	static const int counts[] = { -1, 0, 1, 2 };
+	static const int cheevos[][2] = { { 0, 0 }, { 1, 3 }, { -1, 3 } };
+	static const int widths[] = { 0, 30, 100, 1000 };
+	int builds = 0, wrong = 0;
+	for (size_t z = 0; z < sizeof(zones) / sizeof(zones[0]); z++) {
+		setenv("TZ", zones[z], 1);
+		tzset();
+		long long now = 1762344000; // 2025-11-05 12:00 UTC
+		for (size_t t = 0; t < sizeof(times) / sizeof(times[0]); t++)
+		for (size_t a = 0; a < sizeof(agos) / sizeof(agos[0]); a++)
+		for (size_t n = 0; n < sizeof(counts) / sizeof(counts[0]); n++)
+		for (size_t r = 0; r < sizeof(cheevos) / sizeof(cheevos[0]); r++) {
+			// -2 for a never-set last played (0), -1 for unknown
+			long long last = agos[a] == -2 ? 0 : agos[a] == -1 ? -1 : now - agos[a];
+			SPPlay play = { times[t], last, counts[n], cheevos[r][0], cheevos[r][1] };
+			PCStats stats = { times[t], last, counts[n], cheevos[r][0], cheevos[r][1] };
+			for (int parts = 0; parts < 16; parts++)
+			for (int format = 0; format < 3; format++)
+			for (int never = 0; never < 2; never++) {
+				char mine[160], theirs[160];
+				for (int max = 1; max <= 4; max += 3) {
+					int got = SP_captionBuild(&play, now, parts, format, never, max, mine, sizeof(mine));
+					int want = PC_build(&stats, now, parts, format, never, max, theirs, sizeof(theirs));
+					builds++;
+					if (got != want || strcmp(mine, theirs) != 0) {
+						if (!wrong) fprintf(stderr, "build: got %i \"%s\", want %i \"%s\"\n", got, mine, want, theirs);
+						wrong++;
+					}
+				}
+				SPCaptions mine_c = { parts, format, never };
+				PCOptions theirs_c = { parts, format, never };
+				for (size_t w = 0; w < sizeof(widths) / sizeof(widths[0]); w++) {
+					int got = SP_captionFit(&play, now, &mine_c, widths[w], bytes, NULL, mine, sizeof(mine));
+					int want = PC_fit(&stats, now, &theirs_c, widths[w], bytes, NULL, theirs, sizeof(theirs));
+					if (got != want || strcmp(mine, theirs) != 0) {
+						if (!wrong) fprintf(stderr, "fit: got %i \"%s\", want %i \"%s\"\n", got, mine, want, theirs);
+						wrong++;
+					}
+				}
+			}
+		}
+	}
+	unsetenv("TZ");
+	tzset();
+	CHECK(builds > 100000);
+	CHECK(wrong == 0);
+
+	// a few by hand, so a change to both shows here too
+	setenv("TZ", "UTC0", 1);
+	tzset();
+	long long now = 1762344000;
+	SPPlay tetris = { 8100, now - 3 * 86400, 2, 0, 0 };
+	SPCaptions both = SP_captions("on", "on", "off", "relative", "off", "off");
+	char out[160];
+	CHECK(SP_captionFit(&tetris, now, &both, 1000, bytes, NULL, out, sizeof(out)) == 120);
+	CHECK_STR(out, "2h 15m \xC2\xB7 3 days ago");
+	CHECK(SP_captionFit(&tetris, now, &both, 60, bytes, NULL, out, sizeof(out)) == 48);
+	CHECK_STR(out, "2h \xC2\xB7 3d");
+	CHECK(SP_captionFit(&tetris, now, &both, 10, bytes, NULL, out, sizeof(out)) == 0);
+	CHECK_STR(out, "");
+	SPPlay unseen = { 0, 0, 0, 0, 0 };
+	SPCaptions never = SP_captions("on", "on", "off", "relative", "on", "off");
+	CHECK(SP_captionFit(&unseen, now, &never, 1000, bytes, NULL, out, sizeof(out)) > 0);
+	CHECK_STR(out, "Never played");
+	unsetenv("TZ");
+	tzset();
+}
+
+static void testCaptionPlaces(void) {
+	// under the title pill, below the status pill: the whole width
+	MosaicRect title = SP_title(&AREA, &STATUS, 3, 100);
+	CHECK(rectIs(title, 30, 30, 172, 90));
+	CHECK(rectIs(SP_titleCaption(&AREA, &STATUS, &title, 3, 40), 30, 135, 964, 60));
+	// a taller small font sets the height
+	CHECK(rectIs(SP_titleCaption(&AREA, &STATUS, &title, 3, 70), 30, 135, 964, 70));
+	// level with header widgets, up to them
+	MosaicRect deep = { 794, 30, 200, 150 };
+	CHECK(rectIs(SP_titleCaption(&AREA, &deep, &title, 3, 40), 30, 135, 764, 60));
+	CHECK(SP_titleCaption(&AREA, &STATUS, &NONE, 3, 40).w == 0);
+	// no room above the hints
+	MosaicRect small = { 0, 0, 200, 290 };
+	MosaicRect small_title = SP_title(&small, &NONE, 3, 40);
+	CHECK(small_title.w > 0);
+	CHECK(SP_titleCaption(&small, &NONE, &small_title, 3, 40).w == 0);
+
+	// the strip's line under the name pill
+	SPStrip s;
+	memset(&s, 0, sizeof(s));
+	s.name = (MosaicRect){ 30, 470, 964, 145 };
+	CHECK(rectIs(SP_stripCaption(&s, 90, 3, 40), 30, 575, 964, 40));
+	CHECK(SP_stripCaption(&s, 90, 3, 41).w == 0);
+	CHECK(SP_stripCaption(&s, 90, 3, 0).w == 0);
+	s.name = NONE;
+	CHECK(SP_stripCaption(&s, 90, 3, 40).w == 0);
+
+	// along the bottom of the list's panel, the preview above it
+	SPList l;
+	CHECK(SP_list(&AREA, &STATUS, 3, &l) == 0);
+	MosaicRect preview;
+	CHECK(rectIs(SP_panelCaption(&l.panel, 3, 40, &preview), 439, 578, 555, 40));
+	CHECK(rectIs(preview, 439, 150, 555, 413));
+	// not when the preview would be left less than half
+	MosaicRect low = { 0, 0, 100, 100 };
+	CHECK(SP_panelCaption(&low, 3, 40, &preview).w == 0);
+	CHECK(rectIs(preview, 0, 0, 100, 100));
+	CHECK(SP_panelCaption(&l.panel, 3, 0, &preview).w == 0);
+	CHECK(SP_panelCaption(&NONE, 3, 40, &preview).w == 0);
+}
+
 ///////////////////////////////////////
 // the fake host
 
@@ -286,19 +424,84 @@ static MosaicRect hole_now; // what the view leaves clear, checked against every
 static MosaicHint hints_left[2], hints_right[2];
 static int hints_left_count = 0, hints_right_count = 0;
 static char texts[16][256];
+static int text_x[16], text_y[16], text_font[16];
 static int text_count = 0;
 static const char* style_setting = "full";
+static const char* captions_setting = "off";
+// playtime-captions' cfg, which only answers while it's loaded
+static int captions_loaded = 0;
+static const char* captions_cfg[8][2];
+static int captions_cfg_count = 0;
+static char logged[16][512];
+static int logged_count = 0;
 
 static void fakeLog(const char* id, const char* message) {
 	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
+	if (logged_count < 16) snprintf(logged[logged_count++], sizeof(logged[0]), "%s", message);
 	logs++;
 }
 
+static int wasLogged(const char* message) {
+	for (int i = 0; i < logged_count; i++) {
+		if (strcmp(logged[i], message) == 0) return 1;
+	}
+	return 0;
+}
+
 static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+	if (strcmp(id, "playtime-captions") == 0) {
+		if (!captions_loaded) return fallback;
+		for (int i = captions_cfg_count - 1; i >= 0; i--) {
+			if (strcmp(captions_cfg[i][0], key) == 0) return captions_cfg[i][1];
+		}
+		return fallback;
+	}
 	if (strcmp(key, "style") == 0) return style_setting;
+	if (strcmp(key, "captions") == 0) return captions_setting;
 	return fallback;
+}
+
+static void captionsCfg(const char* key, const char* value) {
+	captions_cfg[captions_cfg_count][0] = key;
+	captions_cfg[captions_cfg_count][1] = value;
+	captions_cfg_count++;
+}
+
+// the play history: Apple played 2h 15m over two sessions three days ago,
+// Banana never, and Cherry's history unknown; achievements for Apple and
+// Cherry
+static long long play_now = 0;
+static int play_asks = 0;
+
+static int playOf(const char* path) {
+	play_asks++;
+	if (strstr(path, "Apple")) return 0;
+	if (strstr(path, "Banana")) return 1;
+	return 2;
+}
+
+static long long fakePlayTime(const char* path) {
+	static const long long t[] = { 8100, 0, -1 };
+	return t[playOf(path)];
+}
+
+static long long fakeLastPlayed(const char* path) {
+	int i = playOf(path);
+	return i == 0 ? play_now - 3 * 86400 : i == 1 ? 0 : -1;
+}
+
+static int fakePlayCount(const char* path) {
+	static const int c[] = { 2, 0, -1 };
+	return c[playOf(path)];
+}
+
+static int fakeAchievements(const char* path, MosaicAchievements* out) {
+	int i = playOf(path);
+	if (i == 1) return 0;
+	out->unlocked = i == 0 ? 1 : 2;
+	out->total = i == 0 ? 3 : 5;
+	return 1;
 }
 
 static void fakeRedraw(void) {
@@ -427,9 +630,12 @@ static int fakeTruncate(int font, const char* text, int max_width, char* out, si
 static int fakeDrawText(MosaicSurface* target, int font, const char* text, int x, int y, MosaicColor color, int max_width) {
 	(void)target;
 	(void)color;
-	(void)x;
-	(void)y;
-	if (text_count < 16) snprintf(texts[text_count++], sizeof(texts[0]), "%s", text);
+	if (text_count < 16) {
+		text_x[text_count] = x;
+		text_y[text_count] = y;
+		text_font[text_count] = font;
+		snprintf(texts[text_count++], sizeof(texts[0]), "%s", text);
+	}
 	int w = fakeTextWidth(font, text);
 	return w < max_width ? w : max_width;
 }
@@ -488,6 +694,10 @@ static void setupHost(void) {
 	fake_host.art_get = fakeArtGet;
 	fake_host.art_load = fakeArtLoad;
 	fake_host.draw_hints = fakeDrawHints;
+	fake_host.play_time = fakePlayTime;
+	fake_host.last_played = fakeLastPlayed;
+	fake_host.play_count = fakePlayCount;
+	fake_host.achievements = fakeAchievements;
 }
 
 static const MosaicPlugin* start(const char* setting) {
@@ -782,6 +992,124 @@ static void testRender(void) {
 	fake_count = 0;
 }
 
+static int findText(const char* text) {
+	for (int i = 0; i < text_count; i++) {
+		if (strcmp(texts[i], text) == 0) return i;
+	}
+	return -1;
+}
+
+static void testCaptions(void) {
+	setenv("TZ", "UTC0", 1);
+	tzset();
+	play_now = (long long)time(NULL);
+	const char* caption = "2h 15m \xC2\xB7 3 days ago";
+
+	// off by default: nothing asked, nothing drawn
+	captions_setting = "off";
+	start("full");
+	threeRecents();
+	registered.enter(registered.data);
+	play_asks = 0;
+	CHECK(draw() == 0);
+	CHECK(play_asks == 0);
+	CHECK(findText(caption) < 0);
+	registered.exit(registered.data);
+
+	// full: on a pill under the title, in playtime-captions' defaults while
+	// it isn't loaded
+	captions_setting = "on";
+	logged_count = 0;
+	start("full");
+	CHECK_STR(last_log, "style full, captions on");
+	threeRecents();
+	registered.enter(registered.data);
+	CHECK(wasLogged("captions time on, last on, sessions off, format relative, never off, achievements off"));
+	fills_into_hole = blits_into_hole = 0;
+	CHECK(draw() == 0);
+	int i = findText(caption);
+	CHECK(i >= 0 && text_font[i] == MOSAIC_FONT_SMALL && text_x[i] == 66 && text_y[i] == 145);
+	CHECK(fills_into_hole == 0 && blits_into_hole == 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, preview drawn, resume, style full, caption 2h 15m \xC2\xB7 3 days ago");
+	// never played and unknown history: none
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 1 of 3: Banana, preview none, open, style full, no caption");
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 2 of 3: Cherry, preview drawn, resume, style full, no caption");
+	registered.exit(registered.data);
+
+	// playtime-captions' settings while it's loaded, read when it opens
+	captions_loaded = 1;
+	captions_cfg_count = 0;
+	captionsCfg("format", "compact");
+	captionsCfg("sessions", "on");
+	captionsCfg("never", "on");
+	logged_count = 0;
+	registered.enter(registered.data);
+	CHECK(wasLogged("captions time on, last on, sessions on, format compact, never on, achievements off"));
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, preview drawn, resume, style full, caption 2h \xC2\xB7 3d \xC2\xB7 2x");
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 1 of 3: Banana, preview none, open, style full, caption Never played");
+	registered.exit(registered.data);
+	// the same settings aren't logged again
+	logged_count = 0;
+	registered.enter(registered.data);
+	CHECK(!wasLogged("captions time on, last on, sessions on, format compact, never on, achievements off"));
+	registered.exit(registered.data);
+
+	// achievements last, also for a game with unknown history
+	captions_cfg_count = 0;
+	captionsCfg("achievements", "on");
+	registered.enter(registered.data);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log,
+		"showing 0 of 3: Apple, preview drawn, resume, style full, caption 2h 15m \xC2\xB7 3 days ago \xC2\xB7 1/3 achievements");
+	press(MOSAIC_BUTTON_LEFT);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 2 of 3: Cherry, preview drawn, resume, style full, caption 2/5 achievements");
+	registered.exit(registered.data);
+	captions_cfg_count = 0;
+	captions_loaded = 0;
+
+	// strip: centred under the name pill
+	start("strip");
+	threeRecents();
+	registered.enter(registered.data);
+	fills_into_hole = 0;
+	CHECK(draw() == 0);
+	i = findText(caption);
+	CHECK(i >= 0 && text_font[i] == MOSAIC_FONT_SMALL && text_x[i] == 312 && text_y[i] == 575);
+	CHECK(fills_into_hole == 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, preview drawn, resume, style strip, caption 2h 15m \xC2\xB7 3 days ago");
+	registered.exit(registered.data);
+
+	// list: the selected recent's, centred under its preview in the panel
+	start("list");
+	threeRecents();
+	registered.enter(registered.data);
+	blits_into_hole = fills_into_hole = 0;
+	CHECK(draw() == 0);
+	i = findText(caption);
+	CHECK(i >= 0 && text_font[i] == MOSAIC_FONT_SMALL && text_x[i] == 516 && text_y[i] == 578);
+	CHECK(text_count == 4); // the three names and Apple's caption
+	CHECK(blits_into_hole == 0 && fills_into_hole == 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, preview drawn, resume, style list, caption 2h 15m \xC2\xB7 3 days ago");
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(draw() == 0);
+	CHECK(text_count == 4); // the names and "No Preview", but no caption for Banana
+	CHECK_STR(last_log, "showing 1 of 3: Banana, preview none, open, style list, no caption");
+	registered.exit(registered.data);
+
+	captions_setting = "off";
+	fake_count = 0;
+	unsetenv("TZ");
+	tzset();
+}
+
 int main(void) {
 	testSettings();
 	testMoves();
@@ -790,9 +1118,12 @@ int main(void) {
 	testGeometry();
 	testStrip();
 	testList();
+	testCaptionsCopy();
+	testCaptionPlaces();
 	testInit();
 	testButtons();
 	testStyleMoves();
 	testRender();
+	testCaptions();
 	CHECK_DONE();
 }

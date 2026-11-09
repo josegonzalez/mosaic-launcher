@@ -3841,6 +3841,64 @@ expect "showing 2 of 3: Gone, preview none, open, style list"
 expect "can't open 2: Gone"
 [ "$(grep -cF "plugin switcher-plus: showing 0 of 3: Saved Game, preview drawn" "$log")" -eq 2 ] || fail "down past the last recent didn't wrap"
 grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's list was turned off"
+
+# switcher-plus's captions: Game was played 2h 15m over 2 sessions 3 days
+# ago and Other never, in playtime-captions' defaults while it isn't
+# loaded and in its settings while it is. Local time is about noon, as for
+# tracker
+[ -f "$PLAY_DB" ] && mv "$PLAY_DB" "$WORK/game_logs.sqlite.saved"
+now=$(date +%s)
+hours_behind=$(( $(date -u +%H | sed 's/^0//') - 12 ))
+make_play_db <<SQL || fail "making the switcher captions fixture"
+CREATE TABLE rom(id INTEGER PRIMARY KEY, type TEXT, name TEXT, file_path TEXT, image_path TEXT, created_at INTEGER DEFAULT (strftime('%s', 'now')), updated_at INTEGER);
+CREATE UNIQUE INDEX rom_id_index ON rom(id);
+CREATE TABLE play_activity(rom_id INTEGER, play_time INTEGER, created_at INTEGER DEFAULT (strftime('%s', 'now')), updated_at INTEGER);
+CREATE INDEX play_activity_rom_id_index ON play_activity(rom_id);
+INSERT INTO rom(id, type, name, file_path) VALUES(1, '', 'Game', 'Switcher Test (SWT)/Game.gb');
+INSERT INTO play_activity(rom_id, play_time, created_at) VALUES(1, 7500, $((now - 10 * 86400)));
+INSERT INTO play_activity(rom_id, play_time, created_at) VALUES(1, 600, $((now - 3 * 86400)));
+SQL
+TZ="TST$(printf '%+d' "$hours_behind")"
+export TZ
+printf 'captions=on\n' >"$STATE/switcher-plus.cfg"
+printf 'steps=action:gamelist.switcher,right,b\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/switcher-plus-captions.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's captions"
+log="$WORK/switcher-plus-captions.log"
+expect "style full, captions on"
+expect "captions time on, last on, sessions off, format relative, never off, achievements off"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style full, caption 2h 15m · 3 days ago"
+expect "showing 1 of 3: Other, preview none, open, style full, no caption"
+grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's screen was turned off with captions"
+make -s -C "$ROOT/plugins" playtime-captions ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building playtime-captions"
+printf 'sessions=on\nnever=on\n' >"$STATE/playtime-captions.cfg"
+run_launcher "$WORK/switcher-plus-captions-set.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's captions and playtime-captions"
+log="$WORK/switcher-plus-captions-set.log"
+expect "captions time on, last on, sessions on, format relative, never on, achievements off"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style full, caption 2h 15m · 3 days ago · 2 sessions"
+expect "showing 1 of 3: Other, preview none, open, style full, caption Never played"
+grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's screen was turned off with playtime-captions"
+# the list's, under the selected recent's preview
+printf 'style=list\ncaptions=on\n' >"$STATE/switcher-plus.cfg"
+printf 'steps=action:gamelist.switcher,down,b\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/switcher-plus-captions-list.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's captions in the list"
+log="$WORK/switcher-plus-captions-list.log"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style list, caption 2h 15m · 3 days ago · 2 sessions"
+expect "showing 1 of 3: Other, preview none, open, style list, caption Never played"
+grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's list was turned off with captions"
+# with the history unknown, nothing, even with never on
+printf 'style=strip\ncaptions=on\n' >"$STATE/switcher-plus.cfg"
+printf 'steps=action:gamelist.switcher,right,b\n' >"$STATE/screener.cfg"
+MOSAIC_LAUNCHER_SQLITE="$WORK/no-such-libsqlite3"
+export MOSAIC_LAUNCHER_SQLITE
+run_launcher "$WORK/switcher-plus-captions-unknown.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's captions and no sqlite"
+unset MOSAIC_LAUNCHER_SQLITE
+log="$WORK/switcher-plus-captions-unknown.log"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style strip, no caption"
+expect "showing 1 of 3: Other, preview none, open, style strip, no caption"
+unset TZ
+rm -f "$PLAY_DB"
+[ -f "$WORK/game_logs.sqlite.saved" ] && mv "$WORK/game_logs.sqlite.saved" "$PLAY_DB"
+rm -rf "$WORK/plugins/playtime-captions.plugin" "$STATE/playtime-captions.cfg"
 : >"$SW_STATES/Game.gb.2.bmp"
 rm -rf "$WORK/plugins/switcher-plus.plugin" "$STATE/switcher-plus.cfg"
 

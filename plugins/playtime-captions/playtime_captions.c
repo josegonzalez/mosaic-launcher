@@ -20,8 +20,11 @@
 // is too narrow it tries the compact format, then drops parts from the
 // end, and shows nothing when even one doesn't fit.
 //
-// Not here yet: captions in the game switcher, which waits for the
-// switcher slot.
+// The game switcher's captions are switcher-plus's, with its captions
+// setting: it reads these settings with cfg_get while this plugin is
+// loaded, and writes the caption with a copy of captions_model.c's
+// formatter, so a change here goes there too. The built-in switcher gets
+// none.
 
 #include <stdio.h>
 #include <string.h>

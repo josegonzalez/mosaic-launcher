@@ -29,9 +29,19 @@
 // copies, the plugin's own surfaces, are kept until it closes, the least
 // recently drawn going first. Everything is drawn around the status pill
 // and header widgets, which stay clear.
+//
+// The captions setting (off by default) adds playtime-captions' caption,
+// such as "2h 15m · 3 days ago", for the selected recent from the play
+// history calls with its path: on a smaller pill under the title in full,
+// under the name pill in strip, and under the preview in list. Its parts
+// and format are playtime-captions' settings, read with cfg_get each time
+// the switcher opens, which only answer while that plugin is loaded, so
+// they're its defaults otherwise. The text is the same as that plugin's,
+// from a copy of its formatter (see SP_captionFit).
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "switcher_model.h"
 #include "mosaic_plugin.h"
 
@@ -49,7 +59,12 @@ static int page_rows = 1;           // and how many it showed, for left and righ
 static unsigned int pressed_here = 0; // buttons pressed while it showed
 static unsigned long now_ms = 0, select_at = 0;
 static int ticking = 0;
-static char shown[SP_PATH_MAX + 128]; // what was last logged as showing
+static char shown[SP_PATH_MAX + 512]; // what was last logged as showing
+static int captions_on = 0;
+static SPCaptions captions;          // playtime-captions' parts and format, read on each open
+static char shown_caption[160];      // the selected recent's caption this frame
+static int caption_drawn = 0;
+static char captions_logged[200];    // the parts and format last logged
 
 static const char* styleName(int s) {
 	return s == SP_STYLE_STRIP ? "strip" : s == SP_STYLE_LIST ? "list" : "full";
@@ -195,6 +210,79 @@ static void pill(MosaicSurface* screen, const MosaicRect* rect, const char* text
 		rect->w - 2 * inner);
 }
 
+///////////////////////////////////////
+// play time captions
+
+#define CAPTIONS_ID "playtime-captions"
+#define MUTE_PERCENT 40 // as playtime-captions' caption
+
+// playtime-captions' settings, its defaults while it isn't loaded
+static void readCaptions(void) {
+	captions = SP_captions(host->cfg_get(CAPTIONS_ID, "time", "on"), host->cfg_get(CAPTIONS_ID, "last", "on"),
+		host->cfg_get(CAPTIONS_ID, "sessions", "off"), host->cfg_get(CAPTIONS_ID, "format", "relative"),
+		host->cfg_get(CAPTIONS_ID, "never", "off"), host->cfg_get(CAPTIONS_ID, "achievements", "off"));
+	static const char* names[] = { "relative", "compact", "date" };
+	char message[sizeof(captions_logged)];
+	snprintf(message, sizeof(message), "captions time %s, last %s, sessions %s, format %s, never %s, achievements %s",
+		captions.parts & SP_PART_TIME ? "on" : "off", captions.parts & SP_PART_LAST ? "on" : "off",
+		captions.parts & SP_PART_SESSIONS ? "on" : "off", names[captions.format], captions.never ? "on" : "off",
+		captions.parts & SP_PART_ACHIEVEMENTS ? "on" : "off");
+	if (strcmp(message, captions_logged) == 0) return;
+	snprintf(captions_logged, sizeof(captions_logged), "%s", message);
+	say(message);
+}
+
+static int measureSmall(const char* text, void* ctx) {
+	(void)ctx;
+	return host->text_width(MOSAIC_FONT_SMALL, text);
+}
+
+// The recent at index's caption that fits max_w, written to out. Returns
+// its width, or 0 for none.
+static int captionOf(int index, int max_w, char* out, size_t size) {
+	out[0] = '\0';
+	if (!captions_on || index < 0 || index >= recents.count || !recents.path[index][0]) return 0;
+	const char* path = recents.path[index];
+	SPPlay play = { host->play_time(path), host->last_played(path), host->play_count(path), 0, 0 };
+	if (captions.parts & SP_PART_ACHIEVEMENTS) {
+		MosaicAchievements progress = { .size = sizeof(MosaicAchievements) };
+		if (host->achievements(path, &progress) == 1 && progress.total > 0) {
+			play.cheevos = progress.unlocked;
+			play.cheevos_total = progress.total;
+		}
+	}
+	int w = SP_captionFit(&play, (long long)time(NULL), &captions, max_w, measureSmall, NULL, out, size);
+	if (w > 0 && index == selected) {
+		snprintf(shown_caption, sizeof(shown_caption), "%s", out);
+		caption_drawn = 1;
+	}
+	return w;
+}
+
+// the theme's hint colour moved toward the colour it's drawn on
+static MosaicColor captionInk(int on, unsigned int fallback) {
+	int hint = host->theme_color(MOSAIC_COLOR_HINT);
+	int under = host->theme_color(on);
+	if (hint < 0) hint = 0xFFFFFF;
+	if (under < 0) under = (int)fallback;
+	return mosaic_color((unsigned int)SP_mute(hint, under, MUTE_PERCENT), 255);
+}
+
+// the full style's caption, on a smaller pill under the title
+static void titleCaption(MosaicSurface* screen, const MosaicRect* area, const MosaicRect* hole, const MosaicRect* title) {
+	int scale = host->screen_scale();
+	int inner = 12 * scale;
+	int text_h = host->text_height(MOSAIC_FONT_SMALL);
+	MosaicRect room = SP_titleCaption(area, hole, title, scale, text_h);
+	char text[160];
+	int w = room.w > 2 * inner ? captionOf(selected, room.w - 2 * inner, text, sizeof(text)) : 0;
+	if (w <= 0) return;
+	MosaicRect p = { room.x, room.y, w + 2 * inner, room.h };
+	host->fill_round_rect(screen, &p, p.h / 2, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257));
+	host->draw_text(screen, MOSAIC_FONT_SMALL, text, p.x + inner, p.y + (p.h - text_h + 1) / 2,
+		captionInk(MOSAIC_COLOR_ACCENT, 0x9B2257), w);
+}
+
 static int renderFull(MosaicSurface* screen, const MosaicScreenView* view, const MosaicRect* hole) {
 	const MosaicRect* area = &view->area;
 	int got = drawPreview(screen, selected, area, hole, mosaic_color(0x000000, 255));
@@ -207,6 +295,7 @@ static int renderFull(MosaicSurface* screen, const MosaicScreenView* view, const
 	MosaicRect title = SP_title(area, hole, host->screen_scale(), host->text_width(MOSAIC_FONT_LARGE, name));
 	if (title.w > 0) {
 		pill(screen, &title, name, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257), themeColor(MOSAIC_COLOR_HINT, 0xFFFFFF));
+		if (captions_on) titleCaption(screen, area, hole, &title);
 	}
 	return got;
 }
@@ -215,7 +304,12 @@ static int renderStrip(MosaicSurface* screen, const MosaicScreenView* view, cons
 	int scale = host->screen_scale();
 	MosaicRect room = SP_room(&view->area, hole, scale);
 	SPStrip strip;
-	if (SP_strip(&room, view->area.w, view->area.h, scale, 30 * scale, 32 * scale, &strip) != 0) {
+	int pill_h = 30 * scale;
+	// a caption line under the name pill, or none when the strip can't fit one
+	int text_h = captions_on ? host->text_height(MOSAIC_FONT_SMALL) : 0;
+	int with_caption = captions_on && text_h > 0 &&
+		SP_strip(&room, view->area.w, view->area.h, scale, pill_h + 5 * scale + text_h, 32 * scale, &strip) == 0;
+	if (!with_caption && SP_strip(&room, view->area.w, view->area.h, scale, pill_h, 32 * scale, &strip) != 0) {
 		*fell_back = 1;
 		return renderFull(screen, view, hole);
 	}
@@ -244,10 +338,19 @@ static int renderStrip(MosaicSurface* screen, const MosaicScreenView* view, cons
 	int w = host->text_width(MOSAIC_FONT_LARGE, name) + 2 * inner;
 	if (w > strip.name.w) w = strip.name.w;
 	if (strip.name.h > 0 && w > 2 * inner) {
-		MosaicRect name_pill = { strip.cx - w / 2, strip.name.y, w, strip.name.h };
+		MosaicRect name_pill = { strip.cx - w / 2, strip.name.y, w, pill_h };
 		if (name_pill.x < strip.name.x) name_pill.x = strip.name.x;
 		pill(screen, &name_pill, name, themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF),
 			themeColor(MOSAIC_COLOR_LIST_TEXT_SELECTED, 0x000000));
+	}
+	if (with_caption) {
+		MosaicRect line = SP_stripCaption(&strip, pill_h, scale, text_h);
+		char text[160];
+		int cw = line.w > 0 ? captionOf(selected, line.w, text, sizeof(text)) : 0;
+		if (cw > 0) {
+			host->draw_text(screen, MOSAIC_FONT_SMALL, text, line.x + (line.w - cw) / 2, line.y,
+				captionInk(MOSAIC_COLOR_BACKGROUND, 0x000000), cw);
+		}
 	}
 	return got;
 }
@@ -279,8 +382,18 @@ static int renderList(MosaicSurface* screen, const MosaicScreenView* view, const
 		}
 	}
 	if (list.panel.w <= 0) return -1;
-	int got = drawPreview(screen, selected, &list.panel, hole, mosaic_color(0, 0));
-	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, "No Preview", &list.panel, ink);
+	// the selected recent's caption along the panel's bottom, under its preview
+	MosaicRect preview = list.panel, line = { 0, 0, 0, 0 };
+	int text_h = captions_on ? host->text_height(MOSAIC_FONT_SMALL) : 0;
+	if (text_h > 0) line = SP_panelCaption(&list.panel, scale, text_h, &preview);
+	int got = drawPreview(screen, selected, &preview, hole, mosaic_color(0, 0));
+	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, "No Preview", &preview, ink);
+	char text[160];
+	int cw = line.w > 0 ? captionOf(selected, line.w, text, sizeof(text)) : 0;
+	if (cw > 0) {
+		host->draw_text(screen, MOSAIC_FONT_SMALL, text, line.x + (line.w - cw) / 2, line.y,
+			captionInk(MOSAIC_COLOR_BACKGROUND, 0x000000), cw);
+	}
 	return got;
 }
 
@@ -300,9 +413,14 @@ static void logShown(int got, int fell_back) {
 		snprintf(line, sizeof(line), "showing no recents, style %s", styleName(style));
 	} else {
 		const MosaicRecent* r = info(selected);
-		snprintf(line, sizeof(line), "showing %i of %i: %s, preview %s, %s, style %s%s", selected, recents.count,
+		char caption[sizeof(shown_caption) + 16] = "";
+		if (captions_on) {
+			if (caption_drawn) snprintf(caption, sizeof(caption), ", caption %s", shown_caption);
+			else snprintf(caption, sizeof(caption), ", no caption");
+		}
+		snprintf(line, sizeof(line), "showing %i of %i: %s, preview %s, %s, style %s%s%s", selected, recents.count,
 			nameOf(selected), got > 0 ? "drawn" : got == 0 ? "loading" : "none", r && r->can_resume ? "resume" : "open",
-			styleName(style), fell_back ? " (too small, drawn full)" : "");
+			styleName(style), fell_back ? " (too small, drawn full)" : "", caption);
 	}
 	if (strcmp(line, shown) == 0) return;
 	snprintf(shown, sizeof(shown), "%s", line);
@@ -321,6 +439,7 @@ static int enter(void* data) {
 	first = 0;
 	pressed_here = 0;
 	shown[0] = '\0';
+	if (captions_on) readCaptions();
 	return 0;
 }
 
@@ -403,6 +522,8 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	frame++;
 	MosaicRect hole = SP_hole(&view->status, &view->header);
 	int got = -1, fell_back = 0;
+	shown_caption[0] = '\0';
+	caption_drawn = 0;
 	if (recents.count <= 0) {
 		MosaicColor black = mosaic_color(0x000000, 255);
 		fillAround(screen, &view->area, &hole, black);
@@ -431,6 +552,10 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	style = SP_style(host->cfg_get(ID, "style", "full"));
+	// the play history and achievements calls came before draw_hints, so
+	// every launcher that gets here has them
+	captions_on = strcmp(host->cfg_get(ID, "captions", "off"), "on") == 0;
+	captions_logged[0] = '\0';
 	static const MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),
 		.flags = MOSAIC_SCREEN_GAME_SWITCHER,
@@ -444,7 +569,7 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	char message[64];
-	snprintf(message, sizeof(message), "style %s", styleName(style));
+	snprintf(message, sizeof(message), "style %s%s", styleName(style), captions_on ? ", captions on" : "");
 	say(message);
 	return 0;
 }
