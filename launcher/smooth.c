@@ -3,8 +3,9 @@
 #include "scalemodel.h"
 
 // a theme's sizes need a few dozen pieces: three pills, their middles and
-// the button's at two heights, and the prompts it shows
-#define SMOOTH_PIECES 64
+// the button's at two heights, the prompts it shows, and the status bar's
+// twenty or so icons
+#define SMOOTH_PIECES 96
 
 typedef struct {
 	SDL_Surface* sheet;

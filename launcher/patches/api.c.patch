@@ -212,3 +212,79 @@
  			int x = dst_rect->x;
  			x += (dst_rect->w - text->w) / 2;
  			SDL_BlitSurface(text, NULL, dst, &(SDL_Rect){x, y});
+@@ -2223,6 +2297,47 @@ void GFX_blitMessage(TTF_Font *font, char *msg, SDL_Surface *dst, SDL_Rect *dst_
+ 	}
+ }
+ 
++// mosaic: the status bar's icons, and the gaps inside the battery, scaled
++// by the theme's pill size over stock's and smooth-scaled from the sheet
++// (launcher/smooth.c), so they keep their place in the pill; at stock's
++// pill size they're stock's, drawn from the sheet as stock does
++static int GFX_statusScale(int v)
++{
++	return PILL_SIZE == UI_stockPill() ? v : (v * PILL_SIZE + UI_stockPill() / 2) / UI_stockPill();
++}
++static SDL_Rect *GFX_statusRects(void)
++{
++	static SDL_Rect rects[ASSET_COUNT];
++	if (PILL_SIZE == UI_stockPill())
++		return asset_rects;
++	for (int i = 0; i < ASSET_COUNT; i++)
++		rects[i] = (SDL_Rect){asset_rects[i].x, asset_rects[i].y, GFX_statusScale(asset_rects[i].w), GFX_statusScale(asset_rects[i].h)};
++	return rects;
++}
++static void GFX_statusRect(int asset, SDL_Rect *dst_rect)
++{
++	*dst_rect = GFX_statusRects()[asset];
++}
++// src_rect is in the scaled icon; if it can't be scaled a whole icon is
++// drawn at stock's size and a part of one isn't drawn
++static void GFX_blitStatusAsset(int asset, SDL_Rect *src_rect, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t asset_color)
++{
++	SDL_Rect *rect = &asset_rects[asset];
++	SDL_Surface *icon = PILL_SIZE == UI_stockPill() ? NULL : Smooth_piece(gfx.assets, rect, GFX_statusScale(rect->w), GFX_statusScale(rect->h));
++	if (icon)
++		GFX_blitSurfaceColor(icon, src_rect, dst, dst_rect, asset_color);
++	else if (PILL_SIZE == UI_stockPill() || !src_rect)
++		GFX_blitAssetColor(asset, src_rect, dst, dst_rect, asset_color);
++}
++// the battery, the hardware indicator and the hardware group, up to
++// GFX_blitHardwareHints, size and draw their icons with these
++#pragma push_macro("asset_rects")
++#pragma push_macro("GFX_assetRect")
++#pragma push_macro("GFX_blitAssetColor")
++#define asset_rects (GFX_statusRects())
++#define GFX_assetRect GFX_statusRect
++#define GFX_blitAssetColor GFX_blitStatusAsset
++
+ void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
+ {
+ 	SDL_Rect battery_rect = asset_rects[ASSET_BATTERY];
+@@ -2230,7 +2345,7 @@ void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
+ 	if (SDL_AtomicGet(&pwr.is_charging))
+ 	{
+ 		GFX_blitAssetColor(ASSET_BATTERY, NULL, dst, &(SDL_Rect){x, y}, THEME_COLOR6);
+-		GFX_blitAssetColor(ASSET_BATTERY_BOLT, NULL, dst, &(SDL_Rect){x + SCALE1(3), y + SCALE1(2)}, THEME_COLOR6);
++		GFX_blitAssetColor(ASSET_BATTERY_BOLT, NULL, dst, &(SDL_Rect){x + GFX_statusScale(SCALE1(3)), y + GFX_statusScale(SCALE1(2))}, THEME_COLOR6); // mosaic
+ 	}
+ 	else
+ 	{
+@@ -2259,7 +2374,7 @@ void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
+ 				clip.x = fill_rect.w - clip.w;
+ 				clip.y = 0;
+ 				GFX_blitAssetColor(percent <= 20 ? ASSET_BATTERY_FILL_LOW : ASSET_BATTERY_FILL, &clip, dst,
+-								   &(SDL_Rect){x + SCALE1(3) + clip.x, y + SCALE1(2)}, THEME_COLOR6);
++								   &(SDL_Rect){x + GFX_statusScale(SCALE1(3)) + clip.x, y + GFX_statusScale(SCALE1(2))}, THEME_COLOR6); // mosaic
+ 			}
+ 		}
+ 	}
+@@ -2495,6 +2610,9 @@ int GFX_blitHardwareGroup(SDL_Surface *dst, int show_setting)
+ 
+ 	return ow;
+ }
++#pragma pop_macro("GFX_blitAssetColor") // mosaic
++#pragma pop_macro("GFX_assetRect")
++#pragma pop_macro("asset_rects")
+ void GFX_blitHardwareHints(SDL_Surface *dst, int show_setting)
+ {
+ 

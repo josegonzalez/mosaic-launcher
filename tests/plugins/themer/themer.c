@@ -17,8 +17,9 @@
 // height, opens Themer and then Inner, and logs the pixel at the left edge
 // halfway down the old frame of that push, which the list leaves to the
 // background, and the alpha across the end of the bottom right hint pill
-// (see edge). In reload mode it then reloads the lists, and logs the
-// sizes and colours again. With still=1 it does none of that, so the
+// (see edge), and the battery's box in the status pill (see icon). In
+// reload mode it then reloads the lists, and logs the sizes and colours
+// again. With still=1 it does none of that, so the
 // screen can be looked at.
 
 #include <stdarg.h>
@@ -141,6 +142,44 @@ static void edge(const MosaicSurface* frame, int w, int h) {
 	say("edge pill %d scale %d alpha%s", pill, s, line);
 }
 
+// The box of the status pill's last icon, the battery, as "icon pill <h>
+// button <h> scale <s> box <gap> <top> <w> <h>": the columns from the
+// pill's right end in, after the gap, that have a pixel at least 110/255
+// of the way from the pill's colour to the icons' (theme colour 6), and
+// the rows those pixels take, from the pill's top.
+static void icon(const MosaicSurface* frame, int w) {
+	int s = host->screen_scale();
+	int pill = s * host->ui_size(MOSAIC_UI_PILL);
+	int pad = s * host->ui_size(MOSAIC_UI_PADDING);
+	int fill = host->theme_color(2), ink = host->theme_color(6);
+	int f[3] = { fill >> 16 & 0xff, fill >> 8 & 0xff, fill & 0xff };
+	int d[3] = { (ink >> 16 & 0xff) - f[0], (ink >> 8 & 0xff) - f[1], (ink & 0xff) - f[2] };
+	int dd = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+	if (!dd) return;
+	int right = w - pad, x0 = -1, x1 = -1, y0 = pill, y1 = -1;
+	for (int x = right - 1; x > right - pill * 4 && x >= 0; x--) {
+		int any = 0;
+		for (int y = 0; y < pill; y++) {
+			MosaicColor p;
+			if (host->read_pixel(frame, x, pad + y, &p) != 0) return;
+			int v = (p.r - f[0]) * d[0] + (p.g - f[1]) * d[1] + (p.b - f[2]) * d[2];
+			if (v * 255 < 110 * dd) continue;
+			any = 1;
+			if (y < y0) y0 = y;
+			if (y > y1) y1 = y;
+		}
+		if (any) {
+			if (x1 < 0) x1 = x;
+			x0 = x;
+		}
+		else if (x1 >= 0)
+			break;
+	}
+	if (x1 < 0) return;
+	say("icon pill %d button %d scale %d box %d %d %d %d", pill, s * host->ui_size(MOSAIC_UI_BUTTON), s,
+		right - 1 - x1, y0, x1 - x0 + 1, y1 - y0 + 1);
+}
+
 static int transitionBegin(MosaicTransition* t) {
 	const char* to = host->current_path();
 	if (t->kind == MOSAIC_TRANSITION_PUSH && to && !strcmp(to, inner)) {
@@ -150,6 +189,7 @@ static int transitionBegin(MosaicTransition* t) {
 		host->read_pixel(t->old_frame, 2, h / 2, &c);
 		say("frame %02X%02X%02X", c.r, c.g, c.b);
 		edge(t->old_frame, w, h);
+		icon(t->old_frame, w);
 	}
 	return MOSAIC_STYLE_OFF;
 }

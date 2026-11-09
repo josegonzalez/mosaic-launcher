@@ -3,8 +3,9 @@
 
 # themer owns the theme slot (and the transition slot, to read the screen
 # back): its colours, background colour, font, text step and UI sizes take
-# effect, ui_size and theme_color report them, a pill's end is stock's
-# sheet at stock's size and smooth-scaled at the theme's, a wallpaper
+# effect, ui_size and theme_color report them, a pill's end and the status
+# pill's battery are stock's sheet at stock's size and smooth-scaled at the
+# theme's, a wallpaper
 # fills a spot with no stock background but never covers a hand-placed
 # bg.png, bad values are refused one by one, and an error, at the start or
 # on a reload, puts stock's theme back. Without slots=theme it's never
@@ -40,12 +41,16 @@ th_run() {
 }
 # th_value <what> <log>: a number themer logged, as "<what> <n>"
 th_value() { sed -n "s/.*plugin themer: start .*$1 \([0-9-]*\).*/\1/p" "$2" | head -n 1; }
-# th_edge <stock|smooth>: the end of a hint pill in $log is stock's sheet
-# unscaled, or smooth-scaled from it (see themer/edge.py)
+# th_edge <stock|smooth>: the end of a hint pill and the status pill's
+# battery in $log are stock's sheet unscaled, or smooth-scaled from it (see
+# themer/edge.py)
 th_edge() {
 	edge=$(grep -m 1 "plugin themer: edge pill" "$log") || fail "themer logged no hint pill edge ($1)"
 	python3 -I "$ROOT/tests/plugins/themer/edge.py" "$1" "$CARD/.system/res" "$edge" \
 		|| fail "the hint pill's end isn't $1: $edge"
+	icon=$(grep -m 1 "plugin themer: icon pill" "$log") || fail "themer logged no status icon ($1)"
+	python3 -I "$ROOT/tests/plugins/themer/edge.py" "$1" "$CARD/.system/res" "$icon" \
+		|| fail "the status pill's battery isn't $1: $icon"
 }
 
 # stock's: nothing set, and with no plugin taking the slot

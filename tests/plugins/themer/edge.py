@@ -6,6 +6,12 @@
 # value nearest-neighbour can't give (none of the sheet's pixels it could
 # pick there), and each is within those pixels' range, so the edge is in
 # its place.
+#
+# With an "icon pill <h> button <h> scale <s> box <gap> <top> <w> <h>"
+# line it checks the battery's box in the status pill instead: at stock's
+# size it's exactly the sheet's art in stock's place, and at another it's
+# the art scaled by the pill's size over stock's, in its scaled place,
+# within 2 pixels each way.
 
 import math
 import re
@@ -15,6 +21,7 @@ import zlib
 
 TOLERANCE = 6  # blending and working the alpha back out round a little
 NEW = 12       # how far from every pixel nearest-neighbour could pick
+ICON = 110     # the alpha themer counts as part of an icon
 
 
 def sheet(path):
@@ -53,8 +60,52 @@ def sheet(path):
     return rows
 
 
+def icon(want, res, line):
+    m = re.search(r"icon pill (\d+) button (\d+) scale (\d+) box (-?\d+) (-?\d+) (\d+) (\d+)", line)
+    if not m:
+        sys.exit("no icon in: %s" % line)
+    pill, button, scale, gap, top, w, h = (int(v) for v in m.groups())
+    rows = sheet("%s/assets@%dx.png" % (res, scale))
+    # the battery, at (47, 51, 17, 10) in layout units, and its art's box,
+    # with the same threshold themer uses
+    rx, ry, rw, rh = (v * scale for v in (47, 51, 17, 10))
+    lit = [(x, y) for y in range(rh) for x in range(rw) if rows[ry + y][(rx + x) * 4 + 3] >= ICON]
+    bx0, by0 = min(x for x, _ in lit), min(y for _, y in lit)
+    bw, bh = max(x for x, _ in lit) - bx0 + 1, max(y for _, y in lit) - by0 + 1
+    stock = 30 * scale
+    k = pill / stock
+
+    def scaled(v):  # as the patch scales a size
+        return (v * pill + stock // 2) // stock
+
+    margin = (pill - button) // 2
+    want_box = (margin + scaled(rw) - (bx0 + bw) * k, (pill - scaled(rh)) // 2 + by0 * k, bw * k, bh * k)
+    names = ("gap", "top", "width", "height")
+    ok = True
+    if want == "stock":
+        if pill != stock:
+            sys.exit("the pill is %d high, not stock's %d" % (pill, stock))
+        for name, a, b in zip(names, (gap, top, w, h), want_box):
+            if a != b:
+                print("the battery's %s is %d, stock's is %d" % (name, a, b))
+                ok = False
+    else:
+        if pill == stock:
+            sys.exit("the pill is stock's size")
+        if (w, h) == (bw, bh):
+            print("the battery is stock's %dx%d" % (w, h))
+            ok = False
+        for name, a, b in zip(names, (gap, top, w, h), want_box):
+            if abs(a - b) > 2:
+                print("the battery's %s is %d, not about %.1f" % (name, a, b))
+                ok = False
+    sys.exit(0 if ok else 1)
+
+
 def main():
     want, res, line = sys.argv[1:4]
+    if "icon pill" in line:
+        icon(want, res, line)
     m = re.search(r"edge pill (\d+) scale (\d+) alpha ([\d ]+)", line)
     if not m:
         sys.exit("no edge in: %s" % line)
