@@ -37,7 +37,7 @@ gl_run glypher-none ''
 grep -qF "fallback font" "$log" && fail "a fallback font was used with none given: $(grep -F "fallback font" "$log")"
 ascii=$(gl_value ascii)
 hangul=$(gl_value hangul)
-[ -n "$ascii" ] && [ -n "$hangul" ] || fail "glypher didn't report its text"
+if [ -z "$ascii" ] || [ -z "$hangul" ]; then fail "glypher didn't report its text"; fi
 
 # the strings slot owner's
 gl_run glypher-strings "strings_font=$GL_DIR/glyphs.ttf\n"
