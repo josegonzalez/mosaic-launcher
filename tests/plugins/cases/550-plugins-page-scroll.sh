@@ -47,7 +47,7 @@ scroll_page() {
 		"$ROOT/scripts/desktop-smoke.sh" "$case_log" 40 --settings plugins >/dev/null 2>"$WORK/smoke.err"
 	status=$?
 	[ "$status" -eq 0 ] || fail "the Plugins page didn't run its presses (status $status)"
-	[ -s "$frame.bmp" ] && [ -s "$frame.txt" ] || fail "presser saved no frame"
+	if [ ! -s "$frame.bmp" ] || [ ! -s "$frame.txt" ]; then fail "presser saved no frame"; fi
 }
 
 # rows_drawn <pattern>: the texts drawn matching the pattern (a grep -E
@@ -86,7 +86,7 @@ pill_rows() {
 
 # expect_page <rows> <selected> <pill row>
 expect_page() {
-	[ -s "$frame.bmp" ] && [ -s "$frame.txt" ] || return
+	if [ ! -s "$frame.bmp" ] || [ ! -s "$frame.txt" ]; then return; fi
 	got=$(rows_drawn "$row_pattern")
 	[ "$got" = "$1" ] || fail "the rows drawn were $got, not $1"
 	got=$(selected_row "$row_pattern")
