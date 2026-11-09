@@ -33,7 +33,7 @@ MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
 	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
-	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c
+	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.

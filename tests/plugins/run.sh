@@ -7,6 +7,7 @@
 # tiles and shares a button, one that declines after registering things,
 # one that powers off, one that sets stock toggles, one that reads theme
 # colours and sets an LED colour, one that asks about Bluetooth, one that
+# reads the Wi-Fi state, one that
 # draws, one that writes pixels into its surfaces, one that draws the game list as a grid, two that decorate rows and
 # add header widgets, one that decorates the game's art, two that show their own surfaces in place of it, one that shows its own in the bundled grid and fancy layouts' art, one that plays audio and one refused the device meanwhile, one that reads back the dots the bundled row-badges
 # puts on rows, two that supply art and load it through the art

@@ -6,6 +6,7 @@
 #include "stocktoggles.h"
 #include "leds.h"
 #include "bluetooth.h"
+#include "wifi.h"
 #include "plugindraw.h"
 #include "drawmodel.h"
 #include "layoutmodel.h"
@@ -735,6 +736,80 @@ static void bluetoothLog(const char* message) {
 	LOG_info("plugins: %s", message);
 }
 
+// Desktop's stock platform code claims a Wi-Fi connection it doesn't have,
+// so desktop answers that there's no Wi-Fi. Its tests can stand a file in
+// for a device with MOSAIC_LAUNCHER_WIFI_FAKE (see Wifi_parseFake); device
+// builds never read it.
+#define IS_DESKTOP (strcmp(PLATFORM, "desktop") == 0)
+
+static const char* wifiFake(void) {
+	if (!IS_DESKTOP) return NULL;
+	const char* path = getenv("MOSAIC_LAUNCHER_WIFI_FAKE");
+	return path && path[0] ? path : NULL;
+}
+static int wifiSupported(void) {
+	if (IS_DESKTOP) return wifiFake() ? 1 : 0;
+	return WIFI_supported() ? 1 : 0;
+}
+// The toggle, read on the main thread and handed to the worker.
+static int wifiOn(void) {
+	if (!wifiSupported()) return 0;
+	if (!IS_DESKTOP) return WIFI_enabled() ? 1 : 0;
+	char* text = readText(wifiFake());
+	int on = 0;
+	Wifi_parseFake(text, &on, NULL, NULL);
+	free(text);
+	return on;
+}
+// On the worker: stock's call runs wpa_cli, ip and iw.
+static int wifiStockSource(WifiInfo* out) {
+	struct WIFI_connection c;
+	memset(&c, 0, sizeof(c));
+	int rc = WIFI_connectionInfo(&c);
+	Wifi_fill(out, rc == 0 && c.valid, c.ssid, c.ip, c.freq, c.rssi, c.link_speed);
+	return 0;
+}
+static int wifiFakeSource(WifiInfo* out) {
+	const char* path = wifiFake();
+	char* text = path ? readText(path) : NULL;
+	int delay_ms = 0;
+	Wifi_parseFake(text, NULL, out, &delay_ms);
+	free(text);
+	if (delay_ms) usleep((useconds_t)delay_ms * 1000);
+	return 0;
+}
+static int hostWifiSupported(void) {
+	return wifiSupported();
+}
+static int hostWifiEnabled(void) {
+	if (!wifiSupported()) return MOSAIC_WIFI_UNAVAILABLE;
+	return wifiOn();
+}
+static int hostWifiConnection(MosaicWifi* out) {
+	if (!out || out->size < sizeof(out->size) || !wifiSupported()) return MOSAIC_WIFI_UNAVAILABLE;
+	Wifi_setSource(IS_DESKTOP ? wifiFakeSource : wifiStockSource);
+	Wifi_setEnabled(wifiOn());
+	WifiInfo info;
+	int rc = Wifi_connection(&info);
+	MosaicWifi full;
+	memset(&full, 0, sizeof(full));
+	full.size = out->size;
+	if (rc == 1) {
+		snprintf(full.ssid, sizeof(full.ssid), "%s", info.ssid);
+		snprintf(full.ip, sizeof(full.ip), "%s", info.ip);
+		full.rssi = info.rssi;
+		full.bars = info.bars;
+		full.freq_mhz = info.freq;
+		full.link_mbps = info.link;
+	}
+	// only the fields the plugin knows about
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return rc;
+}
+static void wifiLog(const char* message) {
+	LOG_info("plugins: %s", message);
+}
+
 // Surfaces belong to a loaded plugin, the one whose init is running included.
 static int isLoaded(const char* plugin_id) {
 	for (int i = 0; plugin_id && i < loaded_count; i++) {
@@ -989,6 +1064,9 @@ static const MosaicHost host = {
 	.play_games_count = PlayHistory_gameCount,
 	.play_game_info = hostPlayGameInfo,
 	.play_time_on = PlayHistory_day,
+	.wifi_supported = hostWifiSupported,
+	.wifi_enabled = hostWifiEnabled,
+	.wifi_connection = hostWifiConnection,
 };
 
 ///////////////////////////////////////
@@ -1219,6 +1297,7 @@ void Plugins_init(void) {
 	if (manifest_count == 0) return;
 	Plugins_adoptPin(); // before simple mode's cfg is read
 	Bluetooth_setLog(bluetoothLog);
+	Wifi_setLog(wifiLog);
 
 	char* choices = readText(PLUGIN_CHOICES_PATH);
 	static PluginDecision decisions[PLUGIN_MAX];
@@ -1283,6 +1362,8 @@ void Plugins_quit(void) {
 	RAProgress_quit();
 	// a refresh or connect still running is stopped and reaped first
 	Bluetooth_quit();
+	// a Wi-Fi look still running is left to finish, its answer dropped
+	Wifi_quit();
 }
 
 int Plugins_discover(const PluginManifest** out) {
@@ -1702,6 +1783,8 @@ void Plugins_tick(unsigned long now) {
 	// the quick menu's Bluetooth tile may have changed it; the worker,
 	// when there is one, never reads stock's settings itself
 	if (loaded_count && BT_supported()) Bluetooth_setEnabled(CFG_getBluetooth());
+	// and its Wi-Fi tile; the toggle alone never starts the worker
+	if (loaded_count && wifiSupported()) Wifi_setEnabled(wifiOn());
 	// RetroAchievements answers came in, for the rows that asked
 	if (RAProgress_news()) state.dirty = 1;
 	EACH_PLUGIN_WITH(tick) p->tick(now);
@@ -1712,11 +1795,13 @@ void Plugins_beforeSleep(void) {
 	// what plugins left open, once its last sound plays out
 	Audio_hostClose("before sleep", 1);
 	Bluetooth_pause(1);
+	Wifi_pause(1);
 }
 
 void Plugins_afterResume(void) {
 	// so plugins' after_resume see a fresh address soon
 	Bluetooth_pause(0);
+	Wifi_pause(0);
 	EACH_PLUGIN_WITH(after_resume) p->after_resume();
 }
 

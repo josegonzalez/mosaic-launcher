@@ -341,6 +341,19 @@ typedef struct MosaicPlayGame {
 	int orphan;             // 1 for a game carried over from Onion, known only by its name
 } MosaicPlayGame;
 
+// The Wi-Fi connection, for host->wifi_connection. The plugin sets size to
+// sizeof(MosaicWifi) before asking, and the launcher fills in only the
+// fields that fit in it, so fields are only added at the end.
+typedef struct MosaicWifi {
+	size_t size;   // sizeof(MosaicWifi) in the plugin
+	char ssid[64]; // the network's name as wpa_supplicant reports it
+	char ip[48];   // the device's address on it, or "" before it has one
+	int rssi;      // the signal in dBm (below 0), or 0 when not known
+	int bars;      // 1 to 3, as stock's status pill shows the signal, or 0 when not known
+	int freq_mhz;  // the channel's frequency in MHz, or 0 when not known
+	int link_mbps; // the link speed in Mbit/s, or 0 when not known
+} MosaicWifi;
+
 // A game's local RetroAchievements progress, for host->achievements. The
 // plugin sets size to sizeof(MosaicAchievements) before asking, and the
 // launcher fills in only the fields that fit in it, so fields are only
@@ -1077,10 +1090,28 @@ typedef struct MosaicHost {
 	int (*play_games_count)(void);
 	int (*play_game_info)(int index, MosaicPlayGame* out);
 	long long (*play_time_on)(int days_ago);
+
+	// Wi-Fi, read only: plugins can't turn it on or off or join a network.
+	// wifi_supported returns 1 on a device with Wi-Fi and 0 elsewhere,
+	// including desktop. wifi_enabled returns the user's Wi-Fi toggle, 1 or
+	// 0, or MOSAIC_WIFI_UNAVAILABLE where there's no Wi-Fi.
+	// wifi_connection fills out (see MosaicWifi) and returns 1 while
+	// connected, or clears it and returns 0 when not connected or Wi-Fi is
+	// off, or MOSAIC_WIFI_UNAVAILABLE where there's no Wi-Fi, for a NULL
+	// out, or before the host's first look since Wi-Fi came on. The host
+	// looks off the main thread every 5 seconds while plugins keep asking,
+	// so it's cheap enough for tick. Check for them with
+	// MOSAIC_HOST_HAS(host, wifi_connection).
+	int (*wifi_supported)(void);
+	int (*wifi_enabled)(void);
+	int (*wifi_connection)(MosaicWifi* out);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
 #define MOSAIC_PLAY_UNKNOWN -1
+
+// What the Wi-Fi calls return where there's no Wi-Fi to report on.
+#define MOSAIC_WIFI_UNAVAILABLE -1
 
 // What ask_pin's on_done gets.
 #define MOSAIC_PIN_RIGHT 1

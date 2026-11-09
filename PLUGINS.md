@@ -660,6 +660,19 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   }
   ```
 
+- `wifi_supported()`, `wifi_enabled()` and `wifi_connection(out)` let a plugin show the Wi-Fi state. They're read only: plugins can't turn Wi-Fi on or off or join a network. `wifi_supported()` returns 1 on a device with Wi-Fi and 0 elsewhere, which today is desktop (its stock platform code reports a connection it doesn't have, so the launcher doesn't ask it). `wifi_enabled()` returns the user's Wi-Fi toggle from Settings or the quick menu, 1 or 0, or `MOSAIC_WIFI_UNAVAILABLE` (-1) where there's no Wi-Fi.
+
+  `wifi_connection(out)` fills `out`, a `MosaicWifi` whose `size` the plugin sets to `sizeof(MosaicWifi)` (the launcher fills only the fields that fit), and returns 1 while connected: `ssid`, the network's name as wpa_supplicant reports it; `ip`, the device's address on it, or `""` before it has one; `rssi`, the signal in dBm, below 0, or 0 when it isn't known; `bars`, 1 to 3 as stock's status pill shows that signal (3 from -60 dBm, 2 from -70, 1 below), or 0 when it isn't known; `freq_mhz`, the channel's frequency; and `link_mbps`, the link speed, each 0 when it isn't known. Where `iw` isn't there stock reports -60 dBm for any connection, so `rssi` and `bars` say so too. It clears `out` and returns 0 when Wi-Fi is on but not connected, or off, and `MOSAIC_WIFI_UNAVAILABLE` where there's no Wi-Fi, for a `NULL` `out`, or before the launcher's first look since Wi-Fi came on, so show nothing for -1 and ask again on a later tick.
+
+  Stock's connection call runs `wpa_cli`, `ip` and `iw`, so the launcher makes it on a thread of its own and the call only copies the last answer, cheap enough for `tick`. It looks every 5 seconds while Wi-Fi is on, the device is awake and a plugin has asked in the last 30 seconds, and at once on the first ask, when Wi-Fi comes on, after the device wakes and on the first ask after a quiet spell (which gets the answer from before it until that look is in). Turning Wi-Fi off answers 0 at once. Nothing runs until a plugin first asks with Wi-Fi on, so a launcher without such a plugin behaves as stock. When the launcher exits, as it does for every launch, it waits up to a second for a look still running and then leaves it to finish. Check for them with `MOSAIC_HOST_HAS(host, wifi_connection)`.
+
+  ```c
+  MosaicWifi wifi = { .size = sizeof(wifi) };
+  int rc = MOSAIC_HOST_HAS(host, wifi_connection) ? host->wifi_connection(&wifi) : MOSAIC_WIFI_UNAVAILABLE;
+  if (rc == 1) show("%s, %s", wifi.ssid, wifi.ip[0] ? wifi.ip : "no address");
+  else if (rc == 0) show(host->wifi_enabled() == 1 ? "not connected" : "off");
+  ```
+
 ## Without writing C
 
 Shell paks can hook into the launcher too:
