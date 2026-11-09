@@ -5,6 +5,7 @@
 void ScreenSet_clear(ScreenSet* set) {
 	memset(set, 0, sizeof(*set));
 	set->home = -1;
+	set->switcher = -1;
 }
 
 static const char* const builtins[] = { "gamelist", "switcher", "quickmenu", "dialog" };
@@ -135,4 +136,32 @@ int ScreenSet_backToHome(ScreenSet* set) {
 	int back = set->under && ScreenSet_homeReady(set) && !ScreenSet_homeOpen(set);
 	set->under = 0;
 	return back;
+}
+
+int ScreenSet_claimSwitcher(ScreenSet* set, int owner) {
+	set->switcher = -1;
+	for (int i = 0; i < set->count && set->switcher < 0; i++) {
+		if (i == set->home) continue;
+		if (set->screens[i].owner == owner && (set->screens[i].hooks.flags & MOSAIC_SCREEN_GAME_SWITCHER)) set->switcher = i;
+	}
+	return set->switcher;
+}
+
+int ScreenSet_switcherReady(const ScreenSet* set) {
+	return set->switcher >= 0 && set->switcher < set->count && !set->screens[set->switcher].off;
+}
+
+int ScreenSet_switcherOpen(const ScreenSet* set) {
+	return set->switcher >= 0 && ScreenSet_position(set, set->switcher) >= 0;
+}
+
+int ScreenSet_kind(const ScreenSet* set, int index) {
+	return index >= 0 && index == set->switcher ? SCREENKIND_SWITCHER : SCREENKIND_PLUGIN;
+}
+
+int ScreenSet_afterClose(ScreenSet* set, int closed) {
+	if (closed < 0 || closed != set->switcher) return AFTER_BASE;
+	// the built-in switcher's B goes on to the home screen, if it's under
+	if (set->screens[closed].off) return AFTER_SWITCHER;
+	return ScreenSet_backToHome(set) ? AFTER_HOME : AFTER_LIST;
 }

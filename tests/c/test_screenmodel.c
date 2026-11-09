@@ -241,6 +241,73 @@ static void testHome(void) {
 	CHECK(Home_start(1, NULL, SCREENKIND_DIALOG) == HOME_START_NONE);
 }
 
+static void testSwitcher(void) {
+	ScreenSet set;
+	ScreenSet_clear(&set);
+	CHECK(set.switcher == -1 && !ScreenSet_switcherReady(&set) && !ScreenSet_switcherOpen(&set));
+	CHECK(ScreenSet_afterClose(&set, -1) == AFTER_BASE);
+	MosaicScreenHooks plain = hooks();
+	MosaicScreenHooks both = hooks();
+	both.flags = MOSAIC_SCREEN_HOME | MOSAIC_SCREEN_GAME_SWITCHER;
+	MosaicScreenHooks switcher = hooks();
+	switcher.flags = MOSAIC_SCREEN_GAME_SWITCHER;
+	ScreenSet_add(&set, "a.switcher", 0, &switcher); // owner 0 doesn't own the slot below
+	ScreenSet_add(&set, "b.plain", 1, &plain);
+	ScreenSet_add(&set, "b.both", 1, &both);
+	ScreenSet_add(&set, "b.switcher", 1, &switcher);
+	ScreenSet_add(&set, "b.switcher2", 1, &switcher);
+
+	// only the owner's, its first with the flag
+	CHECK(ScreenSet_claimSwitcher(&set, 2) == -1);
+	CHECK(!ScreenSet_switcherReady(&set));
+	CHECK(ScreenSet_claimSwitcher(&set, 1) == 2);
+	// but never the home screen too
+	CHECK(ScreenSet_claimHome(&set, 1) == 2);
+	CHECK(ScreenSet_claimSwitcher(&set, 1) == 3);
+	CHECK(ScreenSet_switcherReady(&set) && !ScreenSet_switcherOpen(&set));
+	CHECK(ScreenSet_kind(&set, 3) == SCREENKIND_SWITCHER);
+	CHECK(ScreenSet_kind(&set, 1) == SCREENKIND_PLUGIN);
+	CHECK(ScreenSet_kind(&set, 2) == SCREENKIND_PLUGIN);
+	CHECK(ScreenSet_kind(&set, -1) == SCREENKIND_PLUGIN);
+	// so nothing slides to it or from it, as with the built-in one
+	CHECK(!ScreenKind_slides(SCREENKIND_LIST, ScreenSet_kind(&set, 3)));
+	CHECK(!ScreenKind_slides(ScreenSet_kind(&set, 3), SCREENKIND_PLUGIN));
+
+	// opened over the home screen: that closes, and the switcher goes back to it
+	ScreenSet_push(&set, 2, 0);
+	CHECK(ScreenSet_coveredBy(&set, SCREENKIND_SWITCHER));
+	CHECK(set.under);
+	ScreenSet_pop(&set);
+	ScreenSet_push(&set, 3, 0);
+	CHECK(ScreenSet_switcherOpen(&set));
+	// a launch from it comes back to the home screen
+	CHECK(!strcmp(ScreenSet_leftFrom(&set), "home"));
+	// the quick menu over it keeps that
+	CHECK(ScreenSet_coveredBy(&set, SCREENKIND_QUICKMENU));
+	CHECK(set.under);
+	ScreenSet_pop(&set);
+	CHECK(!ScreenSet_switcherOpen(&set));
+	CHECK(ScreenSet_afterClose(&set, 3) == AFTER_HOME);
+	CHECK(!set.under);
+
+	// opened over the list, it goes back to the list
+	ScreenSet_push(&set, 3, 0);
+	CHECK(!strcmp(ScreenSet_leftFrom(&set), "list"));
+	ScreenSet_pop(&set);
+	CHECK(ScreenSet_afterClose(&set, 3) == AFTER_LIST);
+	// any other screen goes back to the base
+	CHECK(ScreenSet_afterClose(&set, 1) == AFTER_BASE);
+
+	// after an error, the built-in switcher for the rest of the run, still
+	// going back to the home screen under it
+	set.under = 1;
+	set.screens[3].off = 1;
+	CHECK(!ScreenSet_switcherReady(&set));
+	CHECK(ScreenSet_afterClose(&set, 3) == AFTER_SWITCHER);
+	CHECK(set.under);
+	CHECK(ScreenSet_backToHome(&set));
+}
+
 int main(void) {
 	testAdd();
 	testDropOwner();
@@ -248,5 +315,6 @@ int main(void) {
 	testSlides();
 	testOverlays();
 	testHome();
+	testSwitcher();
 	CHECK_DONE();
 }

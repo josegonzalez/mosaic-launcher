@@ -29,6 +29,7 @@
 #define LAUNCH_SLOT "launch" // the exclusive slot asked how a launch begins
 #define BACKGROUND_SLOT "background" // the exclusive slot background_render belongs to
 #define HOME_SLOT "home" // the exclusive slot whose MOSAIC_SCREEN_HOME screen is in place of the root list
+#define SWITCHER_SLOT "switcher" // the exclusive slot whose MOSAIC_SCREEN_GAME_SWITCHER screen is in place of the game switcher
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -250,6 +251,15 @@ void Plugins_homeBack(void);
 // list, for Plugins_homeStart on the next start: at a launch, and when it
 // restarts for HDMI.
 void Plugins_homeLeaving(void);
+
+// The switcher slot. Wherever currentScreen became the built-in game
+// switcher (SELECT, an FN button, run_action, the start screen), opens the
+// slot owner's switcher screen over the game list in its place, closing
+// the open screens first as the built-in one does. Call at start, after
+// Plugins_homeStart, and each frame before and after the screen's input.
+// The built-in switcher stays when there's no switcher screen, after it
+// failed, and for this time when its enter declined.
+void Plugins_switcherCheck(void);
 
 // 1 when plugins' overlays draw over screen (a SCREEN_* id): one has
 // overlay_render, and screen takes them.

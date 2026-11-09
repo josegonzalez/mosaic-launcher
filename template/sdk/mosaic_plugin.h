@@ -314,6 +314,19 @@ typedef struct MosaicTransition {
 #define MOSAIC_TRANSITION_HAS(transition, field) \
 	((transition)->size >= offsetof(MosaicTransition, field) + sizeof((transition)->field))
 
+// A recent, as the game switcher shows it, for host->recent_info. The
+// plugin sets size to sizeof(MosaicRecent) before asking, and the
+// launcher fills in only the fields that fit in it, so fields are only
+// added at the end.
+typedef struct MosaicRecent {
+	size_t size;       // sizeof(MosaicRecent) in the plugin
+	char name[256];    // the name it was launched under, as the switcher's title shows it
+	int type;          // MOSAIC_ENTRY_ROM or MOSAIC_ENTRY_PAK
+	int available;     // 1 when its emulator is installed, so it can open
+	int can_resume;    // 1 when it has a save state to resume: the last one minarch saved
+	char preview[512]; // that state's preview image, for art_load, or "" when there's none
+} MosaicRecent;
+
 // A game's local RetroAchievements progress, for host->achievements. The
 // plugin sets size to sizeof(MosaicAchievements) before asking, and the
 // launcher fills in only the fields that fit in it, so fields are only
@@ -349,6 +362,12 @@ enum MosaicScreenFlag {
 	// first and goes back to. Only for the home slot's owner (slots=home),
 	// on one of its screens; the first it registers with the flag wins.
 	MOSAIC_SCREEN_HOME = 2,
+	// The game switcher, in place of the built-in one: what SELECT, an FN
+	// button, gamelist.switcher, Settings' start screen and coming back
+	// from a game launched from the switcher open. Only for the switcher
+	// slot's owner (slots=switcher), on one of its screens other than its
+	// home screen; the first it registers with the flag wins.
+	MOSAIC_SCREEN_GAME_SWITCHER = 4,
 };
 
 // What MosaicScreenHooks' input returns.
@@ -949,7 +968,8 @@ typedef struct MosaicHost {
 	// such as from an action's run (a button, an FN button or a quick menu
 	// tile), tick, a dialog's callback, or another screen's input. It
 	// returns 0, or -1 for an unknown screen, one already open, one off
-	// after an error, past 8 open, an enter that declined, while a dialog
+	// after an error, past 8 open, an enter that declined, the switcher
+	// slot's screen (run_action("gamelist.switcher") opens it), while a dialog
 	// shows or a launch starts, and from init, enter, exit or any hook that
 	// only draws. close_screen closes a screen and any opened above it,
 	// running their exit, and returns 0, or -1 for one that isn't open,
@@ -975,6 +995,22 @@ typedef struct MosaicHost {
 	// the plugin screens, as an FN button does. Check for it with
 	// MOSAIC_HOST_HAS(host, run_action).
 	int (*run_action)(const char* action_id);
+
+	// The game switcher's recents, for a switcher of a plugin's own (see
+	// MOSAIC_SCREEN_GAME_SWITCHER), alongside recents_count, recent_path and
+	// recent_remove. recent_info fills out (see MosaicRecent) for the
+	// recent at index, newest first, and returns 0, or -1 for an index past
+	// the end or a NULL out. recent_open opens it as the built-in
+	// switcher's A does: with resume 1 a game resumes its save state when
+	// it has one, and with 0 it starts fresh; a pak just launches. Launched
+	// while the switcher slot's screen is open, the launcher comes back to
+	// that screen after the game, as stock's switcher does. recent_open
+	// returns 1 when the launch is queued, or 0 for a bad index, a recent
+	// whose emulator isn't installed, a launch pre_launch cancelled, and
+	// wherever open_screen is refused. Check for them with
+	// MOSAIC_HOST_HAS(host, recent_open).
+	int (*recent_info)(int index, MosaicRecent* out);
+	int (*recent_open)(int index, int resume);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

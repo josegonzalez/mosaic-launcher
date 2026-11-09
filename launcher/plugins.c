@@ -47,6 +47,7 @@ typedef struct LoadedPlugin {
 	int filter_off;      // its input_filter failed, so it's no longer called
 	int overlay_off;     // its overlay_render failed, so its overlay is left out
 	int owns_home;       // claims the home slot, so its MOSAIC_SCREEN_HOME screen is in place of the root list
+	int owns_switcher;   // claims the switcher slot, so its MOSAIC_SCREEN_GAME_SWITCHER screen is in place of the game switcher
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -72,6 +73,7 @@ static int swap_drawn = 0;                  // the layout's last layout_render g
 static ScreenSet screens;      // plugins' screens, and the stack of those open
 static int screen_hook = 0;    // while a screen's enter or exit runs, which can't open or close screens
 static int screen_drawing = 0; // while a screen's render or an overlay runs, which only draw
+static int switcher_declined = 0; // the switcher screen's enter declined, so the built-in switcher shows until it closes
 
 #define SCREEN_COUNT 3
 
@@ -391,6 +393,83 @@ static int hostRecentRemove(int index) {
 static void hostRecentsClear(void) {
 	Recents_clear();
 	state.switcher_selected = 0;
+}
+
+// The game list's resume state, which readyResumePath works out for one
+// entry at a time, kept while the recents' is looked up.
+typedef struct ResumeState {
+	int can_resume;
+	int has_preview;
+	char slot_path[256];
+	char preview_path[256];
+} ResumeState;
+static void resumeSave(ResumeState* saved) {
+	saved->can_resume = state.can_resume;
+	saved->has_preview = state.has_preview;
+	memcpy(saved->slot_path, state.slot_path, sizeof(saved->slot_path));
+	memcpy(saved->preview_path, state.preview_path, sizeof(saved->preview_path));
+}
+static void resumeRestore(const ResumeState* saved) {
+	state.can_resume = saved->can_resume;
+	state.has_preview = saved->has_preview;
+	memcpy(state.slot_path, saved->slot_path, sizeof(state.slot_path));
+	memcpy(state.preview_path, saved->preview_path, sizeof(state.preview_path));
+}
+
+static int hostRecentInfo(int index, MosaicRecent* out) {
+	if (!out || out->size < sizeof(out->size) || !state.recents || index < 0 || index >= state.recents->count) return -1;
+	Recent* recent = state.recents->items[index];
+	char sd_path[256];
+	snprintf(sd_path, sizeof(sd_path), "%s%s", SDCARD_PATH, recent->path);
+	// as entryFromRecent makes the built-in switcher's entry
+	int type = suffixMatch(".pak", sd_path) ? ENTRY_PAK : ENTRY_ROM;
+	MosaicRecent full;
+	memset(&full, 0, sizeof(full));
+	full.size = out->size;
+	full.type = type == ENTRY_PAK ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_ROM;
+	full.available = recent->available ? 1 : 0;
+	if (recent->alias) snprintf(full.name, sizeof(full.name), "%s", recent->alias);
+	else {
+		Entry* entry = Entry_new(sd_path, type);
+		snprintf(full.name, sizeof(full.name), "%s", entry->name);
+		Entry_free(entry);
+	}
+	ResumeState saved;
+	resumeSave(&saved);
+	readyResumePath(sd_path, type);
+	full.can_resume = state.can_resume;
+	if (state.has_preview) snprintf(full.preview, sizeof(full.preview), "%s", state.preview_path);
+	resumeRestore(&saved);
+	// only the fields the plugin knows about
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return 0;
+}
+
+static int screenCallAllowed(const char* call);
+
+// The built-in switcher's A, for a recent by index.
+static int hostRecentOpen(int index, int resume) {
+	if (!screenCallAllowed("recent_open") || !state.top || !state.recents || index < 0 || index >= state.recents->count) return 0;
+	Entry* entry = entryFromRecent(state.recents->items[index]);
+	if (!entry) return 0; // its emulator isn't installed
+	// back to the switcher screen after the game, as stock's switcher comes back to itself
+	int from_switcher = ScreenSet_switcherOpen(&screens);
+	if (from_switcher) putFile(GAME_SWITCHER_PERSIST_PATH, "unused");
+	ResumeState saved;
+	resumeSave(&saved);
+	readyResume(entry);
+	state.should_resume = resume && state.can_resume;
+	Entry_open(entry);
+	int opened = state.startgame;
+	state.recent_alias = NULL; // the entry's name, freed below
+	Entry_free(entry);
+	if (!opened) {
+		if (from_switcher) unlink(GAME_SWITCHER_PERSIST_PATH);
+		state.should_resume = 0;
+		resumeRestore(&saved);
+	}
+	state.dirty = 1;
+	return opened;
 }
 static void hostReloadLists(void) {
 	// on the next frame, so a hook mid-listing never has its list freed
@@ -882,6 +961,8 @@ static const MosaicHost host = {
 	.close_screen = hostCloseScreen,
 	.current_screen = Plugins_currentScreen,
 	.run_action = hostRunAction,
+	.recent_info = hostRecentInfo,
+	.recent_open = hostRecentOpen,
 };
 
 ///////////////////////////////////////
@@ -942,6 +1023,7 @@ static void load(const PluginManifest* m) {
 		LOG_warn("plugins: %s has background_render but no slots=" BACKGROUND_SLOT ", so it won't be called\n", m->id);
 	}
 	p->owns_home = csvHas(m->slots, HOME_SLOT);
+	p->owns_switcher = csvHas(m->slots, SWITCHER_SLOT);
 	int has_width = Plugin_has(plugin, header_width) && plugin->header_width;
 	int has_widget = Plugin_has(plugin, header_widget) && plugin->header_widget;
 	if (has_width != has_widget) {
@@ -1071,6 +1153,26 @@ static void claimHome(void) {
 	else LOG_warn("plugins: %s owns the " HOME_SLOT " slot but registered no MOSAIC_SCREEN_HOME screen, using the root list\n", loaded[owner].id);
 }
 
+// The switcher slot's screen, once every plugin has loaded and home is
+// claimed. The flag on any other plugin's screen means nothing.
+static void claimSwitcher(void) {
+	int owner = -1;
+	for (int i = 0; i < loaded_count && owner < 0; i++) {
+		if (loaded[i].owns_switcher) owner = i;
+	}
+	for (int i = 0; i < screens.count; i++) {
+		const PluginScreen* s = &screens.screens[i];
+		if (s->owner != owner && (s->hooks.flags & MOSAIC_SCREEN_GAME_SWITCHER)) {
+			LOG_warn("plugins: %s's screen %s is marked switcher but %s has no slots=" SWITCHER_SLOT ", so it's an ordinary screen\n",
+				loaded[s->owner].id, s->id, loaded[s->owner].id);
+		}
+	}
+	if (owner < 0) return;
+	int switcher = ScreenSet_claimSwitcher(&screens, owner);
+	if (switcher >= 0) LOG_info("plugins: %s's screen %s is the game switcher\n", loaded[owner].id, screens.screens[switcher].id);
+	else LOG_warn("plugins: %s owns the " SWITCHER_SLOT " slot but registered no MOSAIC_SCREEN_GAME_SWITCHER screen other than its home screen, using the built-in switcher\n", loaded[owner].id);
+}
+
 void Plugins_init(void) {
 	Audio_setMainThread();
 	ScreenSet_clear(&screens);
@@ -1115,6 +1217,7 @@ void Plugins_init(void) {
 	claimTransitions();
 	claimBackground();
 	claimHome();
+	claimSwitcher();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
@@ -2112,11 +2215,12 @@ static int openScreen(int index, int slide) {
 			return -1;
 		}
 	}
-	int from = currentScreen;
+	// the switcher screen is the game switcher, which nothing slides to or from
+	int from = screens.depth > 0 ? ScreenSet_kind(&screens, ScreenSet_top(&screens)) : screenKind(currentScreen);
 	// the base is only kept from the first, which opens over a built-in screen
 	ScreenSet_push(&screens, index, currentScreen);
 	currentScreen = SCREEN_PLUGIN;
-	if (ScreenKind_slides(screenKind(from), SCREENKIND_PLUGIN)) state.animationdirection = slide;
+	if (ScreenKind_slides(from, ScreenSet_kind(&screens, index))) state.animationdirection = slide;
 	state.dirty = 1;
 	LOG_info("plugins: opened screen %s\n", s->id);
 	return 0;
@@ -2125,6 +2229,10 @@ static int openScreen(int index, int slide) {
 static int hostOpenScreen(const char* id) {
 	if (!screenCallAllowed("open_screen")) return -1;
 	int index = ScreenSet_find(&screens, id);
+	if (index >= 0 && index == screens.switcher) {
+		LOG_warn("plugins: can't open screen %s: it's the game switcher, which run_action(\"gamelist.switcher\") opens\n", id);
+		return -1;
+	}
 	int why = ScreenSet_canOpen(&screens, index);
 	if (why != SCREEN_OPENS) {
 		LOG_warn("plugins: can't open screen %s: %s\n", id ? id : "(null)",
@@ -2144,7 +2252,10 @@ static void runExit(PluginScreen* s) {
 
 // Closes the open screens from the top down to index, running their exit,
 // and goes back to what's under it, sliding out as a folder does. The home
-// screen, the root's parent, goes on to the list as a folder opens.
+// screen, the root's parent, goes on to the list as a folder opens. The
+// switcher screen goes back as the built-in switcher does, at once: to the
+// game list or the home screen it opened over, or after an error to the
+// built-in switcher in its place.
 static void closeTo(int index) {
 	int top = -1;
 	while (screens.depth > 0) {
@@ -2153,11 +2264,27 @@ static void closeTo(int index) {
 		LOG_info("plugins: closed screen %s\n", screens.screens[top].id);
 		if (top == index) break;
 	}
-	currentScreen = screens.depth > 0 ? SCREEN_PLUGIN : screens.base;
+	int after = AFTER_BASE;
+	int to;
+	if (screens.depth > 0) {
+		currentScreen = SCREEN_PLUGIN;
+		to = ScreenSet_kind(&screens, ScreenSet_top(&screens));
+	}
+	else {
+		after = ScreenSet_afterClose(&screens, top);
+		currentScreen = after == AFTER_BASE ? screens.base : after == AFTER_SWITCHER ? SCREEN_GAMESWITCHER : SCREEN_GAMELIST;
+		to = screenKind(currentScreen);
+	}
 	int forward = screens.depth == 0 && top == screens.home;
-	if (ScreenKind_slides(SCREENKIND_PLUGIN, screenKind(currentScreen))) state.animationdirection = forward ? SLIDE_LEFT : SLIDE_RIGHT;
+	if (ScreenKind_slides(ScreenSet_kind(&screens, top), to)) state.animationdirection = forward ? SLIDE_LEFT : SLIDE_RIGHT;
 	folderbgchanged = 1; // the screen cleared every layer; repaint the background
 	state.dirty = 1;
+	if (after == AFTER_SWITCHER) {
+		state.switcher_selected = 0;
+		LOG_warn("plugins: using the built-in game switcher in place of %s until the launcher restarts\n", screens.screens[top].id);
+	}
+	// the built-in switcher shows the home screen at once, so this does too
+	else if (after == AFTER_HOME && !state.startgame) openScreen(screens.home, ANIM_NONE);
 }
 
 static int hostCloseScreen(const char* id) {
@@ -2254,16 +2381,40 @@ void Plugins_screenRender(SDL_Surface* surface, const MosaicScreenView* view) {
 	if (rc != 0) screenFailed(s, "render", rc);
 }
 
-void Plugins_screensCheck(void) {
-	// left for a built-in screen some other way, such as an FN button's
-	// action; a quick menu or game switcher over the home screen goes back
-	// to it once it closes
-	if (!ScreenSet_coveredBy(&screens, screenKind(currentScreen))) return;
+// Closes the open screens once a built-in screen of kind came in front of
+// them some other way than open_screen and close_screen; a quick menu or
+// game switcher over the home screen goes back to it once it closes.
+static void closeCovered(int kind, const char* by) {
+	if (!ScreenSet_coveredBy(&screens, kind)) return;
 	while (screens.depth > 0) {
 		int top = ScreenSet_pop(&screens);
 		runExit(&screens.screens[top]);
-		LOG_info("plugins: closed screen %s, as the %s opened over it\n", screens.screens[top].id, Plugins_currentScreen());
+		LOG_info("plugins: closed screen %s, as the %s opened over it\n", screens.screens[top].id, by);
 	}
+}
+
+void Plugins_screensCheck(void) {
+	// the switcher slot's screen in place of the built-in switcher
+	Plugins_switcherCheck();
+	// left for a built-in screen some other way, such as an FN button's action
+	closeCovered(screenKind(currentScreen), Plugins_currentScreen());
+}
+
+void Plugins_switcherCheck(void) {
+	if (currentScreen != SCREEN_GAMESWITCHER) {
+		switcher_declined = 0;
+		return;
+	}
+	if (switcher_declined || !ScreenSet_switcherReady(&screens) || state.startgame) return;
+	// as the built-in one would: over the game list, alone
+	closeCovered(SCREENKIND_SWITCHER, "switcher");
+	currentScreen = SCREEN_GAMELIST;
+	// it brings itself in, so nothing slides
+	if (openScreen(screens.switcher, ANIM_NONE) == 0) return;
+	// the built-in one this time
+	currentScreen = SCREEN_GAMESWITCHER;
+	switcher_declined = 1;
+	state.dirty = 1;
 }
 
 void Plugins_homeStart(void) {

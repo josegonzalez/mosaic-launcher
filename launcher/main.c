@@ -107,6 +107,8 @@ int main (int argc, char *argv[]) {
 
 	// a plugin's home screen in place of the root list
 	Plugins_homeStart();
+	// and its game switcher in place of the built-in one
+	Plugins_switcherCheck();
 
 	// make sure we have no running games logged as active anymore (we might be launching back into the UI here)
 	system("gametimectl.elf stop_all");
@@ -200,6 +202,8 @@ int main (int argc, char *argv[]) {
 
 		gsanimdir = ANIM_NONE;
 
+		// an FN button or a plugin's tick opened the game switcher: a plugin's in its place
+		Plugins_switcherCheck();
 		Screen_get(currentScreen)->handleInput();
 		// plugins' screens close once a built-in screen opened over them
 		Plugins_screensCheck();

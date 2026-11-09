@@ -36,6 +36,7 @@ typedef struct ScreenSet {
 	int base; // the built-in screen under the stack, the caller's id for it
 	int home;  // the home slot's screen, or -1
 	int under; // the quick menu or game switcher in front opened over the home screen, so goes back to it
+	int switcher; // the switcher slot's screen, or -1
 } ScreenSet;
 
 void ScreenSet_clear(ScreenSet* set);
@@ -132,5 +133,33 @@ int ScreenSet_coveredBy(ScreenSet* set, int kind);
 // The quick menu or game switcher closing back to the game list: 1 when
 // the home screen opens in the list's place, as it was under them.
 int ScreenSet_backToHome(ScreenSet* set);
+
+// The switcher slot: one plugin's screen in place of the built-in game
+// switcher. It opens over the game list as the only screen open, the way
+// the built-in one shows, and counts as the game switcher for the rules
+// above.
+
+// Makes owner's first screen with MOSAIC_SCREEN_GAME_SWITCHER, other than the
+// home screen, the switcher screen, or leaves none. Returns it, or -1.
+int ScreenSet_claimSwitcher(ScreenSet* set, int owner);
+
+// 1 while there's a switcher screen that can open: it hasn't failed.
+int ScreenSet_switcherReady(const ScreenSet* set);
+
+// 1 while the switcher screen is open.
+int ScreenSet_switcherOpen(const ScreenSet* set);
+
+// What kind of screen a registered one is for ScreenKind_slides: the
+// switcher screen is SCREENKIND_SWITCHER, any other SCREENKIND_PLUGIN.
+int ScreenSet_kind(const ScreenSet* set, int index);
+
+// What shows once closed, the last open screen, has closed.
+enum AfterClose {
+	AFTER_BASE,     // the built-in screen the stack opened over
+	AFTER_LIST,     // the game list, as the built-in switcher goes back to
+	AFTER_HOME,     // the home screen, which the switcher opened over
+	AFTER_SWITCHER, // the built-in switcher, in place of a switcher screen that failed
+};
+int ScreenSet_afterClose(ScreenSet* set, int closed);
 
 #endif

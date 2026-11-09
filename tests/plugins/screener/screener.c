@@ -13,15 +13,20 @@
 // and new frames' pixel at the probe (where tests/plugins/layerer draws its
 // overlay), so a case can see what was on screen, overlays included. Its
 // home setting, main or fail, marks that screen MOSAIC_SCREEN_HOME, for
-// the home slot (slots=home in its plugin.txt).
+// the home slot (slots=home in its plugin.txt), and its switcher setting,
+// main, bare or fail, marks that one MOSAIC_SCREEN_GAME_SWITCHER, for the
+// switcher slot (slots=switcher). With decline=1 the first enter of the
+// switcher setting's screen declines.
 //
 // Its steps setting is a comma separated list run from tick, one every 20
-// ticks from the 40th: y, a or b presses that button (the desktop build
-// reads the keyboard through SDL, so it pushes key events with
+// ticks from the 40th: y, a, b or select presses that button (the desktop
+// build reads the keyboard through SDL, so it pushes key events with
 // SDL_PushEvent, found with dlsym: a test-only shortcut), open:<id> and
 // close:<id> call open_screen and close_screen, action:<id> calls
-// run_action, pak:<path> opens a pak with open_path, and confirm opens a
-// confirm dialog. It logs what each
+// run_action, pak:<path> opens a pak with open_path, confirm opens a
+// confirm dialog, recents logs recents_count and each recent_info,
+// play:<index>:<resume> calls recent_open and remove:<index>
+// recent_remove. It logs what each
 // returns, what current_screen says whenever it changes, and "done" 40
 // ticks after the last step.
 
@@ -107,9 +112,17 @@ static Screen bare_screen = { "screener.bare", 0 };
 static Screen full_screen = { "screener.full", 0 };
 static Screen fail_screen = { "screener.fail", 0 };
 
+static const char* switcher = "";
+static int declines = 0;
+
 static int enter(void* data) {
 	Screen* s = data;
 	s->rendered = 0;
+	if (declines > 0 && !strcmp(s->id + strlen(ID "."), switcher)) {
+		declines--;
+		say("declined %s over %s", s->id, host->current_screen());
+		return 1;
+	}
 	say("enter %s over %s", s->id, host->current_screen());
 	return 0;
 }
@@ -190,10 +203,18 @@ static int init(const MosaicHost* h) {
 	if (!pushEvent) say("no SDL_PushEvent");
 
 	const char* home = host->cfg_get(ID, "home", "");
-	registerScreen(&main_screen, !strcmp(home, "main") ? MOSAIC_SCREEN_HOME : 0, 1);
-	registerScreen(&bare_screen, 0, 0);
+	switcher = host->cfg_get(ID, "switcher", "");
+	declines = atoi(host->cfg_get(ID, "decline", "0"));
+	int game_switcher = MOSAIC_SCREEN_GAME_SWITCHER;
+	registerScreen(&main_screen, (!strcmp(home, "main") ? MOSAIC_SCREEN_HOME : 0) | (!strcmp(switcher, "main") ? game_switcher : 0), 1);
+	registerScreen(&bare_screen, !strcmp(switcher, "bare") ? game_switcher : 0, 0);
 	registerScreen(&full_screen, MOSAIC_SCREEN_FULL, 1);
-	registerScreen(&fail_screen, !strcmp(home, "fail") ? MOSAIC_SCREEN_HOME : 0, 1);
+	registerScreen(&fail_screen, (!strcmp(home, "fail") ? MOSAIC_SCREEN_HOME : 0) | (!strcmp(switcher, "fail") ? game_switcher : 0), 1);
+	if (MOSAIC_HOST_HAS(host, recent_open)) {
+		MosaicRecent recent = { .size = sizeof(recent) };
+		say("recents from init info %i null %i open %i", host->recent_info(0, &recent), host->recent_info(0, NULL),
+			host->recent_open(0, 1));
+	}
 	MosaicScreenHooks good = { sizeof(good), NULL, 0, NULL, NULL, NULL, render, NULL };
 	MosaicScreenHooks none = { sizeof(none), NULL, 0, NULL, NULL, NULL, NULL, NULL };
 	say("refused dup %i builtin %i empty %i no render %i open %i close %i",
@@ -210,6 +231,7 @@ static int scancode(const char* name) {
 	if (!strcmp(name, "a")) return 22; // S
 	if (!strcmp(name, "b")) return 4;  // A
 	if (!strcmp(name, "y")) return 20; // Q
+	if (!strcmp(name, "select")) return 53; // `
 	return 0;
 }
 
@@ -234,6 +256,27 @@ static void runStep(const char* step) {
 	else if (!strncmp(step, "action:", 7)) say("run %s %i", step + 7, host->run_action(step + 7));
 	else if (!strncmp(step, "pak:", 4)) say("open pak %i", host->open_path(step + 4, MOSAIC_ENTRY_PAK));
 	else if (!strcmp(step, "confirm")) host->confirm("Screener?", "Yes", onYes, NULL);
+	else if (!strcmp(step, "recents")) {
+		int count = host->recents_count();
+		say("recents %i", count);
+		for (int i = 0; i <= count; i++) {
+			MosaicRecent recent = { .size = sizeof(recent) };
+			int rc = host->recent_info(i, &recent);
+			const char* preview = strrchr(recent.preview, '/');
+			say("recent %i %i name %s type %i available %i resume %i preview %s", i, rc, recent.name, recent.type,
+				recent.available, recent.can_resume, preview ? preview + 1 : "-");
+		}
+		// an older plugin's smaller struct gets only what fits
+		struct { size_t size; char name[256]; int type; } old = { sizeof(old), "", -1 };
+		host->recent_info(0, (MosaicRecent*)&old);
+		say("old size %zu name %s type %i", old.size, old.name, old.type);
+	}
+	else if (!strncmp(step, "play:", 5)) {
+		int index = atoi(step + 5);
+		const char* colon = strchr(step + 5, ':');
+		say("play %i %i", index, host->recent_open(index, colon ? atoi(colon + 1) : 1));
+	}
+	else if (!strncmp(step, "remove:", 7)) say("remove %s %i", step + 7, host->recent_remove(atoi(step + 7)));
 	else if (!strcmp(step, "register")) {
 		MosaicScreenHooks good = { sizeof(good), NULL, 0, NULL, NULL, NULL, render, NULL };
 		say("register from tick %i", host->register_screen("screener.late", &good));
