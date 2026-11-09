@@ -4,6 +4,7 @@
 #include "pluginset.h"
 #include "plugins.h"
 #include "theme.h"
+#include "fallback.h"
 #include "stocktoggles.h"
 #include "leds.h"
 #include "bluetooth.h"
@@ -1162,6 +1163,9 @@ static void load(const PluginManifest* m) {
 	if (!p->owns_strings && has_translate) {
 		LOG_warn("plugins: %s translates but has no slots=" STRINGS_SLOT ", so it won't be asked\n", m->id);
 	}
+	if (!p->owns_strings && Plugin_has(plugin, fallback_font) && plugin->fallback_font) {
+		LOG_warn("plugins: %s has a fallback_font but no slots=" STRINGS_SLOT ", so it won't be asked\n", m->id);
+	}
 	int has_width = Plugin_has(plugin, header_width) && plugin->header_width;
 	int has_widget = Plugin_has(plugin, header_widget) && plugin->header_widget;
 	if (has_width != has_widget) {
@@ -1276,13 +1280,18 @@ static void trLog(const char* message) {
 	LOG_warn("%s\n", message);
 }
 
+// The strings slot's owner, or -1, for its fallback font.
+static int strings_owner = -1;
+
 // The strings slot's owner, once every plugin has loaded, so every
 // plugin's init sees English.
 static void claimStrings(void) {
 	Tr_setOwner(NULL);
+	strings_owner = -1;
 	for (int i = 0; i < loaded_count; i++) {
 		if (!loaded[i].owns_strings) continue;
 		const MosaicPlugin* p = loaded[i].plugin;
+		strings_owner = i;
 		if (Plugin_has(p, translate) && p->translate) {
 			TrOwner owner = {
 				.translate = p->translate,
@@ -1317,8 +1326,32 @@ static void claimTheme(void) {
 	Plugins_themeRefresh();
 }
 
+// The fallback font: the theme's, else the strings slot's owner's, else
+// none.
+static void fallbackRefresh(void) {
+	char path[512] = "";
+	char from[300] = "";
+	if (theme_owner >= 0 && !theme_failed && Theme_fallbackFont()[0]) {
+		snprintf(path, sizeof(path), "%s", Theme_fallbackFont());
+		snprintf(from, sizeof(from), "%s's theme", loaded[theme_owner].id);
+	}
+	else if (strings_owner >= 0) {
+		LoadedPlugin* owner = &loaded[strings_owner];
+		if (Plugin_has(owner->plugin, fallback_font) && owner->plugin->fallback_font) {
+			const char* given = owner->plugin->fallback_font();
+			if (given && given[0] && Fallback_check(owner->id, "fallback font", given, path, sizeof(path)) == 0)
+				snprintf(from, sizeof(from), "%s", owner->id);
+		}
+	}
+	if (strcmp(path, Fallback_path()) != 0) state.dirty = 1;
+	Fallback_set(path, from);
+}
+
 int Plugins_themeRefresh(void) {
-	if (theme_owner < 0 || theme_failed) return 0;
+	if (theme_owner < 0 || theme_failed) {
+		fallbackRefresh();
+		return 0;
+	}
 	LoadedPlugin* owner = &loaded[theme_owner];
 	MosaicTheme theme;
 	Theme_blank(&theme);
@@ -1329,6 +1362,7 @@ int Plugins_themeRefresh(void) {
 		Theme_clear();
 	}
 	else Theme_set(owner->id, &theme);
+	fallbackRefresh();
 	state.dirty = 1;
 	return 1;
 }

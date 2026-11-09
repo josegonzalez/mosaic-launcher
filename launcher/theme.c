@@ -11,6 +11,7 @@ static ThemeSizes sizes;            // 0 for each left to stock
 static int colors[MOSAIC_THEME_COLORS]; // 0xRRGGBB or MOSAIC_THEME_UNSET
 static int contrast = 0;
 static char font_path[512];          // "" for stock's
+static char fallback_path[512];      // "" for none
 static ThemeWalls walls;
 
 static ThemeStock stockNow(void) {
@@ -66,6 +67,10 @@ int Theme_uiSize(int which) {
 	}
 }
 
+const char* Theme_fallbackFont(void) {
+	return active ? fallback_path : "";
+}
+
 const char* Theme_fontPath(const char* stock) {
 	return active && font_path[0] ? font_path : stock;
 }
@@ -114,6 +119,21 @@ static void cardFile(const char* owner, const char* field, const char* given, ch
 	}
 }
 
+// A font field: a file on the card, as cardFile, that opens as a font.
+static void cardFont(const char* owner, const char* field, const char* given, char* out, size_t size) {
+	cardFile(owner, field, given, out, size);
+	if (!out[0]) return;
+	// one that won't open would leave the launcher with no font
+	TTF_Font* test = TTF_OpenFont(out, SCALE1(UI_stockFontLarge() + sizes.text_step));
+	if (test) TTF_CloseFont(test);
+	else {
+		char line[600];
+		snprintf(line, sizeof(line), "%s (%s)", field, out);
+		refuse(owner, line, "won't open");
+		out[0] = '\0';
+	}
+}
+
 int Theme_set(const char* owner, const MosaicTheme* theme) {
 	refusals = 0;
 	// the owner may have left a string unterminated
@@ -122,6 +142,7 @@ int Theme_set(const char* owner, const MosaicTheme* theme) {
 	t.wallpaper[sizeof(t.wallpaper) - 1] = '\0';
 	t.wallpaper_list[sizeof(t.wallpaper_list) - 1] = '\0';
 	t.wallpaper_quick[sizeof(t.wallpaper_quick) - 1] = '\0';
+	t.fallback_font[sizeof(t.fallback_font) - 1] = '\0';
 
 	for (int i = 0; i < MOSAIC_THEME_COLORS; i++) {
 		colors[i] = t.colors[i];
@@ -148,18 +169,8 @@ int Theme_set(const char* owner, const MosaicTheme* theme) {
 		refusals++;
 	}
 
-	cardFile(owner, "font", t.font, font_path, sizeof(font_path));
-	if (font_path[0]) {
-		// one that won't open would leave the launcher with no font
-		TTF_Font* test = TTF_OpenFont(font_path, SCALE1(UI_stockFontLarge() + sizes.text_step));
-		if (test) TTF_CloseFont(test);
-		else {
-			char field[600];
-			snprintf(field, sizeof(field), "font (%s)", font_path);
-			refuse(owner, field, "won't open");
-			font_path[0] = '\0';
-		}
-	}
+	cardFont(owner, "font", t.font, font_path, sizeof(font_path));
+	cardFont(owner, "fallback_font", t.fallback_font, fallback_path, sizeof(fallback_path));
 	cardFile(owner, "wallpaper", t.wallpaper, walls.main, sizeof(walls.main));
 	cardFile(owner, "wallpaper_list", t.wallpaper_list, walls.list, sizeof(walls.list));
 	cardFile(owner, "wallpaper_quick", t.wallpaper_quick, walls.quick, sizeof(walls.quick));
@@ -176,6 +187,7 @@ void Theme_clear(void) {
 	active = 0;
 	memset(&sizes, 0, sizeof(sizes));
 	font_path[0] = '\0';
+	fallback_path[0] = '\0';
 	memset(&walls, 0, sizeof(walls));
 	contrast = 0;
 	if (was) GFX_themeChanged();

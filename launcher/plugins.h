@@ -276,8 +276,9 @@ void Plugins_afterResume(void);
 void Plugins_beforePoweroff(void);
 
 // Asks the theme slot's owner for its theme again and puts it in place,
-// as the lists reload; after an error, stock's stays. Returns 1 when it
-// asked, so the theme may have changed.
+// as the lists reload; after an error, stock's stays. Then puts the
+// fallback font in place: the theme's, else the strings slot's owner's.
+// Returns 1 when it asked for the theme, so the theme may have changed.
 int Plugins_themeRefresh(void);
 
 // Loads plugins unless they're paused after a crash. Call once, before

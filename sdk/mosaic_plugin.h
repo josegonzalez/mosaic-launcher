@@ -363,6 +363,7 @@ typedef struct MosaicTheme {
 	char wallpaper[512];               // the background where the card has no bg.png (and no folder's .media/bg.png), or ""
 	char wallpaper_list[512];          // a game folder's background where it has no .media/bglist.png and the card no bg.png, or "" for wallpaper
 	char wallpaper_quick[512];         // the quick menu's background where the card has no .media/quick_<name>.png or quick.png, or ""
+	char fallback_font[512];           // a TrueType or OpenType font for the characters the UI font has no glyphs for, or "" for the strings slot's owner's (see fallback_font in MosaicPlugin) or none
 } MosaicTheme;
 
 #define MOSAIC_THEME_HAS(theme, field) \
@@ -1501,8 +1502,8 @@ typedef struct MosaicPlugin {
 	const char* (*translate_plural)(const char* context, const char* singular, const char* plural, unsigned long n);
 
 	// The theme slot. A plugin with slots=theme in its plugin.txt supplies
-	// the launcher's colours, font, text size, UI sizes and wallpapers:
-	// theme gets a MosaicTheme with every field at stock's value, sets the
+	// the launcher's colours, font and fallback font, text size, UI sizes
+	// and wallpapers: theme gets a MosaicTheme with every field at stock's value, sets the
 	// ones it changes and returns 0. Nothing it sets is written to stock's
 	// settings. The launcher asks once every plugin has loaded, before the
 	// first list is built, and again each time the lists reload. A value
@@ -1514,6 +1515,20 @@ typedef struct MosaicPlugin {
 	// stock's theme back and doesn't ask again until it restarts. Check
 	// for it with MOSAIC_HOST_HAS(host, ui_size).
 	int (*theme)(MosaicTheme* theme);
+
+	// The strings slot's fallback font. The launcher asks the slot's owner
+	// for the full path of a TrueType or OpenType font for the characters
+	// the UI font has no glyphs for (such as a CJK font for its language),
+	// or NULL for none, when it asks for the theme and again each time the
+	// lists reload. Text is then measured and drawn stretch by stretch:
+	// each goes to the UI font when it has the glyphs, otherwise to the
+	// fallback font at the same size, with their baselines lined up. Text
+	// the UI font has every glyph of is drawn exactly as without one. A
+	// theme's fallback_font wins over this one. A path that isn't a
+	// regular file on the card (symlinks may point anywhere on it), or a
+	// font that won't open, is refused and logged, and none is used. An
+	// older launcher never asks.
+	const char* (*fallback_font)(void);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

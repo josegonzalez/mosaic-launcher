@@ -715,6 +715,7 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
 
   - `colors` are stock's seven, numbered as its palettes number them (`colors[0]` is `color1`, the main colour, through `colors[6]`, `color7`, the background colour, which the screen is also cleared with), each `0xRRGGBB`; one left unset is the user's own. `theme_color` returns what's used.
   - `font` is a TrueType or OpenType file, used for every size of stock's text; `text_step` adds points to each of stock's text sizes (16, 14, 12, 10 and 7 before scaling), from -2 to 8.
+  - `fallback_font` is a TrueType or OpenType file for the characters the UI font has no glyphs for (see the fallback font below). It wins over the `strings` slot owner's.
   - `contrast`, from 10 to 210, is the least contrast ratio (WCAG's, in tenths: 45 is 4.5:1) text keeps against what it's drawn on: list text (`color4`) on the background (`color7`), selected text (`color5`) on the selected row's pill (`color1`) and hints (`color6`) on the hint and status pills (`color2`). A text colour short of it is moved towards white or black, whichever its backdrop allows more of, until it's met (or it's white or black). It applies to the colours in use, the theme's and the user's alike, so a theme of `contrast` alone makes the user's own palette readable.
   - `pill_size` is the height of a row and of every pill (stock's `PILL_SIZE`, 30), from 18 to 60, `button_size` the circle of a button in the hints (`BUTTON_SIZE`, 20), from 12 to 4 less than the pill, and `padding` the screen's margins (`PADDING`), from 1 to 30, all before scaling. With a pill size and no padding, the padding is worked out as stock's comments in `defines.h` put it, a third of the pill when it divides the screen's height and otherwise a third of what's left over (or a third of the pill when that's under an eighth of it). The rows the built-in list shows follow, as `(height - 2 * padding - pill) / pill` in layout units, which gives every stock device's `MAIN_ROW_COUNT`. With neither set, padding and rows stay stock's own. Stock's sprite sheet is drawn at stock's sizes, so pill ends and button circles at other sizes are scaled from it.
   - `wallpaper` is the background where the card has no `bg.png` and the selected folder no `.media/bg.png`; `wallpaper_list` a game folder's where it has no `.media/bglist.png` and the card no `bg.png` (`wallpaper` without it); `wallpaper_quick` the quick menu's where the card has no `.media/quick_<name>.png` or `quick.png`. A stock background placed by hand always wins, and a plugin's `art_path` answer for a folder's background comes before them too.
@@ -731,6 +732,15 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
       snprintf(t->font, sizeof(t->font), "%s/Themes/Night/font.ttf", host->sdcard_path);
       snprintf(t->wallpaper, sizeof(t->wallpaper), "%s/Themes/Night/bg.png", host->sdcard_path);
       return 0;
+  }
+  ```
+
+- A fallback font draws the characters the UI font has no glyphs for, such as CJK game names or a translated UI, which stock shows as boxes. The launcher measures and draws text a stretch at a time: each stretch goes to the UI font when it has the glyphs, otherwise to the fallback font at the same size, with their baselines lined up. Combining marks and variation selectors stay with the character before them. Everything the launcher draws goes through it: stock's text (button hints, truncation, wrapping, messages and the scrolling selected row), the launcher's own, and plugins' `draw_text`, `text_width` and `text_truncate`. A line keeps the UI font's height, so a fallback glyph that reaches past it is cut off there. The fallback font comes from the `theme` slot's owner, as its `MosaicTheme`'s `fallback_font`, or else from the `strings` slot's owner, as `fallback_font()` in `MosaicPlugin`, which returns a full path or `NULL` for none, so a language pack can bring a font for its language. Only the `strings` slot's owner is asked; one with it but not the slot is logged and never asked. Both are asked once every plugin has loaded and again each time a plugin calls `reload_lists`. The path is checked as the theme's are, a regular file on the card that opens as a font; one that doesn't is refused and logged, and none is used (a refused theme's leaves the `strings` owner's). With no fallback font, and for text the UI font has every glyph of, text is measured and drawn exactly as stock's.
+
+  ```c
+  // in the strings slot's owner
+  static const char* fallbackFont(void) {
+      return language_needs_cjk ? cjk_font_path : NULL;
   }
   ```
 

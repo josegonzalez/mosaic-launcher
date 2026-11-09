@@ -34,7 +34,7 @@ MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
 	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
 	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c \
-	theme.c thememodel.c
+	theme.c thememodel.c fallback.c fallbackmodel.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.
@@ -64,9 +64,11 @@ PRODUCT = $(BUILD_DIR)/$(TARGET).elf
 # UI sizes into runtime values whose defaults are stock's, and lets the
 # theme slot's owner supply colours and the font. A NextUI bump that the
 # patch no longer applies to fails here; scripts/upstream-drift.sh shows
-# it with upstream's changes to api.c.
+# it with upstream's changes to api.c. fallbackttf.h, included ahead of
+# that, sends every file's SDL_ttf text calls through fallback.c, for the
+# fallback font.
 API_C = $(BUILD_DIR)/api.c
-UISIZES = -include $(CURDIR)/uisizes.h
+UISIZES = -include $(CURDIR)/fallbackttf.h -include $(CURDIR)/uisizes.h
 
 # rcheevos and libchdr, for RetroAchievements hashing; its rules mustn't
 # become the default goal
