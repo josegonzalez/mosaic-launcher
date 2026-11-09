@@ -592,7 +592,7 @@ static void testClient(const char* dir) {
 	CHECK(got && len == 8 && !memcmp(got, "ROMBYTES", 8));
 	free(got);
 	snprintf(link_path, sizeof(link_path), "%s/link.part", dir);
-	symlink(file, link_path);
+	CHECK(symlink(file, link_path) == 0);
 	call.out_path = link_path;
 	CHECK(RN_run(&c, &call) != 0);
 

@@ -48,6 +48,18 @@
 #define ROM_MAX (4LL * 1024 * 1024 * 1024 - 1)
 #define SAVE_SLOT "mosaic-launcher"
 
+// snprintf, for paths and messages that are cut short rather than
+// overflow; through vsnprintf so gcc doesn't warn about every path that
+// could in theory be cut
+static int put(char* out, size_t size, const char* format, ...) __attribute__((format(printf, 3, 4)));
+static int put(char* out, size_t size, const char* format, ...) {
+	va_list args;
+	va_start(args, format);
+	int n = vsnprintf(out, size, format, args);
+	va_end(args);
+	return n;
+}
+
 static const MosaicHost* host;
 static int configured = 0;
 static RNConfig net;
@@ -91,7 +103,7 @@ static int isFile(const char* path) {
 
 static void makeDirs(const char* path) {
 	char buf[RM_PATH_MAX];
-	snprintf(buf, sizeof(buf), "%s", path);
+	put(buf, sizeof(buf), "%s", path);
 	for (char* p = buf + 1; *p; p++) {
 		if (*p != '/') continue;
 		*p = '\0';
@@ -104,7 +116,7 @@ static void makeDirs(const char* path) {
 // Writes text to path through a temporary file. Returns 0, or -1.
 static int writeFile(const char* path, const char* text, size_t len) {
 	char tmp[RM_PATH_MAX + 8];
-	snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+	put(tmp, sizeof(tmp), "%s.tmp", path);
 	int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0644);
 	if (fd < 0) return -1;
 	int ok = write(fd, text, len) == (ssize_t)len && fsync(fd) == 0;
@@ -141,7 +153,7 @@ static char* readFile(const char* path, size_t max, size_t* len) {
 // .userdata/shared, not reached through a link out of it
 static int insideCard(const char* dir, const char* top) {
 	char real_dir[PATH_MAX], real_top[PATH_MAX], want[RM_PATH_MAX];
-	snprintf(want, sizeof(want), "%s/%s", sd, top);
+	put(want, sizeof(want), "%s/%s", sd, top);
 	if (!realpath(dir, real_dir) || !realpath(want, real_top)) return 0;
 	size_t n = strlen(real_top);
 	return strncmp(real_dir, real_top, n) == 0 && real_dir[n] == '/';
@@ -156,7 +168,7 @@ static void loadSettings(void) {
 	const char* url = host->cfg_get(ID, "url", "");
 	const char* user = host->cfg_get(ID, "user", "");
 	char user_copy[256];
-	snprintf(user_copy, sizeof(user_copy), "%s", user);
+	put(user_copy, sizeof(user_copy), "%s", user);
 	sync_saves = strcmp(host->cfg_get(ID, "sync", "on"), "off") != 0;
 	keep_saves = atoi(host->cfg_get(ID, "keep", "10"));
 	if (keep_saves < 1 || keep_saves > 1000) keep_saves = 10;
@@ -182,7 +194,7 @@ static void loadSettings(void) {
 		}
 	}
 	const char* ca = host->cfg_get(ID, "ca_file", "");
-	if (ca[0]) snprintf(net.ca_file, sizeof(net.ca_file), "%s", ca);
+	if (ca[0]) put(net.ca_file, sizeof(net.ca_file), "%s", ca);
 	else RN_systemCa(sd, host->platform, net.ca_file, sizeof(net.ca_file));
 	net.connect_ms = 8000;
 	net.io_ms = 20000;
@@ -218,7 +230,7 @@ static int networkReady(int quiet) {
 	if (!quiet && (!last_gate_toast || now_ms - last_gate_toast > 4000)) {
 		last_gate_toast = now_ms ? now_ms : 1;
 		char message[96];
-		snprintf(message, sizeof(message), "RomM: %s", why);
+		put(message, sizeof(message), "RomM: %s", why);
 		toast(message);
 		sayf("network: %s", why);
 	}
@@ -271,19 +283,19 @@ static void jobFree(Job* j) {
 }
 
 static void httpError(Job* j, const RNCall* call, const char* what) {
-	if (call->status == 401 || call->status == 403) snprintf(j->error, sizeof(j->error), "RomM refused the login");
-	else if (call->status == 404) snprintf(j->error, sizeof(j->error), "%s isn't on the server", what);
-	else snprintf(j->error, sizeof(j->error), "the server answered %d", call->status);
+	if (call->status == 401 || call->status == 403) put(j->error, sizeof(j->error), "RomM refused the login");
+	else if (call->status == 404) put(j->error, sizeof(j->error), "%s isn't on the server", what);
+	else put(j->error, sizeof(j->error), "the server answered %d", call->status);
 }
 
 static int get(Job* j, RNCall* call, const char* target, long long max) {
 	memset(call, 0, sizeof(*call));
 	call->method = "GET";
-	snprintf(call->target, sizeof(call->target), "%s", target);
+	put(call->target, sizeof(call->target), "%s", target);
 	call->max_body = max;
 	call->cancel = &j->cancel;
 	if (RN_run(&net, call) != 0) {
-		snprintf(j->error, sizeof(j->error), "%s", call->error);
+		put(j->error, sizeof(j->error), "%s", call->error);
 		return -1;
 	}
 	return 0;
@@ -300,20 +312,20 @@ static void runPlatforms(Job* j) {
 	j->platforms = calloc(PLATFORMS_MAX, sizeof(RMPlatform));
 	j->count = j->platforms ? RM_parsePlatforms(call.data, call.len, j->platforms, PLATFORMS_MAX) : -1;
 	RN_free(&call);
-	if (j->count < 0) snprintf(j->error, sizeof(j->error), "the platform list isn't RomM's");
+	if (j->count < 0) put(j->error, sizeof(j->error), "the platform list isn't RomM's");
 	else j->ok = 1;
 }
 
 static void runRoms(Job* j) {
 	j->roms = calloc(ROMS_MAX, sizeof(RMRom));
 	if (!j->roms) {
-		snprintf(j->error, sizeof(j->error), "out of memory");
+		put(j->error, sizeof(j->error), "out of memory");
 		return;
 	}
 	int total = 0, offset = 0;
 	for (int page = 0; page < 100; page++) {
 		char target[256];
-		snprintf(target, sizeof(target),
+		put(target, sizeof(target),
 			"/api/roms?platform_ids=%d&limit=500&offset=%d&order_by=name&order_dir=asc"
 			"&with_char_index=false&with_filter_values=false&with_rom_id_index=false",
 			j->platform_id, offset);
@@ -327,7 +339,7 @@ static void runRoms(Job* j) {
 		int got = RM_parseRoms(call.data, call.len, j->roms, &j->count, ROMS_MAX, &total);
 		RN_free(&call);
 		if (got < 0) {
-			snprintf(j->error, sizeof(j->error), "the rom list isn't RomM's");
+			put(j->error, sizeof(j->error), "the rom list isn't RomM's");
 			return;
 		}
 		offset += got;
@@ -340,11 +352,11 @@ static void runDownload(Job* j) {
 	char encoded[RM_NAME_MAX * 3];
 	RM_urlEncode(j->file, encoded, sizeof(encoded));
 	char target[RM_PATH_MAX];
-	snprintf(target, sizeof(target), "/api/roms/%d/content/%s", j->rom_id, encoded);
+	put(target, sizeof(target), "/api/roms/%d/content/%s", j->rom_id, encoded);
 	RNCall call;
 	memset(&call, 0, sizeof(call));
 	call.method = "GET";
-	snprintf(call.target, sizeof(call.target), "%s", target);
+	put(call.target, sizeof(call.target), "%s", target);
 	call.max_body = j->expect > 0 ? j->expect : ROM_MAX;
 	call.out_path = j->temp;
 	call.cancel = &j->cancel;
@@ -353,13 +365,13 @@ static void runDownload(Job* j) {
 	j->total = j->expect;
 	int rc = RN_run(&net, &call);
 	if (rc != 0) {
-		snprintf(j->error, sizeof(j->error), "%s", call.error);
+		put(j->error, sizeof(j->error), "%s", call.error);
 	} else if (call.status != 200) {
 		httpError(j, &call, "the rom");
 	} else if (j->expect > 0 && j->done != j->expect) {
-		snprintf(j->error, sizeof(j->error), "the download was %lld bytes, not %lld", (long long)j->done, j->expect);
+		put(j->error, sizeof(j->error), "the download was %lld bytes, not %lld", (long long)j->done, j->expect);
 	} else if (rename(j->temp, j->path) != 0) {
-		snprintf(j->error, sizeof(j->error), "can't move the download into place");
+		put(j->error, sizeof(j->error), "can't move the download into place");
 	} else {
 		j->ok = 1;
 	}
@@ -377,18 +389,18 @@ static void runUpload(Job* j) {
 	if (fd >= 0) close(fd);
 	char hex[32];
 	RM_hex(random, sizeof(random), hex, sizeof(hex));
-	snprintf(boundary, sizeof(boundary), "mosaicromm%s", hex);
+	put(boundary, sizeof(boundary), "mosaicromm%s", hex);
 	char before[RM_NAME_MAX + 256], after[96];
 	if (RM_multipart(boundary, "saveFile", j->file, before, sizeof(before), after, sizeof(after)) != 0) {
-		snprintf(j->error, sizeof(j->error), "the save's name is too long");
+		put(j->error, sizeof(j->error), "the save's name is too long");
 		return;
 	}
 	char content_type[96];
-	snprintf(content_type, sizeof(content_type), "multipart/form-data; boundary=%s", boundary);
+	put(content_type, sizeof(content_type), "multipart/form-data; boundary=%s", boundary);
 	RNCall call;
 	memset(&call, 0, sizeof(call));
 	call.method = "POST";
-	snprintf(call.target, sizeof(call.target),
+	put(call.target, sizeof(call.target),
 		"/api/saves?rom_id=%d&slot=%s&content_hash=%s&autocleanup=true&autocleanup_limit=%d", j->rom_id, SAVE_SLOT,
 		j->md5, keep_saves);
 	call.content_type = content_type;
@@ -398,7 +410,7 @@ static void runUpload(Job* j) {
 	call.max_body = JSON_MAX;
 	call.cancel = &j->cancel;
 	call.done = &j->done;
-	if (RN_run(&net, &call) != 0) snprintf(j->error, sizeof(j->error), "%s", call.error);
+	if (RN_run(&net, &call) != 0) put(j->error, sizeof(j->error), "%s", call.error);
 	else if (call.status != 200 && call.status != 201) httpError(j, &call, "the game");
 	else j->ok = 1;
 	RN_free(&call);
@@ -407,7 +419,7 @@ static void runUpload(Job* j) {
 static void runAssets(Job* j) {
 	j->assets = calloc(ASSETS_MAX, sizeof(RMAsset));
 	if (!j->assets) {
-		snprintf(j->error, sizeof(j->error), "out of memory");
+		put(j->error, sizeof(j->error), "out of memory");
 		return;
 	}
 	static const struct {
@@ -416,7 +428,7 @@ static void runAssets(Job* j) {
 	} lists[] = { { "/api/saves", RM_ASSET_SAVE }, { "/api/states", RM_ASSET_STATE } };
 	for (size_t i = 0; i < sizeof(lists) / sizeof(lists[0]); i++) {
 		char target[128];
-		snprintf(target, sizeof(target), "%s?rom_id=%d", lists[i].path, j->rom_id);
+		put(target, sizeof(target), "%s?rom_id=%d", lists[i].path, j->rom_id);
 		RNCall call;
 		if (get(j, &call, target, JSON_MAX) != 0) return;
 		if (call.status != 200) {
@@ -427,7 +439,7 @@ static void runAssets(Job* j) {
 		int got = RM_parseAssets(call.data, call.len, lists[i].kind, j->assets, &j->count, ASSETS_MAX);
 		RN_free(&call);
 		if (got < 0) {
-			snprintf(j->error, sizeof(j->error), "the server's list isn't RomM's");
+			put(j->error, sizeof(j->error), "the server's list isn't RomM's");
 			return;
 		}
 	}
@@ -439,16 +451,16 @@ static void runFetch(Job* j) {
 	RNCall call;
 	memset(&call, 0, sizeof(call));
 	call.method = "GET";
-	snprintf(call.target, sizeof(call.target), "/api/%s/%d/content", j->asset_kind == RM_ASSET_SAVE ? "saves" : "states",
+	put(call.target, sizeof(call.target), "/api/%s/%d/content", j->asset_kind == RM_ASSET_SAVE ? "saves" : "states",
 		j->asset_id);
 	call.max_body = SAVE_MAX;
 	call.out_path = j->temp;
 	call.cancel = &j->cancel;
 	call.done = &j->done;
 	call.total = &j->total;
-	if (RN_run(&net, &call) != 0) snprintf(j->error, sizeof(j->error), "%s", call.error);
+	if (RN_run(&net, &call) != 0) put(j->error, sizeof(j->error), "%s", call.error);
 	else if (call.status != 200) httpError(j, &call, "that file");
-	else if (j->expect >= 0 && j->done != j->expect) snprintf(j->error, sizeof(j->error), "the file came back the wrong size");
+	else if (j->expect >= 0 && j->done != j->expect) put(j->error, sizeof(j->error), "the file came back the wrong size");
 	else j->ok = 1;
 	RN_free(&call);
 	if (!j->ok) unlink(j->temp);
@@ -504,7 +516,7 @@ static void jobStartNext(void) {
 	memmove(queue, queue + 1, (size_t)(queued - 1) * sizeof(Job*));
 	queued--;
 	if (pthread_create(&j->thread, NULL, jobThread, j) != 0) {
-		snprintf(j->error, sizeof(j->error), "can't start a thread");
+		put(j->error, sizeof(j->error), "can't start a thread");
 		j->finished = 1;
 		j->thread = 0;
 	}
@@ -560,18 +572,18 @@ static void platformsSave(void) {
 		cleanText(platforms[i].name, name, sizeof(name));
 		char slug[64];
 		cleanText(platforms[i].slug, slug, sizeof(slug));
-		int n = snprintf(text + len, cap - len, "%d\t%s\t%d\t%s\n", platforms[i].id, slug, platforms[i].rom_count, name);
+		int n = put(text + len, cap - len, "%d\t%s\t%d\t%s\n", platforms[i].id, slug, platforms[i].rom_count, name);
 		if (n > 0 && (size_t)n < cap - len) len += (size_t)n;
 	}
 	char path[RM_PATH_MAX];
-	snprintf(path, sizeof(path), "%s/platforms.tsv", data_dir);
+	put(path, sizeof(path), "%s/platforms.tsv", data_dir);
 	writeFile(path, text, len);
 	free(text);
 }
 
 static void platformsLoad(void) {
 	char path[RM_PATH_MAX];
-	snprintf(path, sizeof(path), "%s/platforms.tsv", data_dir);
+	put(path, sizeof(path), "%s/platforms.tsv", data_dir);
 	char* text = readFile(path, 1024 * 1024, NULL);
 	platform_count = 0;
 	if (!text) return;
@@ -592,9 +604,9 @@ static void platformsLoad(void) {
 		}
 		if (n < 4) continue;
 		p->id = atoi(f[0]);
-		snprintf(p->slug, sizeof(p->slug), "%s", f[1]);
+		put(p->slug, sizeof(p->slug), "%s", f[1]);
 		p->rom_count = atoi(f[2]);
-		snprintf(p->name, sizeof(p->name), "%s", f[3]);
+		put(p->name, sizeof(p->name), "%s", f[3]);
 		RM_tagFor(p->slug, p->tag, sizeof(p->tag), NULL, 0);
 		if (p->id > 0) platform_count++;
 	}
@@ -612,9 +624,9 @@ static const RMPlatform* platformById(int id) {
 // else the name stock gives it.
 static void romsFolder(const char* slug, const char* tag, char* out, size_t size) {
 	char roms[RM_PATH_MAX];
-	snprintf(roms, sizeof(roms), "%s/Roms", sd);
+	put(roms, sizeof(roms), "%s/Roms", sd);
 	char want[RM_TAG_MAX + 4];
-	snprintf(want, sizeof(want), "(%s)", tag);
+	put(want, sizeof(want), "(%s)", tag);
 	size_t want_len = strlen(want);
 	out[0] = '\0';
 	DIR* d = opendir(roms);
@@ -624,9 +636,9 @@ static void romsFolder(const char* slug, const char* tag, char* out, size_t size
 			size_t len = strlen(e->d_name);
 			if (!RM_safeName(e->d_name) || len < want_len || strcmp(e->d_name + len - want_len, want) != 0) continue;
 			char full[RM_PATH_MAX];
-			snprintf(full, sizeof(full), "%s/%s", roms, e->d_name);
+			put(full, sizeof(full), "%s/%s", roms, e->d_name);
 			if (!isDir(full)) continue;
-			if (!out[0] || strcmp(e->d_name, out) < 0) snprintf(out, size, "%s", e->d_name);
+			if (!out[0] || strcmp(e->d_name, out) < 0) put(out, size, "%s", e->d_name);
 		}
 		closedir(d);
 	}
@@ -642,11 +654,11 @@ static void romListSave(const RomList* list) {
 		const RMRom* r = &list->roms[i];
 		char name[RM_NAME_MAX];
 		cleanText(r->name, name, sizeof(name));
-		int n = snprintf(text + len, cap - len, "%d\t%lld\t%d\t%s\t%s\n", r->id, r->size, r->multi, r->file, name);
+		int n = put(text + len, cap - len, "%d\t%lld\t%d\t%s\t%s\n", r->id, r->size, r->multi, r->file, name);
 		if (n > 0 && (size_t)n < cap - len) len += (size_t)n;
 	}
 	char path[RM_PATH_MAX];
-	snprintf(path, sizeof(path), "%s/roms-%d.tsv", data_dir, list->platform_id);
+	put(path, sizeof(path), "%s/roms-%d.tsv", data_dir, list->platform_id);
 	writeFile(path, text, len);
 	free(text);
 }
@@ -667,7 +679,7 @@ static void romListLoad(RomList* list) {
 	if (list->count >= 0) return;
 	list->count = 0;
 	char path[RM_PATH_MAX];
-	snprintf(path, sizeof(path), "%s/roms-%d.tsv", data_dir, list->platform_id);
+	put(path, sizeof(path), "%s/roms-%d.tsv", data_dir, list->platform_id);
 	char* text = readFile(path, 64 * 1024 * 1024, NULL);
 	if (!text) return;
 	int lines = 1;
@@ -695,8 +707,8 @@ static void romListLoad(RomList* list) {
 		r->platform_id = list->platform_id;
 		r->size = atoll(f[1]);
 		r->multi = atoi(f[2]);
-		snprintf(r->file, sizeof(r->file), "%s", f[3]);
-		snprintf(r->name, sizeof(r->name), "%s", f[4]);
+		put(r->file, sizeof(r->file), "%s", f[3]);
+		put(r->name, sizeof(r->name), "%s", f[4]);
 		if (r->id > 0) list->count++;
 	}
 	free(text);
@@ -708,7 +720,7 @@ static void platformPath(const RMPlatform* p, char* out, size_t size) {
 	size_t n = 0;
 	for (const char* s = p->name; *s && n + 1 < sizeof(name); s++) name[n++] = *s == '/' ? '-' : *s;
 	name[n] = '\0';
-	snprintf(out, size, "%s/%s", root_path, name);
+	put(out, size, "%s/%s", root_path, name);
 }
 
 // A stub's path, or "" when it can't have one
@@ -716,7 +728,7 @@ static void stubPath(const RMPlatform* p, RomList* list, const RMRom* r, char* o
 	out[0] = '\0';
 	if (!p->tag[0] || r->multi) return;
 	if (!list->folder[0]) romsFolder(p->slug, p->tag, list->folder, sizeof(list->folder));
-	if (list->folder[0]) snprintf(out, size, "%s/Roms/%s/%s", sd, list->folder, r->file);
+	if (list->folder[0]) put(out, size, "%s/Roms/%s/%s", sd, list->folder, r->file);
 }
 
 typedef struct Found {
@@ -730,7 +742,7 @@ static int findRom(const char* path, Found* out) {
 	memset(out, 0, sizeof(*out));
 	if (!path || platform_count <= 0) return 0;
 	char roms[RM_PATH_MAX];
-	snprintf(roms, sizeof(roms), "%s/Roms/", sd);
+	put(roms, sizeof(roms), "%s/Roms/", sd);
 	if (strncmp(path, roms, strlen(roms)) != 0) return 0;
 	const char* folder = path + strlen(roms);
 	const char* slash = strchr(folder, '/');
@@ -740,7 +752,7 @@ static int findRom(const char* path, Found* out) {
 		const RMPlatform* p = &platforms[i];
 		if (!p->tag[0]) continue;
 		char want[RM_TAG_MAX + 4];
-		snprintf(want, sizeof(want), "(%s)", p->tag);
+		put(want, sizeof(want), "(%s)", p->tag);
 		size_t folder_len = (size_t)(slash - folder), want_len = strlen(want);
 		if (folder_len < want_len || strncmp(slash - want_len, want, want_len) != 0) continue;
 		RomList* list = romList(p->id);
@@ -764,7 +776,7 @@ static int findRom(const char* path, Found* out) {
 
 static int recordFind(const char* path, RMRecord* out) {
 	char file[RM_PATH_MAX];
-	snprintf(file, sizeof(file), "%s/games.txt", data_dir);
+	put(file, sizeof(file), "%s/games.txt", data_dir);
 	char* text = readFile(file, 8 * 1024 * 1024, NULL);
 	if (!text) return 0;
 	int found = 0;
@@ -783,7 +795,7 @@ static int recordFind(const char* path, RMRecord* out) {
 // Puts record in games.txt in place of any for the same path
 static void recordPut(const RMRecord* record) {
 	char file[RM_PATH_MAX];
-	snprintf(file, sizeof(file), "%s/games.txt", data_dir);
+	put(file, sizeof(file), "%s/games.txt", data_dir);
 	size_t len = 0;
 	char* text = readFile(file, 8 * 1024 * 1024, &len);
 	size_t cap = len + RM_PATH_MAX + 256;
@@ -798,7 +810,7 @@ static void recordPut(const RMRecord* record) {
 	for (char* line = text ? strtok_r(text, "\n", &save) : NULL; line; line = strtok_r(NULL, "\n", &save)) {
 		RMRecord r;
 		if (RM_recordParse(line, &r) != 0 || strcmp(r.path, record->path) == 0 || lines >= RECORDS_MAX - 1) continue;
-		int n = snprintf(out + used, cap - used, "%s\n", line);
+		int n = put(out + used, cap - used, "%s\n", line);
 		if (n > 0 && (size_t)n < cap - used) used += (size_t)n;
 		lines++;
 	}
@@ -818,13 +830,13 @@ static int localSave(const char* tag, const char* rom_file, char* out, size_t si
 	time_t newest = 0;
 	for (int i = 0; i < 3; i++) {
 		char path[RM_PATH_MAX];
-		snprintf(path, sizeof(path), "%s/Saves/%s/%s", sd, tag, names[i]);
+		put(path, sizeof(path), "%s/Saves/%s/%s", sd, tag, names[i]);
 		struct stat st;
 		if (lstat(path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
 		if (pick < 0 || st.st_mtime > newest) {
 			pick = i;
 			newest = st.st_mtime;
-			snprintf(out, size, "%s", path);
+			put(out, size, "%s", path);
 		}
 	}
 	return pick;
@@ -840,10 +852,10 @@ static char pending_path[RM_PATH_MAX];
 // After a game from RomM: uploads its save when it changed since the last sync
 static void syncSave(int quiet) {
 	char file[RM_PATH_MAX];
-	snprintf(file, sizeof(file), "%s/pending.txt", data_dir);
+	put(file, sizeof(file), "%s/pending.txt", data_dir);
 	char* text = readFile(file, RM_PATH_MAX, NULL);
 	if (!text) return;
-	snprintf(pending_path, sizeof(pending_path), "%s", text);
+	put(pending_path, sizeof(pending_path), "%s", text);
 	pending_path[strcspn(pending_path, "\r\n")] = '\0';
 	free(text);
 	RMRecord record;
@@ -873,11 +885,11 @@ static void syncSave(int quiet) {
 	Job* j = jobNew(J_UPLOAD);
 	if (!j) return;
 	j->rom_id = record.rom_id;
-	snprintf(j->path, sizeof(j->path), "%s", save);
-	snprintf(j->file, sizeof(j->file), "%s", baseName(save));
-	snprintf(j->tag, sizeof(j->tag), "%s", record.tag);
-	snprintf(j->name, sizeof(j->name), "%s", record.path);
-	snprintf(j->md5, sizeof(j->md5), "%s", md5);
+	put(j->path, sizeof(j->path), "%s", save);
+	put(j->file, sizeof(j->file), "%s", baseName(save));
+	put(j->tag, sizeof(j->tag), "%s", record.tag);
+	put(j->name, sizeof(j->name), "%s", record.path);
+	put(j->md5, sizeof(j->md5), "%s", md5);
 	if (jobAdd(j) == 0) sayf("uploading %s for rom %d", j->file, j->rom_id);
 }
 
@@ -892,10 +904,10 @@ static void statusWrite(const char* state, long long done, long long total, cons
 	int len = RM_statusText(state, done, total, label, text, sizeof(text));
 	if (len < 0) return;
 	char dir[RM_PATH_MAX];
-	snprintf(dir, sizeof(dir), "%s/launcher/status.d", host->userdata_path);
+	put(dir, sizeof(dir), "%s/launcher/status.d", host->userdata_path);
 	makeDirs(dir);
 	char tmp[RM_PATH_MAX];
-	snprintf(tmp, sizeof(tmp), "%s/.romm.tmp", dir);
+	put(tmp, sizeof(tmp), "%s/.romm.tmp", dir);
 	int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0644);
 	if (fd < 0) return;
 	int ok = write(fd, text, (size_t)len) == len;
@@ -917,7 +929,7 @@ static int open_download_screen = 0;
 static void startDownload(const Found* f, const char* path) {
 	if (jobPending(J_DOWNLOAD, f->rom->id)) return;
 	char dir[RM_PATH_MAX];
-	snprintf(dir, sizeof(dir), "%s/Roms/%s", sd, f->list->folder);
+	put(dir, sizeof(dir), "%s/Roms/%s", sd, f->list->folder);
 	if (!RM_safeName(f->list->folder)) return;
 	makeDirs(dir);
 	if (!insideCard(dir, "Roms")) {
@@ -936,12 +948,12 @@ static void startDownload(const Found* f, const char* path) {
 	if (!j) return;
 	j->rom_id = f->rom->id;
 	j->expect = f->rom->size > 0 ? f->rom->size : -1;
-	snprintf(j->file, sizeof(j->file), "%s", f->rom->file);
-	snprintf(j->name, sizeof(j->name), "%s", f->rom->name);
-	snprintf(j->tag, sizeof(j->tag), "%s", f->platform->tag);
-	snprintf(j->dir, sizeof(j->dir), "%s", dir);
-	snprintf(j->path, sizeof(j->path), "%s", path);
-	snprintf(j->temp, sizeof(j->temp), "%s/.romm-%d.part", dir, f->rom->id);
+	put(j->file, sizeof(j->file), "%s", f->rom->file);
+	put(j->name, sizeof(j->name), "%s", f->rom->name);
+	put(j->tag, sizeof(j->tag), "%s", f->platform->tag);
+	put(j->dir, sizeof(j->dir), "%s", dir);
+	put(j->path, sizeof(j->path), "%s", path);
+	put(j->temp, sizeof(j->temp), "%s/.romm-%d.part", dir, f->rom->id);
 	// a download goes before lists waiting
 	if (queued >= JOBS_MAX) {
 		jobFree(j);
@@ -1072,7 +1084,7 @@ static int downloadRender(MosaicSurface* screen, const MosaicScreenView* v, void
 		return 0;
 	}
 	char title[RM_NAME_MAX + 32];
-	snprintf(title, sizeof(title), "Downloading %s", j->name);
+	put(title, sizeof(title), "Downloading %s", j->name);
 	centred(screen, MOSAIC_FONT_LARGE, title, y, v->area.w, ink);
 	long long done = j->done, total = j->total > 0 ? j->total : j->expect;
 	int bar_w = v->area.w * 2 / 3, bar_h = 8 * scale;
@@ -1086,15 +1098,15 @@ static int downloadRender(MosaicSurface* screen, const MosaicScreenView* v, void
 	char a[32], b[32], text[96];
 	RM_formatSize(done, a, sizeof(a));
 	RM_formatSize(total, b, sizeof(b));
-	if (total > 0) snprintf(text, sizeof(text), "%s of %s", a, b);
-	else snprintf(text, sizeof(text), "%s", a);
+	if (total > 0) put(text, sizeof(text), "%s of %s", a, b);
+	else put(text, sizeof(text), "%s", a);
 	centred(screen, MOSAIC_FONT_SMALL, text, bar.y + bar_h + 12 * scale, v->area.w, ink);
 	MosaicHint cancel = { MOSAIC_BUTTON_B, "CANCEL" };
 	hints(screen, NULL, 0, &cancel, 1);
 	char shown[64];
-	snprintf(shown, sizeof(shown), "%d%%", percent / 25 * 25);
+	put(shown, sizeof(shown), "%d%%", percent / 25 * 25);
 	if (strcmp(shown, download_shown) != 0) {
-		snprintf(download_shown, sizeof(download_shown), "%s", shown);
+		put(download_shown, sizeof(download_shown), "%s", shown);
 		sayf("download screen: %s, %s", j->file, shown);
 	}
 	return 0;
@@ -1124,20 +1136,20 @@ static struct {
 
 static int stateDir(const char* tag, char* out, size_t size) {
 	char shared[RM_PATH_MAX];
-	snprintf(shared, sizeof(shared), "%s/.userdata/shared", sd);
+	put(shared, sizeof(shared), "%s/.userdata/shared", sd);
 	DIR* d = opendir(shared);
 	if (!d) return -1;
 	char prefix[RM_TAG_MAX + 2];
-	snprintf(prefix, sizeof(prefix), "%s-", tag);
+	put(prefix, sizeof(prefix), "%s-", tag);
 	int found = 0;
 	struct dirent* e;
 	while ((e = readdir(d))) {
 		if (strncmp(e->d_name, prefix, strlen(prefix)) != 0 || !RM_safeName(e->d_name)) continue;
 		char full[RM_PATH_MAX];
-		snprintf(full, sizeof(full), "%s/%s", shared, e->d_name);
+		put(full, sizeof(full), "%s/%s", shared, e->d_name);
 		if (!isDir(full)) continue;
 		found++;
-		snprintf(out, size, "%s", full);
+		put(out, size, "%s", full);
 	}
 	closedir(d);
 	return found == 1 ? 0 : -1; // with two cores' folders it can't tell which
@@ -1152,13 +1164,13 @@ static int assetTarget(const RMAsset* a, char* out, size_t size) {
 		int have = localSave(fb.tag, rom_file, existing, sizeof(existing));
 		char name[RM_NAME_MAX];
 		RM_saveTarget(rom_file, a->file, have >= 0 ? 1 << have : 0, name, sizeof(name));
-		snprintf(out, size, "%s/Saves/%s/%s", sd, fb.tag, name);
+		put(out, size, "%s/Saves/%s/%s", sd, fb.tag, name);
 		return 0;
 	}
 	int slot = RM_stateSlot(a->file);
 	char dir[RM_PATH_MAX];
 	if (slot < 0 || stateDir(fb.tag, dir, sizeof(dir)) != 0) return -1;
-	snprintf(out, size, "%s/%s.st%d", dir, rom_file, slot);
+	put(out, size, "%s/%s.st%d", dir, rom_file, slot);
 	return 0;
 }
 
@@ -1168,12 +1180,12 @@ static void assetLabel(const RMAsset* a, char* out, size_t size) {
 	RM_formatSize(a->size, bytes, sizeof(bytes));
 	int slot = a->kind == RM_ASSET_STATE ? RM_stateSlot(a->file) : -1;
 	char kind[32];
-	if (a->kind == RM_ASSET_SAVE) snprintf(kind, sizeof(kind), "Save");
-	else if (slot >= 0) snprintf(kind, sizeof(kind), "State %d", slot);
-	else snprintf(kind, sizeof(kind), "State");
+	if (a->kind == RM_ASSET_SAVE) put(kind, sizeof(kind), "Save");
+	else if (slot >= 0) put(kind, sizeof(kind), "State %d", slot);
+	else put(kind, sizeof(kind), "State");
 	char target[RM_PATH_MAX];
 	int here = assetTarget(a, target, sizeof(target)) == 0;
-	snprintf(out, size, "%s  %s  %s%s", when, kind, bytes, here ? "" : "  (can't restore)");
+	put(out, size, "%s  %s  %s%s", when, kind, bytes, here ? "" : "  (can't restore)");
 }
 
 static void flashbackLoad(void) {
@@ -1182,7 +1194,7 @@ static void flashbackLoad(void) {
 	fb.count = -1;
 	fb.error[0] = '\0';
 	if (!networkReady(0)) {
-		snprintf(fb.error, sizeof(fb.error), "No network");
+		put(fb.error, sizeof(fb.error), "No network");
 		fb.count = 0;
 		return;
 	}
@@ -1190,7 +1202,7 @@ static void flashbackLoad(void) {
 	if (!j) return;
 	j->rom_id = fb.rom_id;
 	if (jobAdd(j) != 0) {
-		snprintf(fb.error, sizeof(fb.error), "Busy, try again");
+		put(fb.error, sizeof(fb.error), "Busy, try again");
 		fb.count = 0;
 	}
 }
@@ -1217,7 +1229,7 @@ static void restoreConfirmed(void* data) {
 	char target[RM_PATH_MAX];
 	if (assetTarget(a, target, sizeof(target)) != 0) return;
 	char dir[RM_PATH_MAX];
-	snprintf(dir, sizeof(dir), "%s", target);
+	put(dir, sizeof(dir), "%s", target);
 	*strrchr(dir, '/') = '\0';
 	makeDirs(dir);
 	if (!insideCard(dir, a->kind == RM_ASSET_SAVE ? "Saves" : ".userdata/shared")) {
@@ -1231,10 +1243,10 @@ static void restoreConfirmed(void* data) {
 	j->asset_id = a->id;
 	j->rom_id = fb.rom_id;
 	j->expect = a->size > 0 ? a->size : -1;
-	snprintf(j->path, sizeof(j->path), "%s", target);
-	snprintf(j->temp, sizeof(j->temp), "%s/.romm-restore-%d.part", dir, a->id);
-	snprintf(j->tag, sizeof(j->tag), "%s", fb.tag);
-	snprintf(j->name, sizeof(j->name), "%s", fb.path);
+	put(j->path, sizeof(j->path), "%s", target);
+	put(j->temp, sizeof(j->temp), "%s/.romm-restore-%d.part", dir, a->id);
+	put(j->tag, sizeof(j->tag), "%s", fb.tag);
+	put(j->name, sizeof(j->name), "%s", fb.path);
 	if (jobAdd(j) == 0) {
 		sayf("restoring %s %d to %s", a->kind == RM_ASSET_SAVE ? "save" : "state", a->id, target);
 		toast("RomM: restoring...");
@@ -1267,7 +1279,7 @@ static int flashbackInput(const MosaicInput* in, void* data) {
 		char label[RM_PATH_MAX];
 		assetLabel(a, label, sizeof(label));
 		char question[RM_PATH_MAX + 128];
-		snprintf(question, sizeof(question), "Restore this %s?\n%s\nThe one on the card is backed up first.",
+		put(question, sizeof(question), "Restore this %s?\n%s\nThe one on the card is backed up first.",
 			a->kind == RM_ASSET_SAVE ? "save" : "state", label);
 		host->confirm(question, "RESTORE", restoreConfirmed, NULL);
 		return MOSAIC_SCREEN_STAY;
@@ -1280,7 +1292,7 @@ static int flashbackRender(MosaicSurface* screen, const MosaicScreenView* v, voi
 	(void)data;
 	background(screen, v);
 	char title[RM_NAME_MAX + 32];
-	snprintf(title, sizeof(title), "Flashback: %s", fb.name);
+	put(title, sizeof(title), "Flashback: %s", fb.name);
 	titlePill(screen, v, title);
 	int scale = host->screen_scale();
 	MosaicColor ink = themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF);
@@ -1296,11 +1308,11 @@ static int flashbackRender(MosaicSurface* screen, const MosaicScreenView* v, voi
 	char shown[256];
 	if (fb.count < 0) {
 		centred(screen, MOSAIC_FONT_LARGE, "Loading...", v->area.h / 2 - line, v->area.w, ink);
-		snprintf(shown, sizeof(shown), "loading");
+		put(shown, sizeof(shown), "loading");
 	} else if (fb.count == 0) {
 		centred(screen, MOSAIC_FONT_LARGE, fb.error[0] ? fb.error : "No saves or states on the server",
 			v->area.h / 2 - line, v->area.w, ink);
-		snprintf(shown, sizeof(shown), "empty: %s", fb.error[0] ? fb.error : "none");
+		put(shown, sizeof(shown), "empty: %s", fb.error[0] ? fb.error : "none");
 	} else {
 		int rows = (bottom - top) / row_h;
 		if (rows < 1) rows = 1;
@@ -1322,13 +1334,13 @@ static int flashbackRender(MosaicSurface* screen, const MosaicScreenView* v, voi
 		}
 		char label[RM_PATH_MAX];
 		assetLabel(&fb.assets[fb.selected], label, sizeof(label));
-		snprintf(shown, sizeof(shown), "%d of %d: %s", fb.selected, fb.count, label);
+		put(shown, sizeof(shown), "%d of %d: %s", fb.selected, fb.count, label);
 	}
 	MosaicHint left[] = { { MOSAIC_BUTTON_B, "BACK" } };
 	MosaicHint right[] = { { MOSAIC_BUTTON_X, "REFRESH" }, { MOSAIC_BUTTON_A, "RESTORE" } };
 	hints(screen, left, 1, right, fb.count > 0 ? 2 : 1);
 	if (strcmp(shown, fb.shown) != 0) {
-		snprintf(fb.shown, sizeof(fb.shown), "%s", shown);
+		put(fb.shown, sizeof(fb.shown), "%s", shown);
 		sayf("flashback %s", shown);
 	}
 	return 0;
@@ -1348,7 +1360,7 @@ static int selectedGame(RMRecord* out) {
 		if (asked_answer) *out = asked_record;
 		return asked_answer;
 	}
-	snprintf(asked_path, sizeof(asked_path), "%s", path);
+	put(asked_path, sizeof(asked_path), "%s", path);
 	asked_answer = 0;
 	RMRecord r;
 	Found f;
@@ -1357,8 +1369,8 @@ static int selectedGame(RMRecord* out) {
 	} else if (findRom(path, &f)) {
 		memset(&r, 0, sizeof(r));
 		r.rom_id = f.rom->id;
-		snprintf(r.tag, sizeof(r.tag), "%s", f.platform->tag);
-		snprintf(r.path, sizeof(r.path), "%s", path);
+		put(r.tag, sizeof(r.tag), "%s", f.platform->tag);
+		put(r.path, sizeof(r.path), "%s", path);
 		asked_answer = 1;
 	}
 	if (asked_answer) {
@@ -1379,10 +1391,10 @@ static void openFlashback(void* data) {
 	RMRecord r;
 	if (!configured || !selectedGame(&r)) return;
 	fb.rom_id = r.rom_id;
-	snprintf(fb.tag, sizeof(fb.tag), "%s", r.tag);
-	snprintf(fb.path, sizeof(fb.path), "%s", r.path);
+	put(fb.tag, sizeof(fb.tag), "%s", r.tag);
+	put(fb.path, sizeof(fb.path), "%s", r.path);
 	const MosaicEntry* entry = host->selected_entry();
-	snprintf(fb.name, sizeof(fb.name), "%s", entry ? host->entry_name(entry) : baseName(r.path));
+	put(fb.name, sizeof(fb.name), "%s", entry ? host->entry_name(entry) : baseName(r.path));
 	sayf("flashback for rom %d, %s", fb.rom_id, baseName(fb.path));
 	if (host->open_screen(FLASHBACK_SCREEN) != 0) say("couldn't open the flashback screen");
 }
@@ -1392,7 +1404,7 @@ static void openFlashback(void* data) {
 
 static void backupThenPlace(Job* j) {
 	char backup_dir[RM_PATH_MAX];
-	snprintf(backup_dir, sizeof(backup_dir), "%s/backups/%s", data_dir, j->tag);
+	put(backup_dir, sizeof(backup_dir), "%s/backups/%s", data_dir, j->tag);
 	char backup[RM_PATH_MAX] = "";
 	if (isFile(j->path)) {
 		makeDirs(backup_dir);
@@ -1400,7 +1412,7 @@ static void backupThenPlace(Job* j) {
 		struct tm tm;
 		char stamp[32] = "backup";
 		if (localtime_r(&now, &tm)) strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &tm);
-		snprintf(backup, sizeof(backup), "%s/%s.%s", backup_dir, baseName(j->path), stamp);
+		put(backup, sizeof(backup), "%s/%s.%s", backup_dir, baseName(j->path), stamp);
 		// copy rather than move, so a failed rename below leaves the card as it was
 		size_t len = 0;
 		char* old = readFile(j->path, SAVE_MAX, &len);
@@ -1426,7 +1438,7 @@ static void backupThenPlace(Job* j) {
 		RMRecord r;
 		if (recordFind(j->name, &r)) {
 			char md5[33];
-			if (RN_md5File(j->path, SAVE_MAX, md5) == 0) snprintf(r.value, sizeof(r.value), "%s", md5);
+			if (RN_md5File(j->path, SAVE_MAX, md5) == 0) put(r.value, sizeof(r.value), "%s", md5);
 			recordPut(&r);
 		}
 	}
@@ -1466,13 +1478,13 @@ static void finished(Job* j) {
 			sayf("downloaded %s: %lld bytes", j->path, (long long)j->done);
 			RMRecord r = { 0 };
 			r.rom_id = j->rom_id;
-			snprintf(r.tag, sizeof(r.tag), "%s", j->tag);
+			put(r.tag, sizeof(r.tag), "%s", j->tag);
 			// a save already on the card (eg. from before) isn't the server's
-			snprintf(r.value, sizeof(r.value), "-");
-			snprintf(r.path, sizeof(r.path), "%s", j->path);
+			put(r.value, sizeof(r.value), "-");
+			put(r.path, sizeof(r.path), "%s", j->path);
 			recordPut(&r);
 			statusWrite("done", j->expect > 0 ? j->expect / 1024 : 0, j->expect > 0 ? j->expect / 1024 : 0, j->name);
-			snprintf(launch_after, sizeof(launch_after), "%s", j->path);
+			put(launch_after, sizeof(launch_after), "%s", j->path);
 		} else if (j->cancel) {
 			statusClear();
 		} else {
@@ -1488,12 +1500,12 @@ static void finished(Job* j) {
 			toast("RomM: save uploaded");
 			RMRecord r;
 			if (recordFind(j->name, &r)) {
-				snprintf(r.value, sizeof(r.value), "%s", j->md5);
+				put(r.value, sizeof(r.value), "%s", j->md5);
 				recordPut(&r);
 			}
 			if (!strcmp(pending_path, j->name)) {
 				char file[RM_PATH_MAX];
-				snprintf(file, sizeof(file), "%s/pending.txt", data_dir);
+				put(file, sizeof(file), "%s/pending.txt", data_dir);
 				unlink(file);
 			}
 		}
@@ -1512,7 +1524,7 @@ static void finished(Job* j) {
 			sayf("flashback for rom %d: %d saves, %d states", fb.rom_id, saves, fb.count - saves);
 		} else {
 			fb.count = 0;
-			snprintf(fb.error, sizeof(fb.error), "%s", j->error);
+			put(fb.error, sizeof(fb.error), "%s", j->error);
 		}
 		host->request_redraw();
 		break;
@@ -1525,7 +1537,7 @@ static void finished(Job* j) {
 			"listing saves", "restoring" };
 		sayf("%s failed: %s", what[j->kind], j->error);
 		char message[300];
-		snprintf(message, sizeof(message), "RomM: %s", j->error);
+		put(message, sizeof(message), "RomM: %s", j->error);
 		toast(message);
 	}
 }
@@ -1537,7 +1549,7 @@ static void finished(Job* j) {
 // before a game launched
 static int fresh(const char* name) {
 	char path[RM_PATH_MAX];
-	snprintf(path, sizeof(path), "%s/%s", data_dir, name);
+	put(path, sizeof(path), "%s/%s", data_dir, name);
 	struct stat st;
 	time_t now = time(NULL);
 	return stat(path, &st) == 0 && st.st_mtime <= now && now - st.st_mtime < REFRESH_MS / 1000;
@@ -1559,7 +1571,7 @@ static void refreshRoms(RomList* list) {
 	if (jobPending(J_ROMS, list->platform_id)) return;
 	if (list->asked && now_ms - list->asked < REFRESH_MS) return;
 	char name[32];
-	snprintf(name, sizeof(name), "roms-%d.tsv", list->platform_id);
+	put(name, sizeof(name), "roms-%d.tsv", list->platform_id);
 	if (!list->asked && list->count > 0 && fresh(name)) {
 		list->asked = now_ms ? now_ms : 1;
 		return;
@@ -1634,15 +1646,15 @@ static int preLaunch(const MosaicLaunch* launch) {
 		if (!known && listed) {
 			memset(&record, 0, sizeof(record));
 			record.rom_id = f.rom->id;
-			snprintf(record.tag, sizeof(record.tag), "%s", f.platform->tag);
-			snprintf(record.value, sizeof(record.value), "-");
-			snprintf(record.path, sizeof(record.path), "%s", launch->path);
+			put(record.tag, sizeof(record.tag), "%s", f.platform->tag);
+			put(record.value, sizeof(record.value), "-");
+			put(record.path, sizeof(record.path), "%s", launch->path);
 			recordPut(&record);
 			known = 1;
 		}
 		if (known) {
 			char file[RM_PATH_MAX];
-			snprintf(file, sizeof(file), "%s/pending.txt", data_dir);
+			put(file, sizeof(file), "%s/pending.txt", data_dir);
 			writeFile(file, launch->path, strlen(launch->path));
 			sayf("launching %s (rom %d)", launch->path, record.rom_id);
 		}
@@ -1693,7 +1705,7 @@ static void tick(unsigned long now) {
 	}
 	if (launch_after[0] && MOSAIC_HOST_HAS(host, open_path)) {
 		char path[RM_PATH_MAX];
-		snprintf(path, sizeof(path), "%s", launch_after);
+		put(path, sizeof(path), "%s", launch_after);
 		launch_after[0] = '\0';
 		if (!host->open_path(path, MOSAIC_ENTRY_ROM)) sayf("couldn't launch %s", path);
 	}
@@ -1705,14 +1717,14 @@ static void tick(unsigned long now) {
 // partial downloads a run stopped in the middle of (a launch or power off)
 static void removeLeftoversIn(const char* top) {
 	char roms[RM_PATH_MAX];
-	snprintf(roms, sizeof(roms), "%s/%s", sd, top);
+	put(roms, sizeof(roms), "%s/%s", sd, top);
 	DIR* d = opendir(roms);
 	if (!d) return;
 	struct dirent* e;
 	while ((e = readdir(d))) {
 		if (e->d_name[0] == '.') continue;
 		char dir[RM_PATH_MAX];
-		snprintf(dir, sizeof(dir), "%s/%s", roms, e->d_name);
+		put(dir, sizeof(dir), "%s/%s", roms, e->d_name);
 		DIR* inner = isDir(dir) ? opendir(dir) : NULL;
 		if (!inner) continue;
 		struct dirent* f;
@@ -1721,7 +1733,7 @@ static void removeLeftoversIn(const char* top) {
 			size_t len = strlen(f->d_name);
 			if (len < 5 || strcmp(f->d_name + len - 5, ".part") != 0) continue;
 			char full[RM_PATH_MAX];
-			snprintf(full, sizeof(full), "%s/%s", dir, f->d_name);
+			put(full, sizeof(full), "%s/%s", dir, f->d_name);
 			if (isFile(full)) unlink(full);
 		}
 		closedir(inner);
@@ -1737,10 +1749,10 @@ static void removeLeftovers(void) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	snprintf(sd, sizeof(sd), "%s", host->sdcard_path);
-	snprintf(data_dir, sizeof(data_dir), "%s/launcher/romm", host->userdata_path);
-	snprintf(root_path, sizeof(root_path), "%s/RomM", host->sdcard_path);
-	snprintf(status_path, sizeof(status_path), "%s/launcher/status.d/romm.status", host->userdata_path);
+	put(sd, sizeof(sd), "%s", host->sdcard_path);
+	put(data_dir, sizeof(data_dir), "%s/launcher/romm", host->userdata_path);
+	put(root_path, sizeof(root_path), "%s/RomM", host->sdcard_path);
+	put(status_path, sizeof(status_path), "%s/launcher/status.d/romm.status", host->userdata_path);
 	memset(&fb, 0, sizeof(fb));
 	loadSettings();
 	if (!configured) return 0;
