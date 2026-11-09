@@ -30,6 +30,7 @@
 #include "mosaic_plugin.h"
 
 #define ID "filterer"
+#define STOCK_WAKE_MS 1000 // stock ignores power presses this soon after it starts or wakes
 
 // SDL2's keyboard event, as SDL_Event lays it out
 typedef struct {
@@ -79,6 +80,7 @@ static unsigned long pressed_at = 0, released_at = 0;
 static int index_before = -1;
 static int rows = 0, yes = 0, sleeps = 0;
 static int done = 0;
+static int settled = 0; // the press, if any, went in
 static unsigned long last = 0; // the last tick's time
 
 __attribute__((format(printf, 1, 2)))
@@ -187,7 +189,11 @@ static void tick(unsigned long now) {
 	filtered = 0;
 	if (done) return;
 	if (ticks == 30 && confirm) host->confirm("Filter?", "Yes", onYes, NULL);
-	if (ticks == 40) {
+	// things have settled by frame 40, and stock ignores a power press in
+	// its first second, as the press that woke it, so the press also waits
+	// for that to pass however quickly the frames came
+	if (!settled && ticks >= 40 && now >= STOCK_WAKE_MS) {
+		settled = 1;
 		index_before = host->selected_index();
 		if (press && pushEvent) {
 			pressed_at_tick = ticks;

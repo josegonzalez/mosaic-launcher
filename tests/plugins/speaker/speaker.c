@@ -105,9 +105,17 @@ static void next(int to, unsigned long now) {
 ///////////////////////////////////////
 // its own threads
 
-// queues 0.8 s in chunks, then a NULL and past the cap
+static long msSince(const struct timespec* start) {
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (now.tv_sec - start->tv_sec) * 1000 + (now.tv_nsec - start->tv_nsec) / 1000000;
+}
+
+// queues 0.8 s in chunks, then a NULL and past the cap, and counts what's
+// queued straight away, as the device plays on while the main thread waits
+// for its next frame; what played if this thread was kept waiting counts too
 static pthread_t filler;
-static int filled = 0, chunks = 0, null_result = 0, over_result = 0, filler_done = 0;
+static int filled = 0, chunks = 0, null_result = 0, over_result = 0, filled_ok = 0, filler_done = 0;
 static void* fill(void* data) {
 	(void)data;
 	int want = RATE * 8 / 10 / CHUNK;
@@ -117,7 +125,14 @@ static void* fill(void* data) {
 	chunks = want;
 	null_result = host->audio_queue(ID, NULL, 10);
 	// half a second more, in chunks, goes past the cap
-	for (int i = 0; i <= RATE / 2 / CHUNK && over_result == 0; i++) over_result = host->audio_queue(ID, tone, CHUNK);
+	struct timespec last;
+	for (int i = 0; i <= RATE / 2 / CHUNK && over_result == 0; i++) {
+		clock_gettime(CLOCK_MONOTONIC, &last);
+		over_result = host->audio_queue(ID, tone, CHUNK);
+	}
+	q1 = host->audio_queued(ID);
+	long played = msSince(&last) * RATE / 1000;
+	filled_ok = q1 + played >= RATE * 7 / 10 && q1 <= RATE * host->audio_queue_max_ms / 1000;
 	__atomic_store_n(&filler_done, 1, __ATOMIC_SEQ_CST);
 	return NULL;
 }
@@ -220,9 +235,8 @@ static void tick(unsigned long now) {
 	else if (stage == 1) {
 		if (!__atomic_load_n(&filler_done, __ATOMIC_SEQ_CST)) return;
 		pthread_join(filler, NULL);
-		q1 = host->audio_queued(ID);
 		say("thread queued %i of %i chunks, null %i, over %i, queued %i", filled, chunks, null_result, over_result,
-			q1 >= RATE * 7 / 10 ? 1 : 0);
+			filled_ok);
 		next(2, now);
 	}
 	else if (stage == 2) {

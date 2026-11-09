@@ -9,7 +9,10 @@
 // passed to host->decorate_art, for art decorators such as bander's.
 // With swap=1, a plugin's art_replace surface for the selected cell, from
 // host->art_replacement, fills that cell, and it logs each change in what
-// art_replacement answers, with the cell's colour read back.
+// art_replacement answers, with the cell's colour read back. With open=0
+// it neither opens its folder nor moves the selection, for a plugin that
+// opens folders of its own, as its frame-counted open could land after
+// that plugin's timed one on a slow machine.
 //
 // With fail=init in its config, layout_init declines; with fail=input or
 // fail=render, that hook returns an error the third time it's called; and
@@ -29,6 +32,7 @@ static char folder[512];
 static const char* fail = "";
 static int art = 0;
 static int swap = 0;
+static int open_folder = 1;
 static int swap_rc = -2; // what art_replacement last answered for the selected cell
 static int ticks = 0;
 static int inputs = 0;
@@ -211,7 +215,7 @@ static void tick(unsigned long now) {
 	(void)now;
 	if (!host->current_list()) return;
 	ticks++;
-	if (ticks == 2) {
+	if (ticks == 2 && open_folder) {
 		say("open folder %i", host->open_path(folder, MOSAIC_ENTRY_DIR));
 	}
 	if (ticks == 3 && lent) {
@@ -235,6 +239,7 @@ static int init(const MosaicHost* h) {
 	fail = host->cfg_get(ID, "fail", "");
 	art = atoi(host->cfg_get(ID, "art", "0")) && MOSAIC_HOST_HAS(host, decorate_art);
 	swap = atoi(host->cfg_get(ID, "swap", "0")) && MOSAIC_HOST_HAS(host, art_replacement);
+	open_folder = atoi(host->cfg_get(ID, "open", "1"));
 	return 0;
 }
 

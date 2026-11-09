@@ -68,13 +68,17 @@ fi
 # decorate_cell for the selected entry, the lit one, and there's no pill;
 # Inner is the cell beside Before. Where the stock pill would rest on each
 # push's new frame (the first entry, 40,60 inside its left end) is the lit
-# cell, not the pill.
+# cell, not the pill. gridder doesn't open its own folder here: its open
+# counts frames and slider's waits 300 ms, so on a slow machine gridder's
+# could land last and leave Before's list behind.
 build_plugin gridder 'id=gridder\nname=Gridder\napi=1\nslots=layout\n'
 printf 'slider=on\ngridder=on\n' >"$STATE/plugins.txt"
 echo "probe=40,60" >"$STATE/slider.cfg"
+echo "open=0" >"$STATE/gridder.cfg"
 run_launcher "$WORK/slider-layout.log" "plugin slider: done at" || fail "the launcher exited early with slider and gridder loaded"
 log="$WORK/slider-layout.log"
 expect "done at $CARD/Slider/Inner"
+[ "$(grep -c "plugin slider: begin push stock" "$log")" -eq 2 ] || fail "slider wasn't asked about just its two pushes under gridder"
 grep "plugin slider: begin push \(old\|new\) row " "$log" | grep -v " pill 0,0 0x0 on - beside - cell FF0000FF$" \
 	&& fail "a push's selection under gridder isn't its lit cell"
 [ "$(grep -c "plugin slider: begin push \(old\|new\) row [0-9]*,[0-9]* [1-9][0-9]*x[1-9][0-9]* " "$log")" -ge 4 ] \
