@@ -36,7 +36,7 @@ conflicts=
 - `setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]]` declares a setting the Launcher pak's Plugins page shows and edits. `type` is `toggle` (`on` or `off`), `choice` (one of the comma-separated `options`) or `text` (typed on the on-screen keyboard). The plugin reads the value with `host->cfg_get(id, key, default)`. Changes take effect the next time the launcher starts, which is when the user leaves the Launcher pak.
 - `flags`, after the options (leave the options empty for a toggle or text setting, as in `text|Code|||protected,secret`), is a comma-separated list of markers. `protected` makes the Plugins page ask for the launcher's PIN before it shows or changes that setting, and before it turns the plugin off (or turns the whole launcher off while the plugin is on); with no PIN set, a protected setting behaves like any other. `secret`, for `text` settings, makes the value write-only: once it's set, the page shows only Set or Not set, and its keyboard starts empty, so the value is replaced rather than edited. Words the launcher doesn't know are ignored, and a setting without flags behaves as before. An older launcher ignores the field, showing the setting as an ordinary one.
 - `api` is the `MOSAIC_API_VERSION` the plugin was built against. A plugin for a different version is skipped.
-- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, `transition` and `launch` for the `transition_*` hooks, `background` for `background_render`, `home` for a screen in place of the root list, `switcher` for a screen in place of the game switcher, or `strings` for `translate`. Only one plugin can own a slot.
+- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, `transition` and `launch` for the `transition_*` hooks, `background` for `background_render`, `home` for a screen in place of the root list, `switcher` for a screen in place of the game switcher, `strings` for `translate`, or `theme` for `theme`. Only one plugin can own a slot.
 - `requires` lists plugins that must also load. `conflicts` lists plugins that can't load alongside it.
 
 ## The entry point
@@ -708,6 +708,29 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   // in any plugin
   char line[64];
   snprintf(line, sizeof(line), host->tr_plural(MY_ID, NULL, "%d game", "%d games", count), count);
+  ```
+
+- The `theme` slot lets a plugin supply the launcher's look: colours, the background colour, a font, a text size, UI sizes and margins, and wallpapers. It's an exclusive slot, picked like the layout (`slot.theme=<id>` in `plugins.txt`): only a plugin with `slots=theme` in its `plugin.txt` has its `theme(theme)` in `MosaicPlugin` asked, and one with it but not the slot is logged and never asked. The launcher hands it a `MosaicTheme` with `size` set and every field at its "stock's" value (`MOSAIC_THEME_UNSET` colours, empty paths, zero numbers); it sets the ones it changes, checking a field added later with `MOSAIC_THEME_HAS(theme, field)`, and returns 0. It's asked once every plugin has loaded, before the first list is built (so `init` sees stock's look), and again each time a plugin calls `reload_lists`, which applies a changed theme without a restart: colours, font, sizes, the rows the list shows and the background. Nothing it supplies is written to stock's settings, so stock's Settings app, minarch and the Launcher pak's own pages keep the user's choices.
+
+  - `colors` are stock's seven, numbered as its palettes number them (`colors[0]` is `color1`, the main colour, through `colors[6]`, `color7`, the background colour, which the screen is also cleared with), each `0xRRGGBB`; one left unset is the user's own. `theme_color` returns what's used.
+  - `font` is a TrueType or OpenType file, used for every size of stock's text; `text_step` adds points to each of stock's text sizes (16, 14, 12, 10 and 7 before scaling), from -2 to 8.
+  - `contrast`, from 10 to 210, is the least contrast ratio (WCAG's, in tenths: 45 is 4.5:1) text keeps against what it's drawn on: list text (`color4`) on the background (`color7`), selected text (`color5`) on the selected row's pill (`color1`) and hints (`color6`) on the hint and status pills (`color2`). A text colour short of it is moved towards white or black, whichever its backdrop allows more of, until it's met (or it's white or black). It applies to the colours in use, the theme's and the user's alike, so a theme of `contrast` alone makes the user's own palette readable.
+  - `pill_size` is the height of a row and of every pill (stock's `PILL_SIZE`, 30), from 18 to 60, `button_size` the circle of a button in the hints (`BUTTON_SIZE`, 20), from 12 to 4 less than the pill, and `padding` the screen's margins (`PADDING`), from 1 to 30, all before scaling. With a pill size and no padding, the padding is worked out as stock's comments in `defines.h` put it, a third of the pill when it divides the screen's height and otherwise a third of what's left over (or a third of the pill when that's under an eighth of it). The rows the built-in list shows follow, as `(height - 2 * padding - pill) / pill` in layout units, which gives every stock device's `MAIN_ROW_COUNT`. With neither set, padding and rows stay stock's own. Stock's sprite sheet is drawn at stock's sizes, so pill ends and button circles at other sizes are scaled from it.
+  - `wallpaper` is the background where the card has no `bg.png` and the selected folder no `.media/bg.png`; `wallpaper_list` a game folder's where it has no `.media/bglist.png` and the card no `bg.png` (`wallpaper` without it); `wallpaper_quick` the quick menu's where the card has no `.media/quick_<name>.png` or `quick.png`. A stock background placed by hand always wins, and a plugin's `art_path` answer for a folder's background comes before them too.
+  - Paths are full paths to regular files anywhere on the card, so a theme can be a folder of its own such as `<sd>/Themes/<name>/`; a symlink may point anywhere on the card but not off it.
+
+  A value out of range, a path that isn't a regular file on the card, a font that won't open, and sizes that leave the list fewer than 3 rows or stock's text too big for its pill or button, are refused one at a time: the launcher logs each and uses stock's in its place, and the rest of the theme stays. A non-zero return is an error: the launcher logs it, puts stock's whole theme back and doesn't ask again until it restarts. With no plugin owning the slot, every size, colour and font is stock's, byte for byte.
+
+  `ui_size(which)` in `MosaicHost` returns the size an `enum MosaicUISize` names, before scaling (`MOSAIC_UI_PILL`, `MOSAIC_UI_BUTTON`, `MOSAIC_UI_PADDING`, `MOSAIC_UI_ROWS` and `MOSAIC_UI_TEXT_STEP`), stock's or the theme's, so a layout can follow the theme; check for it, and for the theme slot, with `MOSAIC_HOST_HAS(host, ui_size)`.
+
+  ```c
+  static int theme(MosaicTheme* t) {
+      t->colors[MOSAIC_COLOR_BACKGROUND - 1] = 0x102030;
+      t->pill_size = 36;
+      snprintf(t->font, sizeof(t->font), "%s/Themes/Night/font.ttf", host->sdcard_path);
+      snprintf(t->wallpaper, sizeof(t->wallpaper), "%s/Themes/Night/bg.png", host->sdcard_path);
+      return 0;
+  }
   ```
 
 ## Without writing C

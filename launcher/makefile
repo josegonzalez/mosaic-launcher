@@ -33,7 +33,8 @@ MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
 	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
-	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c
+	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c \
+	theme.c thememodel.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.
@@ -46,7 +47,7 @@ SOURCE = $(MODULES) \
 	$(NEXTUI)/all/common/scaler.c \
 	$(NEXTUI)/all/common/utils.c \
 	$(NEXTUI)/all/common/config.c \
-	$(NEXTUI)/all/common/api.c \
+	$(API_C) \
 	$(NEXTUI)/$(PLATFORM)/platform/platform.c
 
 CC = $(CROSS_COMPILE)gcc
@@ -56,6 +57,17 @@ LDFLAGS += -lmsettings
 
 PRODUCT = $(BUILD_DIR)/$(TARGET).elf
 
+# The launcher's own build of stock's api.c: the vendored file with
+# patches/api.c.patch, written to the build folder, so the vendored tree
+# (and minarch and the Settings pak built from it) stays stock's. With
+# uisizes.h, included ahead of every file of nextui.elf, it turns stock's
+# UI sizes into runtime values whose defaults are stock's, and lets the
+# theme slot's owner supply colours and the font. A NextUI bump that the
+# patch no longer applies to fails here; scripts/upstream-drift.sh shows
+# it with upstream's changes to api.c.
+API_C = $(BUILD_DIR)/api.c
+UISIZES = -include $(CURDIR)/uisizes.h
+
 # rcheevos and libchdr, for RetroAchievements hashing; its rules mustn't
 # become the default goal
 .DEFAULT_GOAL := all
@@ -64,12 +76,16 @@ include vendor.mk
 
 .PHONY: all clean
 
-all: $(PREFIX_LOCAL)/include/msettings.h $(VENDOR_OBJECTS)
+all: $(PREFIX_LOCAL)/include/msettings.h $(VENDOR_OBJECTS) $(API_C)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(SOURCE) $(VENDOR_OBJECTS) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+	$(CC) $(UISIZES) $(SOURCE) $(VENDOR_OBJECTS) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+
+$(API_C): $(NEXTUI)/all/common/api.c patches/api.c.patch
+	mkdir -p $(BUILD_DIR)
+	patch -s -o $@ $(NEXTUI)/all/common/api.c patches/api.c.patch || { rm -f $@; exit 1; }
 
 clean:
-	rm -f $(PRODUCT)
+	rm -f $(PRODUCT) $(API_C)
 	rm -rf $(VENDOR_OBJ)
 
 # libmsettings is built from the vendored tree, the same way stock does it.

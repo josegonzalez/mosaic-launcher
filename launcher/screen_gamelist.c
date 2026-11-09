@@ -381,6 +381,7 @@ static void decorateThumb(const Entry* entry) {
 static void emptyUpdate(void) {
 	char defaultBgPath[512];
 	resolveArt(ART_DEFAULT_BG, NULL, defaultBgPath, sizeof(defaultBgPath));
+	Theme_fillWallpaper(THEME_WALL_MAIN, defaultBgPath, sizeof(defaultBgPath));
 	if (strcmp(defaultBgPath, folderBgPath) != 0 && exists(defaultBgPath)) {
 		strncpy(folderBgPath, defaultBgPath, sizeof(folderBgPath) - 1);
 		startLoadFolderBackground(defaultBgPath, onBackgroundLoaded, NULL);
@@ -419,6 +420,8 @@ void GameList_update(void) {
 	// load folder background
 	char defaultBgPath[512];
 	resolveArt(ART_DEFAULT_BG, NULL, defaultBgPath, sizeof(defaultBgPath));
+	// the theme's wallpaper where the card has no bg.png
+	Theme_fillWallpaper(THEME_WALL_MAIN, defaultBgPath, sizeof(defaultBgPath));
 
 	if(((entry->type == ENTRY_DIR || entry->type == ENTRY_ROM) && CFG_getRomsUseFolderBackground())) {
 		char *newBg = entry->type == ENTRY_DIR ? entry->path:rompath;
@@ -433,6 +436,8 @@ void GameList_update(void) {
 				// Safeguard: If no background is available, still render the text to leave the user a way out
 				list_show_entry_names = true;
 				resolveArt(ART_DEFAULT_BG, NULL, tmppath, sizeof(tmppath));
+				// and the theme's where the card has no bg.png either
+				Theme_fillWallpaper(kind == ART_LIST_BG ? THEME_WALL_LIST : THEME_WALL_MAIN, tmppath, sizeof(tmppath));
 			}
 			startLoadFolderBackground(tmppath, onBackgroundLoaded, NULL);
 		}

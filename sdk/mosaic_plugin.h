@@ -341,6 +341,42 @@ typedef struct MosaicPlayGame {
 	int orphan;             // 1 for a game carried over from Onion, known only by its name
 } MosaicPlayGame;
 
+// What the theme slot's owner supplies, for MosaicPlugin's theme. The
+// launcher sets size to sizeof(MosaicTheme) in the launcher and every
+// field to its "stock's" value before asking, so a theme sets only what it
+// changes; fields are only added at the end, so check for a newer one with
+// MOSAIC_THEME_HAS(theme, field) before setting it. Sizes are in stock's
+// layout units, before scaling, as screen_scale says. Paths are full paths
+// to regular files anywhere on the card; a symlink may point anywhere on
+// the card but not off it.
+#define MOSAIC_THEME_COLORS 7
+#define MOSAIC_THEME_UNSET -1
+typedef struct MosaicTheme {
+	size_t size;                       // sizeof(MosaicTheme) in the launcher
+	int colors[MOSAIC_THEME_COLORS];   // color1 to color7 as stock's palettes number them (enum MosaicThemeColor less 1; colors[6] is the background), each 0xRRGGBB or MOSAIC_THEME_UNSET for the user's own
+	char font[512];                    // a TrueType or OpenType font, or "" for the user's own
+	int text_step;                     // points added to each of stock's text sizes, -2 to 8, or 0
+	int contrast;                      // the least contrast ratio text keeps against what it's drawn on, in tenths (45 is 4.5:1), 10 to 210, or 0 for none
+	int pill_size;                     // the height of a row and of a pill, 18 to 60, or 0 for stock's (30)
+	int button_size;                   // a button's circle in the hints, 12 to 4 less than the pill, or 0 for stock's (20)
+	int padding;                       // the screen's margins, 1 to 30, or 0 for stock's (or, with a pill_size, one worked out from it)
+	char wallpaper[512];               // the background where the card has no bg.png (and no folder's .media/bg.png), or ""
+	char wallpaper_list[512];          // a game folder's background where it has no .media/bglist.png and the card no bg.png, or "" for wallpaper
+	char wallpaper_quick[512];         // the quick menu's background where the card has no .media/quick_<name>.png or quick.png, or ""
+} MosaicTheme;
+
+#define MOSAIC_THEME_HAS(theme, field) \
+	((theme)->size >= offsetof(MosaicTheme, field) + sizeof((theme)->field))
+
+// The UI sizes ui_size returns, before scaling.
+enum MosaicUISize {
+	MOSAIC_UI_PILL = 1,      // a row's and a pill's height (stock's PILL_SIZE)
+	MOSAIC_UI_BUTTON = 2,    // a button's circle in the hints (BUTTON_SIZE)
+	MOSAIC_UI_PADDING = 3,   // the screen's margins (PADDING)
+	MOSAIC_UI_ROWS = 4,      // the rows the built-in list shows (MAIN_ROW_COUNT)
+	MOSAIC_UI_TEXT_STEP = 5, // points added to stock's text sizes
+};
+
 // The Wi-Fi connection, for host->wifi_connection. The plugin sets size to
 // sizeof(MosaicWifi) before asking, and the launcher fills in only the
 // fields that fit in it, so fields are only added at the end.
@@ -1130,6 +1166,12 @@ typedef struct MosaicHost {
 	// them with MOSAIC_HOST_HAS(host, tr).
 	const char* (*tr)(const char* plugin_id, const char* context, const char* text);
 	const char* (*tr_plural)(const char* plugin_id, const char* context, const char* singular, const char* plural, unsigned long n);
+
+	// The UI size an enum MosaicUISize names, before scaling: stock's, or
+	// the theme slot's owner's (see theme in MosaicPlugin), or -1 for any
+	// other value. They change only when the lists reload. Check for it
+	// with MOSAIC_HOST_HAS(host, ui_size).
+	int (*ui_size)(int which);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1457,6 +1499,21 @@ typedef struct MosaicPlugin {
 	// English rules pick. Check for them with MOSAIC_HOST_HAS(host, tr).
 	const char* (*translate)(const char* context, const char* text);
 	const char* (*translate_plural)(const char* context, const char* singular, const char* plural, unsigned long n);
+
+	// The theme slot. A plugin with slots=theme in its plugin.txt supplies
+	// the launcher's colours, font, text size, UI sizes and wallpapers:
+	// theme gets a MosaicTheme with every field at stock's value, sets the
+	// ones it changes and returns 0. Nothing it sets is written to stock's
+	// settings. The launcher asks once every plugin has loaded, before the
+	// first list is built, and again each time the lists reload. A value
+	// out of range, a path that isn't a regular file on the card, a font
+	// that won't open and sizes that leave the list fewer than 3 rows are
+	// refused one by one, logged, and stock's used in their place. A
+	// wallpaper only shows where the card has no stock background of its
+	// own. A non-zero return is an error: the launcher logs it, puts
+	// stock's theme back and doesn't ask again until it restarts. Check
+	// for it with MOSAIC_HOST_HAS(host, ui_size).
+	int (*theme)(MosaicTheme* theme);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

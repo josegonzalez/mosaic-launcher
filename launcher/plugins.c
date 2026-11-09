@@ -3,6 +3,7 @@
 #include "launcher.h"
 #include "pluginset.h"
 #include "plugins.h"
+#include "theme.h"
 #include "stocktoggles.h"
 #include "leds.h"
 #include "bluetooth.h"
@@ -50,6 +51,7 @@ typedef struct LoadedPlugin {
 	int owns_home;       // claims the home slot, so its MOSAIC_SCREEN_HOME screen is in place of the root list
 	int owns_switcher;   // claims the switcher slot, so its MOSAIC_SCREEN_GAME_SWITCHER screen is in place of the game switcher
 	int owns_strings;    // claims the strings slot, so its translate is asked
+	int owns_theme;      // claims the theme slot, so its theme is asked
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -1088,6 +1090,7 @@ static const MosaicHost host = {
 	.home_screen = hostHomeScreen,
 	.tr = hostTr,
 	.tr_plural = hostTrPlural,
+	.ui_size = Theme_uiSize,
 };
 
 ///////////////////////////////////////
@@ -1150,6 +1153,10 @@ static void load(const PluginManifest* m) {
 	p->owns_home = csvHas(m->slots, HOME_SLOT);
 	p->owns_switcher = csvHas(m->slots, SWITCHER_SLOT);
 	p->owns_strings = csvHas(m->slots, STRINGS_SLOT);
+	p->owns_theme = csvHas(m->slots, THEME_SLOT);
+	if (!p->owns_theme && Plugin_has(plugin, theme) && plugin->theme) {
+		LOG_warn("plugins: %s has a theme but no slots=" THEME_SLOT ", so it won't be asked\n", m->id);
+	}
 	int has_translate = (Plugin_has(plugin, translate) && plugin->translate)
 		|| (Plugin_has(plugin, translate_plural) && plugin->translate_plural);
 	if (!p->owns_strings && has_translate) {
@@ -1291,6 +1298,41 @@ static void claimStrings(void) {
 	}
 }
 
+// The theme slot's owner, or -1, and whether it has failed for the run.
+static int theme_owner = -1;
+static int theme_failed = 0;
+
+// The theme slot's owner, once every plugin has loaded and before the
+// first list is built.
+static void claimTheme(void) {
+	theme_owner = -1;
+	theme_failed = 0;
+	for (int i = 0; i < loaded_count; i++) {
+		if (!loaded[i].owns_theme) continue;
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (Plugin_has(p, theme) && p->theme) theme_owner = i;
+		else LOG_warn("plugins: %s owns the " THEME_SLOT " slot but has no theme, using stock's\n", loaded[i].id);
+		break;
+	}
+	Plugins_themeRefresh();
+}
+
+int Plugins_themeRefresh(void) {
+	if (theme_owner < 0 || theme_failed) return 0;
+	LoadedPlugin* owner = &loaded[theme_owner];
+	MosaicTheme theme;
+	Theme_blank(&theme);
+	int result = owner->plugin->theme(&theme);
+	if (result != 0) {
+		LOG_warn("plugins: %s's theme failed (%d), using stock's until the launcher restarts\n", owner->id, result);
+		theme_failed = 1;
+		Theme_clear();
+	}
+	else Theme_set(owner->id, &theme);
+	state.dirty = 1;
+	return 1;
+}
+
 // The home slot's screen, once every plugin has loaded. The flag on any
 // other plugin's screen means nothing.
 static void claimHome(void) {
@@ -1378,6 +1420,7 @@ void Plugins_init(void) {
 	claimHome();
 	claimSwitcher();
 	claimStrings();
+	claimTheme();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);

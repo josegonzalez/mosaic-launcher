@@ -32,7 +32,8 @@
 # and switcher slots, draws stock's button hints and presses the bundled
 # game switcher plus's buttons and the bundled screenshot viewer's, and
 # one with an overlay, one that types a query into the bundled search plugin and reads its
-# results back, one that translates the launcher's strings, and one that
+# results back, one that translates the launcher's strings, one that
+# supplies the theme and reads it back, and one that
 # crashes during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
 # time limit's protected settings and scrolls a long one, reads back those

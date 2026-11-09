@@ -164,6 +164,8 @@ void QuickMenu_update(void) {
 	// background
 	if(!exists(newBgPath))
 		strncpy(newBgPath, fallbackBgPath, sizeof(newBgPath) - 1);
+	// the theme's wallpaper where the card has neither
+	Theme_fillWallpaper(THEME_WALL_QUICK, newBgPath, sizeof(newBgPath));
 
 	if(strcmp(newBgPath, folderBgPath) != 0) {
 		strncpy(folderBgPath, newBgPath, sizeof(folderBgPath) - 1);

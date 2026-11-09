@@ -31,6 +31,7 @@
 #define HOME_SLOT "home" // the exclusive slot whose MOSAIC_SCREEN_HOME screen is in place of the root list
 #define SWITCHER_SLOT "switcher" // the exclusive slot whose MOSAIC_SCREEN_GAME_SWITCHER screen is in place of the game switcher
 #define STRINGS_SLOT "strings" // the exclusive slot translate and translate_plural belong to
+#define THEME_SLOT "theme" // the exclusive slot theme belongs to
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its
@@ -273,6 +274,11 @@ void Plugins_overlays(struct SDL_Surface* surface, const MosaicScreenView* view)
 void Plugins_beforeSleep(void);
 void Plugins_afterResume(void);
 void Plugins_beforePoweroff(void);
+
+// Asks the theme slot's owner for its theme again and puts it in place,
+// as the lists reload; after an error, stock's stays. Returns 1 when it
+// asked, so the theme may have changed.
+int Plugins_themeRefresh(void);
 
 // Loads plugins unless they're paused after a crash. Call once, before
 // Menu_init, since building the root list already runs plugin hooks.

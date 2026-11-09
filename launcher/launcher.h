@@ -50,5 +50,6 @@
 #include "statuspill.h"
 #include "background.h"
 #include "audio.h"
+#include "theme.h"
 
 #endif

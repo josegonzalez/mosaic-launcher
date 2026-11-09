@@ -154,6 +154,9 @@ int main (int argc, char *argv[]) {
 		// a plugin changed something on the card (host->reload_lists)
 		if (state.reload) {
 			ArtLoader_reset();
+			// the theme too, before the lists' rows are counted again
+			// and the background drawn again, as its wallpapers may have changed
+			if (Plugins_themeRefresh()) folderBgPath[0] = '\0';
 			Menu_reload();
 		}
 		// art decoded since the last frame, and art past the cache's cap dropped

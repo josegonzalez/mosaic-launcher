@@ -1,0 +1,168 @@
+--- a/workspace/all/common/api.c
++++ b/workspace/all/common/api.c
+@@ -24,6 +24,10 @@
+ 
+ extern pthread_mutex_t audio_mutex;
+ 
++// mosaic: the theme slot's font and colours over stock's (launcher/theme.c)
++const char *Theme_fontPath(const char *stock);
++void Theme_colors(void);
++
+ ///////////////////////////////
+ 
+ void LOG_note(int level, const char *fmt, ...)
+@@ -367,6 +371,8 @@
+ 	// Load/Reload fonts
+ 	if (!TTF_WasInit())
+ 		TTF_Init();
++
++	fontPath = Theme_fontPath(fontPath); // mosaic
+ 
+ 	TTF_CloseFont(font.large);
+ 	TTF_CloseFont(font.medium);
+@@ -393,16 +399,29 @@
+ {
+ 	// We are currently micro managing all of these screen-mapped colors,
+ 	// should just move this to the caller.
+-	THEME_COLOR1 = mapUint(CFG_getColor(COLOR_MAIN));
+-	THEME_COLOR2 = mapUint(CFG_getColor(COLOR_ACCENT));
+-	THEME_COLOR3 = mapUint(CFG_getColor(COLOR_ACCENT2));
+-	THEME_COLOR4 = mapUint(CFG_getColor(COLOR_LIST_TEXT));
+-	THEME_COLOR5 = mapUint(CFG_getColor(COLOR_LIST_TEXT_SELECTED));
+-	THEME_COLOR6 = mapUint(CFG_getColor(COLOR_HINT));
+-	THEME_COLOR7 = mapUint(CFG_getColor(COLOR_BACKGROUND));
+-	ALT_BUTTON_TEXT_COLOR = uintToColour(CFG_getColor(COLOR_ACCENT2));
++	Theme_colors(); // mosaic: sets THEME_COLORn_255, stock's or the theme's
++	THEME_COLOR1 = mapUint(THEME_COLOR1_255);
++	THEME_COLOR2 = mapUint(THEME_COLOR2_255);
++	THEME_COLOR3 = mapUint(THEME_COLOR3_255);
++	THEME_COLOR4 = mapUint(THEME_COLOR4_255);
++	THEME_COLOR5 = mapUint(THEME_COLOR5_255);
++	THEME_COLOR6 = mapUint(THEME_COLOR6_255);
++	THEME_COLOR7 = mapUint(THEME_COLOR7_255);
++	ALT_BUTTON_TEXT_COLOR = uintToColour(THEME_COLOR3_255);
+ 
+ 	return 0;
++}
++
++// mosaic: puts the theme slot's colours, background colour and font in
++// place, or stock's back, without touching stock's settings
++void GFX_themeChanged(void)
++{
++	GFX_updateColors();
++	if (gfx.mode == MODE_MAIN)
++		GFX_setClearColor(mapUint(THEME_COLOR7_255));
++	char path[MAX_PATH];
++	snprintf(path, sizeof(path), "%s/%s", RES_PATH, CFG_getFontFile());
++	GFX_loadSystemFont(path);
+ }
+ 
+ SDL_Surface *GFX_init(int mode)
+@@ -520,6 +539,10 @@
+ 		LOG_info("missing assets, you're about to segfault dummy!\n");
+ 	gfx.assets = IMG_Load(asset_path);
+ 
++	// mosaic: the sheet's cells are stock's button size, whatever the theme's
++#pragma push_macro("BUTTON_SIZE")
++#undef BUTTON_SIZE
++#define BUTTON_SIZE (UI_stockButton())
+ 	input_rects[INPUT_BUTTON_A] = (SDL_Rect){SCALE4(0, 0, BUTTON_SIZE, BUTTON_SIZE)};
+ 	input_rects[INPUT_BUTTON_B] = (SDL_Rect){SCALE4(20, 0, BUTTON_SIZE, BUTTON_SIZE)};
+ 	input_rects[INPUT_BUTTON_X] = (SDL_Rect){SCALE4(40, 0, BUTTON_SIZE, BUTTON_SIZE)};
+@@ -561,6 +584,7 @@
+ 
+ 	input_rects[INPUT_BUTTON_HOME] = (SDL_Rect){SCALE4(0, 60, BUTTON_SIZE, BUTTON_SIZE)};
+ 	input_rects[INPUT_BUTTON_POWER] = (SDL_Rect){SCALE4(20, 60, BUTTON_SIZE, BUTTON_SIZE)};
++#pragma pop_macro("BUTTON_SIZE")
+ 
+ 	char input_path[MAX_PATH];
+ 	sprintf(input_path, RES_PATH "/inputs@%ix.png", FIXED_SCALE);
+@@ -1904,6 +1928,35 @@
+ 	SDL_FreeSurface(tmp);
+ }
+ 
++// mosaic: half of a pill's cap, scaled from the sheet's when it's drawn at
++// the theme's pill or button height; any other height is drawn as stock does
++static void GFX_blitPillCap(int asset, int half, SDL_Surface *dst, int x, int y, int h, uint32_t asset_color)
++{
++	SDL_Rect *rect = &asset_rects[asset];
++	int r = h / 2;
++	if (h == rect->h || (h != SCALE1(PILL_SIZE) && h != SCALE1(BUTTON_SIZE)))
++	{
++		GFX_blitAssetColor(asset, &(SDL_Rect){half ? r : 0, 0, r, h}, dst, &(SDL_Rect){x, y}, asset_color);
++		return;
++	}
++	int sr = rect->h / 2;
++	GFX_blitSurfaceColorScaled(gfx.assets, &(SDL_Rect){rect->x + (half ? sr : 0), rect->y, sr, rect->h}, dst, &(SDL_Rect){x, y, r, h}, asset_color);
++}
++
++// mosaic: a button's circle or prompt at the theme's button size
++static void GFX_blitButtonAsset(SDL_Surface *sheet, SDL_Rect *src, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t asset_color)
++{
++	int size = SCALE1(BUTTON_SIZE);
++	if (size == SCALE1(UI_stockButton()))
++		GFX_blitSurfaceColor(sheet, src, dst, dst_rect, asset_color);
++	else
++	{
++		int w = src->w * size / SCALE1(UI_stockButton());
++		int h = src->h * size / SCALE1(UI_stockButton());
++		GFX_blitSurfaceColorScaled(sheet, src, dst, &(SDL_Rect){dst_rect->x, dst_rect->y, w, h}, asset_color);
++	}
++}
++
+ static int GFX_pillRectAsset(int asset)
+ {
+ 	switch (asset)
+@@ -1938,7 +1991,7 @@
+ 		w = h;
+ 	w -= h;
+ 
+-	GFX_blitAssetColor(asset, &(SDL_Rect){0, 0, r, h}, dst, &(SDL_Rect){x, y}, asset_color);
++	GFX_blitPillCap(asset, 0, dst, x, y, h, asset_color); // mosaic
+ 	x += r;
+ 	if (w > 0)
+ 	{
+@@ -1957,7 +2010,7 @@
+ 		}
+ 		x += w;
+ 	}
+-	GFX_blitAssetColor(asset, &(SDL_Rect){r, 0, r, h}, dst, &(SDL_Rect){x, y}, asset_color);
++	GFX_blitPillCap(asset, 1, dst, x, y, h, asset_color); // mosaic
+ }
+ void GFX_blitPill(int asset, SDL_Surface *dst, SDL_Rect *dst_rect)
+ {
+@@ -2122,12 +2175,12 @@
+ 	// button
+ 	if (strlen(button) == 1 || input_asset >= 0)
+ 	{
+-		GFX_blitAssetColor(ASSET_BUTTON, NULL, dst, dst_rect, THEME_COLOR1);
++		GFX_blitButtonAsset(gfx.assets, &asset_rects[ASSET_BUTTON], dst, dst_rect, THEME_COLOR1); // mosaic
+ 
+ 		// special case: if CFG_getInputPromptStyle() is anything but INPUT_STYLE_TEXT, we want to blit the prompt asset
+ 		if (input_asset >= 0)
+ 		{
+-			GFX_blitInputAssetColor(input_asset, NULL, dst, dst_rect, THEME_COLOR3);
++			GFX_blitButtonAsset(gfx.inputs, &input_rects[input_asset], dst, dst_rect, THEME_COLOR3); // mosaic
+ 			ox += SCALE1(BUTTON_SIZE);
+ 		}
+ 		else {
+@@ -2143,8 +2196,8 @@
+ 		// special case: if CFG_getInputPromptStyle() is anything but INPUT_STYLE_TEXT, we want to blit the prompt asset
+ 		if (input_asset >= 0)
+ 		{
+-			GFX_blitAssetColor(ASSET_BUTTON, NULL, dst, dst_rect, THEME_COLOR1);
+-			GFX_blitInputAssetColor(input_asset, NULL, dst, dst_rect, THEME_COLOR3);
++			GFX_blitButtonAsset(gfx.assets, &asset_rects[ASSET_BUTTON], dst, dst_rect, THEME_COLOR1); // mosaic
++			GFX_blitButtonAsset(gfx.inputs, &input_rects[input_asset], dst, dst_rect, THEME_COLOR3); // mosaic
+ 			ox += SCALE1(BUTTON_SIZE);
+ 		}
+ 		else {
+@@ -2213,7 +2266,7 @@
+ 
+ 		if (len)
+ 		{
+-			text = TTF_RenderUTF8_Blended_Wrapped(font, line, uintToColour(CFG_getColor(COLOR_LIST_TEXT)), dst_rect->w);
++			text = TTF_RenderUTF8_Blended_Wrapped(font, line, uintToColour(THEME_COLOR4_255) /* mosaic */, dst_rect->w);
+ 			int x = dst_rect->x;
+ 			x += (dst_rect->w - text->w) / 2;
+ 			SDL_BlitSurface(text, NULL, dst, &(SDL_Rect){x, y});
