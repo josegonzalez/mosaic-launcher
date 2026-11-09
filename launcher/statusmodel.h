@@ -60,6 +60,22 @@ int Status_fileName(const char* file, char* out, size_t size);
 // then "30%" while running with a total, "done" or "failed".
 void Status_text(const StatusFile* file, const char* pak, char* out, size_t size);
 
+// The printf formats Status_text says those with: the name and "done",
+// "failed", or the percentage (a long long), such as translations of
+// STATUS_DONE_FORMAT.
+#define STATUS_DONE_FORMAT "%s done"
+#define STATUS_FAILED_FORMAT "%s failed"
+#define STATUS_PERCENT_FORMAT "%s %lld%%"
+typedef struct StatusWords {
+	const char* done;
+	const char* failed;
+	const char* percent;
+} StatusWords;
+
+// Status_text in words (NULL for English's), cutting out only between
+// UTF-8 characters.
+void Status_textIn(const StatusFile* file, const char* pak, const StatusWords* words, char* out, size_t size);
+
 // What a file looked like when it was last read: a change to any of these
 // means it's read again.
 typedef struct StatusSig {

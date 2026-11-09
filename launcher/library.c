@@ -899,8 +899,8 @@ Array* getDiscs(char* path){
 				disc += 1;
 				Entry* entry = Entry_new(disc_path, ENTRY_ROM);
 				free(entry->name);
-				char name[16];
-				sprintf(name, "Disc %i", disc);
+				char name[64];
+				snprintf(name, sizeof(name), TR("Disc %i"), disc);
 				entry->name = strdup(name);
 				Array_push(entries, entry);
 			}

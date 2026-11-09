@@ -92,7 +92,10 @@ void StatusPill_tick(unsigned long now) {
 
 	const StatusSlot* slot = StatusBoard_pick(&board, now, (long long)time(NULL));
 	char text[sizeof(shown)] = "";
-	if (slot) Status_text(&slot->file, slot->name, text, sizeof(text));
+	if (slot) {
+		StatusWords words = { TR("%s done"), TR("%s failed"), TR("%s %lld%%") };
+		Status_textIn(&slot->file, slot->name, &words, text, sizeof(text));
+	}
 	if (!strcmp(text, shown)) return;
 	snprintf(shown, sizeof(shown), "%s", text);
 	state.dirty = 1;

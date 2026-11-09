@@ -51,7 +51,7 @@ On macOS, upstream symlinks Homebrew gcc into `/usr/local/bin` with sudo. This p
 ## Tests
 
 ```shell
-brew install bats-core shellcheck
+brew install bats-core shellcheck gettext
 make lint
 make test
 ```
@@ -61,6 +61,8 @@ The bats tests run the pak scripts against a fake SD card, with a fake `mount` t
 `make test-plugins` (`tests/plugins/run.sh`) loads test plugins into the desktop build. `run.sh` holds the helpers, the setup and the teardown, and runs the cases in `tests/plugins/cases/*.sh` in name order; each case builds the test and bundled plugins it uses. A new plugin's cases go in a file of their own, numbered after the last case and before `990-crash.sh`, which leaves plugins paused and so runs last. Each case file has a `# shard: <n>` line: with `SHARD=<i>/<n>` set, `run.sh` runs only the cases of shard i (and `010-hello.sh`, marked `all`, whose logs later cases check against), and with no `SHARD` it runs them all. Each case prints how long it took, so pick the shard with the least time. Cases that use what an earlier one left share its shard, and say so under their shard line: `190-last-path.sh` follows the last path `080-drawer.sh` saved, `300-achiever.sh` reads `290-tracker.sh`'s log, and `510-screens.sh` uses the presser `500-plugins-page.sh` builds.
 
 Each bundled plugin's row in PLUGINS.md's "Bundled plugins" table comes from its `plugins/<name>/README.md`: a `# <name>` heading, a blank line, then the row's text. `./scripts/plugin-table.sh` rewrites the table from them in name order, and `make lint` fails when it's out of date.
+
+`po/launcher.pot` is the gettext template of the launcher's strings, for the strings slot's owner to translate. `make pot` (`scripts/pot.sh`) writes it with xgettext from every literal passed to `TR()`, `TRC()` (with a context), `TRN()` and `TRCN()` (plurals), or marked with `TR_MARK()` (English kept in data, such as an action's label, translated where it's drawn), keeping xgettext's `c-format` flags. `make lint` fails when the committed one is out of date, comparing entries without their locations, which gettext releases wrap differently. It needs gettext's xgettext (`brew install gettext`, or `gettext` on Linux, which CI's lint job installs). New UI text goes through `TR()` where it's drawn, keyed on its English; text that's a printf format gets the same conversions in every translation the launcher uses, so it stays safe to pass to printf.
 
 `make smoke` starts the desktop build for a few seconds, then its settings screens, and fails if either exits on its own. A run still going 5 seconds after SIGTERM gets SIGKILL and fails too, so a launcher that won't stop can't hold up the run. Its logs (`build/smoke.log` and `build/smoke-settings.log`) are also handy for comparing startup output before and after a change.
 
@@ -95,7 +97,9 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `art.c` | where each kind of image (thumbnails, backgrounds, quick menu art) is looked up |
 | `quickitems.c` | the quick menu's pak shortcuts and toggles: which appear, their icons, and what they do |
 | `quicktiles.c` | plugins' quick menu tiles, and the tiles plugins hide or relabel |
-| `tr.c` | `TR()`, which every piece of fixed UI text passes through where it's drawn |
+| `tr.c` | `TR()` and its context and plural forms, which every piece of fixed UI text passes through where it's drawn, asking the strings slot's owner once for each string and keeping its answers |
+| `trmodel.c` | the SDL-free half of the strings slot: whether a translation is safe to draw and to pass to printf (UTF-8, length, lines, the same printf conversions as its English), English's plural rule, and the cache of answers |
+| `text.c` | stock's text truncation and hardware hints made safe for translations: truncating a character at a time so a UTF-8 character is never cut, and the brightness and colour temperature hints through `TR()` |
 | `actions.c` | named actions, the button bindings that trigger them, and the hints generated from those bindings |
 | `transitions.c` | the folder slide and the game switcher's entrance animations, and handing those and the launch to the transition and launch slots' owners, drawing their frames |
 | `pluginset.c` | which discovered plugins load, and in what order |
@@ -114,7 +118,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `leds.c` | a plugin's LED colour, as stock's ambient LED override, and the theme colours |
 | `bluetooth.c` | plugins' Bluetooth: the worker thread that looks for the connected device and runs connects, each a bounded `fork` and `execvp` |
 | `wifi.c` | plugins' Wi-Fi state: the worker thread that asks stock's connection call every few seconds while plugins keep asking and keeps its last answer, and the desktop tests' stand-in file named by `MOSAIC_LAUNCHER_WIFI_FAKE` |
-| `drawmodel.c` | the SDL-free half of plugins' drawing calls: which surfaces exist and which plugin owns each, with its memory budget, handing a plugin's surface to the launcher, text truncation, rounded corners, fitting, and clipping the pixels a plugin writes to its surface |
+| `drawmodel.c` | the SDL-free half of plugins' drawing calls: which surfaces exist and which plugin owns each, with its memory budget, handing a plugin's surface to the launcher, text truncation (plugins' and, for the launcher's own text, stock's a character at a time rather than a byte), rounded corners, fitting, and clipping the pixels a plugin writes to its surface |
 | `plugindraw.c` | plugins' drawing calls over SDL and stock's fonts, and lending a surface such as the screen to a render hook, clipped to the area it may draw in |
 | `layoutmodel.c` | the SDL-free half of the layout slot: whether the owner's layout is still on after its init and each call, the buttons it sees and consumes, and the area it draws in; also the built-in list's row rects for row decorators and where the selection is for transitions, how header widgets are laid out beside the status pill and what they take off the top row, and whether the background slot's owner or stock's background shows, and which plugin's `art_replace` surface shows, with the rounded corners stock gives a thumbnail, and what a change to it draws again on the built-in list or under a layout |
 | `artcache.c` | the SDL-free half of the art cache: decoded images by path and kind, least recently used out first past a byte cap, pins, the worker's load order with prefetches last, requests dropped by sequence number once the selection moves, and plugins' generated art put in under keys of its own |

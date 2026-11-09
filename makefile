@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop plugins-desktop plugins-device ffmpeg-device build-% devices pak test smoke test-plugins test-profiles lint drift clean
+.PHONY: all desktop run-desktop plugins-desktop plugins-device ffmpeg-device build-% devices pak test smoke test-plugins test-profiles lint pot drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -133,6 +133,12 @@ lint:
 	@# the template ships its own copy of the SDK; it must match
 	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h
 	cmp sdk/LICENSE template/sdk/LICENSE
+	@# po/launcher.pot must list every TR() string
+	./scripts/pot.sh --check
+
+# Writes po/launcher.pot, the gettext template of the launcher's strings.
+pot:
+	./scripts/pot.sh
 
 # What changed in upstream's launcher between two NextUI tags, for porting.
 drift:

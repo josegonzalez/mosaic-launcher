@@ -36,7 +36,7 @@ conflicts=
 - `setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]]` declares a setting the Launcher pak's Plugins page shows and edits. `type` is `toggle` (`on` or `off`), `choice` (one of the comma-separated `options`) or `text` (typed on the on-screen keyboard). The plugin reads the value with `host->cfg_get(id, key, default)`. Changes take effect the next time the launcher starts, which is when the user leaves the Launcher pak.
 - `flags`, after the options (leave the options empty for a toggle or text setting, as in `text|Code|||protected,secret`), is a comma-separated list of markers. `protected` makes the Plugins page ask for the launcher's PIN before it shows or changes that setting, and before it turns the plugin off (or turns the whole launcher off while the plugin is on); with no PIN set, a protected setting behaves like any other. `secret`, for `text` settings, makes the value write-only: once it's set, the page shows only Set or Not set, and its keyboard starts empty, so the value is replaced rather than edited. Words the launcher doesn't know are ignored, and a setting without flags behaves as before. An older launcher ignores the field, showing the setting as an ordinary one.
 - `api` is the `MOSAIC_API_VERSION` the plugin was built against. A plugin for a different version is skipped.
-- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, `transition` and `launch` for the `transition_*` hooks, `background` for `background_render`, `home` for a screen in place of the root list, or `switcher` for a screen in place of the game switcher. Only one plugin can own a slot.
+- `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, `transition` and `launch` for the `transition_*` hooks, `background` for `background_render`, `home` for a screen in place of the root list, `switcher` for a screen in place of the game switcher, or `strings` for `translate`. Only one plugin can own a slot.
 - `requires` lists plugins that must also load. `conflicts` lists plugins that can't load alongside it.
 
 ## The entry point
@@ -686,6 +686,28 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   const char* home = MOSAIC_HOST_HAS(host, home_screen) ? host->home_screen() : NULL;
   const char* now = host->current_screen();
   int idle_spot = !strcmp(now, "gamelist") || (home && !strcmp(now, home));
+  ```
+
+- The `strings` slot lets a plugin translate the launcher, such as from gettext `.po` language packs. It's an exclusive slot, picked like the layout (`slot.strings=<id>` in `plugins.txt`): only a plugin with `slots=strings` in its `plugin.txt` has its `translate(context, text)` and `translate_plural(context, singular, plural, n)` in `MosaicPlugin` asked, and one with them but not the slot is logged and never asked. Every piece of fixed text the launcher draws (button hints, the quick menu's tile names, dialogs, the status pill's "done" and "failed") is keyed on its English, as gettext's `msgid`; `po/launcher.pot` lists them all, with `c-format` on the ones that are printf formats, and `make pot` writes it again. `context` is `NULL` for the launcher's own strings, or a `msgctxt` telling the same English apart where it means different things. `translate_plural` gets both English forms and the count, and returns the form the language's plural rules pick for `n`; without it, `translate` is asked for the form English picks (`singular` when `n` is 1). Return `NULL` for anything you have no translation of, and the English shows.
+
+  The launcher asks once for each string (and each count), on the main thread, as the string is first drawn, and copies the answer, so what's returned only has to last until the call returns. It asks only once every plugin has loaded, so plugins' `init` sees English. A translation is refused, logged once, and its English shown when it's empty, over 1023 bytes, has a line over 255 bytes or more than 8 lines, or has different printf conversions from its English (for a plural, from either English form): the same conversions in the same order, where `%i` and `%d` count as one, with no `%n` and no positions such as `%1$s`. A translation of plain English (no conversions) can have a `%` in it, but not one that starts a conversion. One that isn't valid UTF-8 is an error: the launcher logs it and shows English everywhere until it restarts. With no plugin owning the slot, every string is the launcher's English, exactly as stock's. The Launcher pak's settings pages load no plugins, so they stay in English.
+
+  `tr(plugin_id, context, text)` and `tr_plural(plugin_id, context, singular, plural, n)` in `MosaicHost` give plugins the owner's translations of their own text the same way. A `NULL` context is the plugin's id, so a language pack keeps each plugin's strings apart under `msgctxt "<plugin id>"`; pass a context of your own to tell the same English apart. Labels a plugin gives `register_action` are its own strings: the game list's hints, the shared button's menu and the quick menu's tiles show them translated in the plugin's id's context. With no owner, from `init`, for a string with no translation and for one the launcher refused, they return the English passed in; otherwise the launcher's copy, kept until it quits. Ask with fixed text and put names and numbers in afterwards with printf. Check for them with `MOSAIC_HOST_HAS(host, tr)`. Other text plugins hand the launcher, such as `toast` messages, `choose` choices, `rename_quick_tile` labels and `plugin.txt` setting labels, is drawn as it's given.
+
+  The launcher's own text truncation, where it shortens text with "..." (dialog titles and choices, the Launcher pak's rows, the game switcher's title and the quick menu's small tiles), cuts a whole character at a time, so it never leaves half of a UTF-8 character; ASCII comes out as stock's does.
+
+  ```c
+  // French from a language pack: plural rule n <= 1
+  static const char* translate(const char* context, const char* text) {
+      return pack_find(context, text, 0);
+  }
+  static const char* translatePlural(const char* context, const char* singular, const char* plural, unsigned long n) {
+      return pack_find(context, singular, n <= 1 ? 0 : 1);
+  }
+
+  // in any plugin
+  char line[64];
+  snprintf(line, sizeof(line), host->tr_plural(MY_ID, NULL, "%d game", "%d games", count), count);
   ```
 
 ## Without writing C

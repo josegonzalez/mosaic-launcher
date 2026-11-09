@@ -61,6 +61,20 @@ typedef int (*DrawMeasure)(const char* text, void* data);
 // written, or -1 for a bad argument or a failed measure.
 int Draw_truncate(const char* text, int max_width, DrawMeasure measure, void* data, char* out, size_t size);
 
+// Stock's GFX_truncateText one character at a time rather than one byte,
+// so it never cuts a UTF-8 character: text whose width plus padding is
+// over max_width loses its last four characters for "...", then one more
+// before the "..." until it fits. ASCII comes out as stock's does. Unlike
+// stock it stops at "" when not even "..." fits, and keeps to size,
+// cutting text that doesn't fit in it as if it were too wide. Returns the
+// width written plus padding, or -1 for a bad argument or a failed
+// measure.
+int Draw_truncateChars(const char* text, int max_width, int padding, DrawMeasure measure, void* data, char* out, size_t size);
+
+// Copies as much of text into out as fits in size, cutting only between
+// UTF-8 characters. Returns the bytes copied.
+size_t Draw_copy(char* out, size_t size, const char* text);
+
 // radius cut down to at most half of w and h, or -1 for a negative one.
 int Draw_clampRadius(int radius, int w, int h);
 

@@ -268,7 +268,7 @@ static void choiceRender(void) {
 	int pad = SCALE1(BUTTON_PADDING);
 
 	char shown[256];
-	GFX_truncateText(font.large, title, shown, screen->w - SCALE1(PADDING * 2) - ow - header_w, pad * 2);
+	Text_truncate(font.large, title, shown, sizeof(shown), screen->w - SCALE1(PADDING * 2) - ow - header_w, pad * 2);
 	blitRowText(font.large, shown, normal, left + pad, SCALE1(PADDING), screen->w);
 
 	int visible = MAIN_ROW_COUNT - 1;
@@ -278,13 +278,13 @@ static void choiceRender(void) {
 	for (int i = choice_start, j = 1; i < choice_count && j <= visible; i++, j++) {
 		int y = SCALE1(PADDING + j * PILL_SIZE);
 		char label[256];
-		int label_w = GFX_truncateText(font.large, choices[i], label, width, pad * 2);
+		int label_w = Text_truncate(font.large, choices[i], label, sizeof(label), width, pad * 2);
 		int selected = i == choice_selected;
 		if (selected) GFX_blitPillDark(ASSET_WHITE_PILL, screen, &(SDL_Rect){ left, y, label_w, SCALE1(PILL_SIZE) });
 		blitRowText(font.large, label, selected ? picked : normal, left + pad, y, label_w - pad * 2);
 	}
 
-	if (show_setting) GFX_blitHardwareHints(screen, show_setting);
+	if (show_setting) Text_hardwareHints(screen, show_setting);
 	GFX_blitButtonGroup((char*[]){ "B", TR("BACK"), "A", TR("SELECT"), NULL }, 1, screen, 1);
 }
 

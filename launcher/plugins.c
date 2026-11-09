@@ -49,6 +49,7 @@ typedef struct LoadedPlugin {
 	int overlay_off;     // its overlay_render failed, so its overlay is left out
 	int owns_home;       // claims the home slot, so its MOSAIC_SCREEN_HOME screen is in place of the root list
 	int owns_switcher;   // claims the switcher slot, so its MOSAIC_SCREEN_GAME_SWITCHER screen is in place of the game switcher
+	int owns_strings;    // claims the strings slot, so its translate is asked
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -346,8 +347,20 @@ static int hostRegisterAction(const char* id, const char* label,
 	action->available = available;
 	action->run = run;
 	action->data = data;
+	// its label is the plugin's own text, translated in its id's context
+	action->context = initializing >= 0 ? strdup(loaded[initializing].id) : NULL;
 	Actions_register(action);
 	return 0;
+}
+
+// A plugin's own strings are in its id's context unless it names one.
+static const char* hostTr(const char* plugin_id, const char* context, const char* text) {
+	if (!text || initializing >= 0) return text;
+	return TRC(context ? context : plugin_id, text);
+}
+static const char* hostTrPlural(const char* plugin_id, const char* context, const char* singular, const char* plural, unsigned long n) {
+	if (!singular || !plural || initializing >= 0) return n == 1 ? singular : plural;
+	return TRCN(context ? context : plugin_id, singular, plural, n);
 }
 
 static int hostBindButton(int screen, int button, int trigger, const char* action_id) {
@@ -1073,6 +1086,8 @@ static const MosaicHost host = {
 	.wifi_enabled = hostWifiEnabled,
 	.wifi_connection = hostWifiConnection,
 	.home_screen = hostHomeScreen,
+	.tr = hostTr,
+	.tr_plural = hostTrPlural,
 };
 
 ///////////////////////////////////////
@@ -1134,6 +1149,12 @@ static void load(const PluginManifest* m) {
 	}
 	p->owns_home = csvHas(m->slots, HOME_SLOT);
 	p->owns_switcher = csvHas(m->slots, SWITCHER_SLOT);
+	p->owns_strings = csvHas(m->slots, STRINGS_SLOT);
+	int has_translate = (Plugin_has(plugin, translate) && plugin->translate)
+		|| (Plugin_has(plugin, translate_plural) && plugin->translate_plural);
+	if (!p->owns_strings && has_translate) {
+		LOG_warn("plugins: %s translates but has no slots=" STRINGS_SLOT ", so it won't be asked\n", m->id);
+	}
 	int has_width = Plugin_has(plugin, header_width) && plugin->header_width;
 	int has_widget = Plugin_has(plugin, header_widget) && plugin->header_widget;
 	if (has_width != has_widget) {
@@ -1169,6 +1190,7 @@ static void load(const PluginManifest* m) {
 			Action* action = (Action*)now[i];
 			free((char*)action->id);
 			free((char*)action->label);
+			free((char*)action->context);
 			free(action);
 		}
 		Actions_restore(actions, action_count);
@@ -1239,6 +1261,32 @@ static void claimBackground(void) {
 			LOG_info("plugins: %s draws the background\n", loaded[i].id);
 		}
 		else LOG_warn("plugins: %s owns the " BACKGROUND_SLOT " slot but has no background_render, using stock's\n", loaded[i].id);
+		return;
+	}
+}
+
+static void trLog(const char* message) {
+	LOG_warn("%s\n", message);
+}
+
+// The strings slot's owner, once every plugin has loaded, so every
+// plugin's init sees English.
+static void claimStrings(void) {
+	Tr_setOwner(NULL);
+	for (int i = 0; i < loaded_count; i++) {
+		if (!loaded[i].owns_strings) continue;
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (Plugin_has(p, translate) && p->translate) {
+			TrOwner owner = {
+				.translate = p->translate,
+				.translate_plural = Plugin_has(p, translate_plural) ? p->translate_plural : NULL,
+				.id = loaded[i].id,
+				.log = trLog,
+			};
+			Tr_setOwner(&owner);
+			LOG_info("plugins: %s translates the launcher's strings\n", loaded[i].id);
+		}
+		else LOG_warn("plugins: %s owns the " STRINGS_SLOT " slot but has no translate, using English\n", loaded[i].id);
 		return;
 	}
 }
@@ -1329,6 +1377,7 @@ void Plugins_init(void) {
 	claimBackground();
 	claimHome();
 	claimSwitcher();
+	claimStrings();
 
 	if (exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
@@ -1352,6 +1401,8 @@ void Plugins_quit(void) {
 	LayoutSlot_clear(&layout);
 	TransitionSlots_clear(&transitions);
 	BackgroundSlot_clear(&background);
+	// English from here on, as the owner's strings go with it
+	Tr_setOwner(NULL);
 	// before plugins' quit, which stop their threads: one still queueing meanwhile is refused
 	Audio_hostClose("at quit", 0);
 	for (int i = loaded_count - 1; i >= 0; i--) {

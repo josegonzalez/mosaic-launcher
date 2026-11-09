@@ -28,7 +28,7 @@ TARGET = nextui
 INCDIR = -I. -I../sdk -I$(NEXTUI)/all/common/ -I$(NEXTUI)/$(PLATFORM)/platform/ \
 	-I$(RCHEEVOS)/include -I$(LIBCHDR)/include
 MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
-	screens.c screen_gamelist.c screen_switcher.c screen_quickmenu.c art.c quickitems.c quicktiles.c tr.c actions.c transitions.c \
+	screens.c screen_gamelist.c screen_switcher.c screen_quickmenu.c art.c quickitems.c quicktiles.c tr.c trmodel.c text.c actions.c transitions.c \
 	pluginset.c plugins.c toast.c awake.c power.c powerwatch.c pakhooks.c kbmodel.c modal.c \
 	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \

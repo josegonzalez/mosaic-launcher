@@ -1,0 +1,317 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the mosaic-launcher package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: launcher/statuspill.c
+#, c-format
+msgid "%s %lld%%"
+msgstr ""
+
+#: launcher/statuspill.c
+#, c-format
+msgid "%s done"
+msgstr ""
+
+#: launcher/statuspill.c
+#, c-format
+msgid "%s failed"
+msgstr ""
+
+#: launcher/modal.c launcher/screen_gamelist.c launcher/screen_quickmenu.c
+#: launcher/screen_switcher.c launcher/settings.c
+msgid "BACK"
+msgstr ""
+
+#: launcher/text.c
+msgid "BRGHT"
+msgstr ""
+
+#: launcher/text.c
+msgid "BRIGHTNESS"
+msgstr ""
+
+#: launcher/quickitems.c
+msgid "Bluetooth"
+msgstr ""
+
+#: launcher/modal.c
+msgid "CANCEL"
+msgstr ""
+
+#: launcher/settings.c
+msgid "CHANGE"
+msgstr ""
+
+#: launcher/text.c
+msgid "CLTMP"
+msgstr ""
+
+#: launcher/text.c
+msgid "COLOR TEMP"
+msgstr ""
+
+#: launcher/quicktiles.c
+msgid "Collections"
+msgstr ""
+
+#: launcher/settings.c
+msgid ""
+"Crash guard reset.\n"
+"The launcher and its plugins start when you leave this screen."
+msgstr ""
+
+#: launcher/modal.c
+msgid "DELETE"
+msgstr ""
+
+#: launcher/modal.c
+msgid "DONE"
+msgstr ""
+
+#: launcher/library.c
+#, c-format
+msgid "Disc %i"
+msgstr ""
+
+#: launcher/screen_gamelist.c
+msgid "Empty folder"
+msgstr ""
+
+#: launcher/quicktiles.c
+msgid "Games"
+msgstr ""
+
+#: launcher/screen_gamelist.c
+msgid "INFO"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Install a Launcher build for this release."
+msgstr ""
+
+#: launcher/settings.c
+msgid "Installed"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Launcher"
+msgstr ""
+
+#: launcher/settings.c
+msgid ""
+"Launcher could not start.\n"
+"The stock launcher is still in use."
+msgstr ""
+
+#: launcher/settings.c
+msgid ""
+"Launcher is off.\n"
+"The stock launcher is back."
+msgstr ""
+
+#: launcher/settings.c
+msgid ""
+"Launcher is on.\n"
+"It starts when you leave this screen."
+msgstr ""
+
+#: launcher/settings.c
+msgid "Locked"
+msgstr ""
+
+#: launcher/screen_gamelist.c
+msgid "MENU"
+msgstr ""
+
+#: launcher/actions.c
+msgid "MORE"
+msgstr ""
+
+#: launcher/screen_gamelist.c
+msgid "NEXT"
+msgstr ""
+
+#: launcher/settings.c
+msgid "New PIN, empty for none"
+msgstr ""
+
+#: launcher/screen_switcher.c
+msgid "No Preview"
+msgstr ""
+
+#: launcher/screen_switcher.c
+msgid "No Recents"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Not set"
+msgstr ""
+
+#: launcher/modal.c
+msgid "OK"
+msgstr ""
+
+#: launcher/screen_gamelist.c launcher/screen_quickmenu.c
+#: launcher/screen_switcher.c launcher/settings.c
+msgid "OPEN"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Off"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Off - using the stock launcher"
+msgstr ""
+
+#: launcher/settings.c
+msgid "On"
+msgstr ""
+
+#: launcher/settings.c
+msgid "On after the next reboot"
+msgstr ""
+
+#: launcher/settings.c
+msgid "On, plugins paused after a crash"
+msgstr ""
+
+#: launcher/plugins.c launcher/settings.c
+msgid "PIN"
+msgstr ""
+
+#: launcher/settings.c
+msgid "PIN removed."
+msgstr ""
+
+#: launcher/settings.c
+msgid ""
+"PIN set.\n"
+"Simple mode and protected settings ask for it."
+msgstr ""
+
+#: launcher/screen_gamelist.c
+msgid "PREVIOUS"
+msgstr ""
+
+#: launcher/quickitems.c
+msgid "Pak Store"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Paused after crashes - using stock"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Plugins"
+msgstr ""
+
+#: launcher/quickitems.c
+msgid "Poweroff"
+msgstr ""
+
+#: launcher/screen_switcher.c
+msgid "REMOVE"
+msgstr ""
+
+#: launcher/screen_gamelist.c launcher/screen_switcher.c
+msgid "RESUME"
+msgstr ""
+
+#: launcher/quickitems.c
+msgid "Reboot"
+msgstr ""
+
+#: launcher/quicktiles.c
+msgid "Recents"
+msgstr ""
+
+#: launcher/modal.c launcher/settings.c
+msgid "SELECT"
+msgstr ""
+
+#: launcher/modal.c
+msgid "SHIFT"
+msgstr ""
+
+#: launcher/screen_gamelist.c launcher/screen_quickmenu.c
+msgid "SLEEP"
+msgstr ""
+
+#: launcher/modal.c
+msgid "SPACE"
+msgstr ""
+
+#: launcher/screen_gamelist.c
+msgid "SWITCHER"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Set"
+msgstr ""
+
+#: launcher/quickitems.c
+msgid "Settings"
+msgstr ""
+
+#: launcher/quickitems.c
+msgid "Sleep"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Status"
+msgstr ""
+
+#: launcher/settings.c
+msgid "The PIN could not be saved."
+msgstr ""
+
+#: launcher/settings.c
+msgid "This build supports a different NextUI release."
+msgstr ""
+
+#: launcher/quicktiles.c
+msgid "Tools"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Try again"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Turn off"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Turn on"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Waiting for a supported NextUI"
+msgstr ""
+
+#: launcher/quickitems.c
+msgid "Wifi"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Wrong PIN"
+msgstr ""
+
+#: launcher/settings.c
+msgid "unknown"
+msgstr ""

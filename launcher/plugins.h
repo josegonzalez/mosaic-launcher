@@ -30,6 +30,7 @@
 #define BACKGROUND_SLOT "background" // the exclusive slot background_render belongs to
 #define HOME_SLOT "home" // the exclusive slot whose MOSAIC_SCREEN_HOME screen is in place of the root list
 #define SWITCHER_SLOT "switcher" // the exclusive slot whose MOSAIC_SCREEN_GAME_SWITCHER screen is in place of the game switcher
+#define STRINGS_SLOT "strings" // the exclusive slot translate and translate_plural belong to
 
 // True when the plugin's struct is new enough to have this field. A plugin
 // built against an older header has a smaller struct, and reading past its

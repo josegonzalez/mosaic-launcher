@@ -4,6 +4,7 @@
 #include "cfgfile.h"
 #include "pin.h"
 #include "settings.h"
+#include "drawmodel.h"
 
 // Anything that mounts, unmounts or edits the boot hook goes through
 // Launcher.pak/bin/manage.sh, so the rules live in one place and stay
@@ -269,8 +270,8 @@ static void addRow(int kind, int arg, const char* label, const char* value) {
 	Row* r = &rows[row_count++];
 	r->kind = kind;
 	r->arg = arg;
-	snprintf(r->label, sizeof(r->label), "%s", label);
-	snprintf(r->value, sizeof(r->value), "%s", value ? value : "");
+	Draw_copy(r->label, sizeof(r->label), label);
+	Draw_copy(r->value, sizeof(r->value), value ? value : "");
 }
 
 static const char* onOff(int on) {
@@ -504,7 +505,7 @@ static void render(int ow) {
 
 	// the title takes the top row, beside the battery and clock
 	char shown[256];
-	GFX_truncateText(font.large, title, shown, screen->w - SCALE1(PADDING * 2) - ow, pad * 2);
+	Text_truncate(font.large, title, shown, sizeof(shown), screen->w - SCALE1(PADDING * 2) - ow, pad * 2);
 	blitRowText(font.large, shown, normal, left + pad, SCALE1(PADDING), screen->w);
 
 	// not MAX(): NextUI's has no outer parentheses, so a comparison with it
@@ -522,9 +523,9 @@ static void render(int ow) {
 
 		int value_w = 0;
 		char value[128] = "";
-		if (r->value[0]) value_w = GFX_truncateText(font.small, r->value, value, width / 2, pad * 2);
+		if (r->value[0]) value_w = Text_truncate(font.small, r->value, value, sizeof(value), width / 2, pad * 2);
 		char label[256];
-		int label_w = GFX_truncateText(font.large, r->label, label, width - value_w, pad * 2);
+		int label_w = Text_truncate(font.large, r->label, label, sizeof(label), width - value_w, pad * 2);
 
 		// rows with a value get a full-width pill, like the stock settings
 		if (selected) {
@@ -536,7 +537,7 @@ static void render(int ow) {
 		if (value_w) blitRowText(font.small, value, color, left + width - value_w + pad, y, value_w - pad * 2);
 	}
 
-	if (show_setting) GFX_blitHardwareHints(screen, show_setting);
+	if (show_setting) Text_hardwareHints(screen, show_setting);
 	const char* confirm = confirmLabel();
 	if (confirm) GFX_blitButtonGroup((char*[]){ "B", TR("BACK"), "A", (char*)confirm, NULL }, 1, screen, 1);
 	else GFX_blitButtonGroup((char*[]){ "B", TR("BACK"), NULL }, 0, screen, 1);

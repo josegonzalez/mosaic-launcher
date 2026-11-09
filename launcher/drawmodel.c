@@ -205,6 +205,61 @@ int Draw_truncate(const char* text, int max_width, DrawMeasure measure, void* da
 	return width;
 }
 
+// Where the character before the one at end starts.
+static size_t charBefore(const char* text, size_t end) {
+	if (end == 0) return 0;
+	end--;
+	while (end > 0 && isContinuation(text[end])) end--;
+	return end;
+}
+
+// The longest prefix of text, at most most bytes, that ends between
+// characters.
+static size_t charsUpTo(const char* text, size_t len, size_t most) {
+	if (len <= most) return len;
+	while (most > 0 && isContinuation(text[most])) most--;
+	return most;
+}
+
+size_t Draw_copy(char* out, size_t size, const char* text) {
+	if (!out || size == 0) return 0;
+	size_t len = text ? charsUpTo(text, strlen(text), size - 1) : 0;
+	if (len) memcpy(out, text, len);
+	out[len] = '\0';
+	return len;
+}
+
+int Draw_truncateChars(const char* text, int max_width, int padding, DrawMeasure measure, void* data, char* out, size_t size) {
+	if (!text || !measure || !out || size == 0) return -1;
+	size_t len = strlen(text);
+	if (len < size) {
+		memcpy(out, text, len + 1);
+		int width = measure(out, data);
+		if (width < 0) return -1;
+		if (width + padding <= max_width) return width + padding;
+		// stock's first cut: four characters go for the "..."
+		for (int i = 0; i < 4; i++) len = charBefore(text, len);
+	}
+	else len = size > ELLIPSIS_LEN ? charsUpTo(text, len, size - ELLIPSIS_LEN - 1) : 0;
+
+	if (size <= ELLIPSIS_LEN) {
+		out[0] = '\0';
+		return padding;
+	}
+	for (;;) {
+		int width = measurePrefix(text, len, 1, measure, data, out);
+		if (width < 0) {
+			out[0] = '\0';
+			return -1;
+		}
+		if (width + padding <= max_width) return width + padding;
+		if (len == 0) break;
+		len = charBefore(text, len);
+	}
+	out[0] = '\0';
+	return padding;
+}
+
 ///////////////////////////////////////
 // shapes
 

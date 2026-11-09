@@ -1113,6 +1113,23 @@ typedef struct MosaicHost {
 	// for the run, and from init, before the slot is settled. Check for it
 	// with MOSAIC_HOST_HAS(host, home_screen).
 	const char* (*home_screen)(void);
+
+	// The strings slot's translations, for a plugin's own text (see
+	// translate in MosaicPlugin). tr returns text translated by the slot's
+	// owner, and tr_plural the form of singular and plural for the count n
+	// (English rules without an owner: n == 1 picks singular). context
+	// tells apart the same English text with different meanings; NULL
+	// means plugin_id, so each plugin's strings are kept apart from the
+	// launcher's and other plugins'. With no owner, an unknown text, a
+	// translation the host refuses, from init, and from inside the owner's
+	// own translate, they return text (or singular or plural) itself.
+	// Otherwise the result is the host's copy, kept until the launcher
+	// quits. Ask with fixed English text, not names or numbers, and put
+	// numbers in with printf afterwards: a translation of a string with
+	// printf conversions is only used when it has the same ones. Check for
+	// them with MOSAIC_HOST_HAS(host, tr).
+	const char* (*tr)(const char* plugin_id, const char* context, const char* text);
+	const char* (*tr_plural)(const char* plugin_id, const char* context, const char* singular, const char* plural, unsigned long n);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1420,6 +1437,26 @@ typedef struct MosaicPlugin {
 	// which the launcher logs it and leaves this plugin's overlay out until
 	// it restarts. Check for it with MOSAIC_HOST_HAS(host, open_screen).
 	int (*overlay_render)(MosaicSurface* overlay, const MosaicScreenView* view);
+
+	// The strings slot. A plugin with slots=strings in its plugin.txt
+	// translates the launcher's text, and plugins' through host->tr.
+	// translate gets the English text and its context: NULL for the
+	// launcher's own strings, or the asking plugin's id (or the context it
+	// passed to host->tr). translate_plural gets both English forms and
+	// the count, and returns the form the language's plural rules pick for
+	// n. Return NULL for text you have no translation of, which then shows
+	// in English. The host copies what's returned, so it only has to last
+	// until the call returns, and asks once for each text (and each n),
+	// on the main thread, as the text is first drawn. A translation is
+	// refused, and the English shown, when it's empty, over 1023 bytes,
+	// has a line over 255 bytes or more than 8 lines, or has different
+	// printf conversions from its English (for translate_plural, from
+	// either form); one that isn't valid UTF-8 is an error, after which
+	// the launcher logs it and shows English for everything until it
+	// restarts. Without translate_plural, translate is asked for the form
+	// English rules pick. Check for them with MOSAIC_HOST_HAS(host, tr).
+	const char* (*translate)(const char* context, const char* text);
+	const char* (*translate_plural)(const char* context, const char* singular, const char* plural, unsigned long n);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

@@ -162,6 +162,26 @@ static void testText(void) {
 	// the pak's name is sanitised too
 	Status_text(&f, "s\xc3\xa9nc", text, sizeof(text));
 	CHECK_STR(text, "s?nc failed");
+
+	// translated words, and the English for any left NULL
+	StatusWords words = { "%s fertig", NULL, "%s : %lld %%" };
+	Status_textIn(&f, "sync", &words, text, sizeof(text));
+	CHECK_STR(text, "sync failed");
+	parse("state=done\n", &f, NULL);
+	Status_textIn(&f, "sync", &words, text, sizeof(text));
+	CHECK_STR(text, "sync fertig");
+	parse("state=running\ndone=1\ntotal=4\n", &f, NULL);
+	Status_textIn(&f, "sync", &words, text, sizeof(text));
+	CHECK_STR(text, "sync : 25 %");
+	// cut short between characters: "完了" is two three-byte characters
+	StatusWords cjk = { "%s \xe5\xae\x8c\xe4\xba\x86", NULL, NULL };
+	parse("state=done\n", &f, NULL);
+	char small[9];
+	Status_textIn(&f, "sync", &cjk, small, sizeof(small));
+	CHECK_STR(small, "sync \xe5\xae\x8c");
+	char smaller[8];
+	Status_textIn(&f, "sync", &cjk, smaller, sizeof(smaller));
+	CHECK_STR(smaller, "sync ");
 }
 
 static StatusSig sig(long long mtime, long long size) {

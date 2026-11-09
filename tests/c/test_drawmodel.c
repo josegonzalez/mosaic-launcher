@@ -231,6 +231,118 @@ static void testTruncate(void) {
 	CHECK(Draw_truncate("Hi", 10, failing, NULL, out, sizeof(out)) == -1);
 }
 
+// One pixel per character rather than per byte, as a font draws them.
+static int charsWide(const char* text, void* data) {
+	(void)data;
+	int n = 0;
+	for (const char* p = text; *p; p++) n += ((unsigned char)*p & 0xC0) != 0x80;
+	return n;
+}
+
+// Stock's GFX_truncateText, with the measure in place of TTF_SizeUTF8.
+static int stockTruncate(const char* in, char* out, int max_width, int padding) {
+	strcpy(out, in);
+	int width = bytesWide(out, NULL) + padding;
+	while (width > max_width) {
+		int len = (int)strlen(out);
+		strcpy(&out[len - 4], "...");
+		width = bytesWide(out, NULL) + padding;
+	}
+	return width;
+}
+
+static int validUtf8(const char* s) {
+	while (*s) {
+		unsigned char c = (unsigned char)*s;
+		int more = c < 0x80 ? 0 : c >= 0xF0 ? 3 : c >= 0xE0 ? 2 : c >= 0xC2 ? 1 : -1;
+		if (more < 0) return 0;
+		s++;
+		for (int i = 0; i < more; i++, s++) if (((unsigned char)*s & 0xC0) != 0x80) return 0;
+	}
+	return 1;
+}
+
+static void testTruncateChars(void) {
+	char out[64], want[64];
+	// ASCII comes out exactly as stock's does, padding and all
+	const char* names[] = { "Hello world", "Super Mario Bros. 3", "abcdefgh", "Tetris", "A longer name to cut" };
+	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+		for (int width = 7; width <= 30; width++) {
+			for (int padding = 0; padding <= 4; padding += 4) {
+				int got = Draw_truncateChars(names[i], width, padding, bytesWide, NULL, out, sizeof(out));
+				int stock = stockTruncate(names[i], want, width, padding);
+				CHECK(got == stock);
+				CHECK_STR(out, want);
+			}
+		}
+	}
+	// stock's first cut takes four characters for the "...", then one at a time
+	CHECK(Draw_truncateChars("abcdefgh", 7, 0, bytesWide, NULL, out, sizeof(out)) == 7);
+	CHECK_STR(out, "abcd...");
+	CHECK(Draw_truncateChars("abcdefgh", 6, 0, bytesWide, NULL, out, sizeof(out)) == 6);
+	CHECK_STR(out, "abc...");
+	CHECK(Draw_truncateChars("Hello", 5, 0, bytesWide, NULL, out, sizeof(out)) == 5);
+	CHECK_STR(out, "Hello");
+
+	// characters, not bytes: "é" is two bytes, "日本" three each, "😀" four
+	CHECK(Draw_truncateChars("Pok\xc3\xa9mon Red", 8, 0, charsWide, NULL, out, sizeof(out)) == 8);
+	CHECK_STR(out, "Pok\xc3\xa9m...");
+	CHECK(Draw_truncateChars("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe3\x81\xae\xe3\x82\xb2\xe3\x83\xbc\xe3\x83\xa0", 5, 0,
+		charsWide, NULL, out, sizeof(out)) == 5);
+	CHECK_STR(out, "\xe6\x97\xa5\xe6\x9c\xac...");
+	CHECK(Draw_truncateChars("\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80", 4, 0,
+		charsWide, NULL, out, sizeof(out)) == 4);
+	CHECK_STR(out, "\xf0\x9f\x98\x80...");
+	// every width of a mixed string leaves whole characters
+	const char* mixed = "Caf\xc3\xa9 \xe6\x97\xa5\xe6\x9c\xac \xf0\x9f\x98\x80 na\xc3\xafve";
+	for (int width = 0; width < 30; width++) {
+		CHECK(Draw_truncateChars(mixed, width, 0, charsWide, NULL, out, sizeof(out)) >= 0);
+		CHECK(validUtf8(out));
+		CHECK(Draw_truncateChars(mixed, width, 0, bytesWide, NULL, out, sizeof(out)) >= 0);
+		CHECK(validUtf8(out));
+	}
+
+	// where stock would run off the start: "" and the padding
+	CHECK(Draw_truncateChars("Hi", 2, 0, bytesWide, NULL, out, sizeof(out)) == 2);
+	CHECK_STR(out, "Hi");
+	CHECK(Draw_truncateChars("Hello", 2, 0, bytesWide, NULL, out, sizeof(out)) == 0);
+	CHECK_STR(out, "");
+	CHECK(Draw_truncateChars("Hello", 3, 0, bytesWide, NULL, out, sizeof(out)) == 3);
+	CHECK_STR(out, "...");
+	CHECK(Draw_truncateChars("Hello", 4, 4, bytesWide, NULL, out, sizeof(out)) == 4);
+	CHECK_STR(out, "");
+
+	// and it keeps to out, cutting between characters
+	char small[8];
+	CHECK(Draw_truncateChars("Hello world", 100, 0, bytesWide, NULL, small, sizeof(small)) == 7);
+	CHECK_STR(small, "Hell...");
+	CHECK(Draw_truncateChars("\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9", 100, 0, bytesWide, NULL, small, sizeof(small)) == 7);
+	CHECK_STR(small, "\xc3\xa9\xc3\xa9...");
+	char tiny[3];
+	CHECK(Draw_truncateChars("Hello", 100, 0, bytesWide, NULL, tiny, sizeof(tiny)) == 0);
+	CHECK_STR(tiny, "");
+
+	CHECK(Draw_truncateChars(NULL, 10, 0, bytesWide, NULL, out, sizeof(out)) == -1);
+	CHECK(Draw_truncateChars("Hi", 10, 0, NULL, NULL, out, sizeof(out)) == -1);
+	CHECK(Draw_truncateChars("Hi", 10, 0, bytesWide, NULL, out, 0) == -1);
+	CHECK(Draw_truncateChars("Hi", 10, 0, failing, NULL, out, sizeof(out)) == -1);
+}
+
+static void testCopy(void) {
+	char out[6];
+	CHECK(Draw_copy(out, sizeof(out), "Hello") == 5);
+	CHECK_STR(out, "Hello");
+	CHECK(Draw_copy(out, sizeof(out), "Hello world") == 5);
+	CHECK_STR(out, "Hello");
+	// "日" is three bytes: two don't fit after "abc"
+	CHECK(Draw_copy(out, sizeof(out), "abc\xe6\x97\xa5") == 3);
+	CHECK_STR(out, "abc");
+	CHECK(Draw_copy(out, sizeof(out), "ab\xe6\x97\xa5") == 5);
+	CHECK_STR(out, "ab\xe6\x97\xa5");
+	CHECK(Draw_copy(out, sizeof(out), NULL) == 0);
+	CHECK_STR(out, "");
+}
+
 static void testRound(void) {
 	CHECK(Draw_clampRadius(4, 20, 10) == 4);
 	CHECK(Draw_clampRadius(8, 20, 10) == 5);
@@ -376,6 +488,8 @@ int main(void) {
 	testGive();
 	testMany();
 	testTruncate();
+	testTruncateChars();
+	testCopy();
 	testRound();
 	testFit();
 	testColor();

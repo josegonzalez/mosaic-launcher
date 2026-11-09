@@ -3,6 +3,10 @@
 static const Action* registry[ACTIONS_MAX];
 static int registered = 0;
 
+char* Action_label(const Action* action) {
+	return action ? TRC(action->context, action->label) : NULL;
+}
+
 void Actions_register(const Action* action) {
 	if (!action || !action->id) return;
 	for (int i = 0; i < registered; i++) {
@@ -73,7 +77,7 @@ int Bindings_hints(const Binding* const* bindings, int count, char** pairs) {
 		const Binding* binding = bindings[i];
 		if (!Action_available(binding->action)) continue;
 		pairs[hints * 2] = (char*)binding->glyph;
-		pairs[hints * 2 + 1] = TR(binding->action->label);
+		pairs[hints * 2 + 1] = Action_label(binding->action);
 		hints++;
 	}
 	pairs[hints * 2] = NULL;
@@ -120,7 +124,7 @@ int Bindings_sharedHint(const Binding* bindings, int count, const char** glyph, 
 		const Action* first;
 		int n = Bindings_shared(bindings, count, binding->button, binding->trigger, &first, 1);
 		*glyph = binding->glyph;
-		*label = n > 1 ? "MORE" : binding->action->label;
+		*label = n > 1 ? TR("MORE") : Action_label(binding->action);
 		return 1;
 	}
 	return 0;

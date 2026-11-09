@@ -9,7 +9,7 @@ static char* hidden[MAX_HIDDEN];
 static int hidden_count = 0;
 
 // The top row's built-in tiles, and the labels plugins gave them.
-static const char* const renamable[] = { "Recents", "Collections", "Games", "Tools" };
+static const char* const renamable[] = { TR_MARK("Recents"), TR_MARK("Collections"), TR_MARK("Games"), TR_MARK("Tools") };
 #define RENAMABLE_COUNT (int)(sizeof(renamable) / sizeof(renamable[0]))
 static char* labels[RENAMABLE_COUNT];
 

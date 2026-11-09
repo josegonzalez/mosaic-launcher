@@ -33,6 +33,7 @@
 #include "quickitems.h"
 #include "quicktiles.h"
 #include "tr.h"
+#include "text.h"
 #include "actions.h"
 #include "transitions.h"
 #include "plugins.h"

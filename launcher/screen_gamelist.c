@@ -107,13 +107,13 @@ static int shoulderAlone(int button) {
 	return !PAD_isPressed(other) && !PWR_ignoreSettingInput(button, show_setting);
 }
 
-static const Action resumeAction = { "gamelist.resume", "RESUME", canResume, resumeSelected };
-static const Action openAction = { "gamelist.open", "OPEN", canOpen, openSelected };
-static const Action backAction = { "gamelist.back", "BACK", canGoBack, goBack };
-static const Action prevLetterAction = { "gamelist.prev_letter", "PREVIOUS", canJump, prevLetter };
-static const Action nextLetterAction = { "gamelist.next_letter", "NEXT", canJump, nextLetter };
-static const Action switcherAction = { "gamelist.switcher", "SWITCHER", NULL, openSwitcher };
-static const Action quickMenuAction = { "gamelist.quick_menu", "MENU", NULL, openQuickMenu };
+static const Action resumeAction = { "gamelist.resume", TR_MARK("RESUME"), canResume, resumeSelected };
+static const Action openAction = { "gamelist.open", TR_MARK("OPEN"), canOpen, openSelected };
+static const Action backAction = { "gamelist.back", TR_MARK("BACK"), canGoBack, goBack };
+static const Action prevLetterAction = { "gamelist.prev_letter", TR_MARK("PREVIOUS"), canJump, prevLetter };
+static const Action nextLetterAction = { "gamelist.next_letter", TR_MARK("NEXT"), canJump, nextLetter };
+static const Action switcherAction = { "gamelist.switcher", TR_MARK("SWITCHER"), NULL, openSwitcher };
+static const Action quickMenuAction = { "gamelist.quick_menu", TR_MARK("MENU"), NULL, openQuickMenu };
 
 // The game list's own bindings, in the three places stock checked them. In
 // each group, the first that fires and is available wins.
@@ -191,7 +191,7 @@ static void openEntryMenu(const Action** actions, int n) {
 	menu_count = n < ENTRY_MENU_MAX ? n : ENTRY_MENU_MAX;
 	for (int i = 0; i < menu_count; i++) {
 		menu_actions[i] = actions[i];
-		labels[i] = TR(actions[i]->label);
+		labels[i] = Action_label(actions[i]);
 	}
 	Entry* entry = total > 0 ? state.top->entries->items[state.top->selected] : NULL;
 	Modal_choose(entry ? entry->name : "", labels, menu_count, 0, menuPicked, NULL);
@@ -508,22 +508,22 @@ void GameList_render(void) {
 			const Binding* b = &e.overrides[i];
 			if (isOwnAction(b->action) || !Action_available(b->action)) continue;
 			extra_glyph = b->glyph;
-			extra_label = b->action->label;
+			extra_label = Action_label(b->action);
 		}
 	}
-	char* extra_label_tr = extra_glyph ? TR(extra_label) : NULL;
+	char* extra_label_tr = extra_glyph ? (char*)extra_label : NULL;
 
 	// the game list's hints are on whichever buttons their actions are on
 	const Binding* resume = Bindings_find(e.actions, e.action_count, &resumeAction);
 
-	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
+	if (show_setting && !GetHDMI()) Text_hardwareHints(screen, show_setting);
 	// Stock shows the resume hint whenever resume state is set, even in an
 	// empty folder where the action can't run, so this keeps its own check.
-	else if (state.can_resume && resume) GFX_blitButtonGroup((char*[]){ (char*)resume->glyph,TR(resumeAction.label),
+	else if (state.can_resume && resume) GFX_blitButtonGroup((char*[]){ (char*)resume->glyph,Action_label(&resumeAction),
 		(char*)extra_glyph, extra_label_tr, NULL }, 0, screen, 0);
 	else GFX_blitButtonGroup((char*[]){
 		BTN_SLEEP==BTN_POWER?"POWER":"MENU",
-		TR(BTN_SLEEP==BTN_POWER||state.simple_mode?"SLEEP":"INFO"),
+		BTN_SLEEP==BTN_POWER||state.simple_mode?TR("SLEEP"):TR("INFO"),
 		(char*)extra_glyph, extra_label_tr,
 		NULL }, 0, screen, 0);
 

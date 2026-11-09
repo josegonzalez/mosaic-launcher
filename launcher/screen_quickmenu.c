@@ -171,6 +171,16 @@ void QuickMenu_update(void) {
 	}
 }
 
+// What a tile says: a plugin tile's action label in the plugin's context, a
+// label a plugin gave a built-in tile as it is, or the built-in name
+// translated.
+static char* tileText(const Entry* item) {
+	const QuickTile* tile = QuickTiles_forEntry(item);
+	if (tile) return Action_label(tile->action);
+	const char* label = QuickTiles_label(item);
+	return label == item->name ? TR(item->name) : (char*)label;
+}
+
 // A plugin tile's PNG for its on/off state, or "" for none.
 static const char* tileIcon(const QuickTile* tile) {
 	const char* icon = QuickTile_isOff(tile) && tile->icon_off ? tile->icon_off : tile->icon;
@@ -193,8 +203,8 @@ static void blitTileIcon(const QuickTile* tile, Entry* item, SDL_Rect rect, uint
 		SDL_FreeSurface(bmp);
 		return;
 	}
-	char label[64];
-	int w = GFX_truncateText(font.tiny, TR(item->name), label, rect.w, 0);
+	char label[256];
+	int w = Text_truncate(font.tiny, tileText(item), label, sizeof(label), rect.w, 0);
 	int h = TTF_FontHeight(font.tiny);
 	SDL_Rect text_rect = { rect.x + (rect.w - w) / 2, rect.y + (rect.h - h) / 2, w, h };
 	GFX_blitText(font.tiny, label, SCALE1(FONT_TINY), text_color, screen, &text_rect);
@@ -207,7 +217,7 @@ void QuickMenu_render(void) {
 	}
 
 	// buttons (duped and trimmed from below)
-	if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
+	if (show_setting && !GetHDMI()) Text_hardwareHints(screen, show_setting);
 	else GFX_blitButtonGroup((char*[]){ BTN_SLEEP==BTN_POWER?"POWER":"MENU",TR("SLEEP"),  NULL }, 0, screen, 0);
 
 	GFX_blitButtonGroup((char*[]){ "B",TR("BACK"), "A",TR("OPEN"), NULL }, 1, screen, 1);
@@ -281,8 +291,7 @@ void QuickMenu_render(void) {
 			}
 
 			int w, h;
-			const char* label = QuickTiles_label(item);
-			char* text = label == item->name ? TR(item->name) : (char*)label;
+			char* text = tileText(item);
 			GFX_sizeText(font.tiny, text, SCALE1(FONT_TINY), &w, &h);
 			SDL_Rect text_rect = {item_rect.x + (item_size - w) / 2, item_rect.y + item_size - h - SCALE1(BUTTON_MARGIN), w, h};
 			GFX_blitText(font.tiny, text, SCALE1(FONT_TINY), text_color, screen, &text_rect);

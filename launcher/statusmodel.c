@@ -174,18 +174,33 @@ int Status_fileName(const char* file, char* out, size_t size) {
 }
 
 void Status_text(const StatusFile* file, const char* pak, char* out, size_t size) {
+	Status_textIn(file, pak, NULL, out, size);
+}
+
+void Status_textIn(const StatusFile* file, const char* pak, const StatusWords* words, char* out, size_t size) {
 	if (!size) return;
 	char name[STATUS_LABEL_MAX + 1];
 	if (file->label[0]) snprintf(name, sizeof(name), "%s", file->label);
 	else Status_sanitise(pak, pak ? strlen(pak) : 0, STATUS_LABEL_MAX, name, sizeof(name));
 
-	if (file->state == STATUS_DONE) snprintf(out, size, "%s done", name);
-	else if (file->state == STATUS_ERROR) snprintf(out, size, "%s failed", name);
+	int len;
+	if (file->state == STATUS_DONE) len = snprintf(out, size, words && words->done ? words->done : STATUS_DONE_FORMAT, name);
+	else if (file->state == STATUS_ERROR) len = snprintf(out, size, words && words->failed ? words->failed : STATUS_FAILED_FORMAT, name);
 	else if (file->total > 0) {
 		long done = file->done > 0 ? file->done : 0;
-		snprintf(out, size, "%s %lld%%", name, (long long)done * 100 / file->total);
+		len = snprintf(out, size, words && words->percent ? words->percent : STATUS_PERCENT_FORMAT, name,
+			(long long)done * 100 / file->total);
 	}
-	else snprintf(out, size, "%s", name);
+	else len = snprintf(out, size, "%s", name);
+	// a translation may not fit: don't leave half a character at the end
+	if (len >= 0 && (size_t)len >= size && size > 1) {
+		size_t end = size - 1; // the NUL
+		size_t start = end - 1;
+		while (start > 0 && ((unsigned char)out[start] & 0xC0) == 0x80) start--;
+		unsigned char lead = (unsigned char)out[start];
+		size_t want = lead < 0x80 ? 1 : lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : 2;
+		if (end - start < want) out[start] = '\0';
+	}
 }
 
 ///////////////////////////////////////

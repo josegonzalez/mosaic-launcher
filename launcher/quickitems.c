@@ -19,16 +19,16 @@ static void rebootNow(void) { QuickItem_powerOff(1); }
 static void powerOffNow(void) { QuickItem_powerOff(0); }
 
 static const QuickItem items[] = {
-	{ .name = "Settings", .kind = QUICK_PAK, .asset = ASSET_SETTINGS },
-	{ .name = "Pak Store", .kind = QUICK_PAK, .asset = ASSET_STORE },
-	{ .name = "Wifi", .kind = QUICK_TOGGLE, .supported = wifiSupported, .isOn = wifiOn,
+	{ .name = TR_MARK("Settings"), .kind = QUICK_PAK, .asset = ASSET_SETTINGS },
+	{ .name = TR_MARK("Pak Store"), .kind = QUICK_PAK, .asset = ASSET_STORE },
+	{ .name = TR_MARK("Wifi"), .kind = QUICK_TOGGLE, .supported = wifiSupported, .isOn = wifiOn,
 		.asset = ASSET_WIFI, .asset_off = ASSET_WIFI_OFF, .activate = toggleWifi },
-	{ .name = "Bluetooth", .kind = QUICK_TOGGLE, .supported = bluetoothSupported, .isOn = bluetoothOn,
+	{ .name = TR_MARK("Bluetooth"), .kind = QUICK_TOGGLE, .supported = bluetoothSupported, .isOn = bluetoothOn,
 		.asset = ASSET_BLUETOOTH, .asset_off = ASSET_BLUETOOTH_OFF, .activate = toggleBluetooth },
-	{ .name = "Sleep", .kind = QUICK_TOGGLE, .supported = sleepSupported,
+	{ .name = TR_MARK("Sleep"), .kind = QUICK_TOGGLE, .supported = sleepSupported,
 		.asset = ASSET_SUSPEND, .activate = sleepNow },
-	{ .name = "Reboot", .kind = QUICK_TOGGLE, .asset = ASSET_RESTART, .activate = rebootNow },
-	{ .name = "Poweroff", .kind = QUICK_TOGGLE, .asset = ASSET_POWEROFF, .activate = powerOffNow },
+	{ .name = TR_MARK("Reboot"), .kind = QUICK_TOGGLE, .asset = ASSET_RESTART, .activate = rebootNow },
+	{ .name = TR_MARK("Poweroff"), .kind = QUICK_TOGGLE, .asset = ASSET_POWEROFF, .activate = powerOffNow },
 };
 #define ITEM_COUNT (sizeof(items) / sizeof(items[0]))
 
