@@ -1,0 +1,6 @@
+id=second-screen
+name=Second screen (experimental, desktop only)
+api=1
+# experimental: no NextUI device has a second display, so this shows the selection in a second window on the desktop build, and declines to start on devices
+# the second window's size, width by height
+setting.size=choice|Window size|640x480|480x320,640x480,800x480,480x640
