@@ -28,7 +28,8 @@
 # transition styles' frames back, one that presses the bundled hold
 # lock's chord, one that walks the selection through the bundled video
 # previews' clips, one with screens of its own, which also owns the home
-# and switcher slots and draws stock's button hints, and one with an overlay,
+# and switcher slots, draws stock's button hints and presses the bundled
+# game switcher plus's buttons, and one with an overlay,
 # and one that crashes during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
 # time limit's protected settings and reads back those hints. It also checks the status pill shell
@@ -3729,6 +3730,66 @@ printf 'home=main\nswitcher=bare\nsteps=b\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/switcher-home-return.log" "plugin screener: done" || fail "the launcher exited early back from a game over the home screen"
 log="$WORK/switcher-home-return.log"
 [ "$(seen)" = "screener.bare screener.main " ] || fail "back from a game, the switcher screen didn't go back to the home screen: $(seen)"
+
+# the bundled switcher-plus, in stock's style: SELECT opens it in place of
+# the built-in switcher, showing the first recent's save state preview (a
+# real image this time) and stock's hints; right moves on, Y removes, and
+# B goes back to the list. Screener, without the switcher slot, presses the
+# buttons and logs what shows
+make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" switcher-plus >/dev/null || fail "building switcher-plus"
+build_plugin screener 'id=screener\nname=Screener\napi=1\nslots=transition\n'
+rm -rf "$WORK/plugins/layerer.plugin"
+rm -f "$HOME_LEFT" "$SWITCHED"
+cp "$ROOT/tests/plugins/peeker/art.png" "$SW_STATES/Game.gb.2.bmp"
+sw_recents
+printf 'steps=select,right,y,b\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/switcher-plus.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus"
+log="$WORK/switcher-plus.log"
+plugin=switcher-plus
+grep -qF "plugins: switcher-plus's screen switcher-plus.switcher is the game switcher" "$log" || fail "switcher-plus didn't take the switcher"
+[ "$(seen)" = "gamelist switcher-plus.switcher gamelist " ] || fail "switcher-plus didn't open and close as the switcher: $(seen)"
+expect "style full"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style full"
+expect "showing 1 of 3: Other, preview none, open, style full"
+expect "removed 1, 2 left"
+expect "showing 0 of 2: Saved Game, preview drawn, resume, style full"
+[ "$(grep -c . "$RECENTS")" -eq 2 ] || fail "switcher-plus's removal wasn't saved: $(cat "$RECENTS")"
+grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's screen was turned off"
+sw_recents
+
+# A resumes the selected recent, and the launcher comes back to switcher-plus
+printf 'steps=action:gamelist.switcher,a\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/switcher-plus-play.log" && fail "the launcher didn't quit to resume a recent from switcher-plus"
+log="$WORK/switcher-plus-play.log"
+expect "opening 0: Saved Game"
+grep -qE "SWT\.pak/launch\.sh.*Game\.gb" /tmp/next 2>/dev/null || fail "switcher-plus's recent didn't launch: $(cat /tmp/next 2>/dev/null)"
+[ "$(cat /tmp/resume_slot.txt 2>/dev/null)" = "2" ] || fail "switcher-plus's recent didn't resume: $(cat /tmp/resume_slot.txt 2>/dev/null)"
+printf 'steps=b\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/switcher-plus-return.log" "plugin screener: done" || fail "the launcher exited early back from a game from switcher-plus"
+log="$WORK/switcher-plus-return.log"
+[ "$(seen)" = "switcher-plus.switcher gamelist " ] || fail "back from a game, the launcher didn't start on switcher-plus: $(seen)"
+sw_recents
+
+# the strip and list styles; in the list, down past the last recent wraps,
+# and a recent whose emulator isn't installed doesn't open
+printf 'style=strip\n' >"$STATE/switcher-plus.cfg"
+printf 'steps=action:gamelist.switcher,right,b\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/switcher-plus-strip.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's strip"
+log="$WORK/switcher-plus-strip.log"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style strip"
+expect "showing 1 of 3: Other, preview none, open, style strip"
+grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's strip was turned off"
+printf 'style=list\n' >"$STATE/switcher-plus.cfg"
+printf 'steps=action:gamelist.switcher,down,down,a,down,b\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/switcher-plus-list.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's list"
+log="$WORK/switcher-plus-list.log"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style list"
+expect "showing 2 of 3: Gone, preview none, open, style list"
+expect "can't open 2: Gone"
+[ "$(grep -cF "plugin switcher-plus: showing 0 of 3: Saved Game, preview drawn" "$log")" -eq 2 ] || fail "down past the last recent didn't wrap"
+grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's list was turned off"
+: >"$SW_STATES/Game.gb.2.bmp"
+rm -rf "$WORK/plugins/switcher-plus.plugin" "$STATE/switcher-plus.cfg"
 
 rm -rf "$SW_ROMS" "$SW_GONE" "$SW_EMU" "$SW_STATES"
 rmdir "$CARD/Emus/desktop" 2>/dev/null

@@ -19,9 +19,10 @@
 // switcher setting's screen declines.
 //
 // Its steps setting is a comma separated list run from tick, one every 20
-// ticks from the 40th: y, a, b or select presses that button (the desktop
-// build reads the keyboard through SDL, so it pushes key events with
-// SDL_PushEvent, found with dlsym: a test-only shortcut), open:<id> and
+// ticks from the 40th: y, a, b, select, left, right, up or down presses
+// that button (the desktop build reads the keyboard through SDL, so it
+// pushes key events with SDL_PushEvent, found with dlsym: a test-only
+// shortcut), open:<id> and
 // close:<id> call open_screen and close_screen, action:<id> calls
 // run_action, pak:<path> opens a pak with open_path, confirm opens a
 // confirm dialog, recents logs recents_count and each recent_info,
@@ -343,6 +344,10 @@ static int scancode(const char* name) {
 	if (!strcmp(name, "b")) return 4;  // A
 	if (!strcmp(name, "y")) return 20; // Q
 	if (!strcmp(name, "select")) return 53; // `
+	if (!strcmp(name, "right")) return 79;
+	if (!strcmp(name, "left")) return 80;
+	if (!strcmp(name, "down")) return 81;
+	if (!strcmp(name, "up")) return 82;
 	return 0;
 }
 
