@@ -5,8 +5,8 @@
 // rendering to write down each piece of text drawn.
 //
 //   PRESSER_KEYS  buttons to press, one at a time, separated by spaces: a,
-//                 b, x, y, start, up, down, left, right, or wait (a press of
-//                 nothing)
+//                 b, x, y, start, up, down, left, right, l1, r1, select,
+//                 menu, or wait (a press of nothing)
 //   PRESSER_LOG   the file each drawn text is added to, one per line
 //   PRESSER_STEP  milliseconds between presses (300 by default); the first
 //                 comes a second after the first poll
@@ -55,6 +55,10 @@ static const struct {
 	{ "down", 81 },
 	{ "left", 80 },
 	{ "right", 79 },
+	{ "l1", 43 },     // tab
+	{ "r1", 5 },      // B
+	{ "select", 53 }, // `
+	{ "menu", 44 },   // space
 	{ "wait", 0 },
 };
 

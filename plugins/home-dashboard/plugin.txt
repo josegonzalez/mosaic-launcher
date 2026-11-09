@@ -1,0 +1,15 @@
+id=home-dashboard
+name=Home dashboard
+api=1
+slots=home
+# dashboard: tabs with a continue card, pinned games and stats; minui: a plain list of recent games;
+# retroachievements: recent and pinned games with achievements; pico8: the card's Pico-8 carts
+setting.mode=choice|Home mode|dashboard|dashboard,minui,retroachievements,pico8
+# the games played before the last one, under the continue card
+setting.shelf=toggle|Top shelf|on
+# favorites' games, while favorites is on
+setting.pinned=toggle|Pinned tab|on
+# play time from stock's play tracker
+setting.stats=toggle|Stats tab|on
+# the tags of the folders the pico8 mode lists carts from, eg. Roms/Pico-8 (P8)
+setting.pico8_tags=text|Pico-8 folder tags|P8,PICO8,PICO
