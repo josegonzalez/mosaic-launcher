@@ -29,6 +29,17 @@
 // recent_remove. It logs what each
 // returns, what current_screen says whenever it changes, and "done" 40
 // ticks after the last step.
+//
+// Its hints setting has every screen draw button hints with draw_hints
+// over the blue: switcher draws the stock switcher's ("B BACK" on the
+// left, "Y REMOVE  A RESUME" on the right), open "B BACK" and "A OPEN",
+// back "B BACK" alone on the right, and names one hint on the left and
+// two on the right, a different set each frame, for every button with a
+// name. The first render with them logs what draw_hints returned, where
+// the pills went, whether that's where stock puts its own, the pill's
+// colour against the accent colour, and the calls it refuses; its
+// overlay_render and tick log a call too, and each exit how many renders
+// drew hints and how many had a group refused.
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -66,6 +77,10 @@ static int step_count = 0;
 static int key_up_at = 0, key_scancode = 0;
 static char last_screen[80] = "";
 static int done = 0;
+static const char* hints = "";
+static int hinted = 0;        // renders that drew hints
+static int hint_frame = 0;    // for names, which changes them each frame
+static int hint_failures = 0; // renders where a group it drew was refused
 
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
@@ -131,6 +146,7 @@ static void leave(void* data) {
 	Screen* s = data;
 	say("exit %s", s->id);
 	say("%s drew %s", s->id, s->rendered > 10 ? "every frame" : "once or a few times");
+	if (hints[0]) say("hints drawn %i refused %i", hinted, hint_failures);
 }
 
 // Every frame, so a transition's old frame is the screen however the
@@ -158,6 +174,98 @@ static int input(const MosaicInput* in, void* data) {
 	return MOSAIC_SCREEN_STAY;
 }
 
+static MosaicSurface* own = NULL;
+static MosaicSurface* lent = NULL; // the last screen a render was lent, kept to try after
+
+static const MosaicHint switcher_left[] = { { MOSAIC_BUTTON_B, "BACK" } };
+static const MosaicHint switcher_right[] = { { MOSAIC_BUTTON_Y, "REMOVE" }, { MOSAIC_BUTTON_A, "RESUME" } };
+static const MosaicHint open_right[] = { { MOSAIC_BUTTON_A, "OPEN" } };
+// a hint on the left and two on the right, a set a frame
+#define NAME_SETS 4
+static const MosaicHint names[NAME_SETS][3] = {
+	{ { MOSAIC_BUTTON_MENU, "INFO" }, { MOSAIC_BUTTON_START, "DONE" }, { MOSAIC_BUTTON_SELECT, "MORE" } },
+	{ { MOSAIC_BUTTON_POWER, "SLEEP" }, { MOSAIC_BUTTON_L1, "PREV" }, { MOSAIC_BUTTON_R1, "NEXT" } },
+	{ { MOSAIC_BUTTON_X, "SORT" }, { MOSAIC_BUTTON_L2, "UP" }, { MOSAIC_BUTTON_R2, "DOWN" } },
+	{ { MOSAIC_BUTTON_Y, "FIND" }, { MOSAIC_BUTTON_B, "BACK" }, { MOSAIC_BUTTON_A, "PICK" } },
+};
+// a group wider than any screen
+static const MosaicHint wide[] = {
+	{ MOSAIC_BUTTON_A, "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW" },
+	{ MOSAIC_BUTTON_B, "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW" },
+};
+
+// "x,y wxh"
+static const char* rect(const MosaicRect* r) {
+	static char out[2][40];
+	static int next = 0;
+	char* text = out[next++ % 2];
+	snprintf(text, 40, "%i,%i %ix%i", r->x, r->y, r->w, r->h);
+	return text;
+}
+
+// Draws the hints setting's, and the first time logs how it went.
+static void drawHints(MosaicSurface* screen, const MosaicScreenView* view, int w, int h) {
+	MosaicRect left = { 0, 0, 0, 0 }, right = { 0, 0, 0, 0 };
+	int left_rc = 1, right_rc = 1; // 1 for a group not drawn
+	// the background, in the bottom left corner no pill reaches
+	char background[12];
+	snprintf(background, sizeof(background), "%s", pixel(screen, 1, h - 2));
+	if (!strcmp(hints, "switcher")) {
+		left_rc = host->draw_hints(screen, MOSAIC_HINTS_LEFT, switcher_left, 1, &left);
+		right_rc = host->draw_hints(screen, MOSAIC_HINTS_RIGHT, switcher_right, 2, &right);
+	}
+	else if (!strcmp(hints, "open")) {
+		left_rc = host->draw_hints(screen, MOSAIC_HINTS_LEFT, switcher_left, 1, &left);
+		right_rc = host->draw_hints(screen, MOSAIC_HINTS_RIGHT, open_right, 1, &right);
+	}
+	else if (!strcmp(hints, "back")) right_rc = host->draw_hints(screen, MOSAIC_HINTS_RIGHT, switcher_left, 1, &right);
+	else if (!strcmp(hints, "names")) {
+		const MosaicHint* set = names[hint_frame++ % NAME_SETS];
+		left_rc = host->draw_hints(screen, MOSAIC_HINTS_LEFT, set, 1, &left);
+		right_rc = host->draw_hints(screen, MOSAIC_HINTS_RIGHT, set + 1, 2, &right);
+	}
+	if (left_rc < 0 || right_rc < 0) hint_failures++;
+	if (hinted++) return;
+
+	// Where stock's GFX_blitButtonGroup puts them: in from the bottom
+	// corners by stock's padding, as tall as its pills. The status pill,
+	// when it shows, is in from the top right corner by the same padding.
+	const MosaicRect* pill = left_rc == 0 ? &left : &right;
+	int pad = h - pill->y - pill->h;
+	int stock = pill->w > 0 && pad > 0
+		&& (view->status.w == 0 || (view->status.y == pad && view->status.h == pill->h
+			&& view->status.x + view->status.w == w - pad))
+		&& (left_rc != 0 || (left.x == pad && left.y == pill->y && left.h == pill->h))
+		&& (right_rc != 0 || (right.x + right.w == w - pad && right.y == pill->y && right.h == pill->h));
+	// just inside its round left end, and just left of it
+	char in[12];
+	snprintf(in, sizeof(in), "%s", pixel(screen, pill->x + pill->h / 12, pill->y + pill->h / 2));
+	const char* out = pixel(screen, pill->x - 2, pill->y + pill->h / 2);
+	MosaicColor accent = mosaic_color(host->theme_color(MOSAIC_COLOR_ACCENT), 255);
+	say("hints %s on %s left %i %s right %i %s stock %i pill %s accent %02X%02X%02X%02X outside clear %i", hints,
+		view->screen, left_rc, rect(&left), right_rc, rect(&right), stock, in, accent.r, accent.g, accent.b, accent.a,
+		!strcmp(out, background));
+
+	// what it refuses
+	MosaicHint dpad[] = { { MOSAIC_BUTTON_UP, "UP" } };
+	MosaicHint fn[] = { { MOSAIC_BUTTON_FN1, "FN" } };
+	MosaicHint unlabelled[] = { { MOSAIC_BUTTON_A, NULL } };
+	MosaicHint empty[] = { { MOSAIC_BUTTON_A, "" } };
+	MosaicHint three[] = { { MOSAIC_BUTTON_A, "A" }, { MOSAIC_BUTTON_B, "B" }, { MOSAIC_BUTTON_X, "X" } };
+	if (!own) own = host->surface_new(ID, 64, 64);
+	say("hints refused again %i wide %i own %i group %i none %i three %i dpad %i fn %i null %i empty %i",
+		host->draw_hints(screen, pill == &left ? MOSAIC_HINTS_LEFT : MOSAIC_HINTS_RIGHT, switcher_left, 1, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, wide, 2, NULL),
+		host->draw_hints(own, MOSAIC_HINTS_LEFT, switcher_left, 1, NULL),
+		host->draw_hints(screen, 2, switcher_left, 1, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, switcher_left, 0, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, three, 3, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, dpad, 1, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, fn, 1, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, unlabelled, 1, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, empty, 1, NULL));
+}
+
 static int render(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
 	Screen* s = data;
 	int w = 0, h = 0;
@@ -173,6 +281,8 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	}
 	MosaicRect middle = { 0, h / 4, w, h / 2 };
 	host->fill_rect(screen, &middle, mosaic_color(0x0000FF, 255));
+	if (hints[0] && MOSAIC_HOST_HAS(host, draw_hints)) drawHints(screen, view, w, h);
+	lent = screen;
 	if (s == &fail_screen && !strcmp(fail, "render")) return -2;
 	return 0;
 }
@@ -199,6 +309,7 @@ static int init(const MosaicHost* h) {
 		if (*p == ',' || p == steps) step_count++;
 	}
 	fail = host->cfg_get(ID, "fail", "");
+	hints = host->cfg_get(ID, "hints", "");
 	pushEvent = (int (*)(Event*))dlsym(RTLD_DEFAULT, "SDL_PushEvent");
 	if (!pushEvent) say("no SDL_PushEvent");
 
@@ -291,6 +402,8 @@ static void runStep(const char* step) {
 static void tick(unsigned long now) {
 	(void)now;
 	ticks++;
+	static int tried = 0;
+	if (hints[0] && lent && !tried++) say("hints from tick %i", host->draw_hints(lent, MOSAIC_HINTS_LEFT, switcher_left, 1, NULL));
 	const char* current = host->current_screen();
 	if (strcmp(current, last_screen)) {
 		snprintf(last_screen, sizeof(last_screen), "%s", current);
@@ -316,6 +429,14 @@ static int transitionBegin(MosaicTransition* t) {
 	return MOSAIC_STYLE_OFF;
 }
 
+static int overlayRender(MosaicSurface* overlay, const MosaicScreenView* view) {
+	static int tried = 0;
+	if (hints[0] && !tried++) {
+		say("hints on the overlay over %s %i", view->screen, host->draw_hints(overlay, MOSAIC_HINTS_LEFT, switcher_left, 1, NULL));
+	}
+	return 0;
+}
+
 static const MosaicPlugin plugin = {
 	.size = sizeof(MosaicPlugin),
 	.api_version = MOSAIC_API_VERSION,
@@ -323,6 +444,7 @@ static const MosaicPlugin plugin = {
 	.init = init,
 	.tick = tick,
 	.transition_begin = transitionBegin,
+	.overlay_render = overlayRender,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

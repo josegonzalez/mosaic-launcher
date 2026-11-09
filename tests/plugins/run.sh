@@ -28,10 +28,10 @@
 # transition styles' frames back, one that presses the bundled hold
 # lock's chord, one that walks the selection through the bundled video
 # previews' clips, one with screens of its own, which also owns the home
-# slot, and one with an overlay,
+# and switcher slots and draws stock's button hints, and one with an overlay,
 # and one that crashes during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
-# time limit's protected settings. It also checks the status pill shell
+# time limit's protected settings and reads back those hints. It also checks the status pill shell
 # paks' status files show.
 #
 # Each case waits up to PLUGIN_TEST_SECONDS (10 by default) for the log
@@ -3291,7 +3291,7 @@ plugins_page pin-adopt "wait"
 grep -qxF "pin=" "$STATE/simple-mode.cfg" || fail "simple mode's PIN was left in its cfg: $(cat "$STATE/simple-mode.cfg")"
 grep -qF "simple mode's PIN is the launcher's PIN now" "$log" || fail "moving simple mode's PIN wasn't logged"
 never_shown "2468"
-rm -rf "$PIN_PLUGINS" "$PRESSER" "$PIN_FILE" "$LIMIT_CFG" "$STATE/simple-mode.cfg" "$STATE/plugins.txt"
+rm -rf "$PIN_PLUGINS" "$PIN_FILE" "$LIMIT_CFG" "$STATE/simple-mode.cfg" "$STATE/plugins.txt"
 case_log=""
 
 # plugin screens: screener's Y action opens screener.main over the game
@@ -3365,6 +3365,56 @@ grep -qE "plugin screener: render screener.full [0-9]+x[0-9]+ area [0-9]+x[0-9]+
 	|| fail "screener.full had a header: $(grep "plugin screener: render" "$log")"
 expect "transition pop old 0000FFFF"
 grep -qF "plugin layerer: over screener.full" "$log" && fail "layerer's overlay was drawn over a full screen"
+
+# button hints on plugin screens: draw_hints draws stock's pills where
+# stock's own screens put them, with the labels presser writes down, and
+# only on the screen lent to a screen's render
+# hinted <name> <hints> <steps>: screener with that hints setting, its
+# drawn text in $texts
+hinted() {
+	texts="$WORK/$1.texts"
+	: >"$texts"
+	printf 'hints=%s\nsteps=%s\n' "$2" "$3" >"$STATE/screener.cfg"
+	PRESSER_LOG="$texts"
+	export PRESSER_LOG
+	SMOKE_PRELOAD="$PRESSER"
+	export SMOKE_PRELOAD
+	run_launcher "$WORK/$1.log" "plugin screener: done" || fail "the launcher exited early drawing hints ($2)"
+	unset PRESSER_LOG SMOKE_PRELOAD
+	log="$WORK/$1.log"
+	plugin=screener
+}
+# hints_line <hints> <screen> <left rc> <right rc>: the first render's line,
+# with the pills where stock puts them, in its accent colour and no
+# further; the calls it refuses; and no render with a group refused
+hints_line() {
+	grep -qE "plugin screener: hints $1 on $2 left $3 [0-9-]+,[0-9-]+ [0-9]+x[0-9]+ right $4 [0-9-]+,[0-9-]+ [0-9]+x[0-9]+ stock 1 " "$log" \
+		|| fail "screener's $1 hints on $2 weren't where stock puts them: $(grep "plugin screener: hints $1" "$log")"
+	grep -qE "plugin screener: hints $1 .* pill ([0-9A-F]{8}) accent \1 outside clear 1$" "$log" \
+		|| fail "screener's $1 pill wasn't the accent colour, or went past its edge: $(grep "plugin screener: hints $1" "$log")"
+	expect "hints refused again -1 wide -1 own -1 group -1 none -1 three -1 dpad -1 fn -1 null -1 empty -1"
+	grep -qE "plugin screener: hints drawn [1-9][0-9]* refused 0$" "$log" \
+		|| fail "screener's $1 hints were refused: $(grep "plugin screener: hints drawn" "$log")"
+}
+hinted hints-none "" "open:screener.main,b"
+grep -qxF "REMOVE" "$texts" && fail "something drew REMOVE without screener's hints"
+grep -qF "plugin screener: hints" "$log" && fail "screener drew hints without its hints setting"
+hinted hints-switcher switcher "open:screener.main,b"
+hints_line switcher screener.main 0 0
+expect "hints from tick -1"
+expect "hints on the overlay over gamelist -1"
+for label in BACK REMOVE RESUME; do drew "$label"; done
+expect "exit screener.main"
+# a full screen, and the right group alone
+hinted hints-full open "open:screener.full,b"
+hints_line open screener.full 0 0
+hinted hints-back back "open:screener.bare,b"
+hints_line back screener.bare 1 0
+# every button stock names, from a different set each frame
+hinted hints-names names "open:screener.main,b"
+hints_line names screener.main 0 0
+for label in L1 R1 L2 R2 START SELECT INFO SLEEP DONE MORE PREV NEXT UP DOWN SORT FIND PICK; do drew "$label"; done
+rm -f "$PRESSER"
 
 # a screen whose render or input fails closes, back to the game list, and
 # can't open again until the launcher restarts

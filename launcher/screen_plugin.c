@@ -1,9 +1,14 @@
 #include "launcher.h"
+#include "hintmodel.h"
 
 // Plugins' screens and overlays, drawn over what main already put in the
 // header this frame (see plugins.c for the stack and the hooks).
 
 static SDL_Surface* overlay = NULL; // what overlays draw on, the screen's size
+
+#define HINT_PILLS_MAX 2 // a group each side, since a group can't go over another
+static MosaicRect hint_pills[HINT_PILLS_MAX]; // the hints the screen drew this frame
+static int hint_pill_count = 0;
 
 // The whole screen, and where the header main drew this frame is: none on
 // a MOSAIC_SCREEN_FULL screen, where ow is 0.
@@ -25,8 +30,44 @@ void PluginScreen_render(void) {
 	GFX_clearLayers(LAYER_ALL);
 	MosaicScreenView view;
 	screenView(&view);
+	hint_pill_count = 0;
 	Plugins_screenRender(screen, &view);
 	lastScreen = SCREEN_PLUGIN;
+}
+
+int PluginScreen_drawHints(SDL_Surface* surface, const MosaicScreenView* view, int group, const MosaicHint* hints,
+	int count, MosaicRect* drawn) {
+	const char* glyphs[HINTS_MAX];
+	if (!surface || !view || Hints_check(group, hints, count, glyphs) != 0) return -1;
+	char labels[HINTS_MAX][HINT_LABEL_MAX];
+	char* pairs[HINTS_MAX * 2 + 1];
+	int widths[HINTS_MAX];
+	for (int i = 0; i < count; i++) {
+		// labels are UI text, so they go through TR() as stock's do
+		if (Hints_label(TR(hints[i].label), labels[i], sizeof(labels[i])) < 0) return -1;
+		pairs[i * 2] = (char*)glyphs[i];
+		pairs[i * 2 + 1] = labels[i];
+	}
+	pairs[count * 2] = NULL;
+	if (fontMutex) SDL_LockMutex(fontMutex);
+	for (int i = 0; i < count; i++) widths[i] = GFX_getButtonWidth(labels[i], (char*)glyphs[i]);
+	HintMetrics m = { SCALE1(PADDING), SCALE1(PILL_SIZE), SCALE1(BUTTON_MARGIN) };
+	MosaicRect pill;
+	// clear of the header, and of the other group's pill this frame
+	MosaicRect avoid[2 + HINT_PILLS_MAX];
+	int avoid_count = 0;
+	avoid[avoid_count++] = view->status;
+	avoid[avoid_count++] = view->header;
+	for (int i = 0; i < hint_pill_count; i++) avoid[avoid_count++] = hint_pills[i];
+	int ok = hint_pill_count < HINT_PILLS_MAX && Hints_place(group, surface->w, surface->h, &m, widths, count, &pill) == 0
+		&& Hints_clear(&pill, surface->w, surface->h, avoid, avoid_count);
+	// stock's own call, so the pill, fonts and placement are the built-in screens'
+	if (ok) GFX_blitButtonGroup(pairs, Hints_primary(group, count), surface, group == MOSAIC_HINTS_RIGHT);
+	if (fontMutex) SDL_UnlockMutex(fontMutex);
+	if (!ok) return -1;
+	hint_pills[hint_pill_count++] = pill;
+	if (drawn) *drawn = pill;
+	return 0;
 }
 
 void Overlays_render(void) {

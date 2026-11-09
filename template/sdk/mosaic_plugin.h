@@ -370,6 +370,24 @@ enum MosaicScreenFlag {
 	MOSAIC_SCREEN_GAME_SWITCHER = 4,
 };
 
+// A button hint for host->draw_hints: a button and what it does there,
+// such as { MOSAIC_BUTTON_B, "BACK" }. The button is any enum MosaicButton
+// but the d-pad and FN1 to FN3, named as stock names it (A, B, X, Y, L1,
+// R1, L2, R2, START, SELECT, MENU, POWER). The label is one line, in
+// upper case like stock's.
+typedef struct MosaicHint {
+	int button;
+	const char* label;
+} MosaicHint;
+
+// Where host->draw_hints puts a group, as stock's screens do: the left
+// one has the secondary hints, such as the game switcher's "B BACK", and
+// the right one the primary, such as its "Y REMOVE  A RESUME".
+enum MosaicHintGroup {
+	MOSAIC_HINTS_LEFT,
+	MOSAIC_HINTS_RIGHT,
+};
+
 // What MosaicScreenHooks' input returns.
 enum MosaicScreenResult {
 	MOSAIC_SCREEN_STAY,  // keep the screen open
@@ -1011,6 +1029,20 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, recent_open).
 	int (*recent_info)(int index, MosaicRecent* out);
 	int (*recent_open)(int index, int resume);
+
+	// Draws stock's button hints on a plugin screen, as the built-in
+	// screens draw theirs: one group of one or two hints (see MosaicHint)
+	// in a pill at the bottom left (MOSAIC_HINTS_LEFT) or bottom right
+	// (MOSAIC_HINTS_RIGHT) of screen, in stock's fonts and theme colours,
+	// with each label put through the launcher's translation. Only on the
+	// screen lent to a MosaicScreenHooks render, from inside it. When
+	// drawn isn't NULL it gets the pill's rect. Returns 0, or -1 for any
+	// other surface or hook, a bad group, a count other than 1 or 2, a
+	// button stock has no hint for, a NULL or empty label, or a pill that
+	// wouldn't fit on the screen clear of the status pill, the header and
+	// the pills already drawn this frame. Check for it with
+	// MOSAIC_HOST_HAS(host, draw_hints).
+	int (*draw_hints)(MosaicSurface* screen, int group, const MosaicHint* hints, int count, MosaicRect* drawn);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

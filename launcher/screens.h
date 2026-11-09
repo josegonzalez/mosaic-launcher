@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 #include "api.h"
+#include "mosaic_plugin.h"
 
 typedef struct Screen {
 	void (*handleInput)(void);
@@ -45,6 +46,10 @@ void GameList_render(void);
 void LaunchFade_render(void);
 void PluginScreen_handleInput(void);
 void PluginScreen_render(void);
+// host->draw_hints on surface, the screen lent to a plugin screen's render
+// with view; plugins.c checks it's that screen, from inside that render.
+int PluginScreen_drawHints(SDL_Surface* surface, const MosaicScreenView* view, int group, const MosaicHint* hints,
+	int count, MosaicRect* drawn);
 // Plugins' overlays over what was just drawn, on the topmost layer. Call
 // once a frame is drawn, before it's flipped.
 void Overlays_render(void);

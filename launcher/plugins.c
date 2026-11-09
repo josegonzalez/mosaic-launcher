@@ -73,6 +73,8 @@ static int swap_drawn = 0;                  // the layout's last layout_render g
 static ScreenSet screens;      // plugins' screens, and the stack of those open
 static int screen_hook = 0;    // while a screen's enter or exit runs, which can't open or close screens
 static int screen_drawing = 0; // while a screen's render or an overlay runs, which only draw
+static MosaicSurface* hints_screen = NULL;     // the screen lent to a screen's render, the only one draw_hints draws on
+static const MosaicScreenView* hints_view = NULL; // and its view
 static int switcher_declined = 0; // the switcher screen's enter declined, so the built-in switcher shows until it closes
 
 #define SCREEN_COUNT 3
@@ -840,6 +842,7 @@ static int hostRegisterScreen(const char* id, const MosaicScreenHooks* hooks);
 static int hostOpenScreen(const char* id);
 static int hostCloseScreen(const char* id);
 static int hostRunAction(const char* action_id);
+static int hostDrawHints(MosaicSurface* screen, int group, const MosaicHint* hints, int count, MosaicRect* drawn);
 
 static void playLog(const char* message) {
 	LOG_info("%s\n", message);
@@ -963,6 +966,7 @@ static const MosaicHost host = {
 	.run_action = hostRunAction,
 	.recent_info = hostRecentInfo,
 	.recent_open = hostRecentOpen,
+	.draw_hints = hostDrawHints,
 };
 
 ///////////////////////////////////////
@@ -2375,10 +2379,19 @@ void Plugins_screenRender(SDL_Surface* surface, const MosaicScreenView* view) {
 		return;
 	}
 	screen_drawing = 1;
+	hints_screen = lent;
+	hints_view = view;
 	int rc = s->hooks.render(lent, view, s->hooks.data);
+	hints_screen = NULL;
+	hints_view = NULL;
 	screen_drawing = 0;
 	PluginDraw_unlend(lent);
 	if (rc != 0) screenFailed(s, "render", rc);
+}
+
+static int hostDrawHints(MosaicSurface* screen, int group, const MosaicHint* hints, int count, MosaicRect* drawn) {
+	if (!hints_screen || screen != hints_screen) return -1;
+	return PluginScreen_drawHints((SDL_Surface*)hints_screen, hints_view, group, hints, count, drawn);
 }
 
 // Closes the open screens once a built-in screen of kind came in front of
