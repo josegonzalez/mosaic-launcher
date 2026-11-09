@@ -3,6 +3,7 @@
 // the list of themes and the merge with the settings), then the plugin
 // against a fake host, on a card of its own under TEST_SDCARD_PATH.
 
+#define _GNU_SOURCE // dladdr, in theme_plus.c
 #include <limits.h>
 #include <stdlib.h>
 #include <sys/stat.h>

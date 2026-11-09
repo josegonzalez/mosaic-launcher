@@ -42,8 +42,7 @@ tp_run theme-plus-palette 'theme=case palette\n' "plugin theme-plus: theme Case 
 tp_supplies "pill 30, button 20, padding 5, 7 rows, text step 0, font stock's"
 
 tp_run theme-plus-ui 'theme=stock\nui_size=large\ntext_size=large\n' "plugin theme-plus: theme stock"
-tp_supplies "pill 36, button 24, padding "
-tp_supplies "text step 2, font stock's"
+tp_supplies "pill 36, button 24, padding 12, 5 rows, text step 2, font stock's"
 
 tp_run theme-plus-missing 'theme=Nope\n' "plugin theme-plus: theme stock"
 expect "no theme or palette is called Nope, so stock's is used"

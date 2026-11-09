@@ -53,7 +53,7 @@ static void findBundled(void) {
 	Dl_info info;
 	if (!dladdr((const void*)&findBundled, &info) || !info.dli_fname) return;
 	char path[TP_PATH_MAX];
-	snprintf(path, sizeof(path), "%s", info.dli_fname);
+	if ((size_t)snprintf(path, sizeof(path), "%s", info.dli_fname) >= sizeof(path)) return;
 	for (int up = 0; up < 3; up++) {
 		char* slash = strrchr(path, '/');
 		if (!slash) return;

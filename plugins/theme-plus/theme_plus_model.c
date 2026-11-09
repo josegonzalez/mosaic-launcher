@@ -24,6 +24,14 @@ static void say(TPLogFn log, void* ctx, const char* format, ...) {
 	log(ctx, line);
 }
 
+// Copies text into out, cut to fit size.
+static void copyText(char* out, size_t size, const char* text) {
+	size_t len = strlen(text);
+	if (len >= size) len = size - 1;
+	memcpy(out, text, len);
+	out[len] = '\0';
+}
+
 // Copies text without the spaces and tabs around it, up to size.
 static void trimmed(const char* text, size_t len, char* out, size_t size) {
 	while (len && (*text == ' ' || *text == '\t')) {
@@ -168,7 +176,7 @@ int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx) {
 			if (!value[0] || strlen(value) >= TP_NAME_MAX) {
 				say(log, ctx, "line %d: %s isn't 1 to %d characters, dropped", number, key, TP_NAME_MAX - 1);
 			}
-			else snprintf(field, TP_NAME_MAX, "%s", value);
+			else copyText(field, TP_NAME_MAX, value);
 		}
 		else if (!strncmp(key, "color", 5) && key[5] >= '1' && key[5] <= '7' && !key[6]) {
 			int color = TP_parseColor(value);
@@ -222,7 +230,7 @@ int TP_parsePalette(const char* text, const char* file_name, TPPalette* out) {
 			int version = 0;
 			if (TP_parseInt(value, 0, 9999, &version) == 0 && version > TP_VERSION_MAX) return -1;
 		}
-		else if (!strcmp(whole, "name")) snprintf(out->name, sizeof(out->name), "%s", value);
+		else if (!strcmp(whole, "name")) copyText(out->name, sizeof(out->name), value);
 		else if (!strncmp(whole, "color", 5) && whole[5] >= '1' && whole[5] <= '7' && !whole[6]) {
 			int color = TP_parseColor(value);
 			if (color >= 0) out->colors[whole[5] - '1'] = color;
@@ -278,7 +286,7 @@ int TP_resolve(const char* dir, const char* rel, char* out, size_t size, const c
 		*why = "is too long";
 		return -1;
 	}
-	snprintf(out, size, "%s", real);
+	copyText(out, size, real);
 	return 0;
 }
 
@@ -305,9 +313,9 @@ static void addEntry(TPCatalog* catalog, int kind, const char* id, const char* l
 	}
 	TPEntry* entry = &catalog->themes[catalog->theme_count++];
 	entry->kind = kind;
-	snprintf(entry->id, sizeof(entry->id), "%s", id);
-	snprintf(entry->label, sizeof(entry->label), "%s", label && label[0] ? label : id);
-	snprintf(entry->dir, sizeof(entry->dir), "%s", dir ? dir : "");
+	copyText(entry->id, sizeof(entry->id), id);
+	copyText(entry->label, sizeof(entry->label), label && label[0] ? label : id);
+	copyText(entry->dir, sizeof(entry->dir), dir ? dir : "");
 }
 
 static void scanThemes(TPCatalog* catalog, const char* dir_path, int kind) {
@@ -450,7 +458,7 @@ static void applyPath(char* field, size_t size, const char* key, const char* dir
 		say(log, ctx, "%s (%s) %s, dropped", key, rel, why);
 		return;
 	}
-	snprintf(field, size, "%s", real);
+	copyText(field, size, real);
 }
 
 void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const TPPalette* palette,
