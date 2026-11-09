@@ -1,0 +1,14 @@
+id=localization
+name=Localization
+api=1
+slots=strings
+# the language pack to use, by its code; other takes the code below, and off translates nothing
+setting.language=choice|Language|off|off,other,ca,cs,da,de,el,es,fi,fr,hu,it,ja,ko,nl,no,pl,pt,pt_BR,ru,sv,tr,uk,zh_CN,zh_TW
+# a language code for other, eg. eu or pt_PT
+setting.code=text|Other language code|
+# the folder on the card with your own packs (<code>.po) and names lists (<code>/<TAG>.txt)
+setting.folder=text|Language pack folder|Languages
+# a game list button that writes display names into each system's map.txt
+setting.button=choice|Write map.txt names button|none|none,Y,L2,R2,SELECT
+# a Write map.txt names tile on the quick menu
+setting.tile=toggle|Write map.txt names tile|off

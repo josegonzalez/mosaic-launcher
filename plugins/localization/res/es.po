@@ -1,0 +1,250 @@
+# Spanish for mosaic-launcher, from po/launcher.pot, and the localization
+# plugin's own strings under msgctxt "localization".
+# Strings left out (Bluetooth, Launcher, OK, PIN, Plugins, Pak Store, Wifi,
+# the BRGHT and CLTMP abbreviations, SWITCHER and "%s %lld%%") show in
+# English.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%s done"
+msgstr "%s listo"
+
+#, c-format
+msgid "%s failed"
+msgstr "%s falló"
+
+msgid "BACK"
+msgstr "ATRÁS"
+
+msgid "BRIGHTNESS"
+msgstr "BRILLO"
+
+msgid "CANCEL"
+msgstr "CANCELAR"
+
+msgid "CHANGE"
+msgstr "CAMBIAR"
+
+msgid "COLOR TEMP"
+msgstr "TEMP. COLOR"
+
+msgid "Collections"
+msgstr "Colecciones"
+
+msgid ""
+"Crash guard reset.\n"
+"The launcher and its plugins start when you leave this screen."
+msgstr ""
+"Protección contra fallos restablecida.\n"
+"El launcher y sus plugins se inician al salir de esta pantalla."
+
+msgid "DELETE"
+msgstr "BORRAR"
+
+msgid "DONE"
+msgstr "LISTO"
+
+#, c-format
+msgid "Disc %i"
+msgstr "Disco %i"
+
+msgid "Empty folder"
+msgstr "Carpeta vacía"
+
+msgid "Games"
+msgstr "Juegos"
+
+msgid "INFO"
+msgstr "INFO"
+
+msgid "Install a Launcher build for this release."
+msgstr "Instala una compilación de Launcher para esta versión."
+
+msgid "Installed"
+msgstr "Instalado"
+
+msgid ""
+"Launcher could not start.\n"
+"The stock launcher is still in use."
+msgstr ""
+"Launcher no pudo iniciarse.\n"
+"Se sigue usando el launcher original."
+
+msgid ""
+"Launcher is off.\n"
+"The stock launcher is back."
+msgstr ""
+"Launcher está desactivado.\n"
+"Vuelve el launcher original."
+
+msgid ""
+"Launcher is on.\n"
+"It starts when you leave this screen."
+msgstr ""
+"Launcher está activado.\n"
+"Se inicia al salir de esta pantalla."
+
+msgid "Locked"
+msgstr "Bloqueado"
+
+msgid "MENU"
+msgstr "MENÚ"
+
+msgid "MORE"
+msgstr "MÁS"
+
+msgid "NEXT"
+msgstr "SIGUIENTE"
+
+msgid "New PIN, empty for none"
+msgstr "PIN nuevo, vacío para ninguno"
+
+msgid "No Preview"
+msgstr "Sin vista previa"
+
+msgid "No Recents"
+msgstr "Sin recientes"
+
+msgid "Not set"
+msgstr "Sin definir"
+
+msgid "OPEN"
+msgstr "ABRIR"
+
+msgid "Off"
+msgstr "Desactivado"
+
+msgid "Off - using the stock launcher"
+msgstr "Desactivado - usando el launcher original"
+
+msgid "On"
+msgstr "Activado"
+
+msgid "On after the next reboot"
+msgstr "Activado tras el próximo reinicio"
+
+msgid "On, plugins paused after a crash"
+msgstr "Activado, plugins en pausa tras un fallo"
+
+msgid "PIN removed."
+msgstr "PIN eliminado."
+
+msgid ""
+"PIN set.\n"
+"Simple mode and protected settings ask for it."
+msgstr ""
+"PIN establecido.\n"
+"El modo simple y los ajustes protegidos lo piden."
+
+msgid "PREVIOUS"
+msgstr "ANTERIOR"
+
+msgid "Paused after crashes - using stock"
+msgstr "En pausa tras fallos - usando el original"
+
+msgid "Poweroff"
+msgstr "Apagar"
+
+msgid "REMOVE"
+msgstr "QUITAR"
+
+msgid "RESUME"
+msgstr "REANUDAR"
+
+msgid "Reboot"
+msgstr "Reiniciar"
+
+msgid "Recents"
+msgstr "Recientes"
+
+msgid "SELECT"
+msgstr "ELEGIR"
+
+msgid "SHIFT"
+msgstr "MAYÚS"
+
+msgid "SLEEP"
+msgstr "SUSPENDER"
+
+msgid "SPACE"
+msgstr "ESPACIO"
+
+msgid "Set"
+msgstr "Definido"
+
+msgid "Settings"
+msgstr "Ajustes"
+
+msgid "Sleep"
+msgstr "Suspender"
+
+msgid "Status"
+msgstr "Estado"
+
+msgid "The PIN could not be saved."
+msgstr "No se pudo guardar el PIN."
+
+msgid "This build supports a different NextUI release."
+msgstr "Esta compilación es para otra versión de NextUI."
+
+msgid "Tools"
+msgstr "Herramientas"
+
+msgid "Try again"
+msgstr "Inténtalo de nuevo"
+
+msgid "Turn off"
+msgstr "Desactivar"
+
+msgid "Turn on"
+msgstr "Activar"
+
+msgid "Waiting for a supported NextUI"
+msgstr "Esperando una versión de NextUI compatible"
+
+msgid "Wrong PIN"
+msgstr "PIN incorrecto"
+
+msgid "unknown"
+msgstr "desconocido"
+
+msgctxt "localization"
+msgid "Write map.txt names"
+msgstr "Escribir nombres en map.txt"
+
+msgctxt "localization"
+msgid "WRITE"
+msgstr "ESCRIBIR"
+
+msgctxt "localization"
+msgid "Lines already in a map.txt are kept."
+msgstr "Las líneas que ya están en un map.txt se mantienen."
+
+msgctxt "localization"
+msgid "No names lists for this language"
+msgstr "No hay listas de nombres para este idioma"
+
+msgctxt "localization"
+msgid "No names to add to map.txt"
+msgstr "No hay nombres que añadir a map.txt"
+
+#, c-format
+msgctxt "localization"
+msgid "Add names to map.txt in %d folder?"
+msgid_plural "Add names to map.txt in %d folders?"
+msgstr[0] "¿Añadir nombres a map.txt en %d carpeta?"
+msgstr[1] "¿Añadir nombres a map.txt en %d carpetas?"
+
+#, c-format
+msgctxt "localization"
+msgid "Added names to map.txt in %d folder"
+msgid_plural "Added names to map.txt in %d folders"
+msgstr[0] "Nombres añadidos a map.txt en %d carpeta"
+msgstr[1] "Nombres añadidos a map.txt en %d carpetas"
