@@ -327,7 +327,7 @@ static void testResolve(void) {
 	CHECK(TP_cardFile(CARD, away, out, sizeof(out), &why) == -1);
 	CHECK_STR(why, "is outside the card");
 	const char* base = strrchr(outside, '/');
-	char up[PATH_MAX];
+	char up[PATH_MAX + 4];
 	snprintf(up, sizeof(up), "../%s", base ? base + 1 : outside);
 	CHECK(TP_cardFile(CARD, up, out, sizeof(out), &why) == -1);
 	CHECK_STR(why, "is outside the card");
