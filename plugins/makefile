@@ -49,3 +49,7 @@ $(PLUGINS):
 
 clean:
 	rm -rf $(OUT)
+
+# A plugin that needs more than its own .c files (a vendored library, extra
+# flags) has a plugin.mk beside its plugin.txt with its target's rules.
+include $(wildcard */plugin.mk)
