@@ -38,7 +38,7 @@ Rules for agents working on mosaic-launcher.
 ## Git and PRs
 
 - Branches are named `feat/<issue>-...`, `fix/<issue>-...`, `test/<issue>-...` or `docs/<issue>-...`.
-- Rebase onto origin/main, never merge main into a branch. Main is merged by fast-forwarding it to the branch, so a branch must be rebased onto the latest origin/main before it can merge. The exception is a PR that only adds files, rebases onto main cleanly and passed CI: it doesn't need a rebase from you, since it's rebased onto main when it merges.
+- Rebase onto origin/main, never merge main into a branch. Main is merged by fast-forwarding it to the branch, so a branch must be rebased onto the latest origin/main before it can merge. The exception is a PR that rebases onto main cleanly and passed CI: it doesn't need a rebase from you, since it's rebased onto main when it merges.
 - Force-push only feature branches, with `git push --force-with-lease`. Never force-push main.
 - Never amend. To change a PR after review, add a commit on top.
 - Commits are semantic, with no scope and at most 60 characters, and optionally one terse paragraph body. No bullets, headers, manual line breaks, test plans or attribution lines.
