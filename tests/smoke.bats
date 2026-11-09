@@ -103,6 +103,36 @@ fake_gdb() {
 	[ ! -e "$BATS_TEST_TMPDIR/gdb-calls" ]
 }
 
+@test "with SMOKE_STACKS a launcher that ignores SIGTERM has its processes and stacks logged" {
+	fake_gdb
+	fake_launcher "trap '' TERM; echo started; sleep 300 3>&- & echo \$! >'$BATS_TEST_TMPDIR/child'; while :; do sleep 0.1; done"
+	SMOKE_STACKS=1 run smoke
+	child=$(cat "$BATS_TEST_TMPDIR/child")
+	kill "$child"
+	[ "$status" -eq 2 ]
+	[ "${lines[0]}" = "still running 5s after SIGTERM, killed it; log in $LOG" ]
+	[ "${lines[1]}" = "  processes and stacks at the end of the log" ]
+	[ "$(sed -n 1p "$LOG")" = "started" ]
+	grep -qx -- "--- still running 5s after SIGTERM" "$LOG"
+	# the launcher, then its child indented under it, with its command line
+	launcher=$(sed -n '/^processes:$/{n;p;}' "$LOG")
+	case "$launcher" in [0-9]*" $ROOT/build/desktop/nextui.elf"*) ;; *) false ;; esac
+	grep -q "^  $child [0-9]* [^ ]*  *sleep 300\$" "$LOG"
+	[ "$(sed -n '/^stacks:$/{n;p;}' "$LOG")" = "Thread 1 (main)" ]
+	grep -q -- "-p [0-9]" "$BATS_TEST_TMPDIR/gdb-calls"
+	[ ! -e "$LOG.stopping" ]
+}
+
+@test "without SMOKE_STACKS a launcher that ignores SIGTERM logs nothing more" {
+	fake_gdb
+	fake_launcher "trap '' TERM; echo started; while :; do sleep 0.1; done"
+	run smoke
+	[ "$status" -eq 2 ]
+	[ "$output" = "still running 5s after SIGTERM, killed it; log in $LOG" ]
+	[ "$(cat "$LOG")" = "started" ]
+	[ ! -e "$BATS_TEST_TMPDIR/gdb-calls" ]
+}
+
 @test "with SMOKE_UNTIL a launcher that exits after the lines fails" {
 	fake_launcher 'echo one; sleep 0.3; exit 3'
 	SMOKE_UNTIL=one SMOKE_SETTLE=2 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30

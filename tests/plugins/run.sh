@@ -125,7 +125,11 @@ start_launcher() {
 		# this start's marker, which would pause plugins on the next
 		rm -f "$STATE/loading"
 	done
-	[ "$status" -eq 2 ] && fail "the launcher ignored SIGTERM and was killed"
+	if [ "$status" -eq 2 ]; then
+		fail "the launcher ignored SIGTERM and was killed"
+		# its processes and main thread's stack, from the end of its log (SMOKE_STACKS)
+		sed -n '/^--- still running/,$p' "$case_log" | sed -n '/^processes:$/,/^$/p; /^Thread 1 /,/^$/p' | head -n 60 >&2
+	fi
 	if [ "$status" -eq 3 ]; then
 		why=$(sed -n 's/^  //p' "$WORK/smoke.err" | tr '\n' ',')
 		fail "not ready after ${WAIT}s (${why%,})"
