@@ -70,7 +70,29 @@ Build it as a shared object, with no references into the launcher:
 gcc -shared -fPIC -I sdk hello.c -o lib/aarch64/plugin.so
 ```
 
-Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files). They include only `sdk/mosaic_plugin.h` and libc's headers, with two exceptions: `video-previews` also includes ffmpeg's headers, for its types, but never links ffmpeg, loading it with `dlopen` instead and checking each library's major version before using it; and `romm` links BearSSL, from `vendor/BearSSL`, into its own `plugin.so` for HTTPS. A plugin that needs more than its own `.c` files has a `plugin.mk` beside its `plugin.txt` with its rules. `make plugins-device` builds them all for devices in the tg5040 toolchain, `make plugins-desktop` for the desktop build, and `make pak` bundles them into `Launcher.pak/plugins/`. `make run-desktop` runs the desktop build with them available; turn one on with `<id>=on` in `/var/tmp/nextui/sdcard/.userdata/desktop/launcher/plugins.txt`.
+Plugins in this repo live in `plugins/<name>/` (a `plugin.txt` plus `.c` files). They include only `sdk/mosaic_plugin.h` and libc's headers, with these exceptions: `video-previews` also includes ffmpeg's headers, for its types, but never links ffmpeg, loading it with `dlopen` instead and checking each library's major version before using it; `romm` links BearSSL, from `vendor/BearSSL`, into its own `plugin.so` for HTTPS; and a plugin's helper programs (see "Helper programs" below) are programs of their own, not part of `plugin.so`, so they can use other libraries, such as SDL2 for `second-screen-display`'s window and `musicd`'s audio, and dr_libs, from `vendor/dr_libs`, for `musicd`'s decoding. A plugin that needs more than its own `.c` files has a `plugin.mk` beside its `plugin.txt` with its rules. `make plugins-device` builds them all for devices in the tg5040 toolchain, `make plugins-desktop` for the desktop build, and `make pak` bundles them into `Launcher.pak/plugins/`. `make run-desktop` runs the desktop build with them available; turn one on with `<id>=on` in `/var/tmp/nextui/sdcard/.userdata/desktop/launcher/plugins.txt`.
+
+## Helper programs
+
+A plugin can ship helper programs beside its `plugin.so`, for work that shouldn't run inside the launcher's process: a daemon that outlives the launcher, such as music that plays on while a game runs; a window of its own; or work that would take the launcher down with it if it crashed. A helper is an ordinary program, built for each architecture like `plugin.so` and put in the same `lib/<arch>/` folder:
+
+```
+Example.plugin/
+    plugin.txt
+    lib/aarch64/plugin.so
+    lib/aarch64/example-helper
+```
+
+Two bundled plugins have one. `music`'s `musicd` is a daemon that plays the music, started the first time something is played and left running while the launcher exits for a game; the plugin talks to it over `/tmp/mosaic-music.sock`, it writes its pid to `/tmp/mosaic-music.pid`, and it logs to `.userdata/<platform>/logs/music.txt`. `second-screen`'s `second-screen-display` is an SDL2 program that shows the second window, started with a socket as its stdin, and quits when that socket closes, as it does when the launcher quits or is killed. In this repo, a plugin's `plugin.mk` builds its helpers and names them in `PLUGIN_SHIP`, the files `plugins/makefile` copies beside the plugin's `plugin.so` (eg. `music: PLUGIN_SHIP = $(MUSICD) $(MUSIC_LICENSE)`). For a plugin in a pak of its own, [`template/`](template/) builds an example helper from its `helper/` folder beside `plugin.so` and packs it into the pak; its README says how to go without it.
+
+A helper follows these rules:
+
+- It's started by its path, found from the folder `plugin.so` is in with `dladdr` on one of the plugin's own functions, never through a shell command line or `PATH`.
+- It's started with `fork` and `exec` (or `posix_spawn`), with none of the launcher's open files left open in it, and with `LD_PRELOAD` and `DYLD_INSERT_LIBRARIES` taken out of its environment, so libraries preloaded into the launcher aren't loaded into it.
+- Any socket, pid file or other file it keeps under `/tmp` is named for the plugin, eg. `/tmp/mosaic-<id>.sock`.
+- It's stopped by its own pid or through its own socket, never by name (no `pkill` or `killall`).
+- It quits when its socket closes, so one isn't left running once the launcher is gone. A daemon that outlives the launcher on purpose quits when it's told to through its socket or sent `SIGTERM` by its pid, as `musicd` does before a power-off, and removes its socket and pid file as it goes.
+- It logs to `.userdata/<platform>/logs/<name>.txt`, from `host->userdata_path`, eg. by the plugin opening that file as its stdout and stderr.
 
 ## Bundled plugins
 

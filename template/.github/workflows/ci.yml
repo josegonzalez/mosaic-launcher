@@ -18,6 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
+      # lib/aarch64/ gets plugin.so and, with a helper/ folder, the helper
       - name: Build
         run: make build CC="${CROSS_COMPILE}gcc"
 
@@ -40,6 +41,7 @@ jobs:
           name: lib
           path: lib
 
+      # the artifact loses the helper's executable bit; make pak sets it again
       - name: Package
         run: make pak
 
