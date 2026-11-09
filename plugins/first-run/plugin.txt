@@ -1,0 +1,15 @@
+id=first-run
+name=First run
+api=1
+# set once the wizard is finished or skipped; turn it off to see it again at the next start
+setting.seen=toggle|Already shown|off
+# a First run tile on the quick menu that opens the wizard
+setting.tile=toggle|Quick menu tile|on
+# a game list button that opens the wizard
+setting.button=choice|First run button|none|none,Y,L2,R2,SELECT
+# the page of stock's clock, battery percentage, haptics and notification toggles
+setting.toggles=toggle|Settings page|on
+# the page saying whether the launcher has a PIN
+setting.pin=toggle|PIN page|on
+# plugin ids the plugins page suggests, comma-separated; empty leaves the page out
+setting.suggest=text|Suggested plugins|home-dashboard,switcher-plus,favorites,search
