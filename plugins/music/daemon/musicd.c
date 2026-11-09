@@ -15,6 +15,14 @@
 // exits. It writes its pid to MU_PID_PATH, and removes that and the socket
 // when it exits, on quit, SIGTERM, SIGINT or SIGHUP. It logs to stderr,
 // which the plugin points at a log file.
+//
+// Its argument, when it has one, is the resume file (music_model.h has its
+// format): it saves the queue and the track's place there when a track is
+// played, paused, held or put to sleep and when it exits, removes it when
+// the music stops (at the queue's end, or asked to), and plays on from it
+// at restore. The daemon keeps it rather than the plugin, as it has the
+// queue and the place, and it's what runs when the device powers off from
+// a game, with the launcher gone.
 
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -57,6 +65,7 @@ static unsigned long long fed = 0;        // frames queued since then
 static int track_done = 0;                // the decoder is at the end
 static unsigned long paused_at = 0, last_command = 0;
 static short chunk[CHUNK_FRAMES * 2];
+static char resume_path[MU_PATH_MAX]; // "" with no resume file
 
 static unsigned long nowMs(void) {
 	struct timespec ts;
@@ -157,6 +166,8 @@ static void letGo(const char* why) {
 ///////////////////////////////////////
 // playing
 
+static void forgetResume(void);
+
 static void stopPlaying(const char* why) {
 	MuDecoder_close(&decoder);
 	closeDevice();
@@ -221,8 +232,11 @@ static void feed(void) {
 		fed += n;
 	}
 	if (track_done && queuedFrames() == 0) {
-		if (MuQueue_next(&queue, 0) < 0) stopPlaying("the end of the queue");
-		else playCurrent();
+		if (MuQueue_next(&queue, 0) >= 0) playCurrent();
+		else {
+			stopPlaying("the end of the queue");
+			forgetResume();
+		}
 	}
 }
 
@@ -293,6 +307,51 @@ static int playPath(const char* path, char* error, size_t size) {
 	return 0;
 }
 
+///////////////////////////////////////
+// resuming
+
+// Saves the queue and the track's place, while there's a track.
+static void saveResume(const char* why) {
+	if (!resume_path[0] || state == MU_STOPPED) return;
+	long long pos = frameMs(playedFrame());
+	if (MU_writeResume(resume_path, &queue, pos, frameMs(decoder.frames)) == 0) say("saved the place, %lld ms: %s", pos, why);
+	else say("can't save the place in %s", resume_path);
+}
+
+// Forgets it, once the music has stopped.
+static void forgetResume(void) {
+	if (resume_path[0] && unlink(resume_path) == 0) say("removed %s", resume_path);
+}
+
+// restore: the saved queue, without its tracks that are gone, from the
+// saved track's place.
+static int restoreQueue(char* error, size_t size) {
+	MuQueue loaded;
+	MuQueue_init(&loaded, queue.seed);
+	long long pos = 0, len = 0;
+	if (!resume_path[0] || !MU_readResume(resume_path, &loaded, &pos, &len)) {
+		snprintf(error, size, "nothing to play on");
+		return -1;
+	}
+	if (MuQueue_dropMissing(&loaded, MU_isFile, NULL) < 0) {
+		forgetResume();
+		snprintf(error, size, "its track is gone");
+		return -1;
+	}
+	int saved = MuQueue_current(&loaded);
+	MuDecoder_close(&decoder);
+	MuQueue_free(&queue);
+	queue = loaded;
+	if (playCurrent() != 0) {
+		snprintf(error, size, "it wouldn't play");
+		return -1;
+	}
+	if (MuQueue_current(&queue) == saved && pos > 0) restartAt((unsigned long long)pos * decoder.rate / 1000);
+	say("playing on from %s at %lld ms, %i of %i", queue.paths[MuQueue_current(&queue)], frameMs(playedFrame()),
+		queue.pos + 1, queue.count);
+	return 0;
+}
+
 static void status(MuStatus* s) {
 	memset(s, 0, sizeof(*s));
 	s->state = state;
@@ -325,22 +384,28 @@ static int run(const char* line, char* reply, size_t size) {
 		return 0;
 	}
 	case MU_CMD_PLAY:
-		playPath(arg, error, sizeof(error));
+		if (playPath(arg, error, sizeof(error)) == 0) saveResume("played");
 		break;
 	case MU_CMD_PAUSE:
 		pausePlaying();
+		saveResume("paused");
 		break;
 	case MU_CMD_RESUME:
 		if (resumePlaying() != 0) snprintf(error, sizeof(error), "nothing to play on");
 		break;
 	case MU_CMD_TOGGLE:
-		if (playing) pausePlaying();
-		else if (resumePlaying() != 0) snprintf(error, sizeof(error), "nothing to play on");
+		if (playing) {
+			pausePlaying();
+			saveResume("paused");
+		} else if (resumePlaying() != 0) snprintf(error, sizeof(error), "nothing to play on");
 		break;
 	case MU_CMD_NEXT:
 		if (state == MU_STOPPED) snprintf(error, sizeof(error), "nothing playing");
-		else if (MuQueue_next(&queue, 1) < 0) stopPlaying("next at the end of the queue");
-		else playCurrent();
+		else if (MuQueue_next(&queue, 1) >= 0) playCurrent();
+		else {
+			stopPlaying("next at the end of the queue");
+			forgetResume();
+		}
 		break;
 	case MU_CMD_PREV:
 		if (state == MU_STOPPED) snprintf(error, sizeof(error), "nothing playing");
@@ -352,6 +417,7 @@ static int run(const char* line, char* reply, size_t size) {
 		break;
 	case MU_CMD_STOP:
 		if (state != MU_STOPPED) stopPlaying("asked to");
+		forgetResume();
 		break;
 	case MU_CMD_SEEK: {
 		long long to;
@@ -374,6 +440,7 @@ static int run(const char* line, char* reply, size_t size) {
 			pausePlaying();
 			held = 1;
 			letGo("held for a game");
+			saveResume("held");
 		}
 		break;
 	case MU_CMD_RELEASE:
@@ -387,10 +454,14 @@ static int run(const char* line, char* reply, size_t size) {
 		pausePlaying();
 		held = 0;
 		letGo("the device is going to sleep");
+		saveResume("asleep");
 		break;
 	case MU_CMD_QUIT:
 		snprintf(reply, size, "ok\n");
 		return 1;
+	case MU_CMD_RESTORE:
+		restoreQueue(error, sizeof(error));
+		break;
 	default:
 		snprintf(error, sizeof(error), "unknown command");
 		break;
@@ -487,8 +558,9 @@ static void removePid(void) {
 }
 
 int main(int argc, char** argv) {
-	(void)argc;
-	(void)argv;
+	if (argc > 1 && argv[1][0] == '/' && strlen(argv[1]) < sizeof(resume_path)) {
+		snprintf(resume_path, sizeof(resume_path), "%s", argv[1]);
+	}
 	signal(SIGPIPE, SIG_IGN);
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
@@ -525,6 +597,7 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	saveResume(quitting ? "signalled" : state == MU_STOPPED ? "stopped" : "asked to quit");
 	MuDecoder_close(&decoder);
 	closeDevice();
 	MuQueue_free(&queue);

@@ -2,11 +2,13 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 ///////////////////////////////////////
 // files
@@ -258,6 +260,7 @@ static const char* const commands[] = {
 	[MU_CMD_RELEASE] = "release",
 	[MU_CMD_SLEEP] = "sleep",
 	[MU_CMD_QUIT] = "quit",
+	[MU_CMD_RESTORE] = "restore",
 };
 #define COMMAND_COUNT ((int)(sizeof(commands) / sizeof(commands[0])))
 
@@ -382,6 +385,220 @@ void MU_formatTime(long long ms, char* out, size_t size) {
 }
 
 ///////////////////////////////////////
+// resuming after a power-off
+
+// a line of the order field, MU_LIST_MAX indexes of up to 4 digits and
+// their commas, and its key
+#define RESUME_LINE_MAX (MU_LIST_MAX * 5 + 64)
+
+int MU_isFile(const char* path, void* data) {
+	(void)data;
+	struct stat st;
+	return path && stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static int resumePath(const char* path) {
+	return path[0] == '/' && strlen(path) < MU_PATH_MAX && !strpbrk(path, "\r\n");
+}
+
+// Syncs the folder path is in, so a rename into it lasts.
+static void syncFolder(const char* path) {
+	char folder[MU_PATH_MAX];
+	const char* slash = strrchr(path, '/');
+	if (!slash || (size_t)(slash - path) >= sizeof(folder)) return;
+	size_t len = slash == path ? 1 : (size_t)(slash - path);
+	memcpy(folder, path, len);
+	folder[len] = '\0';
+	int fd = open(folder, O_RDONLY);
+	if (fd < 0) return;
+	fsync(fd);
+	close(fd);
+}
+
+int MU_writeResume(const char* path, const MuQueue* q, long long pos_ms, long long len_ms) {
+	int current = MuQueue_current(q);
+	if (!path || current < 0 || q->count > MU_LIST_MAX || pos_ms < 0 || len_ms < 0) return -1;
+	for (int i = 0; i < q->count; i++) {
+		if (!resumePath(q->paths[i])) return -1;
+	}
+	char tmp[MU_PATH_MAX + 8];
+	int n = snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+	if (n <= 0 || (size_t)n >= sizeof(tmp)) return -1;
+	int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (fd < 0) return -1;
+	FILE* f = fdopen(fd, "w");
+	if (!f) {
+		close(fd);
+		unlink(tmp);
+		return -1;
+	}
+	fprintf(f, "%s\npos=%lld\nlen=%lld\nindex=%i\nshuffle=%i\nrepeat=%s\ncount=%i\norder=", MU_RESUME_HEADER, pos_ms,
+		len_ms, q->pos, q->shuffle ? 1 : 0, MU_repeatName(q->repeat), q->count);
+	for (int i = 0; i < q->count; i++) fprintf(f, i ? ",%i" : "%i", q->order[i]);
+	fprintf(f, "\ntrack=%s\n", q->paths[current]);
+	for (int i = 0; i < q->count; i++) fprintf(f, "path=%s\n", q->paths[i]);
+	fputs("end\n", f);
+	int ok = fflush(f) == 0 && !ferror(f) && fsync(fileno(f)) == 0;
+	if (fclose(f) != 0) ok = 0;
+	if (!ok || rename(tmp, path) != 0) {
+		unlink(tmp);
+		return -1;
+	}
+	syncFolder(path);
+	return 0;
+}
+
+// The next line, without its line break, into line. Returns 0 at the end
+// of the file, or for a line too long for it.
+static int readLine(FILE* f, char* line, size_t size) {
+	if (!fgets(line, (int)size, f)) return 0;
+	size_t len = strlen(line);
+	if (len && line[len - 1] == '\n') line[--len] = '\0';
+	else if (!feof(f)) return 0;
+	return 1;
+}
+
+// count indexes, by commas, each below count and each once.
+static int parseOrder(const char* text, int* order, int count) {
+	char* seen = calloc((size_t)count, 1);
+	if (!seen) return 0;
+	const char* p = text;
+	int ok = 1;
+	for (int i = 0; i < count && ok; i++) {
+		if (i && *p++ != ',') ok = 0;
+		else if (!isdigit((unsigned char)*p)) ok = 0;
+		else {
+			long v = 0;
+			while (isdigit((unsigned char)*p) && v <= count) v = v * 10 + (*p++ - '0');
+			if (isdigit((unsigned char)*p) || v >= count || seen[v]) ok = 0;
+			else {
+				seen[v] = 1;
+				order[i] = (int)v;
+			}
+		}
+	}
+	if (*p) ok = 0;
+	free(seen);
+	return ok;
+}
+
+static int parseResume(FILE* f, char* line, MuQueue* q, long long* pos_ms, long long* len_ms) {
+	if (!readLine(f, line, RESUME_LINE_MAX) || strcmp(line, MU_RESUME_HEADER) != 0) return 0;
+	long long pos = -1, len = -1, index = -1, shuffle = -1, count = -1;
+	int repeat = -1;
+	char track[MU_PATH_MAX] = "";
+	char* order_text = NULL;
+	char (*paths)[MU_PATH_MAX] = NULL;
+	int* order = NULL;
+	int ok = 0;
+	// the fields, up to the first path
+	for (;;) {
+		if (!readLine(f, line, RESUME_LINE_MAX)) goto done;
+		if (!strncmp(line, "path=", 5)) break;
+		char* eq = strchr(line, '=');
+		if (!eq) goto done;
+		*eq = '\0';
+		const char* value = eq + 1;
+		long long v = 0;
+		if (!strcmp(line, "track")) {
+			if (track[0] || !resumePath(value)) goto done;
+			snprintf(track, sizeof(track), "%s", value);
+		} else if (!strcmp(line, "order")) {
+			if (order_text || !(order_text = strdup(value))) goto done;
+		} else if (!strcmp(line, "repeat")) {
+			if (repeat >= 0) goto done;
+			if (!strcmp(value, "off")) repeat = MU_REPEAT_OFF;
+			else if (!strcmp(value, "all")) repeat = MU_REPEAT_ALL;
+			else if (!strcmp(value, "one")) repeat = MU_REPEAT_ONE;
+			else goto done;
+		} else {
+			long long* field = !strcmp(line, "pos") ? &pos
+				: !strcmp(line, "len") ? &len
+				: !strcmp(line, "index") ? &index
+				: !strcmp(line, "shuffle") ? &shuffle
+				: !strcmp(line, "count") ? &count
+				: NULL;
+			if (!field || *field >= 0 || !number(value, &v)) goto done;
+			*field = v;
+		}
+	}
+	if (pos < 0 || len < 0 || shuffle < 0 || shuffle > 1 || repeat < 0 || !track[0] || !order_text || count < 1
+		|| count > MU_LIST_MAX || index < 0 || index >= count) {
+		goto done;
+	}
+	paths = malloc((size_t)count * sizeof(*paths));
+	order = malloc((size_t)count * sizeof(int));
+	if (!paths || !order || !parseOrder(order_text, order, (int)count)) goto done;
+	// the paths, then the end line
+	for (int i = 0; i < count; i++) {
+		if (i && !readLine(f, line, RESUME_LINE_MAX)) goto done;
+		if (strncmp(line, "path=", 5) != 0 || !resumePath(line + 5)) goto done;
+		snprintf(paths[i], MU_PATH_MAX, "%s", line + 5);
+	}
+	if (!readLine(f, line, RESUME_LINE_MAX) || strcmp(line, "end") != 0) goto done;
+	if (strcmp(paths[order[index]], track) != 0) goto done;
+	if (len > 0 && pos > len) pos = len;
+	q->paths = paths;
+	q->order = order;
+	paths = NULL;
+	order = NULL;
+	q->count = (int)count;
+	q->pos = (int)index;
+	q->shuffle = (int)shuffle;
+	q->repeat = repeat;
+	*pos_ms = pos;
+	*len_ms = len;
+	ok = 1;
+done:
+	free(order_text);
+	free(paths);
+	free(order);
+	return ok;
+}
+
+int MU_readResume(const char* path, MuQueue* q, long long* pos_ms, long long* len_ms) {
+	MuQueue_free(q);
+	*pos_ms = *len_ms = 0;
+	FILE* f = path ? fopen(path, "r") : NULL;
+	if (!f) return 0;
+	char* line = malloc(RESUME_LINE_MAX);
+	int ok = line && parseResume(f, line, q, pos_ms, len_ms);
+	free(line);
+	fclose(f);
+	return ok;
+}
+
+int MuQueue_dropMissing(MuQueue* q, int (*exists)(const char* path, void* data), void* data) {
+	int current = MuQueue_current(q);
+	int* index = current >= 0 ? malloc((size_t)q->count * sizeof(int)) : NULL;
+	if (!index || !exists(q->paths[current], data)) {
+		free(index);
+		MuQueue_free(q);
+		return -1;
+	}
+	// each track's new index, or -1 for a gone one
+	int count = 0;
+	for (int i = 0; i < q->count; i++) {
+		if (i != current && !exists(q->paths[i], data)) {
+			index[i] = -1;
+			continue;
+		}
+		if (count != i) memcpy(q->paths[count], q->paths[i], MU_PATH_MAX);
+		index[i] = count++;
+	}
+	int n = 0;
+	for (int i = 0; i < q->count; i++) {
+		int t = q->order[i];
+		if (index[t] < 0) continue;
+		if (t == current) q->pos = n;
+		q->order[n++] = index[t];
+	}
+	q->count = count;
+	free(index);
+	return count;
+}
+
+///////////////////////////////////////
 // the plugin's state
 
 int MU_parseOverlay(const char* text) {
@@ -410,6 +627,12 @@ int MuOverlay_visible(const MuOverlay* overlay, unsigned long now) {
 	if (overlay->seconds == 0 || overlay->state == MU_STOPPED || !overlay->track[0]) return 0;
 	if (overlay->seconds == MU_OVERLAY_ALWAYS) return 1;
 	return now < overlay->until;
+}
+
+void MuOverlay_show(MuOverlay* overlay, const MuStatus* status, unsigned long now) {
+	overlay->state = status->state;
+	snprintf(overlay->track, sizeof(overlay->track), "%s", status->track);
+	if (overlay->seconds > 0) overlay->until = now + (unsigned long)overlay->seconds * 1000;
 }
 
 int MU_move(int selected, int count, int delta, int wrap) {

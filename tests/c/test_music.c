@@ -1,7 +1,7 @@
 // The music plugin's model: which files are tracks and how they sort,
-// listing a folder, the queue with shuffle and repeat, the socket
-// protocol's commands and status line, and the plugin's pill timing,
-// unlock press and folder browsing.
+// listing a folder, the queue with shuffle and repeat, its resume file,
+// the socket protocol's commands and status line, and the plugin's pill
+// timing, unlock press and folder browsing.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -215,6 +215,191 @@ static void testQueue(void) {
 	CHECK_STR(MU_repeatName(MU_REPEAT_ONE), "one");
 }
 
+static void writeText(const char* path, const char* text) {
+	FILE* f = fopen(path, "w");
+	if (!f) return;
+	fputs(text, f);
+	fclose(f);
+}
+
+// a test's exists: every path but the ones with "gone" in them
+static int notGone(const char* path, void* data) {
+	(*(int*)data)++;
+	return strstr(path, "gone") == NULL;
+}
+
+static void testResume(void) {
+	char root[] = "/tmp/test_music_resume.XXXXXX";
+	CHECK(mkdtemp(root) != NULL);
+	char file[MU_PATH_MAX], tmp[MU_PATH_MAX + 8];
+	snprintf(file, sizeof(file), "%s/" MU_RESUME_NAME, root);
+	snprintf(tmp, sizeof(tmp), "%s.tmp", file);
+
+	// a shuffled queue written and read back as it was
+	MuList list = fakeList(0, 5);
+	MuQueue q;
+	MuQueue_init(&q, 3);
+	q.shuffle = 1;
+	q.repeat = MU_REPEAT_ALL;
+	CHECK(MuQueue_set(&q, "/M", &list, 2) == 0);
+	MuQueue_next(&q, 1);
+	MuQueue_next(&q, 1);
+	int current = MuQueue_current(&q);
+	CHECK(MU_writeResume(file, &q, 12345, 40000) == 0);
+	CHECK(access(tmp, F_OK) != 0);
+	MuQueue r;
+	MuQueue_init(&r, 9);
+	long long pos = -1, len = -1;
+	CHECK(MU_readResume(file, &r, &pos, &len) == 1);
+	CHECK(pos == 12345 && len == 40000);
+	CHECK(r.count == 5 && r.pos == q.pos && r.shuffle == 1 && r.repeat == MU_REPEAT_ALL && r.seed == 9);
+	for (int i = 0; i < 5 && r.count == 5; i++) {
+		CHECK(r.order[i] == q.order[i]);
+		CHECK_STR(r.paths[i], q.paths[i]);
+	}
+	CHECK(MuQueue_current(&r) == current);
+	// and goes on in the same order
+	CHECK(MuQueue_next(&r, 1) == MuQueue_next(&q, 1));
+
+	// gone tracks are dropped, keeping the order and the current track
+	snprintf(r.paths[r.order[0]], MU_PATH_MAX, "/M/gone a.mp3");
+	snprintf(r.paths[r.order[4]], MU_PATH_MAX, "/M/gone b.mp3");
+	r.pos = 2;
+	int before[5];
+	for (int i = 0; i < 5; i++) before[i] = r.order[i];
+	char want[MU_PATH_MAX];
+	snprintf(want, sizeof(want), "%s", r.paths[MuQueue_current(&r)]);
+	int asked = 0;
+	CHECK(MuQueue_dropMissing(&r, notGone, &asked) == 3);
+	CHECK(asked == 5);
+	CHECK(r.count == 3 && r.pos == 1);
+	CHECK_STR(r.paths[MuQueue_current(&r)], want);
+	for (int i = 0; i < 3 && r.count == 3; i++) {
+		CHECK(r.order[i] >= 0 && r.order[i] < 3);
+		CHECK(strstr(r.paths[r.order[i]], "gone") == NULL);
+	}
+	if (r.count == 3) CHECK(!strcmp(r.paths[r.order[0]], q.paths[before[1]]) && !strcmp(r.paths[r.order[2]], q.paths[before[3]]));
+	// and the current one gone drops it all
+	snprintf(r.paths[MuQueue_current(&r)], MU_PATH_MAX, "/M/gone c.mp3");
+	CHECK(MuQueue_dropMissing(&r, notGone, &asked) == -1);
+	CHECK(r.count == 0 && MuQueue_current(&r) == -1);
+	CHECK(MuQueue_dropMissing(&r, notGone, &asked) == -1);
+
+	// MU_isFile
+	CHECK(MU_isFile(file, NULL));
+	CHECK(!MU_isFile(root, NULL));
+	CHECK(!MU_isFile("/no/such/file.mp3", NULL));
+
+	// a place past the end is kept at the end; nothing to write is refused
+	CHECK(MU_writeResume(file, &q, 50000, 40000) == 0);
+	CHECK(MU_readResume(file, &r, &pos, &len) == 1 && pos == 40000);
+	MuQueue empty;
+	MuQueue_init(&empty, 1);
+	CHECK(MU_writeResume(file, &empty, 0, 0) == -1);
+	CHECK(MU_writeResume(file, &q, -1, 0) == -1);
+	CHECK(MU_readResume(file, &r, &pos, &len) == 1); // left as it was
+	snprintf(q.paths[0], MU_PATH_MAX, "relative.mp3");
+	CHECK(MU_writeResume(file, &q, 0, 0) == -1);
+	char missing[MU_PATH_MAX + 16];
+	snprintf(missing, sizeof(missing), "%s/no/such/" MU_RESUME_NAME, root);
+	CHECK(MU_writeResume(missing, &r, 0, 0) == -1);
+	CHECK(MU_readResume(missing, &r, &pos, &len) == 0);
+	CHECK(r.count == 0 && pos == 0 && len == 0);
+
+	// what a whole file looks like
+	const char* good = MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n";
+	writeText(file, good);
+	CHECK(MU_readResume(file, &r, &pos, &len) == 1);
+	CHECK(r.count == 3 && r.pos == 1 && MuQueue_current(&r) == 0 && r.repeat == MU_REPEAT_ONE && pos == 5 && len == 9);
+	// the end line without its line break, and the fields in another order
+	writeText(file, MU_RESUME_HEADER "\ntrack=/M/b.mp3\norder=0,1\nrepeat=off\ncount=2\nshuffle=0\nindex=1\nlen=0\npos=0\n"
+		"path=/M/a.mp3\npath=/M/b.mp3\nend");
+	CHECK(MU_readResume(file, &r, &pos, &len) == 1);
+	CHECK(r.count == 2 && MuQueue_current(&r) == 1);
+
+	// malformed and cut off files are refused, leaving the queue empty
+	static const char* const bad[] = {
+		"",
+		MU_RESUME_HEADER,
+		"music-resume 2\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		// cut off in the fields, the paths and the end line
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrep",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nen",
+		// a field missing, twice, unknown or out of range
+		MU_RESUME_HEADER "\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\npos=6\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\nvolume=3\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=-5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=3\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=2\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=twice\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=0\nshuffle=0\nrepeat=off\ncount=0\norder=\ntrack=/M/a.mp3\nend\n",
+		// the order not a shuffle of the tracks
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,0\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1,0\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,3\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,,0\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=99999999999999999999,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		// the track isn't the one at index, a path isn't a full one, too few or too many paths
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/b.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=b.mp3\npath=/M/c.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\npath=/M/d.mp3\nend\n",
+		// no paths at all, or a line with no key
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\ntrack=/M/a.mp3\nend\n",
+		MU_RESUME_HEADER "\npos=5\nlen=9\nindex=1\nshuffle=1\nrepeat=one\ncount=3\norder=2,0,1\nnothing\n"
+		"track=/M/a.mp3\npath=/M/a.mp3\npath=/M/b.mp3\npath=/M/c.mp3\nend\n",
+	};
+	for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+		writeText(file, good);
+		CHECK(MU_readResume(file, &r, &pos, &len) == 1);
+		writeText(file, bad[i]);
+		if (MU_readResume(file, &r, &pos, &len) != 0) fprintf(stderr, "bad resume file %zu was read\n", i);
+		CHECK(r.count == 0 && r.paths == NULL && r.order == NULL);
+	}
+	// a line longer than any it writes
+	FILE* f = fopen(file, "w");
+	if (f) {
+		fprintf(f, "%s\npos=", MU_RESUME_HEADER);
+		for (int i = 0; i < 20000; i++) fputc('1', f);
+		fputs("\n", f);
+		fclose(f);
+	}
+	CHECK(MU_readResume(file, &r, &pos, &len) == 0);
+
+	MuQueue_free(&q);
+	MuQueue_free(&r);
+	MU_listFree(&list);
+	char cmd[MU_PATH_MAX * 2];
+	snprintf(cmd, sizeof(cmd), "rm -rf '%s'", root);
+	CHECK(system(cmd) == 0);
+}
+
 static void testCommands(void) {
 	char arg[64];
 	CHECK(MU_parseCommand("status\n", arg, sizeof(arg)) == MU_CMD_STATUS);
@@ -247,7 +432,8 @@ static void testCommands(void) {
 	CHECK(MU_formatCommand(MU_CMD_NONE, NULL, line, sizeof(line)) == -1);
 	CHECK(MU_formatCommand(MU_CMD_PLAY, "/a/long/path", line, 8) == -1);
 	// every command's line parses back to it
-	for (int c = MU_CMD_STATUS; c <= MU_CMD_QUIT; c++) {
+	CHECK(MU_parseCommand("restore", arg, sizeof(arg)) == MU_CMD_RESTORE);
+	for (int c = MU_CMD_STATUS; c <= MU_CMD_RESTORE; c++) {
 		CHECK(MU_formatCommand(c, "x y", line, sizeof(line)) > 0);
 		CHECK(MU_parseCommand(line, arg, sizeof(arg)) == c);
 		CHECK_STR(arg, "x y");
@@ -372,6 +558,22 @@ static void testOverlay(void) {
 	s.state = MU_PLAYING;
 	MuOverlay_update(&off, &s, 0);
 	CHECK(!MuOverlay_visible(&off, 0));
+	s.state = MU_PAUSED;
+	MuOverlay_show(&off, &s, 0);
+	CHECK(!MuOverlay_visible(&off, 0));
+
+	// a paused track restored at start shows for its time, then playing on starts it again
+	MuOverlay restored;
+	MuOverlay_init(&restored, 5);
+	s.state = MU_PAUSED;
+	snprintf(s.track, sizeof(s.track), "/M/1.mp3");
+	MuOverlay_show(&restored, &s, 100000);
+	CHECK(MuOverlay_visible(&restored, 104999));
+	CHECK(!MuOverlay_update(&restored, &s, 101000));
+	CHECK(!MuOverlay_visible(&restored, 105000));
+	s.state = MU_PLAYING;
+	CHECK(MuOverlay_update(&restored, &s, 200000));
+	CHECK(MuOverlay_visible(&restored, 204000));
 }
 
 static void testUnlock(void) {
@@ -429,6 +631,7 @@ int main(void) {
 	testCompare();
 	testScan();
 	testQueue();
+	testResume();
 	testCommands();
 	testStatus();
 	testOverlay();

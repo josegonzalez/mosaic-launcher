@@ -12,6 +12,8 @@ setting.awake=toggle|Stay awake while playing|on
 # the queue's order and what happens at its end; SELECT and START on the player change them too
 setting.shuffle=toggle|Shuffle|off
 setting.repeat=choice|Repeat|off|off,all,one
+# after a power-off, show the last track paused where it was, for X to play on
+setting.resume=toggle|Resume after power-off|on
 # a Music tile on the quick menu
 setting.tile=toggle|Quick menu tile|on
 # a game list button that opens the player

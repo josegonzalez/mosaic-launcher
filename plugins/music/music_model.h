@@ -1,7 +1,8 @@
 // The music plugin's model, apart from SDL and the launcher, shared by the
 // plugin (plugin.so) and its daemon (musicd): which files are tracks and
 // how they sort, listing a folder, the play queue with shuffle and repeat,
-// the socket protocol's commands and status line, and the plugin's own
+// the file it's saved in to resume after a power-off, the socket
+// protocol's commands and status line, and the plugin's own
 // small state machines (the now playing pill's timing, the lock screen's
 // unlock press, browsing up and down folders).
 
@@ -116,6 +117,37 @@ int MuQueue_prev(MuQueue* queue);
 void MuQueue_setShuffle(MuQueue* queue, int on);
 
 ///////////////////////////////////////
+// resuming after a power-off
+
+// The daemon keeps the queue and its track's place in a file of its own,
+// MU_RESUME_NAME in the plugin's folder in the launcher's userdata folder,
+// which the plugin reads at start. It's a MU_RESUME_HEADER line, then the
+// fields pos and len (in ms), index (the current track's place in order),
+// shuffle, repeat, count, order (count indexes, by commas) and track, as
+// key=value lines in any order, then a path= line for each queued track
+// and an end line, so a file cut off part way isn't taken.
+#define MU_RESUME_HEADER "music-resume 1"
+#define MU_RESUME_NAME "resume.txt"
+
+// Writes the queue and its track's place to path, through a temporary
+// file beside it that's synced and renamed over it. Returns 0, or -1 for
+// an empty queue or a write that failed, leaving path as it was.
+int MU_writeResume(const char* path, const MuQueue* queue, long long pos_ms, long long len_ms);
+
+// Reads path into queue, which it frees first (its seed is kept), and the
+// track's place into pos_ms and len_ms. Returns 1, or 0 when there's no
+// file or it isn't a whole, valid one, leaving the queue empty.
+int MU_readResume(const char* path, MuQueue* queue, long long* pos_ms, long long* len_ms);
+
+// Drops the queued tracks exists says are gone, keeping the others' order
+// and the current track. Returns how many are left, or -1 (with the queue
+// freed) when the current track is gone.
+int MuQueue_dropMissing(MuQueue* queue, int (*exists)(const char* path, void* data), void* data);
+
+// An exists for MuQueue_dropMissing: path is a regular file.
+int MU_isFile(const char* path, void* data);
+
+///////////////////////////////////////
 // the protocol: one line to the daemon, one line back, then it closes
 
 enum MuCommand {
@@ -135,6 +167,7 @@ enum MuCommand {
 	MU_CMD_RELEASE, // play on after hold, when it was playing
 	MU_CMD_SLEEP,   // pause and close the audio device now, before a sleep
 	MU_CMD_QUIT,
+	MU_CMD_RESTORE, // play on from the resume file, at its track's place
 };
 
 // The command in line, with what follows its name (after one space,
@@ -198,6 +231,10 @@ void MuOverlay_init(MuOverlay* overlay, int seconds);
 // time again (a new track, or playing again).
 int MuOverlay_update(MuOverlay* overlay, const MuStatus* status, unsigned long now);
 int MuOverlay_visible(const MuOverlay* overlay, unsigned long now);
+
+// Starts the pill's time for status whatever its state, as for a paused
+// track restored at start.
+void MuOverlay_show(MuOverlay* overlay, const MuStatus* status, unsigned long now);
 
 // The list on the plugin's screen: the selection moved by delta, going
 // round at either end only for a single step (wrap 1, a fresh press), and

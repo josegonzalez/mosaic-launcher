@@ -21,6 +21,12 @@
 // the music and lets go of the audio device, and plays on when the
 // launcher comes back, unless the games setting is play. Before a sleep
 // the music pauses; before a power-off the daemon quits.
+//
+// The daemon saves the queue and the track's place in the resume file (see
+// musicd.c). At start, with no daemon running and the resume setting on,
+// the plugin reads it and shows its track paused, on the player and the
+// pill, without starting the daemon; X or music.toggle starts it and plays
+// on from there.
 
 #define _GNU_SOURCE // dladdr
 #include <dlfcn.h>
@@ -66,6 +72,7 @@ static const MosaicHost* host;
 static char root[MU_PATH_MAX];
 static char daemon_path[MU_PATH_MAX];
 static char log_path[MU_PATH_MAX];
+static char resume_path[MU_PATH_MAX]; // "" with the resume setting off
 static int games_play = 0; // keep playing during games
 static int awake = 1;
 static int shuffle = 0, repeat = MU_REPEAT_OFF;
@@ -75,6 +82,10 @@ static MuStatus st;
 static unsigned long next_poll = 0, last_now = 0;
 static int awake_held = 0;
 static char logged_now[MU_PATH_MAX + 64];
+
+// the resume file's track, shown paused until it's played on
+static int restored = 0, restored_pill = 0, restored_shuffle = 0;
+static MuStatus restored_st;
 
 static MuOverlay overlay;
 static int overlay_shown = 0;
@@ -187,11 +198,13 @@ static void askStatus(unsigned long now) {
 	if (rc == 0 && MU_parseStatus(reply, &s)) {
 		if (!daemon_up) say("the daemon is running");
 		daemon_up = 1;
+		restored = 0;
 		st = s;
 	} else {
 		if (daemon_up) say("the daemon stopped answering");
 		daemon_up = 0;
-		memset(&st, 0, sizeof(st));
+		if (restored) st = restored_st;
+		else memset(&st, 0, sizeof(st));
 	}
 	logNowPlaying();
 	if (MuOverlay_update(&overlay, &st, now)) overlay_shown = 0;
@@ -244,7 +257,7 @@ static int startDaemon(void) {
 	if (out < 0) out = open("/dev/null", O_WRONLY | O_CLOEXEC);
 	long max_fd = sysconf(_SC_OPEN_MAX);
 	if (max_fd < 0 || max_fd > 4096) max_fd = 4096;
-	char* const argv[] = { daemon_path, NULL };
+	char* const argv[] = { daemon_path, resume_path[0] ? resume_path : NULL, NULL };
 	pid_t child = fork();
 	if (child == 0) {
 		setsid();
@@ -301,6 +314,7 @@ static void playPath(const char* path) {
 	}
 	sendCommand(MU_CMD_REPEAT, MU_repeatName(repeat), REQUEST_MS);
 	sendCommand(MU_CMD_SHUFFLE, shuffle ? "on" : "off", REQUEST_MS);
+	restored = 0;
 	if (sendCommand(MU_CMD_PLAY, path, DEVICE_REQUEST_MS) == 0) say("playing %s", path);
 	else if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play that");
 	askStatus(last_now);
@@ -310,6 +324,72 @@ static void command(int cmd, const char* arg) {
 	if (!daemon_up) return;
 	sendCommand(cmd, arg, DEVICE_REQUEST_MS);
 	askStatus(last_now);
+}
+
+// Starts the daemon to play on from the resume file, with the shuffle and
+// repeat settings as they are now.
+static void playRestored(void) {
+	if (ensureDaemon() != 0) {
+		if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play");
+		return;
+	}
+	restored = 0;
+	if (sendCommand(MU_CMD_RESTORE, NULL, DEVICE_REQUEST_MS) == 0) {
+		say("playing on from %s at %lld ms", restored_st.track, restored_st.pos_ms);
+		sendCommand(MU_CMD_REPEAT, MU_repeatName(repeat), REQUEST_MS);
+		if (shuffle != restored_shuffle) sendCommand(MU_CMD_SHUFFLE, shuffle ? "on" : "off", REQUEST_MS);
+	} else if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play on");
+	askStatus(last_now);
+}
+
+// X and music.toggle: pause or play on, from the resume file when that's
+// what shows.
+static void playOrPause(void) {
+	if (restored && !daemon_up) playRestored();
+	else command(MU_CMD_TOGGLE, NULL);
+}
+
+// SELECT and START change what a restored track shows too.
+static void restoredSettings(void) {
+	if (!restored) return;
+	restored_st.shuffle = shuffle;
+	restored_st.repeat = repeat;
+	if (!daemon_up) st = restored_st;
+}
+
+// Reads the resume file into what shows, paused, when its track is still
+// on the card, dropping the queue's tracks that aren't.
+static void readResume(void) {
+	MuQueue q;
+	MuQueue_init(&q, 0);
+	long long pos = 0, len = 0;
+	if (!MU_readResume(resume_path, &q, &pos, &len)) {
+		if (access(resume_path, F_OK) == 0) {
+			say("can't read %s; removed it", resume_path);
+			unlink(resume_path);
+		}
+		return;
+	}
+	int count = q.count;
+	if (MuQueue_dropMissing(&q, MU_isFile, NULL) < 0) {
+		say("the track to resume is gone; removed %s", resume_path);
+		unlink(resume_path);
+		return;
+	}
+	memset(&restored_st, 0, sizeof(restored_st));
+	restored_st.state = MU_PAUSED;
+	restored_st.index = q.pos;
+	restored_st.count = q.count;
+	restored_st.pos_ms = pos;
+	restored_st.len_ms = len;
+	restored_st.shuffle = shuffle;
+	restored_st.repeat = repeat;
+	snprintf(restored_st.track, sizeof(restored_st.track), "%s", q.paths[MuQueue_current(&q)]);
+	restored_shuffle = q.shuffle;
+	MuQueue_free(&q);
+	restored = restored_pill = 1;
+	st = restored_st;
+	say("resuming %s at %lld ms, %i of %i (%i gone), paused", st.track, pos, st.index + 1, st.count, count - st.count);
 }
 
 ///////////////////////////////////////
@@ -584,7 +664,7 @@ static int playerInput(const MosaicInput* in, void* data) {
 			else playPath(path);
 		}
 	} else if (PRESSED(X)) {
-		if (st.state != MU_STOPPED) command(MU_CMD_TOGGLE, NULL);
+		if (st.state != MU_STOPPED) playOrPause();
 		else if (list.count > 0 && !list.items[selected].is_dir) {
 			char path[MU_PATH_MAX];
 			if (MU_childPath(dir, list.items[selected].name, path, sizeof(path))) playPath(path);
@@ -603,11 +683,13 @@ static int playerInput(const MosaicInput* in, void* data) {
 		shuffle = !shuffle;
 		host->cfg_set(ID, "shuffle", shuffle ? "on" : "off");
 		say("shuffle %s", shuffle ? "on" : "off");
+		restoredSettings();
 		command(MU_CMD_SHUFFLE, shuffle ? "on" : "off");
 	} else if (PRESSED(START)) {
 		repeat = (repeat + 1) % 3;
 		host->cfg_set(ID, "repeat", MU_repeatName(repeat));
 		say("repeat %s", MU_repeatName(repeat));
+		restoredSettings();
 		command(MU_CMD_REPEAT, MU_repeatName(repeat));
 	} else if (REPEATED(UP)) {
 		selected = MU_move(selected, list.count, -1, PRESSED(UP) != 0);
@@ -693,7 +775,7 @@ static void togglePlaying(void* data) {
 	(void)data;
 	if (!daemon_up) askStatus(last_now);
 	if (st.state == MU_STOPPED) say("nothing to pause or play on");
-	else command(MU_CMD_TOGGLE, NULL);
+	else playOrPause();
 }
 
 ///////////////////////////////////////
@@ -701,6 +783,14 @@ static void togglePlaying(void* data) {
 
 static void tick(unsigned long now) {
 	last_now = now;
+	if (restored_pill) {
+		restored_pill = 0;
+		if (restored && !daemon_up) {
+			MuOverlay_show(&overlay, &st, now);
+			overlay_shown = 0;
+			host->request_redraw();
+		}
+	}
 	if (next_poll && now >= next_poll) {
 		int was_visible = MuOverlay_visible(&overlay, now);
 		long long pos = st.pos_ms;
@@ -806,6 +896,18 @@ static int init(const MosaicHost* h) {
 	snprintf(log_path, sizeof(log_path), "%s/logs", host->userdata_path);
 	mkdir(log_path, 0755);
 	snprintf(log_path, sizeof(log_path), "%s/logs/music.txt", host->userdata_path);
+	restored = restored_pill = 0;
+	snprintf(resume_path, sizeof(resume_path), "%s/launcher", host->userdata_path);
+	mkdir(resume_path, 0755);
+	snprintf(resume_path, sizeof(resume_path), "%s/launcher/" ID, host->userdata_path);
+	mkdir(resume_path, 0755);
+	snprintf(resume_path, sizeof(resume_path), "%s/launcher/" ID "/" MU_RESUME_NAME, host->userdata_path);
+	int resume = strcmp(host->cfg_get(ID, "resume", "on"), "off") != 0;
+	if (!resume) {
+		// nothing kept to play on from once it's turned back on
+		unlink(resume_path);
+		resume_path[0] = '\0';
+	}
 
 	static const MosaicScreenHooks player = {
 		.size = sizeof(MosaicScreenHooks),
@@ -855,12 +957,17 @@ static int init(const MosaicHost* h) {
 		}
 	}
 
-	say("music from %s, daemon %s, games %s, pill %s, shuffle %s, repeat %s", root,
+	say("music from %s, daemon %s, games %s, pill %s, shuffle %s, repeat %s, resume %s", root,
 		daemon_path[0] && access(daemon_path, X_OK) == 0 ? daemon_path : "missing", games_play ? "play" : "pause",
-		overlay_setting, shuffle ? "on" : "off", MU_repeatName(repeat));
+		overlay_setting, shuffle ? "on" : "off", MU_repeatName(repeat), resume ? "on" : "off");
 	// a daemon from before, such as one playing through a game
 	askStatus(0);
-	if (!daemon_up) say("the daemon isn't running");
+	if (!daemon_up) {
+		say("the daemon isn't running");
+		// what was playing before a power-off
+		if (resume_path[0]) readResume();
+		logNowPlaying();
+	}
 	return 0;
 }
 

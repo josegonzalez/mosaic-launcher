@@ -8,7 +8,9 @@
 # track; Y locks, the lock screen takes A, and SELECT then START unlocks;
 # B backs out to the list, where the now playing pill shows. The daemon
 # plays on after the launcher stops, pauses for a pak's launch and plays on
-# when the launcher comes back, and quits before a power-off. The card's
+# when the launcher comes back, and quits before a power-off, saving the
+# queue and the track's place; the next start shows that paused, on the
+# pill and the player, and X plays on from the place. The card's
 # Music folder, recents and the launch's /tmp files are put back, and any
 # daemon left is stopped by its pid
 MU_DIR="$CARD/Music"
@@ -18,6 +20,7 @@ MU_LOG="$CARD/.userdata/desktop/logs/music.txt"
 MU_WORK="$WORK/music"
 MU_SOCK=/tmp/mosaic-music.sock
 MU_PIDFILE=/tmp/mosaic-music.pid
+MU_RESUME="$STATE/music/resume.txt"
 
 # mu_stop: stops a daemon left running, by the pid it wrote
 mu_stop() {
@@ -45,7 +48,7 @@ print(s.makefile().readline().rstrip())' "$MU_SOCK" "$1" 2>/dev/null
 }
 
 mu_stop
-rm -rf "$MU_WORK"
+rm -rf "$MU_WORK" "$STATE/music"
 mkdir -p "$MU_WORK" "$STATE" "$MU_PAK"
 [ -e "$MU_DIR" ] && mv "$MU_DIR" "$MU_WORK/Music.saved"
 [ -f "$RECENTS" ] && cp "$RECENTS" "$MU_WORK/recent.txt.saved"
@@ -160,6 +163,41 @@ kill -0 "$mu_pid" 2>/dev/null && fail "the daemon didn't quit for the power-off"
 [ -e "$MU_PIDFILE" ] && fail "the daemon left its pid file"
 grep -qF "musicd: quit" "$MU_LOG" || fail "the daemon didn't log its quit"
 
+# it saved the queue and the track's place first
+[ -f "$MU_RESUME" ] || fail "the power-off didn't save the place: $(cat "$MU_LOG")"
+grep -qxF "track=$MU_ALBUM/02 Two.wav" "$MU_RESUME" || fail "the resume file isn't on the track playing: $(cat "$MU_RESUME")"
+grep -qxF "count=$MU_TRACKS" "$MU_RESUME" || fail "the resume file doesn't have the queue: $(cat "$MU_RESUME")"
+grep -qF "musicd: saved the place, " "$MU_LOG" || fail "the daemon didn't log the save"
+mu_saved=$(sed -n 's/^pos=//p' "$MU_RESUME")
+[ "${mu_saved:-0}" -gt 0 ] || fail "the saved place is the track's start: $(cat "$MU_RESUME")"
+# at 20 seconds, so playing on from it is told apart from the track's start
+sed 's/^pos=.*/pos=20000/' "$MU_RESUME" >"$MU_WORK/resume.txt" && mv "$MU_WORK/resume.txt" "$MU_RESUME"
+
+# the next start shows it paused on the pill and the player without
+# starting the daemon, and X plays on from the place
+printf 'music=on\n' >"$STATE/plugins.txt"
+log="$WORK/music-resume.log"
+PRESSER_KEYS="wait wait y wait x wait wait"
+PRESSER_LOG="$MU_WORK/resume.texts" SMOKE_PRELOAD="$PRESSER"
+export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+run_launcher "$log" "presser: done" || fail "the launcher exited early resuming music"
+unset PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+expect "the daemon isn't running"
+expect "resuming $MU_ALBUM/02 Two.wav at 20000 ms, 2 of $MU_TRACKS (0 gone), paused"
+expect "now: 02 Two, paused of 0:40"
+expect "pill over gamelist: Paused: 02 Two"
+expect "playing on from $MU_ALBUM/02 Two.wav at 20000 ms"
+mu_pill=$(grep -n "plugin music: pill over gamelist: Paused: 02 Two" "$log" | head -n 1 | cut -d: -f1)
+mu_started=$(grep -n "plugin music: started the daemon" "$log" | head -n 1 | cut -d: -f1)
+[ -n "$mu_started" ] && [ "$mu_pill" -lt "$mu_started" ] || fail "the daemon started before X"
+grep -qF "Paused  0:20 / 0:40" "$MU_WORK/resume.texts" || fail "the player didn't show the place paused"
+grep -qF "musicd: playing on from $MU_ALBUM/02 Two.wav at 20000 ms, 2 of $MU_TRACKS" "$MU_LOG" \
+	|| fail "the daemon didn't play on from the place: $(cat "$MU_LOG")"
+mu_status=$(mu_send status)
+printf '%s\n' "$mu_status" | grep -q "state=playing.*track=$MU_ALBUM/02 Two.wav$" || fail "it isn't playing on: $mu_status"
+mu_pos=$(printf '%s\n' "$mu_status" | tr '\t' '\n' | sed -n 's/^pos=//p')
+[ "${mu_pos:-0}" -ge 20000 ] && [ "$mu_pos" -lt 40000 ] || fail "it didn't play on from the place: $mu_status"
+
 mu_stop
 unset SDL_AUDIODRIVER
 rm -rf "$MU_DIR" "$CARD/Music Test"
@@ -170,5 +208,5 @@ for f in next last.txt; do
 done
 rm -f /tmp/mosaic-launcher-launched "$MU_LOG"
 rm -rf "$MU_WORK" "$PRESSER" "$WORK/plugins/music.plugin" "$WORK/plugins/screener.plugin" "$WORK/plugins/powerer.plugin" \
-	"$STATE/music.cfg" "$STATE/powerer.cfg" "$STATE/plugins.txt"
+	"$STATE/music.cfg" "$STATE/powerer.cfg" "$STATE/plugins.txt" "$STATE/music"
 case_log=""
