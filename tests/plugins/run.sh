@@ -33,7 +33,8 @@
 # one with an overlay, one that types a query into the bundled search plugin and reads its
 # results back, and one that crashes during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
-# time limit's protected settings, reads back those hints, and drives the
+# time limit's protected settings and scrolls a long one, reads back those
+# hints, and drives the
 # bundled home dashboard's tabs and modes and the bundled tags plugin's
 # checklist. It also checks the status pill shell
 # paks' status files show.

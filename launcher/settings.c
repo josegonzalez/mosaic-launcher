@@ -507,10 +507,13 @@ static void render(int ow) {
 	GFX_truncateText(font.large, title, shown, screen->w - SCALE1(PADDING * 2) - ow, pad * 2);
 	blitRowText(font.large, shown, normal, left + pad, SCALE1(PADDING), screen->w);
 
+	// not MAX(): NextUI's has no outer parentheses, so a comparison with it
+	// is always true on a list longer than the screen
 	int visible = MAIN_ROW_COUNT - 1;
+	int last_start = row_count > visible ? row_count - visible : 0;
 	if (m->selected < m->start) m->start = m->selected;
 	if (m->selected >= m->start + visible) m->start = m->selected - visible + 1;
-	if (m->start > MAX(0, row_count - visible)) m->start = MAX(0, row_count - visible);
+	if (m->start > last_start) m->start = last_start;
 
 	for (int i = m->start, j = 1; i < row_count && j <= visible; i++, j++) {
 		const Row* r = &rows[i];

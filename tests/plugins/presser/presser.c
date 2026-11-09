@@ -1,8 +1,9 @@
 // Not a plugin: a library run.sh preloads into the desktop build (through
 // desktop-smoke.sh's SMOKE_PRELOAD) to drive screens that load no plugins,
 // such as the Launcher pak's settings screen, and to read back what they
-// draw. It wraps SDL_PollEvent to press buttons, and SDL_ttf's text
-// rendering to write down each piece of text drawn.
+// draw. It wraps SDL_PollEvent to press buttons, SDL_ttf's text rendering
+// to write down each piece of text drawn, and SDL_RenderPresent to save the
+// frames shown.
 //
 //   PRESSER_KEYS  buttons to press, one at a time, separated by spaces: a,
 //                 b, x, y, start, up, down, left, right, l1, r1, select,
@@ -10,6 +11,10 @@
 //   PRESSER_LOG   the file each drawn text is added to, one per line
 //   PRESSER_STEP  milliseconds between presses (300 by default); the first
 //                 comes a second after the first poll
+//   PRESSER_FRAME a path without an extension: each frame presented before
+//                 "presser: done" replaces <path>.bmp (32 bits, top row
+//                 first) and <path>.txt (the texts drawn for it, one per
+//                 line as "rrggbb text"), so they end up as the last one
 //
 // After the last press and another second, it prints "presser: done" on
 // stderr, which lands in the launcher's log.
@@ -134,12 +139,72 @@ static int scripted(void* out) {
 	return keyEvent(out, code, 1);
 }
 
-static void noteText(const char* text) {
+// the texts drawn since the last frame was presented, for PRESSER_FRAME
+static char frame_texts[16384];
+static size_t frame_texts_len = 0;
+
+static void noteText(const char* text, Color fg) {
+	if (!text) return;
+	if (getenv("PRESSER_FRAME")) {
+		int n = snprintf(frame_texts + frame_texts_len, sizeof(frame_texts) - frame_texts_len, "%02x%02x%02x %s\n",
+			fg.r, fg.g, fg.b, text);
+		if (n > 0 && frame_texts_len + (size_t)n < sizeof(frame_texts)) frame_texts_len += (size_t)n;
+	}
 	const char* path = getenv("PRESSER_LOG");
-	if (!path || !text) return;
+	if (!path) return;
 	FILE* f = fopen(path, "a");
 	if (!f) return;
 	fprintf(f, "%s\n", text);
+	fclose(f);
+}
+
+typedef struct Renderer Renderer;
+int SDL_GetRendererOutputSize(Renderer* renderer, int* w, int* h);
+int SDL_RenderReadPixels(Renderer* renderer, const void* rect, unsigned int format, void* pixels, int pitch);
+void SDL_RenderPresent(Renderer* renderer);
+#define SDL_PIXELFORMAT_ARGB8888 0x16362004u
+
+static void put32(unsigned char* p, unsigned int v) {
+	p[0] = v & 255;
+	p[1] = v >> 8 & 255;
+	p[2] = v >> 16 & 255;
+	p[3] = v >> 24 & 255;
+}
+
+// Saves the frame about to be presented, and the texts drawn for it.
+static void saveFrame(Renderer* renderer) {
+	const char* prefix = getenv("PRESSER_FRAME");
+	size_t texts_len = frame_texts_len;
+	frame_texts_len = 0;
+	if (!prefix || !renderer || finished) return;
+	int w = 0, h = 0;
+	if (SDL_GetRendererOutputSize(renderer, &w, &h) != 0 || w <= 0 || h <= 0) return;
+	unsigned char* pixels = malloc((size_t)w * h * 4);
+	if (!pixels) return;
+	char path[1024];
+	if (SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, pixels, w * 4) == 0) {
+		snprintf(path, sizeof(path), "%s.bmp", prefix);
+		FILE* f = fopen(path, "wb");
+		if (f) {
+			// a negative height puts the top row first
+			unsigned char head[54] = { 'B', 'M' };
+			put32(head + 2, 54 + (unsigned int)(w * h * 4));
+			put32(head + 10, 54);
+			put32(head + 14, 40);
+			put32(head + 18, (unsigned int)w);
+			put32(head + 22, (unsigned int)-h);
+			head[26] = 1;
+			head[28] = 32;
+			fwrite(head, 1, sizeof(head), f);
+			fwrite(pixels, 1, (size_t)w * h * 4, f);
+			fclose(f);
+		}
+	}
+	free(pixels);
+	snprintf(path, sizeof(path), "%s.txt", prefix);
+	FILE* f = fopen(path, "w");
+	if (!f) return;
+	fwrite(frame_texts, 1, texts_len, f);
 	fclose(f);
 }
 
@@ -155,12 +220,17 @@ static int pollEvent(void* event) {
 	return SDL_PollEvent(event);
 }
 static void* renderBlended(Font* font, const char* text, Color fg) {
-	noteText(text);
+	noteText(text, fg);
 	return TTF_RenderUTF8_Blended(font, text, fg);
 }
 static void* renderWrapped(Font* font, const char* text, Color fg, unsigned int wrap) {
-	noteText(text);
+	noteText(text, fg);
 	return TTF_RenderUTF8_Blended_Wrapped(font, text, fg, wrap);
+}
+
+static void renderPresent(Renderer* renderer) {
+	saveFrame(renderer);
+	SDL_RenderPresent(renderer);
 }
 
 #define INTERPOSE(replacement, replacee) \
@@ -169,6 +239,7 @@ static void* renderWrapped(Font* font, const char* text, Color fg, unsigned int 
 INTERPOSE(pollEvent, SDL_PollEvent);
 INTERPOSE(renderBlended, TTF_RenderUTF8_Blended);
 INTERPOSE(renderWrapped, TTF_RenderUTF8_Blended_Wrapped);
+INTERPOSE(renderPresent, SDL_RenderPresent);
 #else
 // LD_PRELOAD: these come before SDL's, which they find with RTLD_NEXT.
 int SDL_PollEvent(void* event) {
@@ -180,13 +251,19 @@ int SDL_PollEvent(void* event) {
 void* TTF_RenderUTF8_Blended(Font* font, const char* text, Color fg) {
 	static void* (*real)(Font*, const char*, Color);
 	if (!real) real = (void* (*)(Font*, const char*, Color))dlsym(RTLD_NEXT, "TTF_RenderUTF8_Blended");
-	noteText(text);
+	noteText(text, fg);
 	return real ? real(font, text, fg) : NULL;
 }
 void* TTF_RenderUTF8_Blended_Wrapped(Font* font, const char* text, Color fg, unsigned int wrap) {
 	static void* (*real)(Font*, const char*, Color, unsigned int);
 	if (!real) real = (void* (*)(Font*, const char*, Color, unsigned int))dlsym(RTLD_NEXT, "TTF_RenderUTF8_Blended_Wrapped");
-	noteText(text);
+	noteText(text, fg);
 	return real ? real(font, text, fg, wrap) : NULL;
+}
+void SDL_RenderPresent(Renderer* renderer) {
+	static void (*real)(Renderer*);
+	if (!real) real = (void (*)(Renderer*))dlsym(RTLD_NEXT, "SDL_RenderPresent");
+	saveFrame(renderer);
+	if (real) real(renderer);
 }
 #endif
