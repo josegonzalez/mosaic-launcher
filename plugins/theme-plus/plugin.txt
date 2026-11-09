@@ -16,3 +16,5 @@ setting.text_size=choice|Text size|theme|theme,small,stock,large,larger,largest
 setting.contrast=choice|Contrast|theme|theme,off,3,4.5,7
 setting.ui_size=choice|UI size|theme|theme,stock,compact,large,larger
 setting.margins=choice|Screen margins|theme|theme,auto,2,5,8,10,15,20
+# a font for the characters the UI font has no glyphs for, relative to the card or a full path; empty keeps the theme's
+setting.fallback_font=text|Fallback font|

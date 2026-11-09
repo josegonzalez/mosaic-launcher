@@ -2,8 +2,9 @@
 // folder <sd>/Themes/<name>/ with a theme.txt (and its own font and
 // wallpapers if it likes), one of the folders this plugin ships in its
 // themes/, or one of stock's palettes as a colours-only theme. "stock"
-// changes nothing. The background, text_size, contrast, ui_size and
-// margins settings override the theme's values, over stock's too.
+// changes nothing. The background, text_size, contrast, ui_size, margins
+// and fallback_font settings override the theme's values, over stock's
+// too.
 //
 // The theme-plus.pick action lists them with choose, from a Theme tile on
 // the quick menu (the "tile" setting) or a game list button (the "button"
@@ -81,6 +82,7 @@ static int theme(MosaicTheme* t) {
 	TPOverrides overrides = TP_overrides(host->cfg_get(ID, "background", "theme"), host->cfg_get(ID, "text_size", "theme"),
 		host->cfg_get(ID, "contrast", "theme"), host->cfg_get(ID, "ui_size", "theme"), host->cfg_get(ID, "margins", "theme"),
 		logLine, (void*)"settings");
+	TP_overrideFallback(&overrides, host->sdcard_path, host->cfg_get(ID, "fallback_font", ""), logLine, (void*)"settings");
 	const TPEntry* entry = NULL;
 	if (strcmp(name, "stock") != 0) {
 		entry = TP_find(&catalog, name);

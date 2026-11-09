@@ -187,6 +187,7 @@ int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx) {
 		else if (!strcmp(key, "wallpaper")) setPath(out->wallpaper, key, value, number, log, ctx);
 		else if (!strcmp(key, "wallpaper_list")) setPath(out->wallpaper_list, key, value, number, log, ctx);
 		else if (!strcmp(key, "wallpaper_quick")) setPath(out->wallpaper_quick, key, value, number, log, ctx);
+		else if (!strcmp(key, "fallback_font")) setPath(out->fallback_font, key, value, number, log, ctx);
 		else if (!strcmp(key, "text_step")) {
 			int step = TP_STEP_UNSET;
 			if (setInt(&step, key, value, -2, 8, number, log, ctx) == 0) out->text_step = step;
@@ -253,20 +254,15 @@ char* TP_readFile(const char* path) {
 	return text;
 }
 
-int TP_resolve(const char* dir, const char* rel, char* out, size_t size, const char** why) {
-	static const char* reason;
-	if (!why) why = &reason;
-	if (!TP_relativePathOk(rel)) {
-		*why = "isn't a path inside the theme's folder";
-		return -1;
-	}
+// A regular file at path whose real path is inside root_dir's real path,
+// which why calls place.
+static int inside(const char* root_dir, const char* path, const char* place, char* out, size_t size, const char** why) {
+	static char outside[64];
 	char root[PATH_MAX];
-	if (!dir || !realpath(dir, root)) {
+	if (!root_dir || !realpath(root_dir, root)) {
 		*why = "has no folder";
 		return -1;
 	}
-	char path[PATH_MAX * 2];
-	snprintf(path, sizeof(path), "%s/%s", dir, rel);
 	char real[PATH_MAX];
 	if (!realpath(path, real)) {
 		*why = "doesn't exist";
@@ -274,7 +270,8 @@ int TP_resolve(const char* dir, const char* rel, char* out, size_t size, const c
 	}
 	size_t len = strlen(root);
 	if (strncmp(real, root, len) != 0 || real[len] != '/') {
-		*why = "is outside the theme's folder";
+		snprintf(outside, sizeof(outside), "is outside %s", place);
+		*why = outside;
 		return -1;
 	}
 	struct stat st;
@@ -288,6 +285,31 @@ int TP_resolve(const char* dir, const char* rel, char* out, size_t size, const c
 	}
 	copyText(out, size, real);
 	return 0;
+}
+
+int TP_resolve(const char* dir, const char* rel, char* out, size_t size, const char** why) {
+	static const char* reason;
+	if (!why) why = &reason;
+	if (!TP_relativePathOk(rel)) {
+		*why = "isn't a path inside the theme's folder";
+		return -1;
+	}
+	char path[PATH_MAX * 2];
+	snprintf(path, sizeof(path), "%s/%s", dir ? dir : "", rel);
+	return inside(dir, path, "the theme's folder", out, size, why);
+}
+
+int TP_cardFile(const char* card, const char* path, char* out, size_t size, const char** why) {
+	static const char* reason;
+	if (!why) why = &reason;
+	if (!path || !path[0] || strlen(path) >= TP_PATH_MAX) {
+		*why = "isn't a path on the card";
+		return -1;
+	}
+	char full[PATH_MAX * 2];
+	if (path[0] == '/') snprintf(full, sizeof(full), "%s", path);
+	else snprintf(full, sizeof(full), "%s/%s", card ? card : "", path);
+	return inside(card, full, "the card", out, size, why);
 }
 
 static int compareEntries(const void* a, const void* b) {
@@ -445,6 +467,16 @@ TPOverrides TP_overrides(const char* background, const char* text_size, const ch
 	return out;
 }
 
+void TP_overrideFallback(TPOverrides* overrides, const char* card, const char* value, TPLogFn log, void* ctx) {
+	overrides->fallback_font[0] = '\0';
+	if (!value || !value[0]) return;
+	const char* why = "";
+	if (TP_cardFile(card, value, overrides->fallback_font, sizeof(overrides->fallback_font), &why) != 0) {
+		overrides->fallback_font[0] = '\0';
+		say(log, ctx, "fallback_font %s %s, so the theme's is used", value, why);
+	}
+}
+
 int TP_buttonFor(int pill) {
 	return pill > 0 ? pill * 2 / 3 : 0;
 }
@@ -478,6 +510,14 @@ void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const 
 		}
 		if (MOSAIC_THEME_HAS(theme, wallpaper_quick)) {
 			applyPath(theme->wallpaper_quick, sizeof(theme->wallpaper_quick), "wallpaper_quick", dir, parsed->wallpaper_quick, log, ctx);
+		}
+	}
+	if (MOSAIC_THEME_HAS(theme, fallback_font)) {
+		if (overrides && overrides->fallback_font[0]) {
+			copyText(theme->fallback_font, sizeof(theme->fallback_font), overrides->fallback_font);
+		}
+		else if (parsed && dir) {
+			applyPath(theme->fallback_font, sizeof(theme->fallback_font), "fallback_font", dir, parsed->fallback_font, log, ctx);
 		}
 	}
 	int step = parsed ? parsed->text_step : TP_STEP_UNSET;

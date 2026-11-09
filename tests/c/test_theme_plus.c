@@ -1,6 +1,7 @@
 // The theme-plus plugin: its model on its own (theme.txt and palette
 // files, malformed ones too, paths that try to leave a theme's folder,
-// the list of themes and the merge with the settings), then the plugin
+// files on the card, the list of themes and the merge with the
+// settings, the fallback font among them), then the plugin
 // against a fake host, on a card of its own under TEST_SDCARD_PATH.
 
 #define _GNU_SOURCE // dladdr, in theme_plus.c
@@ -126,7 +127,8 @@ static void testParseTheme(void) {
 		"padding=8\n"
 		"wallpaper=bg.png\n"
 		"wallpaper_list=list.png\n"
-		"wallpaper_quick=quick.png",
+		"wallpaper_quick=quick.png\n"
+		"fallback_font=fonts/cjk.ttf",
 		&t, capture, NULL) == 0);
 	CHECK(logCount == 0);
 	CHECK_STR(t.name, "Night");
@@ -141,10 +143,11 @@ static void testParseTheme(void) {
 	CHECK_STR(t.wallpaper, "bg.png");
 	CHECK_STR(t.wallpaper_list, "list.png");
 	CHECK_STR(t.wallpaper_quick, "quick.png");
+	CHECK_STR(t.fallback_font, "fonts/cjk.ttf");
 
 	// nothing set: everything left to stock
 	CHECK(TP_parseTheme("", &t, capture, NULL) == 0);
-	CHECK(t.name[0] == '\0' && t.palette[0] == '\0' && t.font[0] == '\0');
+	CHECK(t.name[0] == '\0' && t.palette[0] == '\0' && t.font[0] == '\0' && t.fallback_font[0] == '\0');
 	CHECK(t.colors[0] == MOSAIC_THEME_UNSET && t.colors[6] == MOSAIC_THEME_UNSET);
 	CHECK(t.text_step == TP_STEP_UNSET && t.contrast == 0 && t.pill_size == 0);
 	CHECK(TP_parseTheme(NULL, &t, capture, NULL) == 0);
@@ -176,7 +179,9 @@ static void testParseTheme(void) {
 		"version=one\n"
 		"%s\n"
 		"=0x123456\n"
-		"color5=0x778899\n",
+		"color5=0x778899\n"
+		"fallback_font=../cjk.ttf\n"
+		"fallback_font=/mnt/SDCARD/cjk.ttf\n",
 		longLine);
 	logCount = 0;
 	CHECK(TP_parseTheme(text, &t, capture, NULL) == 0);
@@ -199,12 +204,15 @@ static void testParseTheme(void) {
 	CHECK(loggedLine("line 18: version one isn't a number, dropped"));
 	CHECK(loggedLine("line 19 is too long, ignored"));
 	CHECK(loggedLine("line 20: unknown key , ignored"));
-	CHECK(logCount == 19);
+	CHECK(loggedLine("line 22: fallback_font (../cjk.ttf) isn't a path inside the theme's folder, dropped"));
+	CHECK(loggedLine("line 23: fallback_font (/mnt/SDCARD/cjk.ttf) isn't a path inside"));
+	CHECK(logCount == 21);
 	CHECK(t.colors[1] == MOSAIC_THEME_UNSET && t.colors[2] == MOSAIC_THEME_UNSET);
 	CHECK(t.colors[3] == 0x445566 && t.colors[4] == 0x778899);
 	CHECK(t.text_step == TP_STEP_UNSET && t.contrast == 0);
 	CHECK(t.pill_size == 0 && t.button_size == 0 && t.padding == 0);
 	CHECK(t.font[0] == '\0' && t.wallpaper[0] == '\0' && t.wallpaper_list[0] == '\0' && t.wallpaper_quick[0] == '\0');
+	CHECK(t.fallback_font[0] == '\0');
 
 	// a newer format isn't used at all
 	logCount = 0;
@@ -244,8 +252,12 @@ static void real(const char* path, char* out) {
 static void makeCard(void) {
 	CHECK(system("rm -rf '" CARD "'") == 0);
 	writeFile(CARD "/Themes/Night/theme.txt", "name=Night\npalette=catppuccin mocha\ncolor1=0x112233\nfont=font.ttf\n"
-		"wallpaper=walls/bg.png\nwallpaper_list=inside.png\nwallpaper_quick=outside.png\npill_size=36\n");
+		"wallpaper=walls/bg.png\nwallpaper_list=inside.png\nwallpaper_quick=outside.png\npill_size=36\nfallback_font=fonts/cjk.ttf\n");
 	writeFile(CARD "/Themes/Night/font.ttf", "font");
+	writeFile(CARD "/Themes/Night/fonts/cjk.ttf", "font");
+	writeFile(CARD "/Fonts/glyphs.ttf", "font");
+	writeFile(CARD "/Fonts/notes.txt", "not linked\n");
+	CHECK(symlink("../../../Fonts/glyphs.ttf", CARD "/Themes/Night/fonts/card.ttf") == 0);
 	writeFile(CARD "/Themes/Night/walls/bg.png", "png");
 	writeFile(CARD "/secret.png", "png");
 	CHECK(symlink("walls/bg.png", CARD "/Themes/Night/inside.png") == 0);
@@ -297,6 +309,40 @@ static void testResolve(void) {
 	CHECK_STR(why, "is outside the theme's folder");
 	CHECK(system("rm -rf '" CARD "/Themes/Night2' '" CARD "/Themes/Night/sibling.png'") == 0);
 	CHECK(TP_resolve(CARD "/Themes/Night", "font.ttf", out, 8, &why) == -1);
+	CHECK_STR(why, "is too long");
+
+	// a file on the card, relative to it or a full path, not off it
+	CHECK(TP_cardFile(CARD, "Fonts/glyphs.ttf", out, sizeof(out), &why) == 0);
+	real(CARD "/Fonts/glyphs.ttf", want);
+	CHECK_STR(out, want);
+	CHECK(TP_cardFile(CARD, want, out, sizeof(out), &why) == 0);
+	CHECK_STR(out, want);
+	CHECK(TP_cardFile(CARD, "Themes/Night/fonts/card.ttf", out, sizeof(out), &why) == 0);
+	CHECK_STR(out, want);
+	char outside[PATH_MAX];
+	snprintf(outside, sizeof(outside), "%s", CARD "-outside.ttf");
+	writeFile(outside, "font");
+	char away[PATH_MAX];
+	real(outside, away);
+	CHECK(TP_cardFile(CARD, away, out, sizeof(out), &why) == -1);
+	CHECK_STR(why, "is outside the card");
+	const char* base = strrchr(outside, '/');
+	char up[PATH_MAX];
+	snprintf(up, sizeof(up), "../%s", base ? base + 1 : outside);
+	CHECK(TP_cardFile(CARD, up, out, sizeof(out), &why) == -1);
+	CHECK_STR(why, "is outside the card");
+	CHECK(symlink(away, CARD "/Fonts/away.ttf") == 0);
+	CHECK(TP_cardFile(CARD, "Fonts/away.ttf", out, sizeof(out), &why) == -1);
+	CHECK_STR(why, "is outside the card");
+	CHECK(unlink(CARD "/Fonts/away.ttf") == 0 && unlink(outside) == 0);
+	CHECK(TP_cardFile(CARD, "Fonts", out, sizeof(out), &why) == -1);
+	CHECK_STR(why, "isn't a regular file");
+	CHECK(TP_cardFile(CARD, "Fonts/none.ttf", out, sizeof(out), &why) == -1);
+	CHECK_STR(why, "doesn't exist");
+	CHECK(TP_cardFile(CARD, "", out, sizeof(out), &why) == -1);
+	CHECK_STR(why, "isn't a path on the card");
+	CHECK(TP_cardFile(CARD, NULL, out, sizeof(out), &why) == -1);
+	CHECK(TP_cardFile(CARD, "Fonts/glyphs.ttf", out, 8, &why) == -1);
 	CHECK_STR(why, "is too long");
 
 	char* text = TP_readFile(CARD "/Themes/Night/theme.txt");
@@ -396,6 +442,26 @@ static void testOverrides(void) {
 	CHECK(loggedLine("ui_size giant isn't known"));
 	CHECK(loggedLine("margins 40 isn't auto or from 1 to 30"));
 
+	// the fallback font setting: a file on the card, else the theme's
+	char want[PATH_MAX];
+	real(CARD "/Fonts/glyphs.ttf", want);
+	logCount = 0;
+	TP_overrideFallback(&o, CARD, "Fonts/glyphs.ttf", capture, NULL);
+	CHECK_STR(o.fallback_font, want);
+	TP_overrideFallback(&o, CARD, "", capture, NULL);
+	CHECK(o.fallback_font[0] == '\0');
+	TP_overrideFallback(&o, CARD, NULL, capture, NULL);
+	CHECK(o.fallback_font[0] == '\0');
+	CHECK(logCount == 0);
+	TP_overrideFallback(&o, CARD, "Fonts/none.ttf", capture, NULL);
+	CHECK(o.fallback_font[0] == '\0');
+	CHECK(loggedLine("fallback_font Fonts/none.ttf doesn't exist, so the theme's is used"));
+	TP_overrideFallback(&o, CARD, "/etc/hosts", capture, NULL);
+	CHECK(o.fallback_font[0] == '\0');
+	CHECK(loggedLine("fallback_font /etc/hosts is outside the card, so the theme's is used"));
+	o = TP_overrides(NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+	CHECK(o.fallback_font[0] == '\0');
+
 	CHECK(TP_buttonFor(0) == 0);
 	CHECK(TP_buttonFor(24) == 16);
 	CHECK(TP_buttonFor(30) == 20);
@@ -430,6 +496,41 @@ static void testApply(void) {
 	CHECK(logCount == 1);
 	CHECK(t.pill_size == 36 && t.button_size == 0 && t.padding == 0);
 	CHECK(t.text_step == 0 && t.contrast == 0);
+	real(CARD "/Themes/Night/fonts/cjk.ttf", want);
+	CHECK_STR(t.fallback_font, want);
+
+	// a fallback font that leaves the theme's folder is dropped, even to the card
+	TPTheme escaping = parsed;
+	snprintf(escaping.fallback_font, sizeof(escaping.fallback_font), "fonts/card.ttf");
+	t = stockTheme();
+	logCount = 0;
+	TP_apply(&t, &escaping, CARD "/Themes/Night", mocha, &none, capture, NULL);
+	CHECK(t.fallback_font[0] == '\0');
+	CHECK(loggedLine("fallback_font (fonts/card.ttf) is outside the theme's folder, dropped"));
+
+	// the setting's fallback font wins over the theme's, a palette's and stock's
+	char card[PATH_MAX];
+	real(CARD "/Fonts/glyphs.ttf", card);
+	TPOverrides font = none;
+	TP_overrideFallback(&font, CARD, "Fonts/glyphs.ttf", NULL, NULL);
+	t = stockTheme();
+	logCount = 0;
+	TP_apply(&t, &escaping, CARD "/Themes/Night", mocha, &font, capture, NULL);
+	CHECK_STR(t.fallback_font, card);
+	CHECK(!loggedLine("fallback_font"));
+	t = stockTheme();
+	TP_apply(&t, &parsed, CARD "/Themes/Night", mocha, &font, NULL, NULL);
+	CHECK_STR(t.fallback_font, card);
+	t = stockTheme();
+	TP_apply(&t, NULL, NULL, mocha, &font, NULL, NULL);
+	CHECK_STR(t.fallback_font, card);
+	t = stockTheme();
+	TP_apply(&t, NULL, NULL, NULL, &font, NULL, NULL);
+	CHECK_STR(t.fallback_font, card);
+	CHECK(t.colors[0] == MOSAIC_THEME_UNSET && t.font[0] == '\0' && t.pill_size == 0);
+	t = stockTheme();
+	TP_apply(&t, NULL, NULL, NULL, &none, NULL, NULL);
+	CHECK(t.fallback_font[0] == '\0');
 
 	// the settings win over the theme; a UI size drops the theme's padding and button
 	parsed.padding = 9;
@@ -473,6 +574,13 @@ static void testApply(void) {
 	CHECK(t.colors[0] == 0x112233);
 	CHECK_STR(t.font, "untouched");
 	CHECK(t.pill_size == 77);
+	// and one from before fallback_font
+	t = stockTheme();
+	t.size = offsetof(MosaicTheme, fallback_font);
+	strcpy(t.fallback_font, "untouched");
+	TP_apply(&t, &parsed, CARD "/Themes/Night", mocha, &font, NULL, NULL);
+	CHECK(t.font[0] == '/' && t.wallpaper[0] == '/');
+	CHECK_STR(t.fallback_font, "untouched");
 }
 
 // a fake host
@@ -586,6 +694,32 @@ static void testPlugin(void) {
 	CHECK(hostLogged("theme Night (card, palette Catppuccin Mocha)"));
 	CHECK(hostLogged(CARD "/Themes/Night/theme.txt: wallpaper_quick (outside.png) is outside the theme's folder, dropped"));
 	CHECK(t.colors[0] == 0x112233 && t.colors[6] == 0x1E1E2E && t.pill_size == 36 && t.font[0] == '/');
+	char want[PATH_MAX];
+	real(CARD "/Themes/Night/fonts/cjk.ttf", want);
+	CHECK_STR(t.fallback_font, want);
+
+	// the fallback font setting, over the theme's and over stock's
+	char card[PATH_MAX];
+	real(CARD "/Fonts/glyphs.ttf", card);
+	cfgValues[0][0] = "fallback_font";
+	cfgValues[0][1] = "Fonts/glyphs.ttf";
+	t = asked();
+	CHECK_STR(t.fallback_font, card);
+	CHECK(t.colors[0] == 0x112233);
+	snprintf(cfgTheme, sizeof(cfgTheme), "stock");
+	t = asked();
+	CHECK(hostLogged("theme stock"));
+	CHECK_STR(t.fallback_font, card);
+	CHECK(t.colors[0] == MOSAIC_THEME_UNSET && t.font[0] == '\0');
+	cfgValues[0][1] = card;
+	t = asked();
+	CHECK_STR(t.fallback_font, card);
+	cfgValues[0][1] = "Fonts/gone.ttf";
+	snprintf(cfgTheme, sizeof(cfgTheme), "Night");
+	t = asked();
+	CHECK(hostLogged("settings: fallback_font Fonts/gone.ttf doesn't exist, so the theme's is used"));
+	CHECK_STR(t.fallback_font, want);
+	cfgValues[0][0] = NULL;
 
 	snprintf(cfgTheme, sizeof(cfgTheme), "Catppuccin Mocha");
 	t = asked();

@@ -34,6 +34,7 @@ typedef struct TPTheme {
 	char wallpaper[TP_PATH_MAX];
 	char wallpaper_list[TP_PATH_MAX];
 	char wallpaper_quick[TP_PATH_MAX];
+	char fallback_font[TP_PATH_MAX];
 } TPTheme;
 
 // A palette file in stock's format.
@@ -86,6 +87,12 @@ char* TP_readFile(const char* path);
 // to out and returns 0, or returns -1 with a reason in why.
 int TP_resolve(const char* dir, const char* rel, char* out, size_t size, const char** why);
 
+// Resolves a path on the card, relative to the folder card or a full
+// path, to a regular file whose real path is inside card's real path.
+// Writes the real path to out and returns 0, or returns -1 with a reason
+// in why.
+int TP_cardFile(const char* card, const char* path, char* out, size_t size, const char** why);
+
 enum {
 	TP_KIND_CARD = 1,    // <sd>/Themes/<folder>/theme.txt
 	TP_KIND_BUNDLED = 2, // <plugin>/themes/<folder>/theme.txt
@@ -134,12 +141,18 @@ typedef struct TPOverrides {
 	int contrast;    // tenths, 0 for none, -1 for the theme's
 	int ui;          // a pill size, 0 for stock's, -1 for the theme's
 	int padding;     // 1 to 30, 0 for worked out from the pill, -1 for the theme's
+	char fallback_font[TP_PATH_MAX]; // a real path on the card, or "" for the theme's
 } TPOverrides;
 
 // Reads the settings' values (NULL as "theme"); an unknown one is the
 // theme's, logged.
 TPOverrides TP_overrides(const char* background, const char* text_size, const char* contrast,
 	const char* ui_size, const char* margins, TPLogFn log, void* ctx);
+
+// Reads the fallback_font setting (NULL or "" for the theme's) into
+// overrides: a file on the card, as TP_cardFile. One that won't resolve
+// is logged and the theme's is used.
+void TP_overrideFallback(TPOverrides* overrides, const char* card, const char* value, TPLogFn log, void* ctx);
 
 // The button size theme-plus uses with a ui_size pill, or 0 for stock's.
 int TP_buttonFor(int pill);
