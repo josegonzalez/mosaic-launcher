@@ -1,6 +1,6 @@
 --- a/workspace/all/common/api.c
 +++ b/workspace/all/common/api.c
-@@ -24,6 +24,13 @@
+@@ -24,6 +24,16 @@
  
  extern pthread_mutex_t audio_mutex;
  
@@ -10,11 +10,14 @@
 +// mosaic: the fallback font at stock's sizes (launcher/fallback.c)
 +void Fallback_fontsLoaded(void);
 +void Fallback_fontsClosed(void);
++// mosaic: pill and button parts smooth-scaled to the theme's sizes (launcher/smooth.c)
++SDL_Surface *Smooth_piece(SDL_Surface *sheet, const SDL_Rect *rect, int w, int h);
++void Smooth_flush(void);
 +
  ///////////////////////////////
  
  void LOG_note(int level, const char *fmt, ...)
-@@ -368,6 +375,8 @@ int GFX_loadSystemFont(const char *fontPath)
+@@ -368,6 +378,8 @@ int GFX_loadSystemFont(const char *fontPath)
  	if (!TTF_WasInit())
  		TTF_Init();
  
@@ -23,7 +26,7 @@
  	TTF_CloseFont(font.large);
  	TTF_CloseFont(font.medium);
  	TTF_CloseFont(font.small);
-@@ -386,6 +395,8 @@ int GFX_loadSystemFont(const char *fontPath)
+@@ -386,6 +398,8 @@ int GFX_loadSystemFont(const char *fontPath)
  	TTF_SetFontStyle(font.tiny, CFG_getFontStyle());
  	TTF_SetFontStyle(font.micro, CFG_getFontStyle());
  
@@ -32,7 +35,7 @@
  	return 0;
  }
  
-@@ -393,18 +404,31 @@ int GFX_updateColors(void)
+@@ -393,18 +407,32 @@ int GFX_updateColors(void)
  {
  	// We are currently micro managing all of these screen-mapped colors,
  	// should just move this to the caller.
@@ -61,6 +64,7 @@
 +// place, or stock's back, without touching stock's settings
 +void GFX_themeChanged(void)
 +{
++	Smooth_flush(); // the pill and button parts scaled to the old sizes
 +	GFX_updateColors();
 +	if (gfx.mode == MODE_MAIN)
 +		GFX_setClearColor(mapUint(THEME_COLOR7_255));
@@ -72,7 +76,7 @@
  SDL_Surface *GFX_init(int mode)
  {
  	// Platform init may use the active output to select panel rotation.
-@@ -520,6 +544,10 @@ SDL_Surface *GFX_init(int mode)
+@@ -520,6 +548,10 @@ SDL_Surface *GFX_init(int mode)
  		LOG_info("missing assets, you're about to segfault dummy!\n");
  	gfx.assets = IMG_Load(asset_path);
  
@@ -83,7 +87,7 @@
  	input_rects[INPUT_BUTTON_A] = (SDL_Rect){SCALE4(0, 0, BUTTON_SIZE, BUTTON_SIZE)};
  	input_rects[INPUT_BUTTON_B] = (SDL_Rect){SCALE4(20, 0, BUTTON_SIZE, BUTTON_SIZE)};
  	input_rects[INPUT_BUTTON_X] = (SDL_Rect){SCALE4(40, 0, BUTTON_SIZE, BUTTON_SIZE)};
-@@ -561,6 +589,7 @@ SDL_Surface *GFX_init(int mode)
+@@ -561,6 +593,7 @@ SDL_Surface *GFX_init(int mode)
  
  	input_rects[INPUT_BUTTON_HOME] = (SDL_Rect){SCALE4(0, 60, BUTTON_SIZE, BUTTON_SIZE)};
  	input_rects[INPUT_BUTTON_POWER] = (SDL_Rect){SCALE4(20, 60, BUTTON_SIZE, BUTTON_SIZE)};
@@ -91,51 +95,62 @@
  
  	char input_path[MAX_PATH];
  	sprintf(input_path, RES_PATH "/inputs@%ix.png", FIXED_SCALE);
-@@ -580,6 +609,7 @@ void GFX_quit(void)
+@@ -580,6 +613,8 @@ void GFX_quit(void)
  	TTF_CloseFont(font.small);
  	TTF_CloseFont(font.tiny);
  	TTF_CloseFont(font.micro);
 +	Fallback_fontsClosed(); // mosaic
++	Smooth_flush(); // mosaic
  
  	SDL_FreeSurface(gfx.assets);
  	SDL_FreeSurface(gfx.inputs);
-@@ -1904,6 +1934,35 @@ static void GFX_fillRectBlend(SDL_Surface *dst, const SDL_Rect *rect, uint32_t m
+@@ -1904,6 +1939,45 @@ static void GFX_fillRectBlend(SDL_Surface *dst, const SDL_Rect *rect, uint32_t m
  	SDL_FreeSurface(tmp);
  }
  
-+// mosaic: half of a pill's cap, scaled from the sheet's when it's drawn at
-+// the theme's pill or button height; any other height is drawn as stock does
++// mosaic: a pill part drawn h high is smooth-scaled (launcher/smooth.c)
++// when h is the theme's pill or button height, that size isn't stock's,
++// and the part isn't h high; any other is drawn as stock does
++static int GFX_pillScaled(SDL_Rect *rect, int h)
++{
++	return h != rect->h && ((h == SCALE1(PILL_SIZE) && PILL_SIZE != UI_stockPill()) ||
++							(h == SCALE1(BUTTON_SIZE) && BUTTON_SIZE != UI_stockButton()));
++}
++
++// mosaic: half of a pill's cap
 +static void GFX_blitPillCap(int asset, int half, SDL_Surface *dst, int x, int y, int h, uint32_t asset_color)
 +{
 +	SDL_Rect *rect = &asset_rects[asset];
 +	int r = h / 2;
-+	if (h == rect->h || (h != SCALE1(PILL_SIZE) && h != SCALE1(BUTTON_SIZE)))
-+	{
++	SDL_Surface *cap = GFX_pillScaled(rect, h) ? Smooth_piece(gfx.assets, rect, r * 2, h) : NULL;
++	if (cap)
++		GFX_blitSurfaceColor(cap, &(SDL_Rect){half ? r : 0, 0, r, h}, dst, &(SDL_Rect){x, y}, asset_color);
++	else
 +		GFX_blitAssetColor(asset, &(SDL_Rect){half ? r : 0, 0, r, h}, dst, &(SDL_Rect){x, y}, asset_color);
-+		return;
-+	}
-+	int sr = rect->h / 2;
-+	GFX_blitSurfaceColorScaled(gfx.assets, &(SDL_Rect){rect->x + (half ? sr : 0), rect->y, sr, rect->h}, dst, &(SDL_Rect){x, y, r, h}, asset_color);
++}
++
++// mosaic: a pill's middle, scaled to its height as its caps are
++static void GFX_blitPillMiddle(SDL_Rect *src, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t color)
++{
++	SDL_Surface *middle = GFX_pillScaled(src, dst_rect->h) ? Smooth_piece(gfx.assets, src, src->w, dst_rect->h) : NULL;
++	GFX_blitSurfaceColorScaled(middle ? middle : gfx.assets, middle ? NULL : src, dst, dst_rect, color);
 +}
 +
 +// mosaic: a button's circle or prompt at the theme's button size
 +static void GFX_blitButtonAsset(SDL_Surface *sheet, SDL_Rect *src, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t asset_color)
 +{
-+	int size = SCALE1(BUTTON_SIZE);
-+	if (size == SCALE1(UI_stockButton()))
-+		GFX_blitSurfaceColor(sheet, src, dst, dst_rect, asset_color);
++	int size = SCALE1(BUTTON_SIZE), stock = SCALE1(UI_stockButton());
++	SDL_Surface *piece = size == stock ? NULL : Smooth_piece(sheet, src, src->w * size / stock, src->h * size / stock);
++	if (piece)
++		GFX_blitSurfaceColor(piece, NULL, dst, dst_rect, asset_color);
 +	else
-+	{
-+		int w = src->w * size / SCALE1(UI_stockButton());
-+		int h = src->h * size / SCALE1(UI_stockButton());
-+		GFX_blitSurfaceColorScaled(sheet, src, dst, &(SDL_Rect){dst_rect->x, dst_rect->y, w, h}, asset_color);
-+	}
++		GFX_blitSurfaceColor(sheet, src, dst, dst_rect, asset_color);
 +}
 +
  static int GFX_pillRectAsset(int asset)
  {
  	switch (asset)
-@@ -1938,7 +1997,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
+@@ -1938,7 +2012,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
  		w = h;
  	w -= h;
  
@@ -144,7 +159,16 @@
  	x += r;
  	if (w > 0)
  	{
-@@ -1957,7 +2016,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
+@@ -1948,7 +2022,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
+ 			uint32_t center_color = (fill_color != RGB_WHITE) ? fill_color : asset_color;
+ 			SDL_Rect src_rect = asset_rects[rect_asset];
+ 			SDL_Rect center_dst = {x, y, w, h};
+-			GFX_blitSurfaceColorScaled(gfx.assets, &src_rect, dst, &center_dst, center_color);
++			GFX_blitPillMiddle(&src_rect, dst, &center_dst, center_color); // mosaic
+ 		}
+ 		else
+ 		{
+@@ -1957,7 +2031,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
  		}
  		x += w;
  	}
@@ -153,7 +177,7 @@
  }
  void GFX_blitPill(int asset, SDL_Surface *dst, SDL_Rect *dst_rect)
  {
-@@ -2122,12 +2181,12 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
+@@ -2122,12 +2196,12 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
  	// button
  	if (strlen(button) == 1 || input_asset >= 0)
  	{
@@ -168,7 +192,7 @@
  			ox += SCALE1(BUTTON_SIZE);
  		}
  		else {
-@@ -2143,8 +2202,8 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
+@@ -2143,8 +2217,8 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
  		// special case: if CFG_getInputPromptStyle() is anything but INPUT_STYLE_TEXT, we want to blit the prompt asset
  		if (input_asset >= 0)
  		{
@@ -179,7 +203,7 @@
  			ox += SCALE1(BUTTON_SIZE);
  		}
  		else {
-@@ -2213,7 +2272,7 @@ void GFX_blitMessage(TTF_Font *font, char *msg, SDL_Surface *dst, SDL_Rect *dst_
+@@ -2213,7 +2287,7 @@ void GFX_blitMessage(TTF_Font *font, char *msg, SDL_Surface *dst, SDL_Rect *dst_
  
  		if (len)
  		{

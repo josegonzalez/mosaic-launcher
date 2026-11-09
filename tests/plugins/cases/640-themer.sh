@@ -3,10 +3,12 @@
 
 # themer owns the theme slot (and the transition slot, to read the screen
 # back): its colours, background colour, font, text step and UI sizes take
-# effect, ui_size and theme_color report them, a wallpaper fills a spot
-# with no stock background but never covers a hand-placed bg.png, bad
-# values are refused one by one, and an error, at the start or on a
-# reload, puts stock's theme back. Without slots=theme it's never asked.
+# effect, ui_size and theme_color report them, a pill's end is stock's
+# sheet at stock's size and smooth-scaled at the theme's, a wallpaper
+# fills a spot with no stock background but never covers a hand-placed
+# bg.png, bad values are refused one by one, and an error, at the start or
+# on a reload, puts stock's theme back. Without slots=theme it's never
+# asked.
 build_plugin themer 'id=themer\nname=Themer\napi=1\nslots=theme,transition\n'
 printf 'themer=on\n' >"$STATE/plugins.txt"
 plugin=themer
@@ -38,6 +40,13 @@ th_run() {
 }
 # th_value <what> <log>: a number themer logged, as "<what> <n>"
 th_value() { sed -n "s/.*plugin themer: start .*$1 \([0-9-]*\).*/\1/p" "$2" | head -n 1; }
+# th_edge <stock|smooth>: the end of a hint pill in $log is stock's sheet
+# unscaled, or smooth-scaled from it (see themer/edge.py)
+th_edge() {
+	edge=$(grep -m 1 "plugin themer: edge pill" "$log") || fail "themer logged no hint pill edge ($1)"
+	python3 -I "$ROOT/tests/plugins/themer/edge.py" "$1" "$CARD/.system/res" "$edge" \
+		|| fail "the hint pill's end isn't $1: $edge"
+}
 
 # stock's: nothing set, and with no plugin taking the slot
 th_run themer-empty 'mode=empty\n'
@@ -48,6 +57,7 @@ stock_bg=$(sed -n 's/.*plugin themer: start colors \([0-9A-F ]*\), text.*/\1/p' 
 stock_colors=$(sed -n 's/.*plugin themer: start colors \([0-9A-F ]*\), text.*/\1/p' "$log")
 stock_text=$(th_value text "$log")
 expect "frame $stock_bg"
+th_edge stock
 grep -qF "row 90, other -1" "$log" || fail "stock's row isn't 90 high: $(grep "start colors" "$log")"
 
 # colours, font, text step and sizes
@@ -59,6 +69,7 @@ expect "start colors ABCDEF $(echo "$stock_colors" | cut -d' ' -f2-6) 123456"
 grep -qF "row 108," "$log" || fail "the theme's row isn't 108 high: $(grep "start colors" "$log")"
 [ "$(th_value text "$log")" -gt "$stock_text" ] || fail "the text step didn't make text taller"
 expect "frame 123456"
+th_edge smooth
 grep -qF "refused" "$log" && fail "a good theme had something refused"
 grep -qF "so stock's is used" "$log" && fail "a good theme had something refused: $(grep "so stock's is used" "$log")"
 

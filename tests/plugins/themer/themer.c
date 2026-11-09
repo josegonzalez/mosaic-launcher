@@ -16,12 +16,14 @@
 // theme colours, a large text line's height and the selected row's
 // height, opens Themer and then Inner, and logs the pixel at the left edge
 // halfway down the old frame of that push, which the list leaves to the
-// background. In reload mode it then reloads the lists, and logs the
+// background, and the alpha across the end of the bottom right hint pill
+// (see edge). In reload mode it then reloads the lists, and logs the
 // sizes and colours again. With still=1 it does none of that, so the
 // screen can be looked at.
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "mosaic_plugin.h"
@@ -109,6 +111,36 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	return 0;
 }
 
+// The alpha of the 12 pixels from the right edge of the bottom right hint
+// pill in, a quarter of the way down it, as "edge pill <h> scale <s>
+// alpha <a>...". Each is worked out from the background beside the pill
+// and the pill's colour, on the channel where they differ most.
+static void edge(const MosaicSurface* frame, int w, int h) {
+	int s = host->screen_scale();
+	int pill = s * host->ui_size(MOSAIC_UI_PILL);
+	int pad = s * host->ui_size(MOSAIC_UI_PADDING);
+	int right = w - pad, y = h - pad - pill + pill / 4;
+	MosaicColor bg;
+	if (host->read_pixel(frame, w - 1, y, &bg) != 0) return;
+	int fill = host->theme_color(2);
+	int d[3] = { (fill >> 16 & 0xff) - bg.r, (fill >> 8 & 0xff) - bg.g, (fill & 0xff) - bg.b };
+	int c = 0;
+	for (int i = 1; i < 3; i++)
+		if (abs(d[i]) > abs(d[c])) c = i;
+	if (!d[c]) return;
+	char line[128] = "";
+	size_t n = 0;
+	for (int k = 1; k <= 12; k++) {
+		MosaicColor p;
+		if (host->read_pixel(frame, right - k, y, &p) != 0) return;
+		int v[3] = { p.r - bg.r, p.g - bg.g, p.b - bg.b };
+		int dv = d[c] < 0 ? -v[c] : v[c], dd = abs(d[c]);
+		int a = (dv * 255 + dd / 2) / dd;
+		n += snprintf(line + n, sizeof(line) - n, " %d", a < 0 ? 0 : a > 255 ? 255 : a);
+	}
+	say("edge pill %d scale %d alpha%s", pill, s, line);
+}
+
 static int transitionBegin(MosaicTransition* t) {
 	const char* to = host->current_path();
 	if (t->kind == MOSAIC_TRANSITION_PUSH && to && !strcmp(to, inner)) {
@@ -117,6 +149,7 @@ static int transitionBegin(MosaicTransition* t) {
 		host->surface_size(t->old_frame, &w, &h);
 		host->read_pixel(t->old_frame, 2, h / 2, &c);
 		say("frame %02X%02X%02X", c.r, c.g, c.b);
+		edge(t->old_frame, w, h);
 	}
 	return MOSAIC_STYLE_OFF;
 }
