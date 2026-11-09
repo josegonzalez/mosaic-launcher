@@ -34,7 +34,7 @@ trap 'rm -rf "$tmp"' EXIT
 # the table is the first run of lines starting with | after the heading
 awk -v table="$tmp/table" '
 	/^## Bundled plugins$/ { section = 1 }
-	section == 1 && /^\174/ {
+	section == 1 && /^[|]/ {
 		if (!done) {
 			while ((getline line < table) > 0) print line
 			done = 1
@@ -51,6 +51,7 @@ awk -v table="$tmp/table" '
 
 if [ "${1:-}" = --check ]; then
 	cmp -s "$DOC" "$tmp/PLUGINS.md" || {
+		diff -u "$DOC" "$tmp/PLUGINS.md" >&2
 		echo "PLUGINS.md's bundled plugins table is out of date; run ./scripts/plugin-table.sh" >&2
 		exit 1
 	}
