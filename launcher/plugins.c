@@ -29,6 +29,7 @@
 #define LAUNCHED_MARKER "/tmp/mosaic-launcher-launched" // a launch went ahead; post_return is due
 #define LOADING_MARKER PLUGIN_STATE_DIR "/loading"
 #define PAUSED_MARKER PLUGIN_STATE_DIR "/plugins_paused"
+#define SETTINGS_MARKER PLUGIN_STATE_DIR "/settings_loading" // the Launcher pak's settings are open with plugins loaded
 #define HOME_LEFT_PATH "/tmp/mosaic-launcher-home" // where the last launch left from: home or list
 
 typedef struct LoadedPlugin {
@@ -1407,14 +1408,50 @@ static void claimSwitcher(void) {
 	else LOG_warn("plugins: %s owns the " SWITCHER_SLOT " slot but registered no MOSAIC_SCREEN_GAME_SWITCHER screen other than its home screen, using the built-in switcher\n", loaded[owner].id);
 }
 
-void Plugins_init(void) {
+// The Launcher pak's settings, with only the strings and theme slots'
+// owners loaded (Plugins_initSettings).
+static int settings_only = 0;
+
+// Any exit but a crash: the settings closed, or powered off from there.
+static void settingsExit(void) {
+	if (settings_only) unlink(SETTINGS_MARKER);
+}
+
+// The crash guard for the settings: 1 to load, or 0 to open them with
+// English and stock's theme. Their owners are asked as the pages draw, so
+// the marker stays for as long as they're open, and a crash with it there
+// leaves them out of the next open, so a crashing owner can't keep the
+// user from the page that turns it off. The launcher's own guard is left
+// to the launcher: plugins it paused, or is about to pause, aren't loaded
+// here either.
+static int settingsGuard(void) {
+	if (exists(PAUSED_MARKER)) {
+		LOG_warn("plugins: paused after a crash, so the settings load none\n");
+		return 0;
+	}
+	if (exists(LOADING_MARKER)) {
+		LOG_warn("plugins: the launcher crashed while starting with plugins, so the settings load none\n");
+		return 0;
+	}
+	if (exists(SETTINGS_MARKER)) {
+		LOG_warn("plugins: the settings crashed with plugins loaded, so they load none this time\n");
+		unlink(SETTINGS_MARKER);
+		return 0;
+	}
+	return 1;
+}
+
+static void start(void) {
 	Audio_setMainThread();
 	ScreenSet_clear(&screens);
-	if (exists(PAUSED_MARKER)) {
+	if (settings_only) {
+		if (!settingsGuard()) return;
+	}
+	else if (exists(PAUSED_MARKER)) {
 		LOG_warn("plugins: paused after a crash; turn them back on from the Launcher pak\n");
 		return;
 	}
-	if (exists(LOADING_MARKER)) {
+	else if (exists(LOADING_MARKER)) {
 		// The last start died before its first frame with plugins loaded.
 		LOG_warn("plugins: the launcher crashed while starting with plugins, pausing them\n");
 		unlink(LOADING_MARKER);
@@ -1425,7 +1462,7 @@ void Plugins_init(void) {
 
 	discover();
 	if (manifest_count == 0) return;
-	Plugins_adoptPin(); // before simple mode's cfg is read
+	if (!settings_only) Plugins_adoptPin(); // before simple mode's cfg is read; the settings adopt it themselves
 	Bluetooth_setLog(bluetoothLog);
 	Wifi_setLog(wifiLog);
 
@@ -1433,9 +1470,20 @@ void Plugins_init(void) {
 	static PluginDecision decisions[PLUGIN_MAX];
 	int n = PluginSet_resolve(manifests, manifest_count, choices, decisions);
 	free(choices);
+	const char* marker = LOADING_MARKER;
+	if (settings_only) {
+		// what they require isn't loaded: plugins can't call each other's code,
+		// and the settings run none of the hooks that would need it
+		if (PluginSet_onlySlots(decisions, n, STRINGS_SLOT "," THEME_SLOT,
+				"the settings load only the " STRINGS_SLOT " and " THEME_SLOT " slots' owners") == 0) {
+			return;
+		}
+		marker = SETTINGS_MARKER;
+		atexit(settingsExit);
+	}
 
 	Plugins_ensureStateDir();
-	putFile(LOADING_MARKER, "");
+	putFile((char*)marker, "");
 	sync();
 	// only where to look: nothing is read until a plugin asks
 	PlayHistory_configure(SHARED_USERDATA_PATH "/game_logs.sqlite", ROMS_PATH, playLog);
@@ -1446,7 +1494,7 @@ void Plugins_init(void) {
 		if (decisions[i].load) load(decisions[i].manifest);
 		else LOG_info("plugins: not loading %s: %s\n", decisions[i].manifest->id, decisions[i].reason);
 	}
-	if (loaded_count == 0) unlink(LOADING_MARKER);
+	if (loaded_count == 0) unlink(marker);
 	logOverridden();
 	claimLayout();
 	claimTransitions();
@@ -1456,7 +1504,8 @@ void Plugins_init(void) {
 	claimStrings();
 	claimTheme();
 
-	if (exists(LAUNCHED_MARKER)) {
+	// post_return is the launcher's, when it starts after the pak
+	if (!settings_only && exists(LAUNCHED_MARKER)) {
 		unlink(LAUNCHED_MARKER);
 		// a game or pak ran, so the play history may have moved on
 		PlayHistory_invalidate();
@@ -1465,6 +1514,15 @@ void Plugins_init(void) {
 			if (Plugin_has(p, post_return) && p->post_return) p->post_return();
 		}
 	}
+}
+
+void Plugins_init(void) {
+	start();
+}
+
+void Plugins_initSettings(void) {
+	settings_only = 1;
+	start();
 }
 
 void Plugins_started(void) {
@@ -1498,6 +1556,7 @@ void Plugins_quit(void) {
 	Bluetooth_quit();
 	// a Wi-Fi look still running is left to finish, its answer dropped
 	Wifi_quit();
+	settingsExit();
 }
 
 int Plugins_discover(const PluginManifest** out) {

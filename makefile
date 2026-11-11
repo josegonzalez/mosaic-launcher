@@ -133,10 +133,12 @@ lint:
 	@# the template ships its own copy of the SDK; it must match
 	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h
 	cmp sdk/LICENSE template/sdk/LICENSE
-	@# po/launcher.pot must list every TR() string
+	@# po/launcher.pot must list every TR() string, and po/plugins.pot every
+	@# bundled plugin.txt's name, setting label and option
 	./scripts/pot.sh --check
 
-# Writes po/launcher.pot, the gettext template of the launcher's strings.
+# Writes po/launcher.pot, the gettext template of the launcher's strings,
+# and po/plugins.pot, the bundled plugins' plugin.txt text.
 pot:
 	./scripts/pot.sh
 

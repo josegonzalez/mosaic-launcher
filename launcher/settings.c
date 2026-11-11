@@ -17,6 +17,11 @@
 // with any (or the whole launcher, while one is on). The right PIN unlocks
 // them all until the user leaves the pak. A wrong one only says so: there's
 // no lockout. Secret text settings are never shown once set, only replaced.
+//
+// Only the strings and theme slots' owners load here (Plugins_initSettings),
+// so the pages' text goes through TR() and a plugin's name, labels and
+// options through TRC() in its id's context, the same as host->tr. Values
+// the user typed show as typed.
 
 enum MenuKind { MENU_MAIN, MENU_PLUGINS, MENU_PLUGIN, MENU_CHOICE };
 
@@ -39,6 +44,7 @@ typedef struct Row {
 	int arg;
 	char label[128];
 	char value[128];
+	char option[128]; // a choice's option as saved, for ROW_OPTION
 } Row;
 
 typedef struct Menu {
@@ -267,13 +273,31 @@ static Menu* top(void) {
 	return &stack[depth - 1];
 }
 
-static void addRow(int kind, int arg, const char* label, const char* value) {
-	if (row_count >= ROWS_MAX) return;
+static Row* addRow(int kind, int arg, const char* label, const char* value) {
+	if (row_count >= ROWS_MAX) return NULL;
 	Row* r = &rows[row_count++];
 	r->kind = kind;
 	r->arg = arg;
 	Draw_copy(r->label, sizeof(r->label), label);
 	Draw_copy(r->value, sizeof(r->value), value ? value : "");
+	r->option[0] = '\0';
+	return r;
+}
+
+// A plugin's own text from its plugin.txt (its name, a setting's label or a
+// choice's option), in its id's context, as host->tr gives plugins theirs.
+static const char* pluginText(const PluginManifest* m, const char* text) {
+	return TRC(m->id, text);
+}
+
+// A choice's value as shown: one of its options is the plugin's text, and
+// anything else stays as it is.
+static const char* choiceShown(const PluginManifest* m, const PluginSetting* s, const char* value) {
+	char option[128];
+	for (int i = 0; Manifest_option(s->options, i, option, sizeof(option)); i++) {
+		if (!strcmp(option, value)) return pluginText(m, value);
+	}
+	return value;
 }
 
 static int selectable(const Row* r) {
@@ -304,33 +328,35 @@ static void buildRows(void) {
 		for (int i = 0; i < n; i++) {
 			int at = order[i].plugin;
 			if (at < 0) addRow(ROW_HEADER, order[i].group, TR(PluginOrder_title(order[i].group)), NULL);
-			else addRow(ROW_PLUGIN, at, manifests[at].name, onOff(pluginOn(&manifests[at])));
+			else addRow(ROW_PLUGIN, at, pluginText(&manifests[at], manifests[at].name), onOff(pluginOn(&manifests[at])));
 		}
 		addRow(ROW_PIN, 0, TR("PIN"), Pin_isSet(PIN_PATH) ? TR("Set") : TR("Not set"));
 	}
 	else if (m->kind == MENU_PLUGIN) {
 		const PluginManifest* p = &manifests[m->plugin];
-		snprintf(title, sizeof(title), "%s", p->name);
+		snprintf(title, sizeof(title), "%s", pluginText(p, p->name));
 		addRow(ROW_STATUS, 0, TR("Status"), onOff(pluginOn(p)));
 		for (int i = 0; i < p->setting_count; i++) {
 			const PluginSetting* s = &p->settings[i];
+			const char* label = pluginText(p, s->label);
 			char value[128];
 			settingValue(p, s, value, sizeof(value));
-			if (settingLocked(s)) addRow(ROW_SETTING, i, s->label, TR("Locked"));
-			else if (s->flags & SETTING_SECRET) addRow(ROW_SETTING, i, s->label, value[0] ? TR("Set") : TR("Not set"));
-			else if (s->type == SETTING_TOGGLE) addRow(ROW_SETTING, i, s->label, onOff(!strcmp(value, "on")));
-			else addRow(ROW_SETTING, i, s->label, value);
+			if (settingLocked(s)) addRow(ROW_SETTING, i, label, TR("Locked"));
+			else if (s->flags & SETTING_SECRET) addRow(ROW_SETTING, i, label, value[0] ? TR("Set") : TR("Not set"));
+			else if (s->type == SETTING_TOGGLE) addRow(ROW_SETTING, i, label, onOff(!strcmp(value, "on")));
+			else if (s->type == SETTING_CHOICE) addRow(ROW_SETTING, i, label, choiceShown(p, s, value));
+			else addRow(ROW_SETTING, i, label, value); // typed, so shown as typed
 			memset(value, 0, sizeof(value));
 		}
 	}
 	else if (m->kind == MENU_CHOICE) {
-		const PluginSetting* s = &manifests[m->plugin].settings[m->setting];
-		snprintf(title, sizeof(title), "%s", s->label);
-		char list[256];
-		snprintf(list, sizeof(list), "%s", s->options);
-		for (char* o = strtok(list, ","); o; o = strtok(NULL, ",")) {
-			while (*o == ' ') o++;
-			if (*o) addRow(ROW_OPTION, 0, o, NULL);
+		const PluginManifest* p = &manifests[m->plugin];
+		const PluginSetting* s = &p->settings[m->setting];
+		snprintf(title, sizeof(title), "%s", pluginText(p, s->label));
+		char option[128];
+		for (int i = 0; Manifest_option(s->options, i, option, sizeof(option)); i++) {
+			Row* r = addRow(ROW_OPTION, 0, pluginText(p, option), NULL);
+			if (r) Draw_copy(r->option, sizeof(r->option), option);
 		}
 	}
 
@@ -351,7 +377,7 @@ static void push(int kind, int plugin, int setting) {
 		settingValue(p, &p->settings[setting], value, sizeof(value));
 		buildRows();
 		for (int i = 0; i < row_count; i++) {
-			if (!strcmp(rows[i].label, value)) top()->selected = i;
+			if (!strcmp(rows[i].option, value)) top()->selected = i;
 		}
 	}
 	buildRows();
@@ -440,7 +466,7 @@ static void activate(int step) {
 			}
 			else if (!cycling) {
 				// a secret is replaced, never shown, so its keyboard starts empty
-				Modal_keyboard(s->label, s->flags & SETTING_SECRET ? "" : value, typed,
+				Modal_keyboard(pluginText(p, s->label), s->flags & SETTING_SECRET ? "" : value, typed,
 					(void*)(intptr_t)(m->plugin * PLUGIN_SETTINGS_MAX + r->arg));
 				memset(value, 0, sizeof(value));
 				return;
@@ -450,7 +476,7 @@ static void activate(int step) {
 		case ROW_OPTION: {
 			if (cycling) break;
 			const PluginManifest* p = &manifests[m->plugin];
-			setSetting(p, &p->settings[m->setting], r->label);
+			setSetting(p, &p->settings[m->setting], r->option);
 			pop();
 			return;
 		}
@@ -578,6 +604,9 @@ int Settings_main(int argc, char* argv[]) {
 	PWR_init();
 	if (!HAS_POWER_BUTTON) PWR_disableSleep();
 	GFX_setVsync(VSYNC_STRICT);
+	// the strings and theme slots' owners, so the pages are in their
+	// language and look, with the fallback font
+	Plugins_initSettings();
 
 	push(argc > 0 && !strcmp(argv[0], "plugins") ? MENU_PLUGINS : MENU_MAIN, 0, 0);
 	currentScreen = SCREEN_SETTINGS;
@@ -608,6 +637,7 @@ int Settings_main(int argc, char* argv[]) {
 		else GFX_sync();
 	}
 
+	Plugins_quit();
 	PWR_quit();
 	PAD_quit();
 	GFX_quit();

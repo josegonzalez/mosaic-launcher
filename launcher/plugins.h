@@ -285,6 +285,13 @@ int Plugins_themeRefresh(void);
 // Menu_init, since building the root list already runs plugin hooks.
 void Plugins_init(void);
 
+// For the Launcher pak's settings, in place of Plugins_init, once
+// GFX_init has run: loads only the strings and theme slots' owners, so the
+// pages are translated and themed and take the fallback font, unless the
+// launcher's crash guard has plugins paused or the last open of the
+// settings crashed with plugins loaded. Plugins_quit closes them.
+void Plugins_initSettings(void);
+
 // Call after the first frame is on screen. Until then, a crash leaves a
 // marker that pauses plugins on the next start.
 void Plugins_started(void);

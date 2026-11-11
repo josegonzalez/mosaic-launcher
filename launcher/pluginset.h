@@ -4,6 +4,8 @@
 // Deciding which discovered plugins load, and in what order. Pure: no files,
 // no dlopen, so it can be tested on its own.
 
+#include <stddef.h>
+
 #define PLUGIN_MAX 64
 #define PLUGIN_SETTINGS_MAX 8
 
@@ -54,6 +56,17 @@ int Manifest_parse(const char* text, PluginManifest* out);
 // True when any of the plugin's settings is protected.
 int Manifest_isProtected(const PluginManifest* m);
 
+// The index'th of a choice setting's comma-separated options, as the
+// Plugins page lists them: leading spaces dropped, empty ones skipped.
+// Returns 1, or 0 when there's no such option.
+int Manifest_option(const char* options, int index, char* out, size_t size);
+
+// Calls fn with each piece of a plugin's text the Plugins page shows, for
+// translating under the plugin's id: its name, then each setting's label
+// and, for a choice, each of its options, in order. Repeats are passed
+// again. Values, such as defaults, are left out.
+void Manifest_strings(const PluginManifest* m, void (*fn)(const char* text, void* data), void* data);
+
 // Decides, given the user's choices from plugins.txt:
 //
 //   <id>=on|off       turn a plugin on or off; listed ids load first, in order
@@ -62,6 +75,11 @@ int Manifest_isProtected(const PluginManifest* m);
 // Fills out with one decision per manifest, in load order, and returns the
 // count. choices may be NULL.
 int PluginSet_resolve(const PluginManifest* manifests, int count, const char* choices, PluginDecision* out);
+
+// After PluginSet_resolve: keeps loading only the plugins that claim one
+// of slots (comma-separated), refusing the rest with why. The plugins they
+// require aren't kept for them. Returns how many still load.
+int PluginSet_onlySlots(PluginDecision* out, int count, const char* slots, const char* why);
 
 // True when id appears in a comma-separated list.
 int csvHas(const char* csv, const char* id);

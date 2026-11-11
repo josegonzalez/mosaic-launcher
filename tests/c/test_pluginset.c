@@ -32,6 +32,13 @@ static int loads(int n, const char* id) {
 	return d && d->load;
 }
 
+// Manifest_strings' texts, each followed by ;
+static char strings[512];
+static void append(const char* text, void* data) {
+	(void)data;
+	snprintf(strings + strlen(strings), sizeof(strings) - strlen(strings), "%s;", text);
+}
+
 int main(void) {
 	// manifest parsing
 	PluginManifest m = { .bundled = 1 };
@@ -183,6 +190,69 @@ int main(void) {
 	set = PluginSet_setChoice("fav=on\nx=on\n fav = off\n", "fav", 0); // duplicates collapse
 	CHECK_STR(set, "fav=off\nx=on\n");
 	free(set);
+
+	// a choice's options, as the Plugins page lists them
+	char option[64];
+	CHECK(Manifest_option("none, Y,,L2 , ", 0, option, sizeof(option)));
+	CHECK_STR(option, "none");
+	CHECK(Manifest_option("none, Y,,L2 , ", 1, option, sizeof(option)));
+	CHECK_STR(option, "Y");
+	CHECK(Manifest_option("none, Y,,L2 , ", 2, option, sizeof(option)));
+	CHECK_STR(option, "L2 "); // only leading spaces go, as the page has always shown them
+	CHECK(!Manifest_option("none, Y,,L2 , ", 3, option, sizeof(option)));
+	CHECK(!Manifest_option("", 0, option, sizeof(option)));
+	CHECK(!Manifest_option("a", -1, option, sizeof(option)));
+
+	// the text the Plugins page shows, for make pot and translating: the
+	// name, then each label and a choice's options, but no defaults or
+	// text values
+	PluginManifest t = { .bundled = 1 };
+	CHECK(Manifest_parse("id=tr\nname=Translated\nsetting.on=toggle|Turn it on|off\n"
+		"setting.pick=choice|Pick one|b|a, b,,c\nsetting.note=text|Note|typed\nsetting.bad=choice|Empty|x|\n"
+		"setting.q=choice|\"Quoted\" \\ (%)|n|n\n", &t) == 0);
+	strings[0] = '\0';
+	Manifest_strings(&t, append, NULL);
+	CHECK_STR(strings, "Translated;Turn it on;Pick one;a;b;c;Note;\"Quoted\" \\ (%);n;");
+	PluginManifest bare = { .bundled = 1 };
+	CHECK(Manifest_parse("id=bare\n", &bare) == 0);
+	strings[0] = '\0';
+	Manifest_strings(&bare, append, NULL);
+	CHECK_STR(strings, "bare;"); // the name defaults to the id
+
+	// the Launcher pak's settings load only the strings and theme slots'
+	// owners: one claiming either, or both, or with another slot too, but
+	// not one turned off, one that lost its slot, or one that claims
+	// neither, nor what they require
+	reset();
+	add("id=words\nslots=strings\nrequires=helper", 0);
+	add("id=helper", 0);
+	add("id=looks\nslots=layout, theme", 0);
+	add("id=looks2\nslots=theme", 0);
+	add("id=grid\nslots=layout", 0);
+	add("id=off\nslots=strings", 1);
+	add("id=plain", 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	CHECK(loads(n, "helper") && !loads(n, "grid") && loads(n, "plain") && !loads(n, "looks2"));
+	CHECK(PluginSet_onlySlots(out, n, "strings,theme", "settings only") == 2);
+	CHECK(loads(n, "words"));
+	CHECK(loads(n, "looks"));
+	CHECK(!loads(n, "helper"));
+	CHECK_STR(decision(n, "helper")->reason, "settings only");
+	CHECK(!loads(n, "grid"));
+	CHECK(!loads(n, "plain"));
+	CHECK_STR(decision(n, "plain")->reason, "settings only");
+	CHECK_STR(decision(n, "looks2")->reason, "the theme slot belongs to looks");
+	CHECK(!loads(n, "off"));
+	CHECK_STR(decision(n, "off")->reason, "turned off");
+	// the user's pick for a slot is the one kept
+	n = PluginSet_resolve(manifests, count, "slot.theme=looks2\n", out);
+	CHECK(PluginSet_onlySlots(out, n, "strings,theme", "settings only") == 2);
+	CHECK(loads(n, "looks2"));
+	CHECK(!loads(n, "looks"));
+	// no owners: nothing loads
+	n = PluginSet_resolve(manifests, count, "words=off\nlooks=off\nlooks2=off\n", out);
+	CHECK(PluginSet_onlySlots(out, n, "strings,theme", "settings only") == 0);
+	for (int i = 0; i < n; i++) CHECK(!out[i].load);
 
 	CHECK_DONE();
 }

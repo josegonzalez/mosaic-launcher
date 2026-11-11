@@ -134,6 +134,36 @@ int Manifest_isProtected(const PluginManifest* m) {
 	return 0;
 }
 
+int Manifest_option(const char* options, int index, char* out, size_t size) {
+	if (index < 0 || !options) return 0;
+	const char* p = options;
+	int at = 0;
+	while (*p) {
+		while (*p == ' ') p++;
+		const char* end = strchr(p, ',');
+		if (!end) end = p + strlen(p);
+		if (end > p) {
+			if (at++ == index) {
+				snprintf(out, size, "%.*s", (int)(end - p), p);
+				return 1;
+			}
+		}
+		p = *end ? end + 1 : end;
+	}
+	return 0;
+}
+
+void Manifest_strings(const PluginManifest* m, void (*fn)(const char* text, void* data), void* data) {
+	fn(m->name, data);
+	for (int i = 0; i < m->setting_count; i++) {
+		const PluginSetting* s = &m->settings[i];
+		if (s->label[0]) fn(s->label, data);
+		if (s->type != SETTING_CHOICE) continue;
+		char option[sizeof(s->options)];
+		for (int j = 0; Manifest_option(s->options, j, option, sizeof(option)); j++) fn(option, data);
+	}
+}
+
 ///////////////////////////////////////
 
 typedef struct Choices {
@@ -350,4 +380,22 @@ int PluginSet_resolve(const PluginManifest* manifests, int count, const char* ch
 	}
 
 	return n;
+}
+
+int PluginSet_onlySlots(PluginDecision* out, int count, const char* slots, const char* why) {
+	int kept = 0;
+	for (int i = 0; i < count; i++) {
+		PluginDecision* d = &out[i];
+		if (!d->load) continue;
+		int claims = 0;
+		char mine[256];
+		copyField(mine, sizeof(mine), d->manifest->slots);
+		for (char* slot = strtok(mine, ","); slot && !claims; slot = strtok(NULL, ",")) {
+			trim(slot);
+			claims = csvHas(slots, slot);
+		}
+		if (claims) kept++;
+		else refuse(d, why);
+	}
+	return kept;
 }
