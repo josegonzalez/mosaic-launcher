@@ -51,6 +51,10 @@ Array* Listing_source(char* path);
 Hash* Listing_loadMap(char* path);
 void Listing_applyMap(Array* entries, Hash* map, int* renamed, int* hid_any);
 Array* Listing_filterHidden(Array* entries);
+// In the root and Roms folders, shows the launcher's own rows and the
+// system folders by the strings slot's owner's names for them, leaving
+// map.txt's names, paths and the order as they are.
+void Listing_translateNames(Array* entries, char* path);
 void Listing_markDuplicates(Array* entries);
 void Listing_buildIndex(Directory* self);
 

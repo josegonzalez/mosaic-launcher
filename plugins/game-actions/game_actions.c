@@ -27,6 +27,8 @@
 #include "actions_model.h"
 
 #define ID "game-actions"
+// an action label the launcher translates where it draws it, for make pot
+#define TR_MARK(text) (text)
 #define MAX_COLLECTIONS 63 // choose takes 64 choices, one is "New collection"
 #define MAX_CLEANUP 256    // collections cleaned of a deleted game
 
@@ -40,6 +42,11 @@ static int with_saves = 1;
 
 static void say(const char* message) {
 	host->log(ID, message);
+}
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
 static void toast(const char* message) {
@@ -114,19 +121,19 @@ static void renamed(const char* text, void* data) {
 	refreshNames();
 	int changed = GA_namesSet(&names, renaming, text);
 	if (changed < 0) {
-		toast("Couldn't rename that");
+		toast(tr("Couldn't rename that"));
 		return;
 	}
 	if (changed && saveNames() != 0) {
 		GA_namesLoad(&names, names_path);
-		toast("Couldn't save the name");
+		toast(tr("Couldn't save the name"));
 		return;
 	}
 	char message[GA_PATH_LEN + GA_NAME_LEN + 16];
 	const char* name = GA_namesGet(&names, renaming);
 	snprintf(message, sizeof(message), "named %s %s", renaming, name ? name : "(its own name)");
 	say(message);
-	toast(name ? "Renamed" : "Name restored");
+	toast(name ? tr("Renamed") : tr("Name restored"));
 	renaming[0] = '\0';
 	reload();
 }
@@ -139,7 +146,7 @@ static void rename_(void* data) {
 	snprintf(renaming, sizeof(renaming), "%s", rel);
 	const char* current = GA_namesGet(&names, rel);
 	if (!current) current = host->entry_name(host->selected_entry());
-	host->keyboard("Rename", current ? current : "", renamed, NULL);
+	host->keyboard(tr("Rename"), current ? current : "", renamed, NULL);
 }
 
 ///////////////////////////////////////
@@ -220,7 +227,7 @@ static void deleteConfirmed(void* data) {
 	snprintf(message, sizeof(message), "deleted %i of %i paths", removed, plan.count);
 	say(message);
 	forget(plan.items[0].path, plan.items[0].is_dir);
-	toast(failed ? "Couldn't delete everything" : "Deleted");
+	toast(failed ? tr("Couldn't delete everything") : tr("Deleted"));
 	GA_planFree(&plan);
 	checked[0] = '\0';
 	reload();
@@ -232,7 +239,7 @@ static void delete_(void* data) {
 	if (!path) return;
 	GACard c = card();
 	if (GA_planDelete(&c, path, &plan) != 0) {
-		toast("Can't delete that");
+		toast(tr("Can't delete that"));
 		return;
 	}
 	// name the game as the list shows it, cut to fit the dialog
@@ -240,13 +247,13 @@ static void delete_(void* data) {
 	if (!shown || !shown[0]) shown = plan.name;
 	char summary[160];
 	GA_planSummary(&plan, summary, sizeof(summary));
-	char also[200];
-	if (plan.items[0].is_dir) snprintf(also, sizeof(also), "Also deletes its folder%s%s.\n", summary[0] ? ", " : "", summary);
-	else if (summary[0]) snprintf(also, sizeof(also), "Also deletes %s.\n", summary);
+	char also[512];
+	if (plan.items[0].is_dir) snprintf(also, sizeof(also), tr("Also deletes its folder%s%s.\n"), summary[0] ? ", " : "", summary);
+	else if (summary[0]) snprintf(also, sizeof(also), tr("Also deletes %s.\n"), summary);
 	else also[0] = '\0';
-	char question[300]; // the dialog keeps 255 characters; this always fits in them
-	snprintf(question, sizeof(question), "Delete %.40s%s?\n%sThis can't be undone.", shown, strlen(shown) > 40 ? "..." : "", also);
-	host->confirm(question, "DELETE", deleteConfirmed, NULL);
+	char question[1024]; // the dialog keeps 255 characters per line
+	snprintf(question, sizeof(question), tr("Delete %.40s%s?\n%sThis can't be undone."), shown, strlen(shown) > 40 ? "..." : "", also);
+	host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
 }
 
 ///////////////////////////////////////
@@ -273,11 +280,11 @@ static void addTo(const char* name) {
 	snprintf(file, sizeof(file), "%s/%s.txt", collections_dir, name);
 	mkdir(collections_dir, 0755);
 	int added = GA_collectionAdd(file, collecting);
-	char shown[GA_NAME_LEN + 32];
-	if (added < 0) snprintf(shown, sizeof(shown), "Couldn't add to %s", name);
-	else if (added == 0) snprintf(shown, sizeof(shown), "Already in %s", name);
+	char shown[GA_NAME_LEN + 256];
+	if (added < 0) snprintf(shown, sizeof(shown), tr("Couldn't add to %s"), name);
+	else if (added == 0) snprintf(shown, sizeof(shown), tr("Already in %s"), name);
 	else {
-		snprintf(shown, sizeof(shown), "Added to %s", name);
+		snprintf(shown, sizeof(shown), tr("Added to %s"), name);
 		char message[GA_PATH_LEN * 2 + 16];
 		snprintf(message, sizeof(message), "added %.1000s to %.1000s", collecting, file);
 		say(message);
@@ -291,7 +298,7 @@ static void named(const char* text, void* data) {
 	(void)data;
 	if (!text || !collecting[0]) return;
 	if (!GA_validCollectionName(text)) {
-		toast("That name can't be a collection");
+		toast(tr("That name can't be a collection"));
 		return;
 	}
 	addTo(text);
@@ -305,7 +312,7 @@ static void picked(int index, void* data) {
 	}
 	if (index == choice_count) {
 		freeChoices();
-		host->keyboard("New collection", "", named, NULL);
+		host->keyboard(tr("New collection"), "", named, NULL);
 		return;
 	}
 	char name[GA_NAME_LEN];
@@ -322,10 +329,10 @@ static void collect(void* data) {
 	choice_count = GA_collections(host->sdcard_path, choices, MAX_COLLECTIONS);
 	const char* list[MAX_COLLECTIONS + 1];
 	for (int i = 0; i < choice_count; i++) list[i] = choices[i];
-	list[choice_count] = "New collection";
-	if (host->choose("Add to collection", list, choice_count + 1, 0, picked, NULL) != 0) {
+	list[choice_count] = tr("New collection");
+	if (host->choose(tr("Add to collection"), list, choice_count + 1, 0, picked, NULL) != 0) {
 		freeChoices();
-		toast("Couldn't list collections");
+		toast(tr("Couldn't list collections"));
 	}
 }
 
@@ -385,15 +392,15 @@ static int init(const MosaicHost* h) {
 	}
 
 	if (settingOn("rename")) {
-		if (MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.rename", "RENAME", canRename, rename_, button);
+		if (MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.rename", TR_MARK("RENAME"), canRename, rename_, button);
 		else say("this launcher has no keyboard; rename is off");
 	}
 	if (settingOn("collections")) {
-		if (MOSAIC_HOST_HAS(host, choose) && MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.collect", "ADD TO COLLECTION", canCollect, collect, button);
+		if (MOSAIC_HOST_HAS(host, choose) && MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.collect", TR_MARK("ADD TO COLLECTION"), canCollect, collect, button);
 		else say("this launcher can't show a choice list; add to collection is off");
 	}
 	if (settingOn("delete")) {
-		if (MOSAIC_HOST_HAS(host, confirm) && MOSAIC_HOST_HAS(host, reload_lists)) add("game-actions.delete", "DELETE", canDelete, delete_, button);
+		if (MOSAIC_HOST_HAS(host, confirm) && MOSAIC_HOST_HAS(host, reload_lists)) add("game-actions.delete", TR_MARK("DELETE"), canDelete, delete_, button);
 		else say("this launcher has no confirm dialog; delete is off");
 	}
 	return 0;

@@ -76,6 +76,11 @@ static struct {
 	char summary[SS_LINE_SIZE + 256];
 } reading;
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
 	char message[1400];
@@ -308,13 +313,13 @@ static int compose(const MosaicSurface* img) {
 	if (title_h <= 0 || small_h <= 0) return -1;
 
 	char lines[SS_TITLE_LINES][SS_LINE_SIZE];
-	int count = SS_wrap(want.empty ? "Empty folder" : want.name, t->w, SS_TITLE_LINES, measure, &title_font, lines);
+	int count = SS_wrap(want.empty ? tr("Empty folder") : want.name, t->w, SS_TITLE_LINES, measure, &title_font, lines);
 	for (int i = 0; i < count && y + title_h <= bottom; i++, y += title_h)
 		if (host->draw_text(frame, title_font, lines[i], t->x, y, ink, t->w) < 0) return -1;
 	y += small_h / 2;
 	const char* kind = want.empty ? "" : SS_kindLabel(want.type);
 	if (kind[0] && y + small_h <= bottom) {
-		if (host->draw_text(frame, small_font, kind, t->x, y, accent, t->w) < 0) return -1;
+		if (host->draw_text(frame, small_font, tr(kind), t->x, y, accent, t->w) < 0) return -1;
 		y += small_h + small_h / 2;
 	}
 	int shown = 0;

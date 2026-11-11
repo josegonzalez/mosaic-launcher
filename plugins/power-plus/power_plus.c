@@ -77,6 +77,11 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -141,19 +146,20 @@ static void tick(unsigned long now) {
 	if (!guard_on || !PpGuard_due(&guard, now)) return;
 	int level = host->battery_level();
 	int seconds = 0;
-	char message[128];
+	char message[256];
 	switch (PpGuard_sample(&guard, now, level, charging(), &seconds)) {
 		case PP_GUARD_WARN:
-			snprintf(message, sizeof(message), "Battery at %d%%, charge soon", level);
+			snprintf(message, sizeof(message), tr("Battery at %d%%, charge soon"), level);
 			toast(message);
+			snprintf(message, sizeof(message), "Battery at %d%%, charge soon", level);
 			say(message);
 			break;
 		case PP_GUARD_COUNTDOWN:
-			snprintf(message, sizeof(message), "Battery at %d%%, powering off in %ds", level, seconds);
+			snprintf(message, sizeof(message), tr("Battery at %d%%, powering off in %ds"), level, seconds);
 			toast(message);
 			break;
 		case PP_GUARD_CANCEL:
-			toast("Power off cancelled");
+			toast(tr("Power off cancelled"));
 			say("low battery power off cancelled");
 			break;
 		case PP_GUARD_POWER_OFF:
@@ -182,9 +188,10 @@ static void afterResume(void) {
 		say("woke at the wake alarm, but charging or held awake, so not powering off");
 		return;
 	}
-	char message[128];
-	snprintf(message, sizeof(message), "Asleep for %ld min, powering off", slept / 60);
+	char message[256];
+	snprintf(message, sizeof(message), tr("Asleep for %ld min, powering off"), slept / 60);
 	toast(message);
+	snprintf(message, sizeof(message), "Asleep for %ld min, powering off", slept / 60);
 	say(message);
 	sleep_off_pending = 1;
 	sleep_off_at = 0;

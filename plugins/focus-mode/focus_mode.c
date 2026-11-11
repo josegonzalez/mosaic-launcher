@@ -28,6 +28,11 @@ static int exists(const char* path) {
 	return stat(path, &st) == 0;
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static int isOn(void* data) {
 	(void)data;
 	return strcmp(host->cfg_get(ID, "on", "on"), "off") != 0;
@@ -41,7 +46,7 @@ static int always(void* data) {
 static void toggle(void* data) {
 	int on = !isOn(data);
 	host->cfg_set(ID, "on", on ? "on" : "off");
-	if (MOSAIC_HOST_HAS(host, toast)) host->toast(on ? "Focus mode on" : "Focus mode off");
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(on ? tr("Focus mode on") : tr("Focus mode off"));
 	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	host->request_redraw();
 }
@@ -58,7 +63,9 @@ static MosaicList* rootReplace(void) {
 
 	MosaicList* root = host->list_new();
 	for (int i = 0; i < count; i++) {
-		host->list_push(root, host->entry_new(rows[i].path, rows[i].type, rows[i].name));
+		// the all-systems row is the only one with a name of its own
+		const char* name = rows[i].name && !strcmp(rows[i].name, FOCUS_ALL_NAME) ? tr("All systems") : rows[i].name;
+		host->list_push(root, host->entry_new(rows[i].path, rows[i].type, name));
 	}
 	return root;
 }

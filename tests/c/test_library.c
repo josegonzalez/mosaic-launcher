@@ -1046,6 +1046,92 @@ static void test_select_keeps_the_row_in_view(void) {
 	Directory_free(dir);
 }
 
+// A strings slot owner for the root's names, counting what it's asked.
+static int tr_asks = 0;
+static const char* rootTranslate(const char* context, const char* text) {
+	tr_asks++;
+	if (!context) {
+		if (!strcmp(text, "Recently Played")) return "Joués récemment";
+		if (!strcmp(text, "Tools")) return "Outils";
+		if (!strcmp(text, "Tetris")) return "Tétris"; // a game, never asked
+		return NULL;
+	}
+	if (!strcmp(context, "systems")) {
+		if (!strcmp(text, "Game Boy")) return "Zelda Boy"; // sorts after Sega, but stays in place
+		if (!strcmp(text, "Atari 2600")) return "Atari VCS";
+		if (!strcmp(text, "Sega Genesis")) return "Sega Mega Drive";
+		if (!strcmp(text, "Famicom")) return "Famicom (FR)";
+	}
+	return NULL;
+}
+
+static void test_root_names_translated_for_display(void) {
+	resetCard();
+	addEmu("GB");
+	addEmu("A2600");
+	addEmu("MD");
+	addEmu("NES");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Tetris.gb", "");
+	writeFile(ROMS_PATH "/01) Atari 2600 (A2600)/Pitfall.a26", "");
+	writeFile(ROMS_PATH "/Sega Genesis (MD)/Sonic.md", "");
+	writeFile(ROMS_PATH "/Nintendo (NES)/Mario.nes", "");
+	// the user's name for a folder wins, and isn't translated
+	writeFile(ROMS_PATH "/map.txt", "Nintendo (NES)\tFamicom\n");
+	writeFile(COLLECTIONS_PATH "/Favorites.txt", "");
+	writeFile(TOOLS_PATH "/Clock.pak/launch.sh", "");
+	writeFile(RECENT_PATH, "/Roms/Game Boy (GB)/Tetris.gb\n");
+
+	TrOwner owner = { rootTranslate, NULL, "test", NULL };
+	Tr_setOwner(&owner);
+	tr_asks = 0;
+	Directory* dir = Directory_new(SDCARD_PATH, 0);
+	// stock's order, by the English names
+	CHECK(dir->entries->count == 7);
+	if (dir->entries->count == 7) {
+		CHECK_STR(at(dir, 0)->name, "Joués récemment");
+		CHECK_STR(at(dir, 0)->path, FAUX_RECENT_PATH);
+		CHECK_STR(at(dir, 1)->name, "Collections"); // no translation
+		CHECK_STR(at(dir, 2)->name, "01) Atari VCS");
+		CHECK_STR(at(dir, 3)->name, "Famicom");
+		CHECK_STR(at(dir, 4)->name, "Zelda Boy");
+		// paths, which art goes by, stay English
+		CHECK_STR(at(dir, 4)->path, ROMS_PATH "/Game Boy (GB)");
+		CHECK_STR(at(dir, 5)->name, "Sega Mega Drive");
+		CHECK_STR(at(dir, 6)->name, "Outils");
+		CHECK_STR(at(dir, 6)->path, TOOLS_PATH);
+	}
+	Directory_free(dir);
+
+	// the Roms folder shows the same names
+	dir = Directory_new(ROMS_PATH, 0);
+	CHECK(dir->entries->count == 4);
+	if (dir->entries->count == 4) {
+		CHECK_STR(at(dir, 0)->name, "01) Atari VCS");
+		CHECK_STR(at(dir, 2)->name, "Zelda Boy");
+	}
+	Directory_free(dir);
+
+	// a console's games aren't asked about
+	int asks = tr_asks;
+	dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	CHECK(dir->entries->count == 1);
+	if (dir->entries->count == 1) CHECK_STR(at(dir, 0)->name, "Tetris");
+	CHECK(tr_asks == asks);
+	Directory_free(dir);
+
+	// with no owner, stock's English
+	Tr_setOwner(NULL);
+	dir = Directory_new(SDCARD_PATH, 0);
+	CHECK(dir->entries->count == 7);
+	if (dir->entries->count == 7) {
+		CHECK_STR(at(dir, 0)->name, "Recently Played");
+		CHECK_STR(at(dir, 2)->name, "01) Atari 2600");
+		CHECK_STR(at(dir, 4)->name, "Game Boy");
+		CHECK_STR(at(dir, 6)->name, "Tools");
+	}
+	Directory_free(dir);
+}
+
 int main(void) {
 	state.recents = Array_new();
 	test_root_orders_collections_consoles_tools();
@@ -1077,5 +1163,6 @@ int main(void) {
 	test_hide_chain_any_hides();
 	test_hidden_names_follow_the_final_order();
 	test_select_keeps_the_row_in_view();
+	test_root_names_translated_for_display();
 	CHECK_DONE();
 }

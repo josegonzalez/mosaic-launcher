@@ -42,6 +42,11 @@ static int selected[2] = { 0, 0 };
 static int first[2] = { 0, 0 };
 static char shown[1024];
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -145,7 +150,7 @@ static void drawTabs(MosaicSurface* screen, const MosaicRect* room) {
 	int large_h = host->text_height(MOSAIC_FONT_LARGE);
 	int l1_w = host->text_width(MOSAIC_FONT_SMALL, "L1"), r1_w = host->text_width(MOSAIC_FONT_SMALL, "R1");
 	int widths[AS_TABS];
-	for (int i = 0; i < AS_TABS; i++) widths[i] = host->text_width(MOSAIC_FONT_LARGE, AS_tabLabel(i)) + 2 * pad;
+	for (int i = 0; i < AS_TABS; i++) widths[i] = host->text_width(MOSAIC_FONT_LARGE, tr(AS_tabLabel(i))) + 2 * pad;
 	int all = AS_tabsFit(widths, AS_TABS, l1_w + r1_w + pad, room->w);
 	int x = room->x, right = room->x + room->w;
 	int w = host->draw_text(screen, MOSAIC_FONT_SMALL, "L1", x, room->y + (room->h - small_h) / 2, C_HINT(), right - x);
@@ -158,7 +163,7 @@ static void drawTabs(MosaicSurface* screen, const MosaicRect* room) {
 		MosaicRect pill = { x, room->y, tab_w, room->h };
 		int on = i == tab;
 		if (on) host->fill_round_rect(screen, &pill, room->h / 2, C_MAIN());
-		host->draw_text(screen, MOSAIC_FONT_LARGE, AS_tabLabel(i), x + pad, room->y + (room->h - large_h) / 2,
+		host->draw_text(screen, MOSAIC_FONT_LARGE, tr(AS_tabLabel(i)), x + pad, room->y + (room->h - large_h) / 2,
 			on ? C_SELECTED() : C_TEXT(), tab_w - 2 * pad);
 		x += tab_w;
 	}
@@ -240,7 +245,7 @@ static void drawList(MosaicSurface* screen, const MosaicRect* room, char* log, s
 	int pad = 10 * scale;
 	int list = tab == AS_TAB_LAUNCHES;
 	if (game_count == 0) {
-		centred(screen, MOSAIC_FONT_LARGE, "Nothing played yet", room, C_HINT());
+		centred(screen, MOSAIC_FONT_LARGE, tr("Nothing played yet"), room, C_HINT());
 		snprintf(log, size, "%s: nothing played yet", AS_tabLabel(tab));
 		return;
 	}
@@ -315,8 +320,8 @@ static void openSelected(void) {
 	snprintf(message, sizeof(message), "open %s %i", game->path, opened);
 	say(message);
 	if (!opened && MOSAIC_HOST_HAS(host, toast)) {
-		char text[AS_NAME_MAX + 32];
-		snprintf(text, sizeof(text), "Couldn't open %s", game->name);
+		char text[AS_NAME_MAX + 256];
+		snprintf(text, sizeof(text), tr("Couldn't open %s"), game->name);
 		host->toast(text);
 	}
 }
@@ -368,7 +373,7 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	MosaicRect room = AS_room(&view->area, &hole, scale);
 	char line[sizeof(shown)];
 	if (game_count < 0) {
-		centred(screen, MOSAIC_FONT_LARGE, "No play history", room.w > 0 ? &room : &view->area, C_HINT());
+		centred(screen, MOSAIC_FONT_LARGE, tr("No play history"), room.w > 0 ? &room : &view->area, C_HINT());
 		snprintf(line, sizeof(line), "%s: no play history", AS_tabLabel(tab));
 	} else if (room.w <= 0) {
 		snprintf(line, sizeof(line), "%s: no room", AS_tabLabel(tab));

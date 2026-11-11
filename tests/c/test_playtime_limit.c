@@ -107,6 +107,16 @@ static void testFormat(void) {
 	PL_format(45 * 60, small, sizeof(small));
 	CHECK_STR(small, "45m");
 	PL_format(45 * 60, NULL, 4);
+
+	// in a translation's words
+	static const char* const words[PL_WORDS_COUNT] = { "Fini", "encore %lld min", "encore %lld h %02lld" };
+	char out[32];
+	PL_formatIn(0, words, out, sizeof(out));
+	CHECK_STR(out, "Fini");
+	PL_formatIn(45 * 60, words, out, sizeof(out));
+	CHECK_STR(out, "encore 45 min");
+	PL_formatIn(65 * 60, words, out, sizeof(out));
+	CHECK_STR(out, "encore 1 h 05");
 }
 
 static void testCode(void) {

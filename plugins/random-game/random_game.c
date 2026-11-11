@@ -53,6 +53,11 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -239,7 +244,7 @@ static void launch(int system) {
 	char path[RG_PATH_LEN];
 	int type;
 	if (!pick(system, path, sizeof(path), &type)) {
-		toast("No games to pick from");
+		toast(tr("No games to pick from"));
 		return;
 	}
 	host->open_path(path, type);
@@ -297,7 +302,7 @@ static void rootEntries(MosaicList* root) {
 	if (!MOSAIC_HOST_HAS(host, open_path) || !isOn("root", "on")) return;
 	scan();
 	if (!library.count) return;
-	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, FOLDER_NAME));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Random game")));
 }
 
 // Opening the root row picks a game and shows it; tick launches it, since
@@ -327,7 +332,7 @@ static void tick(unsigned long now) {
 	if (!pending) return;
 	pending = 0;
 	if (!shown_path[0]) {
-		toast("No games to pick from");
+		toast(tr("No games to pick from"));
 		return;
 	}
 	host->open_path(shown_path, shown_type);

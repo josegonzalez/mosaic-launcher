@@ -67,6 +67,11 @@ static int save(void) {
 	return 0;
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -158,18 +163,18 @@ static void hide(void* data) {
 	refresh();
 	int added = HiddenSet_add(&hidden, path);
 	if (added < 0) {
-		toast("Couldn't hide that");
+		toast(tr("Couldn't hide that"));
 		return;
 	}
 	if (added && save() != 0) {
 		HiddenSet_remove(&hidden, path);
-		toast("Couldn't save hidden games");
+		toast(tr("Couldn't save hidden games"));
 		return;
 	}
 	char message[MAX_PATH_LEN * 2 + 8];
 	snprintf(message, sizeof(message), "hid %s", path);
 	say(message);
-	toast("Hidden");
+	toast(tr("Hidden"));
 	reload();
 }
 
@@ -190,13 +195,13 @@ static void unhide(void* data) {
 	if (!HiddenSet_remove(&hidden, path)) return;
 	if (save() != 0) {
 		HiddenSet_add(&hidden, path);
-		toast("Couldn't save hidden games");
+		toast(tr("Couldn't save hidden games"));
 		return;
 	}
 	char message[MAX_PATH_LEN * 2 + 16];
 	snprintf(message, sizeof(message), "unhid %s", path);
 	say(message);
-	toast("Unhidden");
+	toast(tr("Unhidden"));
 	reload();
 }
 
@@ -214,7 +219,7 @@ static int anyOnCard(void) {
 static void rootEntries(MosaicList* root) {
 	refresh();
 	if (!anyOnCard()) return;
-	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, "Hidden"));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Hidden")));
 }
 
 static MosaicList* virtualDir(const char* path) {

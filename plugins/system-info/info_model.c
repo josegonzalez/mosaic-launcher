@@ -1,5 +1,8 @@
 #include "info_model.h"
 
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -16,7 +19,8 @@
 
 const char* Si_label(int row) {
 	static const char* labels[SI_ROWS] = {
-		"Battery", "Wi-Fi", "IP address", "Storage", "Memory", "Uptime", "Platform", "Version",
+		TR_MARK("Battery"), TR_MARK("Wi-Fi"), TR_MARK("IP address"), TR_MARK("Storage"), TR_MARK("Memory"), TR_MARK("Uptime"),
+		TR_MARK("Platform"), TR_MARK("Version"),
 	};
 	return row >= 0 && row < SI_ROWS ? labels[row] : "";
 }

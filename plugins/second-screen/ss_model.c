@@ -146,11 +146,14 @@ int SS_infoLines(SSInfoGet get, void* data, char lines[][SS_LINE_SIZE], int max)
 	return count;
 }
 
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
+
 const char* SS_kindLabel(int type) {
 	switch (type) {
-	case MOSAIC_ENTRY_ROM: return "Game";
-	case MOSAIC_ENTRY_DIR: return "Folder";
-	case MOSAIC_ENTRY_PAK: return "Pak";
+	case MOSAIC_ENTRY_ROM: return TR_MARK("Game");
+	case MOSAIC_ENTRY_DIR: return TR_MARK("Folder");
+	case MOSAIC_ENTRY_PAK: return TR_MARK("Pak");
 	default: return "";
 	}
 }

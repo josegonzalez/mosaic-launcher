@@ -35,7 +35,6 @@
 
 #define ID "search"
 #define FOLDER_NAME "Search"
-#define NEW_SEARCH "New search"
 #define MAX_PATH_LEN 512
 #define MAX_DEPTH 3 // subfolders below a system folder that are scanned
 #ifndef SE_LAST_FILE
@@ -67,6 +66,11 @@ static int back_on_cancel = 0; // asked from the root row: cancelling backs out
 // back from a game launched from the results
 static int restoring = 0;
 static char restore_path[MAX_PATH_LEN];
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
 
 static void say(const char* message) {
 	host->log(ID, message);
@@ -288,8 +292,8 @@ static void run(const char* text) {
 
 	refresh();
 	if (!hit_count && MOSAIC_HOST_HAS(host, toast)) {
-		char message[SE_QUERY_LEN + 32];
-		snprintf(message, sizeof(message), "No games match %s", query);
+		char message[SE_QUERY_LEN + 256];
+		snprintf(message, sizeof(message), tr("No games match %s"), query);
 		host->toast(message);
 	}
 	if (inFolder()) {
@@ -324,7 +328,7 @@ static void typed(const char* text, void* data) {
 static void picked(int index, void* data) {
 	(void)data;
 	if (index < 0) cancelled();
-	else if (index == 0) host->keyboard(FOLDER_NAME, "", typed, NULL);
+	else if (index == 0) host->keyboard(tr("Search"), "", typed, NULL);
 	else if (index <= recents.count) {
 		char again[SE_QUERY_LEN];
 		snprintf(again, sizeof(again), "%s", recents.items[index - 1]);
@@ -338,11 +342,11 @@ static void ask(int from_row) {
 	back_on_cancel = from_row;
 	if (recents_max > 0 && recents.count > 0 && MOSAIC_HOST_HAS(host, choose)) {
 		const char* choices[SE_RECENTS_MAX + 1];
-		choices[0] = NEW_SEARCH;
+		choices[0] = tr("New search");
 		for (int i = 0; i < recents.count; i++) choices[i + 1] = recents.items[i];
-		if (host->choose(FOLDER_NAME, choices, recents.count + 1, 0, picked, NULL) == 0) return;
+		if (host->choose(tr("Search"), choices, recents.count + 1, 0, picked, NULL) == 0) return;
 	}
-	host->keyboard(FOLDER_NAME, "", typed, NULL);
+	host->keyboard(tr("Search"), "", typed, NULL);
 }
 
 static int canSearch(void* data) {
@@ -359,7 +363,7 @@ static void searchAction(void* data) {
 
 static void rootEntries(MosaicList* root) {
 	if (!canSearch(NULL) || !strcmp(host->cfg_get(ID, "root", "on"), "off")) return;
-	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, FOLDER_NAME));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Search")));
 }
 
 static MosaicList* virtualDir(const char* path) {

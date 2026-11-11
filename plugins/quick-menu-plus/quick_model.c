@@ -3,6 +3,9 @@
 #include <strings.h>
 #include "quick_model.h"
 
+// English the plugin translates where it's used, for make pot
+#define TR_MARK(text) (text)
+
 // The launcher's built-in tiles, top row first.
 static const char* const builtins[] = {
 	"Recents", "Collections", "Games", "Tools",
@@ -119,13 +122,13 @@ int Qmp_parseHidden(const char* setting, char out[][QMP_NAME_LEN], int max) {
 // The names match MOSAIC_TOGGLE_* in mosaic_plugin.h, which this file
 // doesn't include so it stays apart from the host.
 static const QmpToggle toggles[] = {
-	{ "notify_manual_save", "save", "Save notices" },
-	{ "notify_load", "load", "Load notices" },
-	{ "notify_screenshot", "screenshot", "Screenshot notices" },
-	{ "notify_adjustments", "adjustments", "Adjustment notices" },
-	{ "show_clock", "clock", "Clock" },
-	{ "show_battery_percent", "battery", "Battery %" },
-	{ "haptics", "haptics", "Haptics" },
+	{ "notify_manual_save", "save", TR_MARK("Save notices") },
+	{ "notify_load", "load", TR_MARK("Load notices") },
+	{ "notify_screenshot", "screenshot", TR_MARK("Screenshot notices") },
+	{ "notify_adjustments", "adjustments", TR_MARK("Adjustment notices") },
+	{ "show_clock", "clock", TR_MARK("Clock") },
+	{ "show_battery_percent", "battery", TR_MARK("Battery %") },
+	{ "haptics", "haptics", TR_MARK("Haptics") },
 };
 #define TOGGLE_COUNT (sizeof(toggles) / sizeof(toggles[0]))
 

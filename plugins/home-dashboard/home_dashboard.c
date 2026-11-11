@@ -106,6 +106,16 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 ///////////////////////////////////////
 // entries for art
 
@@ -269,8 +279,8 @@ static void openItem(Item* item) {
 	snprintf(message, sizeof(message), "open %s %i", item->path, opened);
 	say(message);
 	if (!opened) {
-		char shown[300];
-		snprintf(shown, sizeof(shown), "Couldn't open %s", item->name);
+		char shown[512];
+		snprintf(shown, sizeof(shown), tr("Couldn't open %s"), item->name);
 		host->toast(shown);
 	}
 }
@@ -353,8 +363,8 @@ static void drawTabs(MosaicSurface* screen, const MosaicRect* bar) {
 	int text_h = host->text_height(MOSAIC_FONT_LARGE);
 	int y = bar->y + (bar->h - text_h) / 2;
 	if (mode != HD_MODE_DASHBOARD) {
-		const char* title = mode == HD_MODE_MINUI ? "Recently played"
-			: mode == HD_MODE_RETROACHIEVEMENTS ? "Achievements" : "Pico-8";
+		const char* title = mode == HD_MODE_MINUI ? tr("Recently played")
+			: mode == HD_MODE_RETROACHIEVEMENTS ? tr("Achievements") : "Pico-8";
 		host->draw_text(screen, MOSAIC_FONT_LARGE, title, bar->x + pad, y, C_TEXT(), bar->w - pad);
 		return;
 	}
@@ -366,7 +376,7 @@ static void drawTabs(MosaicSurface* screen, const MosaicRect* bar) {
 		if (w > 0) x += w + pad / 2;
 	}
 	for (int i = 0; i < tab_count && x < right; i++) {
-		const char* label = HD_tabLabel(tabs[i]);
+		const char* label = tr(HD_tabLabel(tabs[i]));
 		int w = host->text_width(MOSAIC_FONT_LARGE, label) + 2 * pad;
 		if (x + w > right) w = right - x;
 		MosaicRect pill = { x, bar->y, w, bar->h };
@@ -448,17 +458,17 @@ static void drawHome(MosaicSurface* screen, const HDLayout* layout) {
 	int small_h = host->text_height(MOSAIC_FONT_SMALL);
 	const MosaicRect* t = &layout->text;
 	if (!recent_count) {
-		host->draw_text(screen, MOSAIC_FONT_LARGE, "Nothing played yet", t->x, t->y + (t->h - large_h) / 2, muted, t->w);
+		host->draw_text(screen, MOSAIC_FONT_LARGE, tr("Nothing played yet"), t->x, t->y + (t->h - large_h) / 2, muted, t->w);
 	} else {
 		Item* item = &recents[0];
 		drawArt(screen, item, &layout->art, 1, radius);
 		int y = t->y;
-		host->draw_text(screen, MOSAIC_FONT_SMALL, "CONTINUE", t->x, y, muted, t->w);
+		host->draw_text(screen, MOSAIC_FONT_SMALL, tr("CONTINUE"), t->x, y, muted, t->w);
 		y += small_h + 4 * scale;
 		host->draw_text(screen, MOSAIC_FONT_LARGE, item->name, t->x, y, text, t->w);
 		y += large_h + 4 * scale;
 		char line[128] = "";
-		if (!item->available) snprintf(line, sizeof(line), "%s", "Its emulator isn't installed");
+		if (!item->available) snprintf(line, sizeof(line), "%s", tr("Its emulator isn't installed"));
 		else if (historyKnown()) {
 			HD_playLine(host->play_time(item->path), host->last_played(item->path), (long long)time(NULL), line, sizeof(line));
 		}
@@ -490,7 +500,7 @@ static void drawPinned(MosaicSurface* screen, const HDLayout* layout) {
 	row_count = 0;
 	for (int i = 0; i < pinned_count; i++) addRow(pinned[i].name, &pinned[i]);
 	if (!row_count) {
-		drawMessage(screen, &layout->content, "No favorites yet");
+		drawMessage(screen, &layout->content, tr("No favorites yet"));
 		return;
 	}
 	list_selected = HD_listMove(list_selected, row_count, 0, 0);
@@ -502,10 +512,10 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 	row_count = 0;
 	long long today = host->play_time_today();
 	if (today < 0) {
-		drawMessage(screen, &layout->content, "No play history yet");
+		drawMessage(screen, &layout->content, tr("No play history yet"));
 		return;
 	}
-	Row* row = addRow("Played today", NULL);
+	Row* row = addRow(tr("Played today"), NULL);
 	HD_duration(today, row->right, sizeof(row->right));
 	if (!row->right[0]) snprintf(row->right, sizeof(row->right), "%s", "0m");
 
@@ -530,15 +540,16 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 		times[count] = host->play_time(pinned[i].path);
 		count++;
 	}
-	row = addRow("Recently played", NULL);
+	row = addRow(tr("Recently played"), NULL);
 	char total[32];
 	HD_duration(recent_total, total, sizeof(total));
-	snprintf(row->right, sizeof(row->right), "%i %s%s%s", recent_games, recent_games == 1 ? "game" : "games",
-		total[0] ? " \xc2\xb7 " : "", total);
+	char games[64];
+	snprintf(games, sizeof(games), trPlural("%i game", "%i games", (unsigned long)recent_games), recent_games);
+	snprintf(row->right, sizeof(row->right), "%s%s%s", games, total[0] ? " \xc2\xb7 " : "", total);
 
 	int top[MOST_PLAYED_MAX];
 	int n = HD_mostPlayed(times, count, top, MOST_PLAYED_MAX);
-	if (n) addRow("MOST PLAYED", NULL)->header = 1;
+	if (n) addRow(tr("MOST PLAYED"), NULL)->header = 1;
 	for (int i = 0; i < n; i++) {
 		Item* item = known[top[i]];
 		row = addRow(item->name, item);
@@ -547,7 +558,9 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 		HD_duration(times[top[i]], played, sizeof(played));
 		int sessions = host->play_count(item->path);
 		if (sessions > 0) {
-			snprintf(row->right, sizeof(row->right), "%s \xc2\xb7 %i %s", played, sessions, sessions == 1 ? "session" : "sessions");
+			char count[64];
+			snprintf(count, sizeof(count), trPlural("%i session", "%i sessions", (unsigned long)sessions), sessions);
+			snprintf(row->right, sizeof(row->right), "%s \xc2\xb7 %s", played, count);
 		} else {
 			snprintf(row->right, sizeof(row->right), "%s", played);
 		}
@@ -559,7 +572,7 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 static void drawMinUI(MosaicSurface* screen, const HDLayout* layout) {
 	row_count = 0;
 	for (int i = 0; i < recent_count; i++) addRow(recents[i].name, &recents[i]);
-	addRow("Games", NULL);
+	addRow(tr("Games"), NULL);
 	list_selected = HD_listMove(list_selected, row_count, 0, 0);
 	drawRows(screen, &layout->content, list_selected, &list_first);
 }
@@ -595,7 +608,7 @@ static void raRows(void) {
 static void drawAchievements(MosaicSurface* screen, const HDLayout* layout) {
 	if (pending) waiting = 1;
 	if (!row_count) {
-		drawMessage(screen, &layout->content, pending ? "Checking achievements" : "No achievements on the card yet");
+		drawMessage(screen, &layout->content, pending ? tr("Checking achievements") : tr("No achievements on the card yet"));
 		return;
 	}
 	list_selected = HD_listMove(list_selected, row_count, 0, 0);
@@ -604,7 +617,7 @@ static void drawAchievements(MosaicSurface* screen, const HDLayout* layout) {
 
 static void drawCarts(MosaicSurface* screen, const HDLayout* layout) {
 	if (!cart_count) {
-		drawMessage(screen, &layout->content, "No Pico-8 carts");
+		drawMessage(screen, &layout->content, tr("No Pico-8 carts"));
 		return;
 	}
 	int scale = host->screen_scale();

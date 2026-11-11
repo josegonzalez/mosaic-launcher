@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "rootnames.h"
 
 Entry* Entry_new(char* path, int type) {
 	char display_name[256];
@@ -75,9 +76,9 @@ void getUniqueName(Entry* entry, char* out_name) {
 
 ///////////////////////////////////////
 // Listing a directory, in stages: source -> map.txt names -> hide -> sort
-// -> plugin filter -> plugin display names -> plugin sort -> plugin
-// list_ready -> duplicate names -> letter index. Directory_new runs them in
-// order.
+// -> plugin filter -> translated names -> plugin display names -> plugin
+// sort -> plugin list_ready -> duplicate names -> letter index.
+// Directory_new runs them in order.
 
 // Where a directory's entries come from. Most sources already sort.
 Array* Listing_source(char* path) {
@@ -162,6 +163,55 @@ Array* Listing_filterHidden(Array* entries) {
 	return kept;
 }
 
+static const char* listingTr(const char* context, const char* text) {
+	return TRC(context, text);
+}
+
+// The English name of the launcher's own row at path, or NULL for any
+// other entry.
+static const char* rowName(const char* path) {
+	char tools_path[256];
+	snprintf(tools_path, sizeof(tools_path), "%s/Tools/%s", SDCARD_PATH, PLATFORM);
+	if (!strcmp(path, FAUX_RECENT_PATH)) return TR_MARK("Recently Played");
+	if (!strcmp(path, COLLECTIONS_PATH)) return TR_MARK("Collections");
+	if (!strcmp(path, tools_path)) return TR_MARK("Tools");
+	return NULL;
+}
+
+// 1 for a folder straight under Roms.
+static int isSystem(const char* path) {
+	size_t at = strlen(ROMS_PATH);
+	return !strncmp(path, ROMS_PATH, at) && path[at] == '/' && path[at + 1] && !strchr(path + at + 1, '/');
+}
+
+// After plugins' filters, which may go by the English names, and before
+// their display names, which then see the shown ones. Only names still the
+// launcher's own change: one from map.txt is the user's.
+void Listing_translateNames(Array* entries, char* path) {
+	if (!Tr_active() || (!exactMatch(path, SDCARD_PATH) && !exactMatch(path, ROMS_PATH))) return;
+	for (int i = 0; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		if (entry->type != ENTRY_DIR) continue;
+		int kind;
+		const char* row = rowName(entry->path);
+		if (row) {
+			if (strcmp(entry->name, row)) continue;
+			kind = ROOTNAME_ROW;
+		}
+		else if (isSystem(entry->path)) {
+			char english[256];
+			getDisplayName(entry->path, english);
+			if (strcmp(entry->name, english)) continue;
+			kind = ROOTNAME_SYSTEM;
+		}
+		else continue;
+		char shown[256];
+		if (!RootName_translate(kind, entry->name, listingTr, shown, sizeof(shown))) continue;
+		free(entry->name);
+		entry->name = strdup(shown);
+	}
+}
+
 // Neighbours with the same display name get a unique name: their file
 // names, or the name plus emulator tag when the file names match too
 // (the same game in two collated console folders).
@@ -224,6 +274,8 @@ void Directory_index(Directory* self) {
 	}
 
 	self->entries = Plugins_filter(self->entries, self->path);
+	// shown names only, so the order stays the English one, as stock's
+	Listing_translateNames(self->entries, self->path);
 	// recents and collections keep their own order even when renamed
 	if (Plugins_displayNames(self->entries) && !skip_index) EntryArray_sort(self->entries);
 	// plugins' order goes on top of the launcher's, so it comes after any

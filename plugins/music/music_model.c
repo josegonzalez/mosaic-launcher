@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
+
 ///////////////////////////////////////
 // files
 
@@ -135,7 +138,7 @@ int MU_parseRepeat(const char* text) {
 }
 
 const char* MU_repeatName(int repeat) {
-	return repeat == MU_REPEAT_ALL ? "all" : repeat == MU_REPEAT_ONE ? "one" : "off";
+	return repeat == MU_REPEAT_ALL ? TR_MARK("all") : repeat == MU_REPEAT_ONE ? TR_MARK("one") : TR_MARK("off");
 }
 
 void MuQueue_init(MuQueue* queue, unsigned int seed) {

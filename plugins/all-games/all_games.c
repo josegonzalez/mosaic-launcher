@@ -35,6 +35,11 @@ static int replaced = 0; // the last root listing was ours
 static int tags = 1;
 static int placing = 0; // back from a game: the selection may need placing
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static int exists(const char* path) {
 	struct stat st;
 	return stat(path, &st) == 0;
@@ -177,7 +182,7 @@ static MosaicList* rootReplace(void) {
 	if (index_.game_count == 0) return NULL; // stock's root, so Tools and the rest stay in reach
 
 	MosaicList* root = host->list_new();
-	host->list_push(root, host->entry_new(roms_path, MOSAIC_ENTRY_DIR, AG_SYSTEMS_NAME));
+	host->list_push(root, host->entry_new(roms_path, MOSAIC_ENTRY_DIR, tr("Systems")));
 	for (int i = 0; i < index_.game_count; i++) {
 		const AGGame* game = &index_.games[i];
 		host->list_push(root, host->entry_new(game->path, game->type, game->name));

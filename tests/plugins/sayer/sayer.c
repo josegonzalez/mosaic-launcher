@@ -3,11 +3,15 @@
 // host->tr and host->tr_plural give it back. Its action, on Y, has a label
 // of its own, which the game list's hint shows translated. A few of the
 // Launcher pak's settings strings, and its own name, setting label and
-// options, are translated too.
+// options, are translated too, as are Recently Played, the Game Boy system
+// and a few of the bundled quick-menu-plus's and theme-plus's strings.
 //
 //   mode=bad    answers OPEN with text that isn't UTF-8, an error after which
 //               the launcher shows English until it restarts
 //   mode=crash  crashes when it's first asked for a translation
+//   mode=root   logs the root list's names and paths and the Game Boy
+//               row's art, then runs quick-menu-plus.awake (a toast) and
+//               theme-plus.pick (a choose), and logs "root done"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +21,7 @@
 static const MosaicHost* host;
 static int bad = 0;
 static int crash = 0;
+static int root = 0;
 static int ticked = 0;
 
 static void say(const char* format, const char* a, const char* b) {
@@ -40,6 +45,7 @@ static const char* translate(const char* context, const char* text) {
 		if (!strcmp(text, "Plugins")) return "Extensions";
 		if (!strcmp(text, "Language")) return "Langue";
 		if (!strcmp(text, "Status")) return "Statut";
+		if (!strcmp(text, "Recently Played")) return "Joués récemment";
 		return NULL;
 	}
 	if (!strcmp(context, "sayer")) {
@@ -52,6 +58,12 @@ static const char* translate(const char* context, const char* text) {
 		return NULL;
 	}
 	if (!strcmp(context, "sayer.button") && !strcmp(text, "Open")) return "Ouvrir";
+	if (!strcmp(context, "systems") && !strcmp(text, "Game Boy")) return "Vieille Game Boy"; // sorts after Pocket Colour, but stays before it
+	if (!strcmp(context, "quick-menu-plus") && !strcmp(text, "Staying awake")) return "Reste éveillé";
+	if (!strcmp(context, "theme-plus")) {
+		if (!strcmp(text, "Theme")) return "Thème";
+		if (!strcmp(text, "Stock")) return "D'origine";
+	}
 	return NULL;
 }
 
@@ -69,8 +81,69 @@ static void shout(void* data) {
 	(void)data;
 }
 
+static int endsWith(const char* s, const char* suffix) {
+	size_t a = strlen(s), b = strlen(suffix);
+	return a >= b && !strcmp(s + a - b, suffix);
+}
+
+// mode=root, a step each tick: the root's rows once it's listed, the Game
+// Boy row's art once it's in, then the toast and the choose a while apart.
+static int root_step = 0;
+static unsigned long root_at = 0;
+static int art_asks = 0;
+
+static void rootTick(unsigned long now) {
+	const char* path = host->current_path();
+	const MosaicList* list = host->current_list();
+	if (root_step == 0) {
+		if (!path || strcmp(path, host->sdcard_path) || !list || host->list_count(list) == 0) return;
+		for (int i = 0; i < host->list_count(list); i++) {
+			const MosaicEntry* e = host->list_get(list, i);
+			say("root row %s at %s", host->entry_name(e), host->entry_path(e));
+		}
+		root_step = 1;
+	}
+	if (root_step == 1) {
+		const MosaicEntry* gb = NULL;
+		for (int i = 0; list && i < host->list_count(list); i++) {
+			const MosaicEntry* e = host->list_get(list, i);
+			if (endsWith(host->entry_path(e), "/Roms/Game Boy (GB)")) gb = e;
+		}
+		if (!gb) {
+			say("root has no Game Boy row%s%s", "", "");
+			root_step = 2;
+			root_at = now;
+			return;
+		}
+		char art[1024] = "";
+		host->art_find(gb, MOSAIC_ART_THUMBNAIL, art, sizeof(art));
+		const MosaicSurface* image = NULL;
+		int got = host->art_get(gb, MOSAIC_ART_THUMBNAIL, &image);
+		if (got == MOSAIC_ART_LOADING && ++art_asks < 300) return;
+		char line[1200];
+		snprintf(line, sizeof(line), "%s, %s", got == MOSAIC_ART_READY ? "ready" : got == MOSAIC_ART_LOADING ? "loading" : "missing", art);
+		say("root art for %s: %s", host->entry_name(gb), line);
+		root_step = 2;
+		root_at = now;
+	}
+	if (root_step == 2 && now - root_at >= 500) {
+		say("ran quick-menu-plus.awake %s%s", host->run_action("quick-menu-plus.awake") == 0 ? "0" : "-1", "");
+		root_step = 3;
+		root_at = now;
+	}
+	if (root_step == 3 && now - root_at >= 1000) {
+		say("ran theme-plus.pick %s%s", host->run_action("theme-plus.pick") == 0 ? "0" : "-1", "");
+		root_step = 4;
+		root_at = now;
+	}
+	if (root_step == 4 && now - root_at >= 1000) {
+		say("root done%s%s", "", "");
+		root_step = 5;
+	}
+}
+
 static void tick(unsigned long now) {
-	(void)now;
+	if (root) rootTick(now);
 	if (ticked++) return;
 	say("tr Hello = %s%s", host->tr("sayer", NULL, "Hello"), "");
 	say("tr Open = %s, button %s", host->tr("sayer", NULL, "Open"), host->tr("sayer", "sayer.button", "Open"));
@@ -91,6 +164,7 @@ static int init(const MosaicHost* h) {
 	}
 	bad = !strcmp(host->cfg_get("sayer", "mode", ""), "bad");
 	crash = !strcmp(host->cfg_get("sayer", "mode", ""), "crash");
+	root = !strcmp(host->cfg_get("sayer", "mode", ""), "root");
 	// from init, before the slot is settled: English
 	say("init tr Hello = %s%s", host->tr("sayer", NULL, "Hello"), "");
 	host->register_action("sayer.shout", "SHOUT", NULL, shout, NULL);

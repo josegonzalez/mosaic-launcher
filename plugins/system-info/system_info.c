@@ -59,6 +59,11 @@ static char page_logged[64];
 static int own_page = 0; // 1 when the graph doesn't fit under the rows and has a page of its own
 static int on_graph = 0; // 1 on that page
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -255,7 +260,7 @@ static int tryLayout(const MosaicScreenView* view, const MosaicRect* hole, int f
 	if (scale < 1) scale = 1;
 	int label_w = 0;
 	for (int i = 0; i < SI_ROWS; i++) {
-		int w = host->text_width(font, Si_label(i));
+		int w = host->text_width(font, tr(Si_label(i)));
 		if (w > label_w) label_w = w;
 	}
 	int row_h = host->text_height(font) + 2 * scale;
@@ -304,7 +309,7 @@ static void drawGraph(MosaicSurface* screen, const SiLayout* layout) {
 	MosaicColor ink = themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF);
 	if (layout->graph.w <= 0) return;
 	if (!history.count) {
-		text(screen, MOSAIC_FONT_TINY, "No battery history: battery-logger hasn't logged a game yet", layout->caption.x,
+		text(screen, MOSAIC_FONT_TINY, tr("No battery history: battery-logger hasn't logged a game yet"), layout->caption.x,
 			layout->caption.y, layout->caption.w, ink);
 		logGraph("no battery history");
 		return;
@@ -381,7 +386,7 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 			const MosaicRect* row = &layout.rows[i];
 			if (row->w <= 0) continue;
 			int y = row->y + (row->h - th) / 2;
-			text(screen, font, Si_label(i), row->x, y, layout.label_w, label);
+			text(screen, font, tr(Si_label(i)), row->x, y, layout.label_w, label);
 			text(screen, font, values.text[i], row->x + layout.label_w, y, row->w - layout.label_w, value);
 		}
 	}

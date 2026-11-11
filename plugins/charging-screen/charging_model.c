@@ -4,6 +4,9 @@
 #include <string.h>
 #include "charging_model.h"
 
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
+
 ///////////////////////////////////////
 // Settings
 
@@ -80,7 +83,7 @@ void CS_formatLevel(int level, char* out, size_t size) {
 }
 
 const char* CS_stateLabel(int level) {
-	return level >= 100 ? "Charged" : "Charging";
+	return level >= 100 ? TR_MARK("Charged") : TR_MARK("Charging");
 }
 
 void CS_formatClock(int hour, int minute, int mode, char* out, size_t size) {

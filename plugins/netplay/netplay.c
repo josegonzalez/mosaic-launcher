@@ -37,6 +37,11 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -76,7 +81,7 @@ static void addressTyped(const char* text, void* data) {
 	char address[NP_HOST_LEN];
 	int at;
 	if (NP_parseAddress(text, port(), address, sizeof(address), &at) != 0) {
-		toast("Type a host name or IP address, with :port for another port");
+		toast(tr("Type a host name or IP address, with :port for another port"));
 		return;
 	}
 	host->cfg_set(ID, "last_address", text);
@@ -86,7 +91,7 @@ static void addressTyped(const char* text, void* data) {
 static void modePicked(int index, void* data) {
 	(void)data;
 	if (index == 0) launch(NP_HOST, NULL, port());
-	else if (index == 1) host->keyboard("Host address", host->cfg_get(ID, "last_address", ""), addressTyped, NULL);
+	else if (index == 1) host->keyboard(tr("Host address"), host->cfg_get(ID, "last_address", ""), addressTyped, NULL);
 }
 
 static int canOpen(void* data) {
@@ -101,9 +106,9 @@ static void open_(void* data) {
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	if (!entry || snprintf(picked, sizeof(picked), "%s", host->entry_path(entry)) >= (int)sizeof(picked)) return;
-	static const char* const choices[] = { "Host a game", "Join a game" };
+	const char* choices[] = { tr("Host a game"), tr("Join a game") };
 	int count = MOSAIC_HOST_HAS(host, keyboard) ? 2 : 1;
-	if (host->choose("Netplay", choices, count, 0, modePicked, NULL) != 0) say("couldn't open the netplay choice");
+	if (host->choose(tr("Netplay"), choices, count, 0, modePicked, NULL) != 0) say("couldn't open the netplay choice");
 }
 
 static int preLaunch(const MosaicLaunch* l) {
@@ -113,7 +118,7 @@ static int preLaunch(const MosaicLaunch* l) {
 	char program[NP_PATH_LEN * 2];
 	if (emulatorFor(l->path, program, sizeof(program)) != 0) {
 		say("no emulator pak for this game; netplay launch cancelled");
-		toast("No emulator for netplay");
+		toast(tr("No emulator for netplay"));
 		return MOSAIC_LAUNCH_CANCEL;
 	}
 
@@ -123,7 +128,7 @@ static int preLaunch(const MosaicLaunch* l) {
 	for (int i = 0; i < n; i++) argv[i] = args[i];
 	if (n < 0 || host->replace_launch(program, argv, n) != 0) {
 		say("couldn't replace the launch, maybe another plugin already did; netplay launch cancelled");
-		toast("Netplay couldn't start this game");
+		toast(tr("Netplay couldn't start this game"));
 		return MOSAIC_LAUNCH_CANCEL;
 	}
 	return MOSAIC_LAUNCH_REPLACE;

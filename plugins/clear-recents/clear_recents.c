@@ -23,6 +23,11 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -58,14 +63,14 @@ static void cleared(void* data) {
 	(void)data;
 	host->recents_clear();
 	say("cleared recents");
-	toast("Recents cleared");
+	toast(tr("Recents cleared"));
 	host->reload_lists();
 }
 
 static void clearAll(void* data) {
 	(void)data;
 	if (!host->recents_count()) return;
-	host->confirm("Clear all recently played games?", "CLEAR", cleared, NULL);
+	host->confirm(tr("Clear all recently played games?"), tr("CLEAR"), cleared, NULL);
 }
 
 static int canClearHere(void* data) {
@@ -83,10 +88,10 @@ static void removeSelected(void* data) {
 	int at = selectedRecent();
 	if (at < 0) return;
 	if (host->recent_remove(at) != 0) {
-		toast("Couldn't remove that");
+		toast(tr("Couldn't remove that"));
 		return;
 	}
-	toast("Removed from recents");
+	toast(tr("Removed from recents"));
 	host->reload_lists();
 }
 

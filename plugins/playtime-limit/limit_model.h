@@ -55,6 +55,12 @@ long long PL_shownMinutes(long long left);
 // "Time's up" at 0.
 void PL_format(long long left, char* out, size_t size);
 
+// The same in other words: words[PL_WORDS_UP] at 0, else
+// words[PL_WORDS_MINUTES] with the minutes ("%lldm left") or, from an hour,
+// words[PL_WORDS_HOURS] with the hours and minutes ("%lldh %02lldm left").
+enum { PL_WORDS_UP, PL_WORDS_MINUTES, PL_WORDS_HOURS, PL_WORDS_COUNT };
+void PL_formatIn(long long left, const char* const words[PL_WORDS_COUNT], char* out, size_t size);
+
 // 1 when typed is the code, both with spaces, tabs and line breaks
 // trimmed. An empty code never matches, and neither does a NULL typed
 // (the keyboard was cancelled).

@@ -49,6 +49,11 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 ///////////////////////////////////////
 // scaled copies
 
@@ -171,7 +176,7 @@ static void selectedTitle(MosaicSurface* screen, const MosaicScreenView* view, c
 static int renderFull(MosaicSurface* screen, const MosaicScreenView* view, const MosaicRect* hole) {
 	fillAround(screen, &view->area, hole, mosaic_color(0x000000, 255));
 	int got = drawShot(screen, &list.shots[selected], &view->area, hole, fulls, FULL_COPIES);
-	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, "Can't show this screenshot", &view->area, mosaic_color(0xFFFFFF, 255));
+	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, tr("Can't show this screenshot"), &view->area, mosaic_color(0xFFFFFF, 255));
 	prefetch(selected + 1, &view->area);
 	prefetch(selected - 1, &view->area);
 	selectedTitle(screen, view, hole);
@@ -253,7 +258,7 @@ static void deleteConfirmed(void* data) {
 	if (at < 0 || SV_remove(dir, &list, at) != 0) {
 		snprintf(message, sizeof(message), "can't delete %s", pending);
 		say(message);
-		if (MOSAIC_HOST_HAS(host, toast)) host->toast("Couldn't delete that");
+		if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Couldn't delete that"));
 		return;
 	}
 	copiesFree(thumbs, THUMB_COPIES, pending);
@@ -262,7 +267,7 @@ static void deleteConfirmed(void* data) {
 	if (list.count == 0) full = 0;
 	snprintf(message, sizeof(message), "deleted %s, %i left", pending, list.count);
 	say(message);
-	if (MOSAIC_HOST_HAS(host, toast)) host->toast("Screenshot deleted");
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Screenshot deleted"));
 	host->request_redraw();
 }
 
@@ -270,9 +275,9 @@ static void askDelete(void) {
 	snprintf(pending, sizeof(pending), "%s", list.shots[selected].file);
 	char text[SV_NAME_MAX + 32];
 	SV_title(&list.shots[selected], text, sizeof(text));
-	char question[sizeof(text) + 32];
-	snprintf(question, sizeof(question), "Delete this screenshot?\n%s", text);
-	host->confirm(question, "DELETE", deleteConfirmed, NULL);
+	char question[sizeof(text) + 256];
+	snprintf(question, sizeof(question), tr("Delete this screenshot?\n%s"), text);
+	host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
 }
 
 ///////////////////////////////////////
@@ -341,8 +346,8 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	if (selected >= list.count) selected = list.count > 0 ? list.count - 1 : 0;
 	if (list.count <= 0) {
 		fillAround(screen, &view->area, &hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
-		title(screen, view, &hole, "Screenshots");
-		centred(screen, MOSAIC_FONT_LARGE, "No screenshots", &view->area, themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF));
+		title(screen, view, &hole, tr("Screenshots"));
+		centred(screen, MOSAIC_FONT_LARGE, tr("No screenshots"), &view->area, themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF));
 	} else if (!full) {
 		fillAround(screen, &view->area, &hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
 		got = renderGrid(screen, view, &hole);

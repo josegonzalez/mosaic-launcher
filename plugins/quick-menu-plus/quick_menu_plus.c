@@ -26,6 +26,8 @@
 #include "quick_model.h"
 
 #define ID "quick-menu-plus"
+// an action label the launcher translates where it draws it, for make pot
+#define TR_MARK(text) (text)
 #define MAX_PATH_LEN 1024
 // as in plugin.txt: the in-game notifications
 #define QMP_TOGGLES_DEFAULT "save, load, screenshot, adjustments"
@@ -40,6 +42,11 @@ static char pak[MAX_PATH_LEN]; // Launcher.pak, or "" when manage.sh isn't found
 
 static void say(const char* message) {
 	host->log(ID, message);
+}
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
 static void toast(const char* message) {
@@ -106,13 +113,13 @@ static int stockOn(void* data) {
 static void flipStock(void* data) {
 	const QmpToggle* toggle = data;
 	int on = !stockOn(data);
-	char message[200];
+	char message[512];
 	if (host->stock_toggle_set(toggle->name, on) != 0) {
-		snprintf(message, sizeof(message), "Couldn't change %s", toggle->label);
+		snprintf(message, sizeof(message), tr("Couldn't change %s"), tr(toggle->label));
 		toast(message);
 		return;
 	}
-	snprintf(message, sizeof(message), "%s %s", toggle->label, on ? "on" : "off");
+	snprintf(message, sizeof(message), on ? tr("%s on") : tr("%s off"), tr(toggle->label));
 	toast(message);
 	host->request_redraw();
 }
@@ -143,7 +150,7 @@ static void setAwake(int on) {
 static void toggleAwake(void* data) {
 	(void)data;
 	setAwake(!awake);
-	toast(awake ? "Staying awake" : "Sleeping as usual");
+	toast(awake ? tr("Staying awake") : tr("Sleeping as usual"));
 	host->request_redraw();
 }
 
@@ -197,13 +204,13 @@ static void rebootToStock(void* data) {
 	(void)data;
 	char cmd[MAX_PATH_LEN * 2];
 	if (!Qmp_manageCommand(pak, "turn-off", cmd, sizeof(cmd))) {
-		toast("Couldn't turn the launcher off");
+		toast(tr("Couldn't turn the launcher off"));
 		return;
 	}
 	int rc = system(cmd);
 	if (rc == -1 || !WIFEXITED(rc) || WEXITSTATUS(rc) != 0) {
 		say("manage.sh turn-off failed; not rebooting");
-		toast("Couldn't turn the launcher off");
+		toast(tr("Couldn't turn the launcher off"));
 		return;
 	}
 	say("launcher turned off; rebooting to stock");
@@ -213,7 +220,7 @@ static void rebootToStock(void* data) {
 static void askRebootToStock(void* data) {
 	(void)data;
 	if (!pak[0]) return;
-	host->confirm("Reboot to stock NextUI?\nTurn Launcher back on from Tools.", "REBOOT", rebootToStock, NULL);
+	host->confirm(tr("Reboot to stock NextUI?\nTurn Launcher back on from Tools."), tr("REBOOT"), rebootToStock, NULL);
 }
 
 ///////////////////////////////////////
@@ -272,7 +279,7 @@ static int init(const MosaicHost* h) {
 	if (isOn("awake_tile", "on")) {
 		if (!MOSAIC_HOST_HAS(host, inhibit_sleep)) say("this launcher can't hold off sleep; no Stay awake tile");
 		else {
-			addTile(ID ".awake", "Stay awake", always, toggleAwake, awakeOn, NULL);
+			addTile(ID ".awake", TR_MARK("Stay awake"), always, toggleAwake, awakeOn, NULL);
 			if (access(QMP_AWAKE_FILE, F_OK) == 0) setAwake(1);
 		}
 	}
@@ -284,7 +291,7 @@ static int init(const MosaicHost* h) {
 		else {
 			findPak();
 			if (!pak[0]) say("manage.sh not found; no Reboot to stock tile");
-			addTile(ID ".stock", "Reboot to stock", canRebootToStock, askRebootToStock, NULL, NULL);
+			addTile(ID ".stock", TR_MARK("Reboot to stock"), canRebootToStock, askRebootToStock, NULL, NULL);
 		}
 	}
 	return 0;

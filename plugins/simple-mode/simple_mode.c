@@ -23,6 +23,11 @@
 
 static const MosaicHost* host;
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static int isOn(void* data) {
 	(void)data;
 	return Simple_isOn(host->cfg_get(ID, "on", "on"));
@@ -50,7 +55,7 @@ static void hideTiles(int hide) {
 static void setOn(int on) {
 	host->cfg_set(ID, "on", on ? "on" : "off");
 	hideTiles(on);
-	toast(on ? "Simple mode on" : "Simple mode off");
+	toast(on ? tr("Simple mode on") : tr("Simple mode off"));
 	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	host->request_redraw();
 }
@@ -63,14 +68,14 @@ static void leave(void* data) {
 static void checkedPin(int result, void* data) {
 	(void)data;
 	if (result == MOSAIC_PIN_RIGHT) setOn(0);
-	else if (result == MOSAIC_PIN_WRONG) toast("Wrong PIN");
+	else if (result == MOSAIC_PIN_WRONG) toast(tr("Wrong PIN"));
 }
 
 static void typedPin(const char* text, void* data) {
 	(void)data;
 	if (!text) return; // cancelled
 	if (Simple_pinMatches(host->cfg_get(ID, "pin", ""), text)) setOn(0);
-	else toast("Wrong PIN");
+	else toast(tr("Wrong PIN"));
 }
 
 static void toggle(void* data) {
@@ -79,15 +84,15 @@ static void toggle(void* data) {
 		return;
 	}
 	if (MOSAIC_HOST_HAS(host, ask_pin)) {
-		if (host->has_pin()) host->ask_pin("PIN to leave simple mode", checkedPin, NULL);
-		else if (MOSAIC_HOST_HAS(host, confirm)) host->confirm("Leave simple mode?", "LEAVE", leave, NULL);
+		if (host->has_pin()) host->ask_pin(tr("PIN to leave simple mode"), checkedPin, NULL);
+		else if (MOSAIC_HOST_HAS(host, confirm)) host->confirm(tr("Leave simple mode?"), tr("LEAVE"), leave, NULL);
 		else setOn(0);
 	}
 	else if (Simple_leaveStep(host->cfg_get(ID, "pin", "")) == SIMPLE_LEAVE_PIN) {
-		if (MOSAIC_HOST_HAS(host, keyboard)) host->keyboard("PIN to leave simple mode", "", typedPin, NULL);
+		if (MOSAIC_HOST_HAS(host, keyboard)) host->keyboard(tr("PIN to leave simple mode"), "", typedPin, NULL);
 		else host->log(ID, "this launcher has no keyboard to type the PIN on; turn simple mode off from the Launcher pak");
 	}
-	else if (MOSAIC_HOST_HAS(host, confirm)) host->confirm("Leave simple mode?", "LEAVE", leave, NULL);
+	else if (MOSAIC_HOST_HAS(host, confirm)) host->confirm(tr("Leave simple mode?"), tr("LEAVE"), leave, NULL);
 	else setOn(0);
 }
 
@@ -99,7 +104,7 @@ static int filter(const MosaicEntry* entry, const char* dir_path) {
 
 static int preLaunch(const MosaicLaunch* launch) {
 	if (!isOn(NULL) || !Simple_isTools(launch->path, host->sdcard_path, host->platform)) return MOSAIC_LAUNCH_CONTINUE;
-	toast("Tools are off in simple mode");
+	toast(tr("Tools are off in simple mode"));
 	return MOSAIC_LAUNCH_CANCEL;
 }
 

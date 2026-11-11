@@ -62,6 +62,11 @@ static const char* shown_state = "";
 static char want_level[8], want_clock[16];
 static const char* want_state = "";
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -86,7 +91,7 @@ static void readBattery(unsigned long now) {
 
 static void wanted(void) {
 	CS_formatLevel(level, want_level, sizeof(want_level));
-	want_state = CS_stateLabel(level);
+	want_state = tr(CS_stateLabel(level));
 	time_t t = time(NULL);
 	struct tm local;
 	if (clock_mode != CS_CLOCK_OFF && localtime_r(&t, &local)) {

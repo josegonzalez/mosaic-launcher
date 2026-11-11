@@ -38,6 +38,8 @@
 #include "romm_zip.h"
 
 #define ID "romm"
+// English translated where it's used, for make pot
+#define TR_MARK(text) (text)
 #define DOWNLOAD_SCREEN ID ".download"
 #define FLASHBACK_SCREEN ID ".flashback"
 #define FLASHBACK_ACTION ID ".flashback"
@@ -86,6 +88,11 @@ static void sayf(const char* format, ...) {
 	vsnprintf(line, sizeof(line), format, args);
 	va_end(args);
 	say(line);
+}
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
 static void toast(const char* message) {
@@ -225,16 +232,16 @@ static int networkReady(int quiet) {
 		MosaicWifi wifi = { .size = sizeof(wifi) };
 		int rc = host->wifi_connection(&wifi);
 		if (rc == 1) return 1;
-		if (host->wifi_enabled() != 1) why = "Wi-Fi is off";
-		else if (rc == 0) why = "Wi-Fi isn't connected";
-		else why = "Wi-Fi isn't ready yet";
+		if (host->wifi_enabled() != 1) why = TR_MARK("Wi-Fi is off");
+		else if (rc == 0) why = TR_MARK("Wi-Fi isn't connected");
+		else why = TR_MARK("Wi-Fi isn't ready yet");
 	} else {
 		return 1; // no Wi-Fi to ask about, such as desktop: try the network
 	}
 	if (!quiet && (!last_gate_toast || now_ms - last_gate_toast > 4000)) {
 		last_gate_toast = now_ms ? now_ms : 1;
-		char message[96];
-		put(message, sizeof(message), "RomM: %s", why);
+		char message[512];
+		put(message, sizeof(message), tr("RomM: %s"), tr(why));
 		toast(message);
 		sayf("network: %s", why);
 	}
@@ -983,14 +990,14 @@ static void startDownload(const Found* f, const char* path) {
 	makeDirs(dir);
 	if (!insideCard(dir, "Roms")) {
 		sayf("refusing to download into %s: it isn't a folder in Roms", dir);
-		toast("RomM: that system's folder isn't on the card");
+		toast(tr("RomM: that system's folder isn't on the card"));
 		return;
 	}
 	struct statvfs vfs;
 	// a zip and what it unpacks to are on the card at once
 	long long need = f->rom->size * (f->rom->multi ? 2 : 1) + 1024 * 1024;
 	if (statvfs(dir, &vfs) == 0 && f->rom->size > 0 && (long long)vfs.f_bavail * (long long)vfs.f_frsize < need) {
-		toast("RomM: not enough space on the card");
+		toast(tr("RomM: not enough space on the card"));
 		say("not enough space for the download");
 		return;
 	}
@@ -1001,7 +1008,7 @@ static void startDownload(const Found* f, const char* path) {
 		if (lstat(game, &st) == 0) {
 			// never unpacked over what's there
 			sayf("not downloading into %s: it's already on the card", game);
-			toast("RomM: a folder of that name is already on the card");
+			toast(tr("RomM: a folder of that name is already on the card"));
 			return;
 		}
 	}
@@ -1144,11 +1151,11 @@ static int downloadRender(MosaicSurface* screen, const MosaicScreenView* v, void
 	int line = host->text_height(MOSAIC_FONT_LARGE);
 	int y = v->area.h / 2 - 2 * line;
 	if (!j) {
-		centred(screen, MOSAIC_FONT_LARGE, "Starting...", y, v->area.w, ink);
+		centred(screen, MOSAIC_FONT_LARGE, tr("Starting..."), y, v->area.w, ink);
 		return 0;
 	}
-	char title[RM_NAME_MAX + 32];
-	put(title, sizeof(title), "%s %s", j->unpacking ? "Unpacking" : "Downloading", j->name);
+	char title[RM_NAME_MAX + 256];
+	put(title, sizeof(title), j->unpacking ? tr("Unpacking %s") : tr("Downloading %s"), j->name);
 	centred(screen, MOSAIC_FONT_LARGE, title, y, v->area.w, ink);
 	long long done = j->done, total = j->total > 0 ? j->total : j->expect;
 	int bar_w = v->area.w * 2 / 3, bar_h = 8 * scale;
@@ -1159,10 +1166,10 @@ static int downloadRender(MosaicSurface* screen, const MosaicScreenView* v, void
 	MosaicRect fill = bar;
 	fill.w = bar_w * percent / 100;
 	if (fill.w >= bar_h) host->fill_round_rect(screen, &fill, bar_h / 2, themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF));
-	char a[32], b[32], text[96];
+	char a[32], b[32], text[256];
 	RM_formatSize(done, a, sizeof(a));
 	RM_formatSize(total, b, sizeof(b));
-	if (total > 0) put(text, sizeof(text), "%s of %s", a, b);
+	if (total > 0) put(text, sizeof(text), tr("%s of %s"), a, b);
 	else put(text, sizeof(text), "%s", a);
 	centred(screen, MOSAIC_FONT_SMALL, text, bar.y + bar_h + 12 * scale, v->area.w, ink);
 	MosaicHint cancel = { MOSAIC_BUTTON_B, "CANCEL" };
@@ -1335,7 +1342,7 @@ static void restoreConfirmed(void* data) {
 	*strrchr(dir, '/') = '\0';
 	makeDirs(dir);
 	if (!insideCard(dir, a->kind == RM_ASSET_SAVE ? "Saves" : ".userdata/shared")) {
-		toast("RomM: that folder isn't on the card");
+		toast(tr("RomM: that folder isn't on the card"));
 		return;
 	}
 	if (!networkReady(0)) return;
@@ -1351,7 +1358,7 @@ static void restoreConfirmed(void* data) {
 	put(j->name, sizeof(j->name), "%s", fb.path);
 	if (jobAdd(j) == 0) {
 		sayf("restoring %s %d to %s", a->kind == RM_ASSET_SAVE ? "save" : "state", a->id, target);
-		toast("RomM: restoring...");
+		toast(tr("RomM: restoring..."));
 	}
 }
 
@@ -1373,17 +1380,17 @@ static int flashbackInput(const MosaicInput* in, void* data) {
 		const RMAsset* a = &fb.assets[fb.selected];
 		char target[RM_PATH_MAX];
 		if (assetTarget(a, target, sizeof(target)) != 0) {
-			toast("RomM: this state can't be restored on this device");
+			toast(tr("RomM: this state can't be restored on this device"));
 			return MOSAIC_SCREEN_STAY;
 		}
 		if (!MOSAIC_HOST_HAS(host, confirm)) return MOSAIC_SCREEN_STAY;
 		fb.asked = fb.selected;
 		char label[RM_PATH_MAX];
 		assetLabel(a, label, sizeof(label));
-		char question[RM_PATH_MAX + 128];
-		put(question, sizeof(question), "Restore this %s?\n%s\nThe one on the card is backed up first.",
-			a->kind == RM_ASSET_SAVE ? "save" : "state", label);
-		host->confirm(question, "RESTORE", restoreConfirmed, NULL);
+		char question[RM_PATH_MAX + 512];
+		put(question, sizeof(question), a->kind == RM_ASSET_SAVE ? tr("Restore this save?\n%s\nThe one on the card is backed up first.")
+			: tr("Restore this state?\n%s\nThe one on the card is backed up first."), label);
+		host->confirm(question, tr("RESTORE"), restoreConfirmed, NULL);
 		return MOSAIC_SCREEN_STAY;
 	}
 	if (fb.selected != before) host->request_redraw();
@@ -1393,8 +1400,8 @@ static int flashbackInput(const MosaicInput* in, void* data) {
 static int flashbackRender(MosaicSurface* screen, const MosaicScreenView* v, void* data) {
 	(void)data;
 	background(screen, v);
-	char title[RM_NAME_MAX + 32];
-	put(title, sizeof(title), "Flashback: %s", fb.name);
+	char title[RM_NAME_MAX + 256];
+	put(title, sizeof(title), tr("Flashback: %s"), fb.name);
 	titlePill(screen, v, title);
 	int scale = host->screen_scale();
 	MosaicColor ink = themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF);
@@ -1409,10 +1416,10 @@ static int flashbackRender(MosaicSurface* screen, const MosaicScreenView* v, voi
 	int bottom = v->area.h - 2 * row_h;
 	char shown[256];
 	if (fb.count < 0) {
-		centred(screen, MOSAIC_FONT_LARGE, "Loading...", v->area.h / 2 - line, v->area.w, ink);
+		centred(screen, MOSAIC_FONT_LARGE, tr("Loading..."), v->area.h / 2 - line, v->area.w, ink);
 		put(shown, sizeof(shown), "loading");
 	} else if (fb.count == 0) {
-		centred(screen, MOSAIC_FONT_LARGE, fb.error[0] ? fb.error : "No saves or states on the server",
+		centred(screen, MOSAIC_FONT_LARGE, fb.error[0] ? fb.error : tr("No saves or states on the server"),
 			v->area.h / 2 - line, v->area.w, ink);
 		put(shown, sizeof(shown), "empty: %s", fb.error[0] ? fb.error : "none");
 	} else {
@@ -1535,20 +1542,20 @@ static void backupThenPlace(Job* j) {
 			free(old);
 			unlink(j->temp);
 			sayf("can't back up %s, so it wasn't restored", j->path);
-			toast("RomM: couldn't back up the current file");
+			toast(tr("RomM: couldn't back up the current file"));
 			return;
 		}
 		free(old);
 	}
 	if (rename(j->temp, j->path) != 0) {
 		unlink(j->temp);
-		toast("RomM: couldn't restore it");
+		toast(tr("RomM: couldn't restore it"));
 		sayf("can't move the restore into %s", j->path);
 		return;
 	}
 	sayf("restored %s %d to %s, backup %s", j->asset_kind == RM_ASSET_SAVE ? "save" : "state", j->asset_id, j->path,
 		backup[0] ? backup : "none (nothing there)");
-	toast("RomM: restored");
+	toast(tr("RomM: restored"));
 	if (j->asset_kind == RM_ASSET_SAVE) {
 		RMRecord r;
 		if (recordFind(j->name, &r)) {
@@ -1613,7 +1620,7 @@ static void finished(Job* j) {
 	case J_UPLOAD:
 		if (j->ok) {
 			sayf("uploaded %s for rom %d", j->file, j->rom_id);
-			toast("RomM: save uploaded");
+			toast(tr("RomM: save uploaded"));
 			RMRecord r;
 			if (recordFind(j->name, &r)) {
 				put(r.value, sizeof(r.value), "%s", j->md5);
@@ -1652,8 +1659,8 @@ static void finished(Job* j) {
 		static const char* what[] = { "listing platforms", "listing roms", "downloading", "uploading the save",
 			"listing saves", "restoring" };
 		sayf("%s failed: %s", what[j->kind], j->error);
-		char message[300];
-		put(message, sizeof(message), "RomM: %s", j->error);
+		char message[512];
+		put(message, sizeof(message), tr("RomM: %s"), j->error);
 		toast(message);
 	}
 }

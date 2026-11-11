@@ -58,6 +58,11 @@ static void say(const char* fmt, ...) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -104,7 +109,8 @@ static void refresh(void) {
 	long long left, played;
 	int state = look(day, &left, &played);
 	char text[sizeof(shown_text)] = "";
-	if (state != PL_OFF && state != PL_UNKNOWN) PL_format(left, text, sizeof(text));
+	const char* words[PL_WORDS_COUNT] = { tr("Time's up"), tr("%lldm left"), tr("%lldh %02lldm left") };
+	if (state != PL_OFF && state != PL_UNKNOWN) PL_formatIn(left, words, text, sizeof(text));
 	int changed = !looked || state != shown_state || PL_shownMinutes(left) != PL_shownMinutes(shown_left)
 		|| strcmp(day, shown_day) != 0 || strcmp(text, shown_text) != 0;
 	shown_state = state;
@@ -127,7 +133,7 @@ static void typedCode(const char* text, void* data) {
 	if (!text) return; // cancelled
 	if (!PL_codeMatches(host->cfg_get(ID, "code", ""), text)) {
 		say("wrong code");
-		toast("Wrong code");
+		toast(tr("Wrong code"));
 		return;
 	}
 	char day[PL_DAY_LEN];
@@ -140,8 +146,8 @@ static void typedCode(const char* text, void* data) {
 	host->cfg_set(ID, "grant_day", day);
 	host->cfg_set(ID, "grant_minutes", minutes);
 	say("granted %i more minutes today, %i in all", extra, total);
-	char message[64];
-	snprintf(message, sizeof(message), "%i more minutes today", extra);
+	char message[256];
+	snprintf(message, sizeof(message), tr("%i more minutes today"), extra);
 	toast(message);
 	looked = 0;
 	refresh();
@@ -149,7 +155,7 @@ static void typedCode(const char* text, void* data) {
 
 static void askCode(void* data) {
 	(void)data;
-	host->keyboard("Code for extra time", "", typedCode, NULL);
+	host->keyboard(tr("Code for extra time"), "", typedCode, NULL);
 }
 
 static int preLaunch(const MosaicLaunch* launch) {
@@ -168,11 +174,11 @@ static int preLaunch(const MosaicLaunch* launch) {
 	say("refused %s: %lld seconds played today, the limit is %i minutes%s", nameOf(launch->path), played,
 		limit + grantToday(day), can_ask ? "; offering extra time behind the code" : "");
 	if (can_ask) {
-		char message[96];
-		snprintf(message, sizeof(message), "Time's up for today. Enter the code for %i more minutes?", extra);
-		host->confirm(message, "CODE", askCode, NULL);
+		char message[512];
+		snprintf(message, sizeof(message), tr("Time's up for today. Enter the code for %i more minutes?"), extra);
+		host->confirm(message, tr("CODE"), askCode, NULL);
 	}
-	else toast("Time's up for today");
+	else toast(tr("Time's up for today"));
 	return MOSAIC_LAUNCH_CANCEL;
 }
 
@@ -181,10 +187,10 @@ static void postReturn(void) {
 	if (limit <= 0) return;
 	looked = 0;
 	refresh();
-	if (shown_state == PL_UP) toast("Time's up for today");
+	if (shown_state == PL_UP) toast(tr("Time's up for today"));
 	else if (shown_state == PL_WARN) {
-		char message[48];
-		snprintf(message, sizeof(message), "%s today", shown_text);
+		char message[256];
+		snprintf(message, sizeof(message), tr("%s today"), shown_text);
 		toast(message);
 	}
 }

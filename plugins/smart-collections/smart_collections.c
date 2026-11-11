@@ -32,6 +32,16 @@ static SMNameSet dismissed;
 static int min_games = 2;
 static int scanned = 0;
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -185,10 +195,10 @@ static void dismissConfirmed(void* data) {
 	(void)data;
 	if (!pending[0] || !SM_setAdd(&dismissed, pending)) return;
 	saveDismissed();
-	char message[SM_NAME_LEN + 32];
+	char message[SM_NAME_LEN + 256];
 	snprintf(message, sizeof(message), "dismissed %s", pending);
 	say(message);
-	snprintf(message, sizeof(message), "Dismissed %s", pending);
+	snprintf(message, sizeof(message), tr("Dismissed %s"), pending);
 	pending[0] = '\0';
 	changed(message);
 }
@@ -209,9 +219,9 @@ static void dismiss(void* data) {
 		dismissConfirmed(NULL);
 		return;
 	}
-	char question[SM_NAME_LEN + 32];
-	snprintf(question, sizeof(question), "Dismiss %s?", pending);
-	host->confirm(question, "DISMISS", dismissConfirmed, NULL);
+	char question[SM_NAME_LEN + 256];
+	snprintf(question, sizeof(question), tr("Dismiss %s?"), pending);
+	host->confirm(question, tr("DISMISS"), dismissConfirmed, NULL);
 }
 
 static void restoreConfirmed(void* data) {
@@ -220,7 +230,7 @@ static void restoreConfirmed(void* data) {
 	dismissed.count = 0;
 	saveDismissed();
 	say("brought back dismissed collections");
-	changed("Dismissed collections are back");
+	changed(tr("Dismissed collections are back"));
 }
 
 static int canRestore(void* data) {
@@ -235,9 +245,10 @@ static void restore(void* data) {
 		restoreConfirmed(NULL);
 		return;
 	}
-	char question[64];
-	snprintf(question, sizeof(question), "Bring back %d dismissed collection%s?", dismissed.count, dismissed.count == 1 ? "" : "s");
-	host->confirm(question, "RESTORE", restoreConfirmed, NULL);
+	char question[256];
+	snprintf(question, sizeof(question), trPlural("Bring back %d dismissed collection?", "Bring back %d dismissed collections?",
+		(unsigned long)dismissed.count), dismissed.count);
+	host->confirm(question, tr("RESTORE"), restoreConfirmed, NULL);
 }
 
 ///////////////////////////////////////
@@ -249,7 +260,7 @@ static void rootEntries(MosaicList* root) {
 	scan();
 	int found[SM_MAX_FRANCHISES];
 	if (SM_visible(&index_, &catalog, min_games, NULL, found) == 0) return;
-	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, FOLDER_NAME));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Smart Collections")));
 }
 
 static MosaicList* virtualDir(const char* path) {

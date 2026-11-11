@@ -62,11 +62,16 @@ long long PL_shownMinutes(long long left) {
 }
 
 void PL_format(long long left, char* out, size_t size) {
+	static const char* const english[PL_WORDS_COUNT] = { "Time's up", "%lldm left", "%lldh %02lldm left" };
+	PL_formatIn(left, english, out, size);
+}
+
+void PL_formatIn(long long left, const char* const words[PL_WORDS_COUNT], char* out, size_t size) {
 	if (!out || !size) return;
 	long long minutes = PL_shownMinutes(left);
-	if (minutes == 0) snprintf(out, size, "Time's up");
-	else if (minutes < 60) snprintf(out, size, "%lldm left", minutes);
-	else snprintf(out, size, "%lldh %02lldm left", minutes / 60, minutes % 60);
+	if (minutes == 0) snprintf(out, size, "%s", words[PL_WORDS_UP]);
+	else if (minutes < 60) snprintf(out, size, words[PL_WORDS_MINUTES], minutes);
+	else snprintf(out, size, words[PL_WORDS_HOURS], minutes / 60, minutes % 60);
 }
 
 static void trim(const char* in, char out[PL_CODE_LEN]) {

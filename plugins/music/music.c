@@ -143,6 +143,11 @@ static MosaicSurface* art_scaled = NULL;
 static char art_scaled_path[MU_PATH_MAX], art_failed[MU_PATH_MAX], art_logged[MU_PATH_MAX];
 static int art_scaled_size = 0;
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* format, ...) __attribute__((format(printf, 1, 2)));
 static void say(const char* format, ...) {
 	char text[2 * MU_PATH_MAX + 2 * MU_TAG_TEXT_MAX + 64]; // a track, its art and two tags
@@ -350,14 +355,14 @@ static int ensureDaemon(void) {
 // Plays a track and the rest of its folder.
 static void playPath(const char* path) {
 	if (ensureDaemon() != 0) {
-		if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play");
+		if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Music can't play"));
 		return;
 	}
 	sendCommand(MU_CMD_REPEAT, MU_repeatName(repeat), REQUEST_MS);
 	sendCommand(MU_CMD_SHUFFLE, shuffle ? "on" : "off", REQUEST_MS);
 	restored = 0;
 	if (sendCommand(MU_CMD_PLAY, path, DEVICE_REQUEST_MS) == 0) say("playing %s", path);
-	else if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play that");
+	else if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Music can't play that"));
 	askStatus(last_now);
 }
 
@@ -371,7 +376,7 @@ static void command(int cmd, const char* arg) {
 // repeat settings as they are now.
 static void playRestored(void) {
 	if (ensureDaemon() != 0) {
-		if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play");
+		if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Music can't play"));
 		return;
 	}
 	restored = 0;
@@ -379,7 +384,7 @@ static void playRestored(void) {
 		say("playing on from %s at %lld ms", restored_st.track, restored_st.pos_ms);
 		sendCommand(MU_CMD_REPEAT, MU_repeatName(repeat), REQUEST_MS);
 		if (shuffle != restored_shuffle) sendCommand(MU_CMD_SHUFFLE, shuffle ? "on" : "off", REQUEST_MS);
-	} else if (MOSAIC_HOST_HAS(host, toast)) host->toast("Music can't play on");
+	} else if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Music can't play on"));
 	askStatus(last_now);
 }
 
@@ -697,8 +702,10 @@ static void stateLine(char* out, size_t size) {
 	char pos[16], len[16];
 	MU_formatTime(st.pos_ms, pos, sizeof(pos));
 	MU_formatTime(st.len_ms, len, sizeof(len));
-	snprintf(out, size, "%s  %s / %s%s  Repeat %s", st.state == MU_PLAYING ? "Playing" : "Paused", pos, len,
-		st.shuffle ? "  Shuffle" : "", MU_repeatName(st.repeat));
+	char repeat[128];
+	snprintf(repeat, sizeof(repeat), tr("Repeat %s"), tr(MU_repeatName(st.repeat)));
+	snprintf(out, size, "%s  %s / %s%s%s  %s", st.state == MU_PLAYING ? tr("Playing") : tr("Paused"), pos, len,
+		st.shuffle ? "  " : "", st.shuffle ? tr("Shuffle") : "", repeat);
 }
 
 // the hole the status pill and header widgets leave in the top row
@@ -753,7 +760,7 @@ static int playerRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 
 	// the folder's name in the top row
 	const char* slash = strrchr(dir, '/');
-	const char* name = strcmp(dir, root) == 0 ? "Music" : slash ? slash + 1 : dir;
+	const char* name = strcmp(dir, root) == 0 ? tr("Music") : slash ? slash + 1 : dir;
 	int title_max = (top.w > 0 ? top.x : area.x + area.w) - area.x - 3 * pad;
 	if (title_max > 0) {
 		char cut[MU_NAME_MAX];
@@ -809,8 +816,8 @@ static int playerRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 	if (visible_rows < 1) visible_rows = 1;
 	if (list.count <= 0) {
 		MosaicRect box = { area.x + pad, list_top, area.w - 2 * pad, list_bottom - list_top };
-		char message[MU_PATH_MAX + 32];
-		snprintf(message, sizeof(message), "No music in %s", strcmp(dir, root) == 0 ? root + strlen(host->sdcard_path) : name);
+		char message[MU_PATH_MAX + 256];
+		snprintf(message, sizeof(message), tr("No music in %s"), strcmp(dir, root) == 0 ? root + strlen(host->sdcard_path) : name);
 		textCentred(screen, MOSAIC_FONT_LARGE, message, &box, list_top + (box.h - large) / 2, text);
 	} else {
 		if (selected >= list.count) selected = list.count - 1;
@@ -904,7 +911,7 @@ static int overlayRender(MosaicSurface* surface, const MosaicScreenView* view) {
 	char title[MU_TAG_TEXT_MAX], text[2 * MU_TAG_TEXT_MAX + 16], cut[sizeof(text)];
 	nowTitle(title, sizeof(title));
 	const char* artist = nowArtist();
-	snprintf(text, sizeof(text), "%s: %s%s%s", st.state == MU_PLAYING ? "Playing" : "Paused", title, artist[0] ? " - " : "",
+	snprintf(text, sizeof(text), "%s: %s%s%s", st.state == MU_PLAYING ? tr("Playing") : tr("Paused"), title, artist[0] ? " - " : "",
 		artist);
 	int w = host->text_truncate(MOSAIC_FONT_SMALL, text, area.w / 2 - 2 * pad, cut, sizeof(cut));
 	if (w <= 0) return 0;

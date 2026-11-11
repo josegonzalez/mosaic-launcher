@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: \n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
 #: launcher/statuspill.c
@@ -29,6 +29,41 @@ msgstr ""
 #: launcher/statuspill.c
 #, c-format
 msgid "%s failed"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Amiga"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Amstrad CPC"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Arcade"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Atari 2600"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Atari 5200"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Atari 7800"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Atari Lynx"
 msgstr ""
 
 #: launcher/modal.c launcher/screen_gamelist.c launcher/screen_quickmenu.c
@@ -68,8 +103,38 @@ msgstr ""
 msgid "COLOR TEMP"
 msgstr ""
 
-#: launcher/quicktiles.c
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Colecovision"
+msgstr ""
+
+#: launcher/library.c launcher/quicktiles.c
 msgid "Collections"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Commodore 128"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Commodore 64"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Commodore PET"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Commodore Plus4"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Commodore VIC20"
 msgstr ""
 
 #: launcher/settings.c
@@ -91,8 +156,33 @@ msgstr ""
 msgid "Disc %i"
 msgstr ""
 
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Doom"
+msgstr ""
+
 #: launcher/screen_gamelist.c
 msgid "Empty folder"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Famicom Disk System"
+msgstr ""
+
+#: vendor/NextUI/skeleton/BASE/Roms
+msgctxt "systems"
+msgid "Game Boy"
+msgstr ""
+
+#: vendor/NextUI/skeleton/BASE/Roms vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Game Boy Advance"
+msgstr ""
+
+#: vendor/NextUI/skeleton/BASE/Roms
+msgctxt "systems"
+msgid "Game Boy Color"
 msgstr ""
 
 #: launcher/pluginorder.c
@@ -169,12 +259,32 @@ msgstr ""
 msgid "Main menu"
 msgstr ""
 
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Microsoft MSX"
+msgstr ""
+
 #: launcher/screen_gamelist.c
 msgid "NEXT"
 msgstr ""
 
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Neo Geo Pocket"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Neo Geo Pocket Color"
+msgstr ""
+
 #: launcher/settings.c
 msgid "New PIN, empty for none"
+msgstr ""
+
+#: vendor/NextUI/skeleton/BASE/Roms
+msgctxt "systems"
+msgid "Nintendo Entertainment System"
 msgstr ""
 
 #: launcher/screen_switcher.c
@@ -248,8 +358,18 @@ msgstr ""
 msgid "Paused after crashes - using stock"
 msgstr ""
 
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Pico-8"
+msgstr ""
+
 #: launcher/settings.c
 msgid "Plugins"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Pokémon mini"
 msgstr ""
 
 #: launcher/quickitems.c
@@ -266,6 +386,10 @@ msgstr ""
 
 #: launcher/quickitems.c
 msgid "Reboot"
+msgstr ""
+
+#: launcher/library.c
+msgid "Recently Played"
 msgstr ""
 
 #: launcher/quicktiles.c
@@ -292,6 +416,36 @@ msgstr ""
 msgid "SWITCHER"
 msgstr ""
 
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Sega 32X"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Sega CD"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Sega Game Gear"
+msgstr ""
+
+#: vendor/NextUI/skeleton/BASE/Roms
+msgctxt "systems"
+msgid "Sega Genesis"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Sega Master System"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Sega SG-1000"
+msgstr ""
+
 #: launcher/settings.c
 msgid "Set"
 msgstr ""
@@ -304,8 +458,23 @@ msgstr ""
 msgid "Sleep"
 msgstr ""
 
+#: vendor/NextUI/skeleton/BASE/Roms
+msgctxt "systems"
+msgid "Sony PlayStation"
+msgstr ""
+
 #: launcher/settings.c
 msgid "Status"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Super Game Boy"
+msgstr ""
+
+#: vendor/NextUI/skeleton/BASE/Roms vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Super Nintendo Entertainment System"
 msgstr ""
 
 #: launcher/settings.c
@@ -320,7 +489,7 @@ msgstr ""
 msgid "This build supports a different NextUI release."
 msgstr ""
 
-#: launcher/quicktiles.c
+#: launcher/library.c launcher/quicktiles.c
 msgid "Tools"
 msgstr ""
 
@@ -332,12 +501,22 @@ msgstr ""
 msgid "Try again"
 msgstr ""
 
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "TurboGrafx-16"
+msgstr ""
+
 #: launcher/settings.c
 msgid "Turn off"
 msgstr ""
 
 #: launcher/settings.c
 msgid "Turn on"
+msgstr ""
+
+#: vendor/NextUI/skeleton/EXTRAS/Roms
+msgctxt "systems"
+msgid "Virtual Boy"
 msgstr ""
 
 #: launcher/settings.c

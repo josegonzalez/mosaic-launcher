@@ -37,6 +37,11 @@ static int min_systems = 1;
 static char skip[1024]; // folder names that aren't genres, comma-separated
 static int tags = GV_TAGS_SHARED;
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static int exists(const char* path) {
 	struct stat st;
 	return stat(path, &st) == 0;
@@ -215,7 +220,7 @@ static void pushFolders(MosaicList* list, const char* path, const GVGroups* fold
 static void rootEntries(MosaicList* root) {
 	GVGroups found;
 	genres(&found);
-	if (found.count > 0) host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, FOLDER_NAME));
+	if (found.count > 0) host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Genres")));
 	GV_groupsFree(&found);
 }
 

@@ -70,6 +70,11 @@ static const char* styleName(int s) {
 	return s == SP_STYLE_STRIP ? "strip" : s == SP_STYLE_LIST ? "list" : "full";
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -289,7 +294,7 @@ static int renderFull(MosaicSurface* screen, const MosaicScreenView* view, const
 	if (got == 0) fillAround(screen, area, hole, mosaic_color(0x000000, 255));
 	if (got < 0) {
 		fillAround(screen, area, hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
-		centred(screen, MOSAIC_FONT_LARGE, "No Preview", area, mosaic_color(0xFFFFFF, 255));
+		centred(screen, MOSAIC_FONT_LARGE, tr("No Preview"), area, mosaic_color(0xFFFFFF, 255));
 	}
 	const char* name = nameOf(selected);
 	MosaicRect title = SP_title(area, hole, host->screen_scale(), host->text_width(MOSAIC_FONT_LARGE, name));
@@ -329,7 +334,7 @@ static int renderStrip(MosaicSurface* screen, const MosaicScreenView* view, cons
 			}
 			host->fill_rect(screen, &rect, card);
 			int drew = drawPreview(screen, index, &rect, hole, mosaic_color(0x000000, 255));
-			if (drew < 0) centred(screen, d == 0 ? MOSAIC_FONT_LARGE : MOSAIC_FONT_SMALL, "No Preview", &rect, ink);
+			if (drew < 0) centred(screen, d == 0 ? MOSAIC_FONT_LARGE : MOSAIC_FONT_SMALL, tr("No Preview"), &rect, ink);
 			if (d == 0) got = drew;
 		}
 	}
@@ -387,7 +392,7 @@ static int renderList(MosaicSurface* screen, const MosaicScreenView* view, const
 	int text_h = captions_on ? host->text_height(MOSAIC_FONT_SMALL) : 0;
 	if (text_h > 0) line = SP_panelCaption(&list.panel, scale, text_h, &preview);
 	int got = drawPreview(screen, selected, &preview, hole, mosaic_color(0, 0));
-	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, "No Preview", &preview, ink);
+	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, tr("No Preview"), &preview, ink);
 	char text[160];
 	int cw = line.w > 0 ? captionOf(selected, line.w, text, sizeof(text)) : 0;
 	if (cw > 0) {

@@ -66,6 +66,11 @@ static char shown[SM_NAME_MAX * 2 + 128];
 
 static void forget(void);
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -206,7 +211,7 @@ static int renderFull(MosaicSurface* screen, const MosaicScreenView* v, const Mo
 	const SMSlot* slot = &game->slots[slot_sel];
 	fillAround(screen, &v->area, hole, mosaic_color(0x000000, 255));
 	int got = drawPreview(screen, slot->preview, &v->area, hole, fulls, FULL_COPIES);
-	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, "No preview", &v->area, mosaic_color(0xFFFFFF, 255));
+	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, tr("No preview"), &v->area, mosaic_color(0xFFFFFF, 255));
 	prefetch(game, slot_sel + 1, &v->area);
 	prefetch(game, slot_sel - 1, &v->area);
 	char text[SM_NAME_MAX + 128];
@@ -255,7 +260,7 @@ static int renderGrid(MosaicSurface* screen, const MosaicScreenView* v, const Mo
 		}
 		int got = drawPreview(screen, preview, &box, NULL, thumbs, THUMB_COPIES);
 		if (got > 0) drawn++;
-		if (got < 0) centred(screen, MOSAIC_FONT_SMALL, "No preview", &box, ink);
+		if (got < 0) centred(screen, MOSAIC_FONT_SMALL, tr("No preview"), &box, ink);
 		MosaicColor color = i == selected ? ring : ink;
 		host->draw_text(screen, MOSAIC_FONT_SMALL, top, cell.x, box.y + box.h + 2 * scale, color, cell.w);
 		host->draw_text(screen, MOSAIC_FONT_SMALL, bottom, cell.x, box.y + box.h + 2 * scale + line_h, color, cell.w);
@@ -322,7 +327,7 @@ static void deleteConfirmed(void* data) {
 	if (removed < 0) {
 		snprintf(message, sizeof(message), "can't delete %s of %s", label, pending.name);
 		say(message);
-		if (MOSAIC_HOST_HAS(host, toast)) host->toast("Couldn't delete that state");
+		if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Couldn't delete that state"));
 		return;
 	}
 	deleted = 1;
@@ -344,7 +349,7 @@ static void deleteConfirmed(void* data) {
 	} else if (view == SM_VIEW_FULL && slot_sel >= game->count) {
 		slot_sel = game->count - 1;
 	}
-	if (MOSAIC_HOST_HAS(host, toast)) host->toast("Save state deleted");
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Save state deleted"));
 	host->request_redraw();
 }
 
@@ -356,9 +361,9 @@ static void askDelete(void) {
 	pending.slot = game->slots[slot_sel].slot;
 	char text[SM_NAME_MAX + 128];
 	slotTitle(game, &game->slots[slot_sel], 1, text, sizeof(text));
-	char question[sizeof(text) + 32];
-	snprintf(question, sizeof(question), "Delete this save state?\n%s", text);
-	host->confirm(question, "DELETE", deleteConfirmed, NULL);
+	char question[sizeof(text) + 256];
+	snprintf(question, sizeof(question), tr("Delete this save state?\n%s"), text);
+	host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
 }
 
 ///////////////////////////////////////
@@ -448,11 +453,11 @@ static int render(MosaicSurface* screen, const MosaicScreenView* v, void* data) 
 	int got = -1, shown_view = view;
 	fillAround(screen, &v->area, &hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
 	if (count <= 0) {
-		title(screen, v, &hole, view == SM_VIEW_GAMES || !game ? "Save states" : game->display);
-		centred(screen, MOSAIC_FONT_LARGE, "No save states", &v->area, themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF));
+		title(screen, v, &hole, view == SM_VIEW_GAMES || !game ? tr("Save states") : game->display);
+		centred(screen, MOSAIC_FONT_LARGE, tr("No save states"), &v->area, themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF));
 	} else if (view == SM_VIEW_GAMES) {
 		got = renderGrid(screen, v, &hole, count, game_sel, &game_row);
-		title(screen, v, &hole, game ? game->display : "Save states");
+		title(screen, v, &hole, game ? game->display : tr("Save states"));
 	} else if (view == SM_VIEW_SLOTS) {
 		got = renderGrid(screen, v, &hole, count, slot_sel, &slot_row);
 		if (got < 0) shown_view = SM_VIEW_FULL; // too small for a grid: the full view stands in

@@ -1,6 +1,6 @@
 # The bundled plugins' names, setting labels and choice options, from
-# their plugin.txt files, under msgctxt set to the plugin's id. Written
-# by make pot.
+# their plugin.txt files, and the fixed text their code hands the
+# launcher, under msgctxt set to the plugin's id. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -13,6 +13,22 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "30 days"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "7 days"
+msgstr ""
+
+#: plugins/activity-stats/activity_stats.c
+msgctxt "activity-stats"
+msgid "Activity"
+msgstr ""
 
 #: plugins/activity-stats/plugin.txt
 msgctxt "activity-stats"
@@ -24,9 +40,35 @@ msgctxt "activity-stats"
 msgid "Activity stats"
 msgstr ""
 
+#: plugins/activity-stats/activity_stats.c
+#, c-format
+msgctxt "activity-stats"
+msgid "Couldn't open %s"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Games"
+msgstr ""
+
 #: plugins/activity-stats/plugin.txt
 msgctxt "activity-stats"
 msgid "L2"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Launches"
+msgstr ""
+
+#: plugins/activity-stats/activity_stats.c
+msgctxt "activity-stats"
+msgid "No play history"
+msgstr ""
+
+#: plugins/activity-stats/activity_stats.c
+msgctxt "activity-stats"
+msgid "Nothing played yet"
 msgstr ""
 
 #: plugins/activity-stats/plugin.txt
@@ -62,6 +104,11 @@ msgstr ""
 #: plugins/all-games/plugin.txt
 msgctxt "all-games"
 msgid "Show the system on shared names"
+msgstr ""
+
+#: plugins/all-games/all_games.c
+msgctxt "all-games"
+msgid "Systems"
 msgstr ""
 
 #: plugins/art-backdrop/plugin.txt
@@ -354,6 +401,16 @@ msgctxt "charging-screen"
 msgid "60"
 msgstr ""
 
+#: plugins/charging-screen/charging_model.c
+msgctxt "charging-screen"
+msgid "Charged"
+msgstr ""
+
+#: plugins/charging-screen/charging_model.c
+msgctxt "charging-screen"
+msgid "Charging"
+msgstr ""
+
 #: plugins/charging-screen/plugin.txt
 msgctxt "charging-screen"
 msgid "Charging screen (unsupported on desktop)"
@@ -374,7 +431,22 @@ msgctxt "charging-screen"
 msgid "off"
 msgstr ""
 
-#: plugins/clear-recents/plugin.txt
+#: plugins/clear-recents/clear_recents.c
+msgctxt "clear-recents"
+msgid "CLEAR"
+msgstr ""
+
+#: plugins/clear-recents/clear_recents.c
+msgctxt "clear-recents"
+msgid "CLEAR ALL"
+msgstr ""
+
+#: plugins/clear-recents/clear_recents.c
+msgctxt "clear-recents"
+msgid "Clear all recently played games?"
+msgstr ""
+
+#: plugins/clear-recents/clear_recents.c plugins/clear-recents/plugin.txt
 msgctxt "clear-recents"
 msgid "Clear recents"
 msgstr ""
@@ -382,6 +454,11 @@ msgstr ""
 #: plugins/clear-recents/plugin.txt
 msgctxt "clear-recents"
 msgid "Clear recents tile on the quick menu"
+msgstr ""
+
+#: plugins/clear-recents/clear_recents.c
+msgctxt "clear-recents"
+msgid "Couldn't remove that"
 msgstr ""
 
 #: plugins/clear-recents/plugin.txt
@@ -394,9 +471,24 @@ msgctxt "clear-recents"
 msgid "R2"
 msgstr ""
 
+#: plugins/clear-recents/clear_recents.c
+msgctxt "clear-recents"
+msgid "REMOVE"
+msgstr ""
+
 #: plugins/clear-recents/plugin.txt
 msgctxt "clear-recents"
 msgid "Recently Played button"
+msgstr ""
+
+#: plugins/clear-recents/clear_recents.c
+msgctxt "clear-recents"
+msgid "Recents cleared"
+msgstr ""
+
+#: plugins/clear-recents/clear_recents.c
+msgctxt "clear-recents"
+msgid "Removed from recents"
 msgstr ""
 
 #: plugins/clear-recents/plugin.txt
@@ -514,6 +606,32 @@ msgctxt "core-prefetch"
 msgid "Warm the game too"
 msgstr ""
 
+#: plugins/emulator-override/emulator_override.c
+msgctxt "emulator-override"
+msgid "Couldn't list the emulators"
+msgstr ""
+
+#: plugins/emulator-override/emulator_override.c
+msgctxt "emulator-override"
+msgid "Couldn't save the emulator"
+msgstr ""
+
+#: plugins/emulator-override/emulator_override.c
+#, c-format
+msgctxt "emulator-override"
+msgid "Default (%s)"
+msgstr ""
+
+#: plugins/emulator-override/emulator_override.c
+msgctxt "emulator-override"
+msgid "EMULATOR"
+msgstr ""
+
+#: plugins/emulator-override/emulator_override.c
+msgctxt "emulator-override"
+msgid "Emulator"
+msgstr ""
+
 #: plugins/emulator-override/plugin.txt
 msgctxt "emulator-override"
 msgid "Emulator button"
@@ -522,6 +640,12 @@ msgstr ""
 #: plugins/emulator-override/plugin.txt
 msgctxt "emulator-override"
 msgid "Emulator override"
+msgstr ""
+
+#: plugins/emulator-override/emulator_override.c
+#, c-format
+msgctxt "emulator-override"
+msgid "Emulator set to %s"
 msgstr ""
 
 #: plugins/emulator-override/plugin.txt
@@ -539,14 +663,42 @@ msgctxt "emulator-override"
 msgid "R2"
 msgstr ""
 
+#: plugins/emulator-override/emulator_override.c
+msgctxt "emulator-override"
+msgid "Using the default emulator"
+msgstr ""
+
 #: plugins/emulator-override/plugin.txt
 msgctxt "emulator-override"
 msgid "Y"
 msgstr ""
 
+#: plugins/favorites/favorites.c
+#, c-format
+msgctxt "favorites"
+msgid "%s is full"
+msgstr ""
+
+#: plugins/favorites/favorites.c
+#, c-format
+msgctxt "favorites"
+msgid "Added to %s"
+msgstr ""
+
 #: plugins/favorites/plugin.txt
 msgctxt "favorites"
 msgid "Collection"
+msgstr ""
+
+#: plugins/favorites/favorites.c
+#, c-format
+msgctxt "favorites"
+msgid "Couldn't save %s"
+msgstr ""
+
+#: plugins/favorites/favorites.c
+msgctxt "favorites"
+msgid "FAVORITE"
 msgstr ""
 
 #: plugins/favorites/plugin.txt
@@ -559,12 +711,45 @@ msgctxt "favorites"
 msgid "Pin to top"
 msgstr ""
 
+#: plugins/favorites/favorites.c
+msgctxt "favorites"
+msgid "REMOVE"
+msgstr ""
+
+#: plugins/favorites/favorites.c
+#, c-format
+msgctxt "favorites"
+msgid "Remove %.120s from %.60s?"
+msgstr ""
+
+#: plugins/favorites/favorites.c
+#, c-format
+msgctxt "favorites"
+msgid "Removed from %s"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+#, c-format
+msgctxt "first-run"
+msgid "%i of %i"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "All set"
+msgstr ""
+
 #: plugins/first-run/plugin.txt
 msgctxt "first-run"
 msgid "Already shown"
 msgstr ""
 
-#: plugins/first-run/plugin.txt
+#: plugins/first-run/first_run.c plugins/first-run/plugin.txt
 msgctxt "first-run"
 msgid "First run"
 msgstr ""
@@ -574,14 +759,59 @@ msgctxt "first-run"
 msgid "First run button"
 msgstr ""
 
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Haptic feedback"
+msgstr ""
+
 #: plugins/first-run/plugin.txt
 msgctxt "first-run"
 msgid "L2"
 msgstr ""
 
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Left and right change the selected setting, saved at once. Settings has them too."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Off"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "On"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Once it's done or skipped it won't open by itself again."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Once it's done or skipped it won't open by itself again. The First run tile on the quick menu opens it."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "PIN"
+msgstr ""
+
 #: plugins/first-run/plugin.txt
 msgctxt "first-run"
 msgid "PIN page"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Plugins"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Plugins to try:"
 msgstr ""
 
 #: plugins/first-run/plugin.txt
@@ -599,9 +829,24 @@ msgctxt "first-run"
 msgid "SELECT"
 msgstr ""
 
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Settings"
+msgstr ""
+
 #: plugins/first-run/plugin.txt
 msgctxt "first-run"
 msgid "Settings page"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Show battery percentage"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Show clock"
 msgstr ""
 
 #: plugins/first-run/plugin.txt
@@ -609,9 +854,64 @@ msgctxt "first-run"
 msgid "Suggested plugins"
 msgstr ""
 
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "That's it."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "That's it. The First run tile on the quick menu opens this again."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "The launcher has a PIN."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "The launcher has no PIN."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "This goes over a few settings and plugins. A goes on, B goes back, and Y skips the rest."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Turn them on in Tools > Launcher > Plugins. They start the next time the launcher does."
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Volume and display notifications"
+msgstr ""
+
+#: plugins/first-run/first_run.c
+msgctxt "first-run"
+msgid "Welcome"
+msgstr ""
+
 #: plugins/first-run/plugin.txt
 msgctxt "first-run"
 msgid "Y"
+msgstr ""
+
+#: plugins/first-run/wizard_model.c
+msgctxt "first-run"
+msgid "a Favorites folder, Y adds a game"
+msgstr ""
+
+#: plugins/first-run/wizard_model.c
+msgctxt "first-run"
+msgid "a home screen with your last game"
+msgstr ""
+
+#: plugins/first-run/wizard_model.c
+msgctxt "first-run"
+msgid "more game switcher styles"
 msgstr ""
 
 #: plugins/first-run/plugin.txt
@@ -619,9 +919,34 @@ msgctxt "first-run"
 msgid "none"
 msgstr ""
 
+#: plugins/first-run/wizard_model.c
+msgctxt "first-run"
+msgid "search every game by name"
+msgstr ""
+
+#: plugins/focus-mode/focus_mode.c
+msgctxt "focus-mode"
+msgid "All systems"
+msgstr ""
+
+#: plugins/focus-mode/focus_mode.c
+msgctxt "focus-mode"
+msgid "Focus"
+msgstr ""
+
 #: plugins/focus-mode/plugin.txt
 msgctxt "focus-mode"
 msgid "Focus mode"
+msgstr ""
+
+#: plugins/focus-mode/focus_mode.c
+msgctxt "focus-mode"
+msgid "Focus mode off"
+msgstr ""
+
+#: plugins/focus-mode/focus_mode.c
+msgctxt "focus-mode"
+msgid "Focus mode on"
 msgstr ""
 
 #: plugins/focus-mode/plugin.txt
@@ -629,9 +954,80 @@ msgctxt "focus-mode"
 msgid "Focus on favorites"
 msgstr ""
 
-#: plugins/game-actions/plugin.txt
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "ADD TO COLLECTION"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c plugins/game-actions/plugin.txt
 msgctxt "game-actions"
 msgid "Add to collection"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+#, c-format
+msgctxt "game-actions"
+msgid "Added to %s"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+#, c-format
+msgctxt "game-actions"
+msgid "Already in %s"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+#, c-format
+msgctxt "game-actions"
+msgid "Also deletes %s.\n"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+#, c-format
+msgctxt "game-actions"
+msgid "Also deletes its folder%s%s.\n"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Can't delete that"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+#, c-format
+msgctxt "game-actions"
+msgid "Couldn't add to %s"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Couldn't delete everything"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Couldn't list collections"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Couldn't rename that"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Couldn't save the name"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "DELETE"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+#, c-format
+msgctxt "game-actions"
+msgid "Delete %.40s%s?\n%sThis can't be undone."
 msgstr ""
 
 #: plugins/game-actions/plugin.txt
@@ -642,6 +1038,11 @@ msgstr ""
 #: plugins/game-actions/plugin.txt
 msgctxt "game-actions"
 msgid "Delete saves and states with a game"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Deleted"
 msgstr ""
 
 #: plugins/game-actions/plugin.txt
@@ -659,14 +1060,39 @@ msgctxt "game-actions"
 msgid "L2"
 msgstr ""
 
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Name restored"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "New collection"
+msgstr ""
+
 #: plugins/game-actions/plugin.txt
 msgctxt "game-actions"
 msgid "R2"
 msgstr ""
 
-#: plugins/game-actions/plugin.txt
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "RENAME"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c plugins/game-actions/plugin.txt
 msgctxt "game-actions"
 msgid "Rename"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "Renamed"
+msgstr ""
+
+#: plugins/game-actions/game_actions.c
+msgctxt "game-actions"
+msgid "That name can't be a collection"
 msgstr ""
 
 #: plugins/game-actions/plugin.txt
@@ -779,6 +1205,11 @@ msgctxt "gamification"
 msgid "L2"
 msgstr ""
 
+#: plugins/gamification/gamification.c
+msgctxt "gamification"
+msgid "Quests"
+msgstr ""
+
 #: plugins/gamification/plugin.txt
 msgctxt "gamification"
 msgid "Quests button"
@@ -859,6 +1290,11 @@ msgctxt "genre-view"
 msgid "Genre view"
 msgstr ""
 
+#: plugins/genre-view/genre_view.c
+msgctxt "genre-view"
+msgid "Genres"
+msgstr ""
+
 #: plugins/genre-view/plugin.txt
 msgctxt "genre-view"
 msgid "Show the system"
@@ -904,6 +1340,26 @@ msgctxt "header-indicators"
 msgid "SSH dot"
 msgstr ""
 
+#: plugins/hidden/hidden.c
+msgctxt "hidden"
+msgid "Couldn't hide that"
+msgstr ""
+
+#: plugins/hidden/hidden.c
+msgctxt "hidden"
+msgid "Couldn't save hidden games"
+msgstr ""
+
+#: plugins/hidden/hidden.c
+msgctxt "hidden"
+msgid "HIDE"
+msgstr ""
+
+#: plugins/hidden/hidden.c
+msgctxt "hidden"
+msgid "Hidden"
+msgstr ""
+
 #: plugins/hidden/plugin.txt
 msgctxt "hidden"
 msgid "Hidden games"
@@ -927,6 +1383,16 @@ msgstr ""
 #: plugins/hidden/plugin.txt
 msgctxt "hidden"
 msgid "SELECT"
+msgstr ""
+
+#: plugins/hidden/hidden.c
+msgctxt "hidden"
+msgid "UNHIDE"
+msgstr ""
+
+#: plugins/hidden/hidden.c
+msgctxt "hidden"
+msgid "Unhidden"
 msgstr ""
 
 #: plugins/hidden/plugin.txt
@@ -989,6 +1455,53 @@ msgctxt "hold-lock"
 msgid "select+start"
 msgstr ""
 
+#: plugins/home-dashboard/home_dashboard.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/home-dashboard/home_dashboard.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "Achievements"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "CONTINUE"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "Checking achievements"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "Couldn't open %s"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "Games"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+msgctxt "home-dashboard"
+msgid "Home"
+msgstr ""
+
 #: plugins/home-dashboard/plugin.txt
 msgctxt "home-dashboard"
 msgid "Home dashboard"
@@ -999,14 +1512,69 @@ msgctxt "home-dashboard"
 msgid "Home mode"
 msgstr ""
 
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "Its emulator isn't installed"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "MOST PLAYED"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "No Pico-8 carts"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "No achievements on the card yet"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "No favorites yet"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "No play history yet"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "Nothing played yet"
+msgstr ""
+
 #: plugins/home-dashboard/plugin.txt
 msgctxt "home-dashboard"
 msgid "Pico-8 folder tags"
 msgstr ""
 
+#: plugins/home-dashboard/home_model.c
+msgctxt "home-dashboard"
+msgid "Pinned"
+msgstr ""
+
 #: plugins/home-dashboard/plugin.txt
 msgctxt "home-dashboard"
 msgid "Pinned tab"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "Played today"
+msgstr ""
+
+#: plugins/home-dashboard/home_dashboard.c
+msgctxt "home-dashboard"
+msgid "Recently played"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+msgctxt "home-dashboard"
+msgid "Stats"
 msgstr ""
 
 #: plugins/home-dashboard/plugin.txt
@@ -1389,6 +1957,22 @@ msgctxt "led-status"
 msgid "theme"
 msgstr ""
 
+#: plugins/localization/localization.c
+#, c-format
+msgctxt "localization"
+msgid "Add names to map.txt in %d folder?"
+msgid_plural "Add names to map.txt in %d folders?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/localization/localization.c
+#, c-format
+msgctxt "localization"
+msgid "Added names to map.txt in %d folder"
+msgid_plural "Added names to map.txt in %d folders"
+msgstr[0] ""
+msgstr[1] ""
+
 #: plugins/localization/plugin.txt
 msgctxt "localization"
 msgid "Fallback font"
@@ -1409,9 +1993,24 @@ msgctxt "localization"
 msgid "Language pack folder"
 msgstr ""
 
+#: plugins/localization/localization.c
+msgctxt "localization"
+msgid "Lines already in a map.txt are kept."
+msgstr ""
+
 #: plugins/localization/plugin.txt
 msgctxt "localization"
 msgid "Localization"
+msgstr ""
+
+#: plugins/localization/localization.c
+msgctxt "localization"
+msgid "No names lists for this language"
+msgstr ""
+
+#: plugins/localization/localization.c
+msgctxt "localization"
+msgid "No names to add to map.txt"
 msgstr ""
 
 #: plugins/localization/plugin.txt
@@ -1427,6 +2026,16 @@ msgstr ""
 #: plugins/localization/plugin.txt
 msgctxt "localization"
 msgid "SELECT"
+msgstr ""
+
+#: plugins/localization/localization.c
+msgctxt "localization"
+msgid "WRITE"
+msgstr ""
+
+#: plugins/localization/localization.c
+msgctxt "localization"
+msgid "Write map.txt names"
 msgstr ""
 
 #: plugins/localization/plugin.txt
@@ -1604,9 +2213,29 @@ msgctxt "music"
 msgid "During games"
 msgstr ""
 
-#: plugins/music/plugin.txt
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Lock screen"
+msgstr ""
+
+#: plugins/music/music.c plugins/music/plugin.txt
 msgctxt "music"
 msgid "Music"
+msgstr ""
+
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Music can't play"
+msgstr ""
+
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Music can't play on"
+msgstr ""
+
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Music can't play that"
 msgstr ""
 
 #: plugins/music/plugin.txt
@@ -1614,9 +2243,30 @@ msgctxt "music"
 msgid "Music folder"
 msgstr ""
 
+#: plugins/music/music.c
+#, c-format
+msgctxt "music"
+msgid "No music in %s"
+msgstr ""
+
 #: plugins/music/plugin.txt
 msgctxt "music"
 msgid "Now playing pill (seconds)"
+msgstr ""
+
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Paused"
+msgstr ""
+
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Play or pause music"
+msgstr ""
+
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Playing"
 msgstr ""
 
 #: plugins/music/plugin.txt
@@ -1629,12 +2279,18 @@ msgctxt "music"
 msgid "Repeat"
 msgstr ""
 
+#: plugins/music/music.c
+#, c-format
+msgctxt "music"
+msgid "Repeat %s"
+msgstr ""
+
 #: plugins/music/plugin.txt
 msgctxt "music"
 msgid "Resume after power-off"
 msgstr ""
 
-#: plugins/music/plugin.txt
+#: plugins/music/music.c plugins/music/plugin.txt
 msgctxt "music"
 msgid "Shuffle"
 msgstr ""
@@ -1644,7 +2300,7 @@ msgctxt "music"
 msgid "Stay awake while playing"
 msgstr ""
 
-#: plugins/music/plugin.txt
+#: plugins/music/music_model.c plugins/music/plugin.txt
 msgctxt "music"
 msgid "all"
 msgstr ""
@@ -1654,12 +2310,12 @@ msgctxt "music"
 msgid "always"
 msgstr ""
 
-#: plugins/music/plugin.txt
+#: plugins/music/music_model.c plugins/music/plugin.txt
 msgctxt "music"
 msgid "off"
 msgstr ""
 
-#: plugins/music/plugin.txt
+#: plugins/music/music_model.c plugins/music/plugin.txt
 msgctxt "music"
 msgid "one"
 msgstr ""
@@ -1674,14 +2330,54 @@ msgctxt "music"
 msgid "play"
 msgstr ""
 
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "Host a game"
+msgstr ""
+
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "Host address"
+msgstr ""
+
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "Join a game"
+msgstr ""
+
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "NETPLAY"
+msgstr ""
+
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "Netplay"
+msgstr ""
+
 #: plugins/netplay/plugin.txt
 msgctxt "netplay"
 msgid "Netplay (needs NextUI netplay)"
 msgstr ""
 
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "Netplay couldn't start this game"
+msgstr ""
+
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "No emulator for netplay"
+msgstr ""
+
 #: plugins/netplay/plugin.txt
 msgctxt "netplay"
 msgid "Port"
+msgstr ""
+
+#: plugins/netplay/netplay.c
+msgctxt "netplay"
+msgid "Type a host name or IP address, with :port for another port"
 msgstr ""
 
 #: plugins/numeric-prefix/plugin.txt
@@ -1722,6 +2418,11 @@ msgstr ""
 #: plugins/platform-jump/plugin.txt
 msgctxt "platform-jump"
 msgid "Platform jump"
+msgstr ""
+
+#: plugins/platform-jump/platform_jump.c
+msgctxt "platform-jump"
+msgid "SYSTEM"
 msgstr ""
 
 #: plugins/platform-jump/plugin.txt
@@ -1779,6 +2480,30 @@ msgctxt "playtime-captions"
 msgid "relative"
 msgstr ""
 
+#: plugins/playtime-limit/playtime_limit.c
+#, c-format
+msgctxt "playtime-limit"
+msgid "%i more minutes today"
+msgstr ""
+
+#: plugins/playtime-limit/playtime_limit.c
+#, c-format
+msgctxt "playtime-limit"
+msgid "%lldh %02lldm left"
+msgstr ""
+
+#: plugins/playtime-limit/playtime_limit.c
+#, c-format
+msgctxt "playtime-limit"
+msgid "%lldm left"
+msgstr ""
+
+#: plugins/playtime-limit/playtime_limit.c
+#, c-format
+msgctxt "playtime-limit"
+msgid "%s today"
+msgstr ""
+
 #: plugins/playtime-limit/plugin.txt
 msgctxt "playtime-limit"
 msgid "10"
@@ -1829,7 +2554,12 @@ msgctxt "playtime-limit"
 msgid "90"
 msgstr ""
 
-#: plugins/playtime-limit/plugin.txt
+#: plugins/playtime-limit/playtime_limit.c
+msgctxt "playtime-limit"
+msgid "CODE"
+msgstr ""
+
+#: plugins/playtime-limit/playtime_limit.c plugins/playtime-limit/plugin.txt
 msgctxt "playtime-limit"
 msgid "Code for extra time"
 msgstr ""
@@ -1849,9 +2579,30 @@ msgctxt "playtime-limit"
 msgid "Play time limit"
 msgstr ""
 
+#: plugins/playtime-limit/playtime_limit.c
+msgctxt "playtime-limit"
+msgid "Time's up"
+msgstr ""
+
+#: plugins/playtime-limit/playtime_limit.c
+msgctxt "playtime-limit"
+msgid "Time's up for today"
+msgstr ""
+
+#: plugins/playtime-limit/playtime_limit.c
+#, c-format
+msgctxt "playtime-limit"
+msgid "Time's up for today. Enter the code for %i more minutes?"
+msgstr ""
+
 #: plugins/playtime-limit/plugin.txt
 msgctxt "playtime-limit"
 msgid "Warn at (minutes left)"
+msgstr ""
+
+#: plugins/playtime-limit/playtime_limit.c
+msgctxt "playtime-limit"
+msgid "Wrong code"
 msgstr ""
 
 #: plugins/playtime-limit/plugin.txt
@@ -1909,6 +2660,24 @@ msgctxt "power-plus"
 msgid "8"
 msgstr ""
 
+#: plugins/power-plus/power_plus.c
+#, c-format
+msgctxt "power-plus"
+msgid "Asleep for %ld min, powering off"
+msgstr ""
+
+#: plugins/power-plus/power_plus.c
+#, c-format
+msgctxt "power-plus"
+msgid "Battery at %d%%, charge soon"
+msgstr ""
+
+#: plugins/power-plus/power_plus.c
+#, c-format
+msgctxt "power-plus"
+msgid "Battery at %d%%, powering off in %ds"
+msgstr ""
+
 #: plugins/power-plus/plugin.txt
 msgctxt "power-plus"
 msgid "Hours asleep before powering off"
@@ -1934,9 +2703,57 @@ msgctxt "power-plus"
 msgid "Power off after a long sleep"
 msgstr ""
 
+#: plugins/power-plus/power_plus.c
+msgctxt "power-plus"
+msgid "Power off cancelled"
+msgstr ""
+
 #: plugins/power-plus/plugin.txt
 msgctxt "power-plus"
 msgid "Power plus"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+#, c-format
+msgctxt "quick-menu-plus"
+msgid "%s off"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+#, c-format
+msgctxt "quick-menu-plus"
+msgid "%s on"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_model.c
+msgctxt "quick-menu-plus"
+msgid "Adjustment notices"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_model.c
+msgctxt "quick-menu-plus"
+msgid "Battery %"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_model.c
+msgctxt "quick-menu-plus"
+msgid "Clock"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+#, c-format
+msgctxt "quick-menu-plus"
+msgid "Couldn't change %s"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+msgctxt "quick-menu-plus"
+msgid "Couldn't turn the launcher off"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_model.c
+msgctxt "quick-menu-plus"
+msgid "Haptics"
 msgstr ""
 
 #: plugins/quick-menu-plus/plugin.txt
@@ -1944,9 +2761,29 @@ msgctxt "quick-menu-plus"
 msgid "Hidden tiles (Pak Store, ...)"
 msgstr ""
 
+#: plugins/quick-menu-plus/quick_model.c
+msgctxt "quick-menu-plus"
+msgid "Load notices"
+msgstr ""
+
 #: plugins/quick-menu-plus/plugin.txt
 msgctxt "quick-menu-plus"
 msgid "Quick menu plus"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+msgctxt "quick-menu-plus"
+msgid "REBOOT"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+msgctxt "quick-menu-plus"
+msgid "Reboot to stock"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+msgctxt "quick-menu-plus"
+msgid "Reboot to stock NextUI?\nTurn Launcher back on from Tools."
 msgstr ""
 
 #: plugins/quick-menu-plus/plugin.txt
@@ -1954,9 +2791,34 @@ msgctxt "quick-menu-plus"
 msgid "Reboot to stock tile on the quick menu"
 msgstr ""
 
+#: plugins/quick-menu-plus/quick_model.c
+msgctxt "quick-menu-plus"
+msgid "Save notices"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_model.c
+msgctxt "quick-menu-plus"
+msgid "Screenshot notices"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+msgctxt "quick-menu-plus"
+msgid "Sleeping as usual"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+msgctxt "quick-menu-plus"
+msgid "Stay awake"
+msgstr ""
+
 #: plugins/quick-menu-plus/plugin.txt
 msgctxt "quick-menu-plus"
 msgid "Stay awake tile on the quick menu"
+msgstr ""
+
+#: plugins/quick-menu-plus/quick_menu_plus.c
+msgctxt "quick-menu-plus"
+msgid "Staying awake"
 msgstr ""
 
 #: plugins/quick-menu-plus/plugin.txt
@@ -1969,12 +2831,27 @@ msgctxt "quick-menu-plus"
 msgid "Toggle tiles (save, load, clock, ...)"
 msgstr ""
 
+#: plugins/random-game/random_game.c
+msgctxt "random-game"
+msgid "No games to pick from"
+msgstr ""
+
 #: plugins/random-game/plugin.txt
 msgctxt "random-game"
 msgid "Prefer unplayed games"
 msgstr ""
 
-#: plugins/random-game/plugin.txt
+#: plugins/random-game/random_game.c
+msgctxt "random-game"
+msgid "RANDOM"
+msgstr ""
+
+#: plugins/random-game/random_game.c
+msgctxt "random-game"
+msgid "Random"
+msgstr ""
+
+#: plugins/random-game/plugin.txt plugins/random-game/random_game.c
 msgctxt "random-game"
 msgid "Random game"
 msgstr ""
@@ -1987,6 +2864,12 @@ msgstr ""
 #: plugins/random-game/plugin.txt
 msgctxt "random-game"
 msgid "Random tile on the quick menu"
+msgstr ""
+
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "%s of %s"
 msgstr ""
 
 #: plugins/romm/plugin.txt
@@ -2019,14 +2902,41 @@ msgctxt "romm"
 msgid "Certificate fingerprint (SHA-256)"
 msgstr ""
 
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "Downloading %s"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "FLASHBACK"
+msgstr ""
+
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "Flashback button"
 msgstr ""
 
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "Flashback: %s"
+msgstr ""
+
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "L2"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "Loading..."
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "No saves or states on the server"
 msgstr ""
 
 #: plugins/romm/plugin.txt
@@ -2039,9 +2949,82 @@ msgctxt "romm"
 msgid "R2"
 msgstr ""
 
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RESTORE"
+msgstr ""
+
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "Restore this save?\n%s\nThe one on the card is backed up first."
+msgstr ""
+
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "Restore this state?\n%s\nThe one on the card is backed up first."
+msgstr ""
+
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "RomM"
+msgstr ""
+
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "RomM: %s"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: a folder of that name is already on the card"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: couldn't back up the current file"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: couldn't restore it"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: not enough space on the card"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: restored"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: restoring..."
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: save uploaded"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: that folder isn't on the card"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: that system's folder isn't on the card"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "RomM: this state can't be restored on this device"
 msgstr ""
 
 #: plugins/romm/plugin.txt
@@ -2059,6 +3042,17 @@ msgctxt "romm"
 msgid "Server"
 msgstr ""
 
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "Starting..."
+msgstr ""
+
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "Unpacking %s"
+msgstr ""
+
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "Upload saves after playing"
@@ -2067,6 +3061,21 @@ msgstr ""
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "User"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "Wi-Fi is off"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "Wi-Fi isn't connected"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "Wi-Fi isn't ready yet"
 msgstr ""
 
 #: plugins/romm/plugin.txt
@@ -2094,6 +3103,22 @@ msgctxt "row-badges"
 msgid "Unplayed dot"
 msgstr ""
 
+#: plugins/save-state-manager/save_state_manager.c
+msgctxt "save-state-manager"
+msgid "Couldn't delete that state"
+msgstr ""
+
+#: plugins/save-state-manager/save_state_manager.c
+msgctxt "save-state-manager"
+msgid "DELETE"
+msgstr ""
+
+#: plugins/save-state-manager/save_state_manager.c
+#, c-format
+msgctxt "save-state-manager"
+msgid "Delete this save state?\n%s"
+msgstr ""
+
 #: plugins/save-state-manager/plugin.txt
 msgctxt "save-state-manager"
 msgid "Delete with Y"
@@ -2102,6 +3127,16 @@ msgstr ""
 #: plugins/save-state-manager/plugin.txt
 msgctxt "save-state-manager"
 msgid "L2"
+msgstr ""
+
+#: plugins/save-state-manager/save_state_manager.c
+msgctxt "save-state-manager"
+msgid "No preview"
+msgstr ""
+
+#: plugins/save-state-manager/save_state_manager.c
+msgctxt "save-state-manager"
+msgid "No save states"
 msgstr ""
 
 #: plugins/save-state-manager/plugin.txt
@@ -2114,14 +3149,29 @@ msgctxt "save-state-manager"
 msgid "R2"
 msgstr ""
 
+#: plugins/save-state-manager/save_state_manager.c
+msgctxt "save-state-manager"
+msgid "SAVE STATES"
+msgstr ""
+
 #: plugins/save-state-manager/plugin.txt
 msgctxt "save-state-manager"
 msgid "SELECT"
 msgstr ""
 
+#: plugins/save-state-manager/save_state_manager.c
+msgctxt "save-state-manager"
+msgid "Save state deleted"
+msgstr ""
+
 #: plugins/save-state-manager/plugin.txt
 msgctxt "save-state-manager"
 msgid "Save state manager"
+msgstr ""
+
+#: plugins/save-state-manager/save_state_manager.c
+msgctxt "save-state-manager"
+msgid "Save states"
 msgstr ""
 
 #: plugins/save-state-manager/plugin.txt
@@ -2279,6 +3329,27 @@ msgctxt "screensaver"
 msgid "slide"
 msgstr ""
 
+#: plugins/screenshot-viewer/screenshot_viewer.c
+msgctxt "screenshot-viewer"
+msgid "Can't show this screenshot"
+msgstr ""
+
+#: plugins/screenshot-viewer/screenshot_viewer.c
+msgctxt "screenshot-viewer"
+msgid "Couldn't delete that"
+msgstr ""
+
+#: plugins/screenshot-viewer/screenshot_viewer.c
+msgctxt "screenshot-viewer"
+msgid "DELETE"
+msgstr ""
+
+#: plugins/screenshot-viewer/screenshot_viewer.c
+#, c-format
+msgctxt "screenshot-viewer"
+msgid "Delete this screenshot?\n%s"
+msgstr ""
+
 #: plugins/screenshot-viewer/plugin.txt
 msgctxt "screenshot-viewer"
 msgid "Delete with Y"
@@ -2287,6 +3358,11 @@ msgstr ""
 #: plugins/screenshot-viewer/plugin.txt
 msgctxt "screenshot-viewer"
 msgid "L2"
+msgstr ""
+
+#: plugins/screenshot-viewer/screenshot_viewer.c
+msgctxt "screenshot-viewer"
+msgid "No screenshots"
 msgstr ""
 
 #: plugins/screenshot-viewer/plugin.txt
@@ -2304,9 +3380,19 @@ msgctxt "screenshot-viewer"
 msgid "SELECT"
 msgstr ""
 
+#: plugins/screenshot-viewer/screenshot_viewer.c
+msgctxt "screenshot-viewer"
+msgid "Screenshot deleted"
+msgstr ""
+
 #: plugins/screenshot-viewer/plugin.txt
 msgctxt "screenshot-viewer"
 msgid "Screenshot viewer"
+msgstr ""
+
+#: plugins/screenshot-viewer/screenshot_viewer.c
+msgctxt "screenshot-viewer"
+msgid "Screenshots"
 msgstr ""
 
 #: plugins/screenshot-viewer/plugin.txt
@@ -2329,6 +3415,17 @@ msgctxt "search"
 msgid "L2"
 msgstr ""
 
+#: plugins/search/search.c
+msgctxt "search"
+msgid "New search"
+msgstr ""
+
+#: plugins/search/search.c
+#, c-format
+msgctxt "search"
+msgid "No games match %s"
+msgstr ""
+
 #: plugins/search/plugin.txt
 msgctxt "search"
 msgid "R2"
@@ -2339,12 +3436,17 @@ msgctxt "search"
 msgid "Remember recent searches"
 msgstr ""
 
+#: plugins/search/search.c
+msgctxt "search"
+msgid "SEARCH"
+msgstr ""
+
 #: plugins/search/plugin.txt
 msgctxt "search"
 msgid "SELECT"
 msgstr ""
 
-#: plugins/search/plugin.txt
+#: plugins/search/plugin.txt plugins/search/search.c
 msgctxt "search"
 msgid "Search"
 msgstr ""
@@ -2389,6 +3491,26 @@ msgctxt "second-screen"
 msgid "800x480"
 msgstr ""
 
+#: plugins/second-screen/second_screen.c
+msgctxt "second-screen"
+msgid "Empty folder"
+msgstr ""
+
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
+msgid "Folder"
+msgstr ""
+
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
+msgid "Game"
+msgstr ""
+
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
+msgid "Pak"
+msgstr ""
+
 #: plugins/second-screen/plugin.txt
 msgctxt "second-screen"
 msgid "Second screen (experimental, desktop only)"
@@ -2404,14 +3526,44 @@ msgctxt "simple-mode"
 msgid "Hide settings tiles"
 msgstr ""
 
-#: plugins/simple-mode/plugin.txt
+#: plugins/simple-mode/simple_mode.c
+msgctxt "simple-mode"
+msgid "LEAVE"
+msgstr ""
+
+#: plugins/simple-mode/simple_mode.c
+msgctxt "simple-mode"
+msgid "Leave simple mode?"
+msgstr ""
+
+#: plugins/simple-mode/simple_mode.c
+msgctxt "simple-mode"
+msgid "PIN to leave simple mode"
+msgstr ""
+
+#: plugins/simple-mode/plugin.txt plugins/simple-mode/simple_mode.c
 msgctxt "simple-mode"
 msgid "Simple mode"
 msgstr ""
 
-#: plugins/simple-mode/plugin.txt
+#: plugins/simple-mode/simple_mode.c
+msgctxt "simple-mode"
+msgid "Simple mode off"
+msgstr ""
+
+#: plugins/simple-mode/plugin.txt plugins/simple-mode/simple_mode.c
 msgctxt "simple-mode"
 msgid "Simple mode on"
+msgstr ""
+
+#: plugins/simple-mode/simple_mode.c
+msgctxt "simple-mode"
+msgid "Tools are off in simple mode"
+msgstr ""
+
+#: plugins/simple-mode/simple_mode.c
+msgctxt "simple-mode"
+msgid "Wrong PIN"
 msgstr ""
 
 #: plugins/smart-collections/plugin.txt
@@ -2439,9 +3591,39 @@ msgctxt "smart-collections"
 msgid "5"
 msgstr ""
 
+#: plugins/smart-collections/smart_collections.c
+#, c-format
+msgctxt "smart-collections"
+msgid "Bring back %d dismissed collection?"
+msgid_plural "Bring back %d dismissed collections?"
+msgstr[0] ""
+msgstr[1] ""
+
 #: plugins/smart-collections/plugin.txt
 msgctxt "smart-collections"
 msgid "Built-in franchises"
+msgstr ""
+
+#: plugins/smart-collections/smart_collections.c
+msgctxt "smart-collections"
+msgid "DISMISS"
+msgstr ""
+
+#: plugins/smart-collections/smart_collections.c
+#, c-format
+msgctxt "smart-collections"
+msgid "Dismiss %s?"
+msgstr ""
+
+#: plugins/smart-collections/smart_collections.c
+#, c-format
+msgctxt "smart-collections"
+msgid "Dismissed %s"
+msgstr ""
+
+#: plugins/smart-collections/smart_collections.c
+msgctxt "smart-collections"
+msgid "Dismissed collections are back"
 msgstr ""
 
 #: plugins/smart-collections/plugin.txt
@@ -2449,12 +3631,17 @@ msgctxt "smart-collections"
 msgid "More franchises"
 msgstr ""
 
+#: plugins/smart-collections/smart_collections.c
+msgctxt "smart-collections"
+msgid "RESTORE"
+msgstr ""
+
 #: plugins/smart-collections/plugin.txt
 msgctxt "smart-collections"
 msgid "Smallest collection"
 msgstr ""
 
-#: plugins/smart-collections/plugin.txt
+#: plugins/smart-collections/plugin.txt plugins/smart-collections/smart_collections.c
 msgctxt "smart-collections"
 msgid "Smart Collections"
 msgstr ""
@@ -2462,6 +3649,11 @@ msgstr ""
 #: plugins/switcher-plus/plugin.txt
 msgctxt "switcher-plus"
 msgid "Game switcher plus"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_plus.c
+msgctxt "switcher-plus"
+msgid "No Preview"
 msgstr ""
 
 #: plugins/switcher-plus/plugin.txt
@@ -2489,9 +3681,34 @@ msgctxt "switcher-plus"
 msgid "strip"
 msgstr ""
 
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "Battery"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "IP address"
+msgstr ""
+
 #: plugins/system-info/plugin.txt
 msgctxt "system-info"
 msgid "L2"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "Memory"
+msgstr ""
+
+#: plugins/system-info/system_info.c
+msgctxt "system-info"
+msgid "No battery history: battery-logger hasn't logged a game yet"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "Platform"
 msgstr ""
 
 #: plugins/system-info/plugin.txt
@@ -2509,7 +3726,12 @@ msgctxt "system-info"
 msgid "SELECT"
 msgstr ""
 
-#: plugins/system-info/plugin.txt
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "Storage"
+msgstr ""
+
+#: plugins/system-info/plugin.txt plugins/system-info/system_info.c
 msgctxt "system-info"
 msgid "System info"
 msgstr ""
@@ -2517,6 +3739,21 @@ msgstr ""
 #: plugins/system-info/plugin.txt
 msgctxt "system-info"
 msgid "System info button"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "Uptime"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "Version"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "Wi-Fi"
 msgstr ""
 
 #: plugins/system-info/plugin.txt
@@ -2529,9 +3766,48 @@ msgctxt "system-info"
 msgid "none"
 msgstr ""
 
+#: plugins/tags/tags.c
+#, c-format
+msgctxt "tags"
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "Couldn't save tags"
+msgstr ""
+
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "Couldn't tag that"
+msgstr ""
+
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "DELETE"
+msgstr ""
+
+#: plugins/tags/tags.c
+#, c-format
+msgctxt "tags"
+msgid "Delete the tag %s?"
+msgstr ""
+
 #: plugins/tags/plugin.txt
 msgctxt "tags"
 msgid "L2"
+msgstr ""
+
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "New tag"
+msgstr ""
+
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "Not a tag name"
 msgstr ""
 
 #: plugins/tags/plugin.txt
@@ -2539,12 +3815,17 @@ msgctxt "tags"
 msgid "R2"
 msgstr ""
 
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "TAGS"
+msgstr ""
+
 #: plugins/tags/plugin.txt
 msgctxt "tags"
 msgid "Tag tiles on the quick menu"
 msgstr ""
 
-#: plugins/tags/plugin.txt
+#: plugins/tags/plugin.txt plugins/tags/tags.c
 msgctxt "tags"
 msgid "Tags"
 msgstr ""
@@ -2559,9 +3840,24 @@ msgctxt "tags"
 msgid "Tags folder on the root"
 msgstr ""
 
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "Too many tags"
+msgstr ""
+
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "Untag its games to delete it"
+msgstr ""
+
 #: plugins/tags/plugin.txt
 msgctxt "tags"
 msgid "Y"
+msgstr ""
+
+#: plugins/tags/tags.c
+msgctxt "tags"
+msgid "unused"
 msgstr ""
 
 #: plugins/theme-plus/plugin.txt
@@ -2644,12 +3940,17 @@ msgctxt "theme-plus"
 msgid "Screen margins"
 msgstr ""
 
+#: plugins/theme-plus/theme_plus.c
+msgctxt "theme-plus"
+msgid "Stock"
+msgstr ""
+
 #: plugins/theme-plus/plugin.txt
 msgctxt "theme-plus"
 msgid "Text size"
 msgstr ""
 
-#: plugins/theme-plus/plugin.txt
+#: plugins/theme-plus/plugin.txt plugins/theme-plus/theme_plus.c
 msgctxt "theme-plus"
 msgid "Theme"
 msgstr ""

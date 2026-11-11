@@ -42,6 +42,11 @@ static int pin_on = 0;                      // the "pin" setting
 static PinSet pins;                         // favorites, for sort_compare
 static char sorted_dir[MAX_PATH_LEN];       // the folder sort_compare saw last
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -182,29 +187,29 @@ static int canToggle(void* data) {
 static void change(const char* rel) {
 	load();
 	char message[MAX_PATH_LEN + 32];
-	char shown[160];
+	char shown[320];
 	int i = indexOf(rel);
 	if (i >= 0) {
 		memmove(&favorites[i], &favorites[i + 1], (size_t)(count - i - 1) * MAX_PATH_LEN);
 		count--;
 		snprintf(message, sizeof(message), "removed %s", rel);
-		snprintf(shown, sizeof(shown), "Removed from %s", folder_name);
+		snprintf(shown, sizeof(shown), tr("Removed from %s"), folder_name);
 	}
 	else if (count < MAX_FAVORITES) {
 		// at the end, like adding to any collection, so a hand-ordered list keeps its order
 		snprintf(favorites[count++], MAX_PATH_LEN, "%s", rel);
 		snprintf(message, sizeof(message), "added %s", rel);
-		snprintf(shown, sizeof(shown), "Added to %s", folder_name);
+		snprintf(shown, sizeof(shown), tr("Added to %s"), folder_name);
 	}
 	else {
 		say("favorites are full");
-		snprintf(shown, sizeof(shown), "%s is full", folder_name);
+		snprintf(shown, sizeof(shown), tr("%s is full"), folder_name);
 		if (MOSAIC_HOST_HAS(host, toast)) host->toast(shown);
 		return;
 	}
 	relist();
 	if (save() == 0) say(message);
-	else snprintf(shown, sizeof(shown), "Couldn't save %s", folder_name);
+	else snprintf(shown, sizeof(shown), tr("Couldn't save %s"), folder_name);
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(shown);
 	// list the folder again so the game moves to or from the top
 	if (pin_on && MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
@@ -238,9 +243,9 @@ static void toggle(void* data) {
 		snprintf(name, sizeof(name), "%s", base ? base + 1 : rel);
 		char* dot = strrchr(name, '.');
 		if (dot && dot != name) *dot = '\0';
-		char question[256];
-		snprintf(question, sizeof(question), "Remove %.120s from %.60s?", name, folder_name);
-		host->confirm(question, "REMOVE", removeConfirmed, NULL);
+		char question[512];
+		snprintf(question, sizeof(question), tr("Remove %.120s from %.60s?"), name, folder_name);
+		host->confirm(question, tr("REMOVE"), removeConfirmed, NULL);
 		return;
 	}
 	change(rel);

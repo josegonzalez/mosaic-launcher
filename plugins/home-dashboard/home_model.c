@@ -8,6 +8,9 @@
 #include <strings.h>
 #include <time.h>
 
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
+
 static const char* const mode_names[] = { "dashboard", "minui", "retroachievements", "pico8" };
 
 int HD_modeOf(const char* name) {
@@ -33,9 +36,9 @@ int HD_tabs(int pinned_on, int favorites_loaded, int stats_on, int* out) {
 
 const char* HD_tabLabel(int tab) {
 	switch (tab) {
-		case HD_TAB_PINNED: return "Pinned";
-		case HD_TAB_STATS: return "Stats";
-		default: return "Home";
+		case HD_TAB_PINNED: return TR_MARK("Pinned");
+		case HD_TAB_STATS: return TR_MARK("Stats");
+		default: return TR_MARK("Home");
 	}
 }
 

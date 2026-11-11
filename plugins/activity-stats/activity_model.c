@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
 #include "activity_model.h"
 
 // stock's sizes, in its units
@@ -213,10 +216,10 @@ MosaicRect AS_bar(const MosaicRect* plot, int days, int days_ago, long long seco
 
 const char* AS_tabLabel(int tab) {
 	switch (tab) {
-		case AS_TAB_WEEK: return "7 days";
-		case AS_TAB_MONTH: return "30 days";
-		case AS_TAB_GAMES: return "Games";
-		case AS_TAB_LAUNCHES: return "Launches";
+		case AS_TAB_WEEK: return TR_MARK("7 days");
+		case AS_TAB_MONTH: return TR_MARK("30 days");
+		case AS_TAB_GAMES: return TR_MARK("Games");
+		case AS_TAB_LAUNCHES: return TR_MARK("Launches");
 		default: return "";
 	}
 }

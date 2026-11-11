@@ -39,6 +39,11 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -134,7 +139,7 @@ static void picked(int index, void* data) {
 	int changed = EO_mapSet(&map, picking, pak);
 	if (changed < 0 || (changed && saveMap() != 0)) {
 		EO_mapLoad(&map, map_path);
-		toast("Couldn't save the emulator");
+		toast(tr("Couldn't save the emulator"));
 		picking[0] = '\0';
 		return;
 	}
@@ -142,9 +147,9 @@ static void picked(int index, void* data) {
 	if (pak) snprintf(message, sizeof(message), "%s now launches with %s", picking, pak);
 	else snprintf(message, sizeof(message), "%s now launches with its default emulator", picking);
 	if (changed) say(message);
-	char shown[EO_NAME_LEN + 32];
-	if (pak) snprintf(shown, sizeof(shown), "Emulator set to %s", pak);
-	else snprintf(shown, sizeof(shown), "Using the default emulator");
+	char shown[EO_NAME_LEN + 256];
+	if (pak) snprintf(shown, sizeof(shown), tr("Emulator set to %s"), pak);
+	else snprintf(shown, sizeof(shown), "%s", tr("Using the default emulator"));
 	toast(shown);
 	picking[0] = '\0';
 	forgetCheck(); // clearing the last choice can leave nothing to pick
@@ -154,8 +159,8 @@ static void choose(void* data) {
 	(void)data;
 	if (!check()) return;
 	refreshMap();
-	char first[EO_NAME_LEN + 16];
-	snprintf(first, sizeof(first), "Default (%s)", tag);
+	char first[EO_NAME_LEN + 256];
+	snprintf(first, sizeof(first), tr("Default (%s)"), tag);
 	const char* list[MAX_PAKS + 1];
 	list[0] = first;
 	const char* current = EO_mapGet(&map, key);
@@ -165,9 +170,9 @@ static void choose(void* data) {
 		if (current && !strcmp(current, paks[i])) selected = i + 1;
 	}
 	snprintf(picking, sizeof(picking), "%s", key);
-	if (host->choose("Emulator", list, pak_count + 1, selected, picked, NULL) != 0) {
+	if (host->choose(tr("Emulator"), list, pak_count + 1, selected, picked, NULL) != 0) {
 		picking[0] = '\0';
-		toast("Couldn't list the emulators");
+		toast(tr("Couldn't list the emulators"));
 	}
 }
 

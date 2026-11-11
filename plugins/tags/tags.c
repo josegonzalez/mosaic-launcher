@@ -53,6 +53,16 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -90,7 +100,7 @@ static int save(void) {
 		say("couldn't save the tags file");
 		TG_load(&store, store_path);
 		remember();
-		toast("Couldn't save tags");
+		toast(tr("Couldn't save tags"));
 		return -1;
 	}
 	remember();
@@ -193,7 +203,7 @@ static void toggle(int row) {
 	if (!isTagRow(row)) return;
 	int on = !TG_has(&store, row, game);
 	if (TG_set(&store, row, game, on) < 0) {
-		toast("Couldn't tag that");
+		toast(tr("Couldn't tag that"));
 		return;
 	}
 	char name[TG_NAME_LEN];
@@ -215,7 +225,7 @@ static void named(const char* text, void* data) {
 	int added = 0;
 	int tag = TG_add(&store, text, &added);
 	if (tag < 0) {
-		toast(store.count >= TG_TAGS_MAX ? "Too many tags" : "Not a tag name");
+		toast(store.count >= TG_TAGS_MAX ? tr("Too many tags") : tr("Not a tag name"));
 		return;
 	}
 	int tagged = TG_set(&store, tag, game, 1);
@@ -224,7 +234,7 @@ static void named(const char* text, void* data) {
 	if (tagged < 0 || save() != 0) {
 		if (tagged < 0) TG_load(&store, store_path);
 		countAll();
-		if (tagged < 0) toast("Couldn't tag that");
+		if (tagged < 0) toast(tr("Couldn't tag that"));
 		return;
 	}
 	countAll();
@@ -287,15 +297,15 @@ static int checkInput(const MosaicInput* input, void* data) {
 			toggle(selected);
 			host->request_redraw();
 		}
-		else host->keyboard("New tag", "", named, NULL);
+		else host->keyboard(tr("New tag"), "", named, NULL);
 	}
 	else if (pressedBit(pressed, MOSAIC_BUTTON_X) && isTagRow(selected)) {
-		if (on_card[selected]) toast("Untag its games to delete it");
+		if (on_card[selected]) toast(tr("Untag its games to delete it"));
 		else {
 			snprintf(deleting, sizeof(deleting), "%s", store.tags[selected].name);
-			char question[TG_NAME_LEN + 32];
-			snprintf(question, sizeof(question), "Delete the tag %s?", deleting);
-			host->confirm(question, "DELETE", deleteConfirmed, NULL);
+			char question[TG_NAME_LEN + 256];
+			snprintf(question, sizeof(question), tr("Delete the tag %s?"), deleting);
+			host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
 		}
 	}
 	return MOSAIC_SCREEN_STAY;
@@ -371,7 +381,7 @@ static int checkRender(MosaicSurface* screen, const MosaicScreenView* view, void
 		if (on) host->fill_round_rect(screen, &r, row_h / 2, C_MAIN());
 		int x = r.x + pad;
 		if (!isTagRow(i)) {
-			host->draw_text(screen, MOSAIC_FONT_LARGE, "New tag", x, r.y + (row_h - large_h) / 2, on ? C_SELECTED() : C_HINT(),
+			host->draw_text(screen, MOSAIC_FONT_LARGE, tr("New tag"), x, r.y + (row_h - large_h) / 2, on ? C_SELECTED() : C_HINT(),
 				r.w - 2 * pad);
 			continue;
 		}
@@ -379,10 +389,9 @@ static int checkRender(MosaicSurface* screen, const MosaicScreenView* view, void
 		drawBox(screen, &box, TG_has(&store, i, game), on);
 		x += box_size + pad;
 
-		char count[32];
-		if (on_card[i] == 1) snprintf(count, sizeof(count), "1 game");
-		else if (on_card[i]) snprintf(count, sizeof(count), "%i games", on_card[i]);
-		else snprintf(count, sizeof(count), "unused");
+		char count[128];
+		if (on_card[i]) snprintf(count, sizeof(count), trPlural("%i game", "%i games", (unsigned long)on_card[i]), on_card[i]);
+		else snprintf(count, sizeof(count), "%s", tr("unused"));
 		int count_w = host->text_width(MOSAIC_FONT_SMALL, count);
 		if (count_w > r.w / 3) count_w = r.w / 3;
 		if (count_w > 0) {
@@ -412,7 +421,7 @@ static void rootEntries(MosaicList* root) {
 		root_logged = tags;
 	}
 	if (!tags) return;
-	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, FOLDER_NAME));
+	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Tags")));
 }
 
 static MosaicList* virtualDir(const char* path) {

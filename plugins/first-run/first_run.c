@@ -27,6 +27,8 @@
 #include "wizard_model.h"
 
 #define ID "first-run"
+// English translated where it's drawn, for make pot
+#define TR_MARK(text) (text)
 #define SCREEN_ID ID ".main"
 #define ACTION_ID ID ".open"
 #define PADDING 10
@@ -43,10 +45,10 @@ static const struct {
 	const char* name;
 	const char* label;
 } toggles[] = {
-	{ MOSAIC_TOGGLE_SHOW_CLOCK, "Show clock" },
-	{ MOSAIC_TOGGLE_SHOW_BATTERY_PERCENT, "Show battery percentage" },
-	{ MOSAIC_TOGGLE_HAPTICS, "Haptic feedback" },
-	{ MOSAIC_TOGGLE_NOTIFY_ADJUSTMENTS, "Volume and display notifications" },
+	{ MOSAIC_TOGGLE_SHOW_CLOCK, TR_MARK("Show clock") },
+	{ MOSAIC_TOGGLE_SHOW_BATTERY_PERCENT, TR_MARK("Show battery percentage") },
+	{ MOSAIC_TOGGLE_HAPTICS, TR_MARK("Haptic feedback") },
+	{ MOSAIC_TOGGLE_NOTIFY_ADJUSTMENTS, TR_MARK("Volume and display notifications") },
 };
 #define TOGGLE_COUNT ((int)(sizeof(toggles) / sizeof(toggles[0])))
 
@@ -63,7 +65,13 @@ static int tile_on = 1;
 static int last_page = -1;
 
 static const char* const page_names[FR_PAGES] = { "welcome", "toggles", "pin", "plugins", "done" };
-static const char* const page_titles[FR_PAGES] = { "Welcome", "Settings", "PIN", "Plugins", "All set" };
+static const char* const page_titles[FR_PAGES] = { TR_MARK("Welcome"), TR_MARK("Settings"), TR_MARK("PIN"), TR_MARK("Plugins"),
+	TR_MARK("All set") };
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
 
 static void say(const char* message) {
 	host->log(ID, message);
@@ -252,12 +260,12 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	int left = a->x + pad, right = a->x + a->w - pad;
 
 	// the title, stopping short of the status pill on its line
-	const char* title = page_titles[wizard.page];
+	const char* title = tr(page_titles[wizard.page]);
 	int title_right = right;
 	if (!empty(&gap) && gap.y < a->y + pad + pill && gap.y + gap.h > a->y + pad && gap.x - pad < title_right)
 		title_right = gap.x - pad;
-	char step[32];
-	snprintf(step, sizeof(step), "%i of %i", FR_pageNumber(&wizard, wizard.page), FR_pageCount(&wizard));
+	char step[128];
+	snprintf(step, sizeof(step), tr("%i of %i"), FR_pageNumber(&wizard, wizard.page), FR_pageCount(&wizard));
 	int step_w = host->text_width(MOSAIC_FONT_TINY, step);
 	int tw = host->text_width(MOSAIC_FONT_LARGE, title) + 2 * inner;
 	if (tw > title_right - left - step_w - pad) tw = title_right - left - step_w - pad;
@@ -284,46 +292,46 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	switch (wizard.page) {
 		case FR_WELCOME:
 			y = paragraph(screen,
-				"This goes over a few settings and plugins. A goes on, B goes back, and Y skips the rest.", x, y, w,
+				tr("This goes over a few settings and plugins. A goes on, B goes back, and Y skips the rest."), x, y, w,
 				bottom, ink);
 			paragraph(screen,
-				tile_on ? "Once it's done or skipped it won't open by itself again. The First run tile on the quick menu opens it."
-						: "Once it's done or skipped it won't open by itself again.",
+				tile_on ? tr("Once it's done or skipped it won't open by itself again. The First run tile on the quick menu opens it.")
+						: tr("Once it's done or skipped it won't open by itself again."),
 				x, y + pad, w, bottom, ink);
 			break;
 		case FR_TOGGLES:
 			for (int r = 0; r < wizard.rows && y + row_h <= bottom; r++) {
 				MosaicRect rr = { left, y, right - left, row_h };
-				drawRow(screen, &rr, toggles[row_toggle[r]].label, row_on[r] ? "On" : "Off", r == wizard.row);
+				drawRow(screen, &rr, tr(toggles[row_toggle[r]].label), row_on[r] ? tr("On") : tr("Off"), r == wizard.row);
 				y += row_h;
 			}
-			paragraph(screen, "Left and right change the selected setting, saved at once. Settings has them too.", x,
+			paragraph(screen, tr("Left and right change the selected setting, saved at once. Settings has them too."), x,
 				y + pad, w, bottom, hint);
 			break;
 		case FR_PIN:
-			y = paragraph(screen, pin_set ? "The launcher has a PIN." : "The launcher has no PIN.", x, y, w, bottom, ink);
+			y = paragraph(screen, pin_set ? tr("The launcher has a PIN.") : tr("The launcher has no PIN."), x, y, w, bottom, ink);
 			paragraph(screen,
-				"A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins.",
+				tr("A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins."),
 				x, y + pad, w, bottom, ink);
 			break;
 		case FR_PLUGINS:
-			y = paragraph(screen, "Plugins to try:", x, y, w, bottom, ink);
+			y = paragraph(screen, tr("Plugins to try:"), x, y, w, bottom, ink);
 			for (int i = 0; i < suggest_count && y + row_h <= bottom; i++) {
-				char label[FR_ID_MAX + 80];
+				char label[FR_ID_MAX + 256];
 				const char* what = FR_describe(suggest[i]);
-				if (what) snprintf(label, sizeof(label), "%.63s - %.70s", suggest[i], what);
+				if (what) snprintf(label, sizeof(label), "%.63s - %.180s", suggest[i], tr(what));
 				else snprintf(label, sizeof(label), "%.63s", suggest[i]);
 				MosaicRect rr = { left, y, right - left, row_h };
-				drawRow(screen, &rr, label, suggest_on[i] ? "On" : "Off", 0);
+				drawRow(screen, &rr, label, suggest_on[i] ? tr("On") : tr("Off"), 0);
 				y += row_h;
 			}
-			paragraph(screen, "Turn them on in Tools > Launcher > Plugins. They start the next time the launcher does.", x,
+			paragraph(screen, tr("Turn them on in Tools > Launcher > Plugins. They start the next time the launcher does."), x,
 				y + pad, w, bottom, hint);
 			break;
 		default:
 			paragraph(screen,
-				tile_on ? "That's it. The First run tile on the quick menu opens this again."
-						: "That's it.",
+				tile_on ? tr("That's it. The First run tile on the quick menu opens this again.")
+						: tr("That's it."),
 				x, y, w, bottom, ink);
 			break;
 	}

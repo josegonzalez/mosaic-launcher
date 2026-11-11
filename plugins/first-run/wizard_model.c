@@ -4,6 +4,9 @@
 #include <string.h>
 #include "wizard_model.h"
 
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
+
 void FR_init(FrWizard* w, int rows, int pin, int plugins) {
 	memset(w, 0, sizeof(*w));
 	w->rows = rows < 0 ? 0 : rows > FR_TOGGLES_MAX ? FR_TOGGLES_MAX : rows;
@@ -118,10 +121,10 @@ const char* FR_describe(const char* id) {
 		const char* id;
 		const char* what;
 	} known[] = {
-		{ "home-dashboard", "a home screen with your last game" },
-		{ "switcher-plus", "more game switcher styles" },
-		{ "favorites", "a Favorites folder, Y adds a game" },
-		{ "search", "search every game by name" },
+		{ "home-dashboard", TR_MARK("a home screen with your last game") },
+		{ "switcher-plus", TR_MARK("more game switcher styles") },
+		{ "favorites", TR_MARK("a Favorites folder, Y adds a game") },
+		{ "search", TR_MARK("search every game by name") },
 	};
 	if (!id) return NULL;
 	for (size_t i = 0; i < sizeof(known) / sizeof(known[0]); i++) {

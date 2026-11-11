@@ -1,12 +1,13 @@
 // Writes the gettext template of the plugin.txt files named on the command
 // line to stdout: each plugin's name, setting labels and choice options,
-// read by the launcher's own parser (Manifest_strings) and under msgctxt
-// set to the plugin's id, as the Launcher pak's Plugins page translates
-// them. Entries are sorted by context, then text (bytewise), with
-// file-only locations, so the template changes only when a string does.
-// Built and run by scripts/pot.sh.
+// read by the launcher's own parser (Manifest_strings), and the strings
+// xgettext found in its code (-c <file> after its plugin.txt), all under
+// msgctxt set to the plugin's id, as the Launcher pak's Plugins page and
+// host->tr translate them. Entries are sorted by context, then text
+// (bytewise), with file-only locations, so the template changes only when
+// a string does. Built and run by scripts/pot.sh.
 //
-//   plugin-pot plugins/*/plugin.txt > po/plugins.pot
+//   plugin-pot plugins/a/plugin.txt -c build/pot/code/a.pot plugins/b/plugin.txt > po/plugins.pot
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,11 +15,14 @@
 #include "pluginset.h"
 
 #define ENTRIES_MAX 4096
+#define FILES_MAX 32 // locations on one of xgettext's entries
 
 typedef struct Entry {
 	char context[64];
-	char text[256];
+	char text[512];
+	char plural[512]; // "" for none
 	char file[512];
+	int c_format;
 } Entry;
 
 static Entry entries[ENTRIES_MAX];
@@ -26,8 +30,7 @@ static int entry_count = 0;
 static const char* reading; // the file whose strings are being added
 static const PluginManifest* manifest;
 
-static void add(const char* text, void* data) {
-	(void)data;
+static void addEntry(const char* text, const char* plural, const char* file, int c_format) {
 	if (!text[0]) return;
 	if (entry_count >= ENTRIES_MAX) {
 		fprintf(stderr, "plugin-pot: more than %d strings\n", ENTRIES_MAX);
@@ -36,7 +39,14 @@ static void add(const char* text, void* data) {
 	Entry* e = &entries[entry_count++];
 	snprintf(e->context, sizeof(e->context), "%s", manifest->id);
 	snprintf(e->text, sizeof(e->text), "%s", text);
-	snprintf(e->file, sizeof(e->file), "%s", reading);
+	snprintf(e->plural, sizeof(e->plural), "%s", plural ? plural : "");
+	snprintf(e->file, sizeof(e->file), "%s", file);
+	e->c_format = c_format;
+}
+
+static void add(const char* text, void* data) {
+	(void)data;
+	addEntry(text, NULL, reading, 0);
 }
 
 static int compare(const void* a, const void* b) {
@@ -63,12 +73,84 @@ static char* readFile(const char* path) {
 	return text;
 }
 
+// Appends the C string that starts at the quote in line to out, without
+// its escapes.
+static void unquote(const char* line, char* out, size_t size) {
+	size_t len = strlen(out);
+	const char* p = strchr(line, '"');
+	if (!p) return;
+	for (p++; *p && *p != '"' && len + 1 < size; p++) {
+		char c = *p;
+		if (c == '\\' && p[1]) {
+			p++;
+			c = *p == 'n' ? '\n' : *p == 't' ? '\t' : *p;
+		}
+		out[len++] = c;
+	}
+	out[len] = '\0';
+}
+
+// The entries of a template xgettext wrote (with --no-wrap): each one's
+// locations, c-format flag, msgid and msgid_plural. Its header is left out.
+static int readCode(const char* path) {
+	char* text = readFile(path);
+	if (!text) {
+		fprintf(stderr, "plugin-pot: can't read %s\n", path);
+		return -1;
+	}
+	char files[FILES_MAX][512];
+	int file_count = 0, c_format = 0, started = 0;
+	char msgid[512] = "", plural[512] = "";
+	char* field = NULL; // where a continuation line goes
+	size_t field_size = 0;
+	char* line = text;
+	while (line) {
+		char* next = strchr(line, '\n');
+		if (next) *next++ = '\0';
+		if (!line[0]) {
+			// an entry ends at a blank line
+			for (int i = 0; started && i < file_count; i++) addEntry(msgid, plural[0] ? plural : NULL, files[i], c_format);
+			file_count = c_format = started = 0;
+			msgid[0] = plural[0] = '\0';
+			field = NULL;
+		}
+		else if (!strncmp(line, "#:", 2)) {
+			for (char* f = strtok(line + 2, " "); f && file_count < FILES_MAX; f = strtok(NULL, " ")) {
+				int seen = 0;
+				for (int i = 0; i < file_count; i++) seen |= !strcmp(files[i], f);
+				if (!seen) snprintf(files[file_count++], sizeof(files[0]), "%s", f);
+			}
+		}
+		else if (!strncmp(line, "#,", 2)) {
+			for (char* f = strtok(line + 2, " ,"); f; f = strtok(NULL, " ,")) c_format |= !strcmp(f, "c-format");
+		}
+		else if (!strncmp(line, "msgid_plural ", 13)) {
+			field = plural;
+			field_size = sizeof(plural);
+			unquote(line, field, field_size);
+		}
+		else if (!strncmp(line, "msgid ", 6)) {
+			started = 1;
+			field = msgid;
+			field_size = sizeof(msgid);
+			unquote(line, field, field_size);
+		}
+		else if (!strncmp(line, "msgstr", 6) || !strncmp(line, "msgctxt", 7)) field = NULL;
+		else if (line[0] == '"' && field) unquote(line, field, field_size);
+		line = next;
+	}
+	for (int i = 0; started && i < file_count; i++) addEntry(msgid, plural[0] ? plural : NULL, files[i], c_format);
+	free(text);
+	return 0;
+}
+
 // A C string as gettext writes it.
 static void quoted(const char* s) {
 	putchar('"');
 	for (; *s; s++) {
 		if (*s == '"' || *s == '\\') printf("\\%c", *s);
 		else if (*s == '\t') fputs("\\t", stdout);
+		else if (*s == '\n') fputs("\\n", stdout);
 		else putchar(*s);
 	}
 	putchar('"');
@@ -77,6 +159,14 @@ static void quoted(const char* s) {
 int main(int argc, char* argv[]) {
 	static PluginManifest m;
 	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "-c")) {
+			if (!manifest || i + 1 >= argc) {
+				fprintf(stderr, "plugin-pot: -c needs a plugin.txt before it and a file after it\n");
+				return 1;
+			}
+			if (readCode(argv[++i]) != 0) return 1;
+			continue;
+		}
 		char* text = readFile(argv[i]);
 		if (!text) {
 			fprintf(stderr, "plugin-pot: can't read %s\n", argv[i]);
@@ -93,10 +183,12 @@ int main(int argc, char* argv[]) {
 		Manifest_strings(&m, add, NULL);
 	}
 	qsort(entries, entry_count, sizeof(entries[0]), compare);
+	int plurals = 0;
+	for (int i = 0; i < entry_count; i++) plurals |= entries[i].plural[0] != '\0';
 
 	fputs("# The bundled plugins' names, setting labels and choice options, from\n"
-		"# their plugin.txt files, under msgctxt set to the plugin's id. Written\n"
-		"# by make pot.\n"
+		"# their plugin.txt files, and the fixed text their code hands the\n"
+		"# launcher, under msgctxt set to the plugin's id. Written by make pot.\n"
 		"#, fuzzy\n"
 		"msgid \"\"\n"
 		"msgstr \"\"\n"
@@ -109,20 +201,33 @@ int main(int argc, char* argv[]) {
 		"\"MIME-Version: 1.0\\n\"\n"
 		"\"Content-Type: text/plain; charset=UTF-8\\n\"\n"
 		"\"Content-Transfer-Encoding: 8bit\\n\"\n", stdout);
+	if (plurals) fputs("\"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\\n\"\n", stdout);
 	for (int i = 0; i < entry_count; ) {
 		// one entry for each context and text, naming every file it's in
 		int j = i;
-		while (j < entry_count && !strcmp(entries[j].context, entries[i].context) && !strcmp(entries[j].text, entries[i].text)) j++;
+		int c_format = 0;
+		const char* plural = "";
+		while (j < entry_count && !strcmp(entries[j].context, entries[i].context) && !strcmp(entries[j].text, entries[i].text)) {
+			c_format |= entries[j].c_format;
+			if (entries[j].plural[0]) plural = entries[j].plural;
+			j++;
+		}
 		printf("\n#:");
 		for (int k = i; k < j; k++) {
 			if (k > i && !strcmp(entries[k].file, entries[k - 1].file)) continue;
 			printf(" %s", entries[k].file);
 		}
+		if (c_format) printf("\n#, c-format");
 		printf("\nmsgctxt ");
 		quoted(entries[i].context);
 		printf("\nmsgid ");
 		quoted(entries[i].text);
-		printf("\nmsgstr \"\"\n");
+		if (plural[0]) {
+			printf("\nmsgid_plural ");
+			quoted(plural);
+			printf("\nmsgstr[0] \"\"\nmsgstr[1] \"\"\n");
+		}
+		else printf("\nmsgstr \"\"\n");
 		i = j;
 	}
 	return 0;

@@ -33,6 +33,11 @@ static TPCatalog catalog;
 static char bundledDir[TP_PATH_MAX];
 static char pickIds[CHOICES_MAX][TP_NAME_MAX];
 
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static void say(const char* format, ...) __attribute__((format(printf, 1, 2)));
 static void say(const char* format, ...) {
 	char line[400];
@@ -136,14 +141,14 @@ static void pick(void* data) {
 	int count = 0;
 	int cursor = 0;
 	snprintf(pickIds[count], TP_NAME_MAX, "stock");
-	labels[count++] = "Stock";
+	labels[count++] = tr("Stock");
 	for (int i = 0; i < catalog.theme_count && count < CHOICES_MAX; i++) {
 		if (&catalog.themes[i] == selected) cursor = count;
 		snprintf(pickIds[count], TP_NAME_MAX, "%s", catalog.themes[i].id);
 		labels[count++] = catalog.themes[i].label;
 	}
 	if (catalog.theme_count >= CHOICES_MAX) say("only the first %d themes are listed", CHOICES_MAX - 1);
-	if (host->choose("Theme", labels, count, cursor, picked, NULL) != 0) say("couldn't list the themes");
+	if (host->choose(tr("Theme"), labels, count, cursor, picked, NULL) != 0) say("couldn't list the themes");
 }
 
 static int init(const MosaicHost* h) {
