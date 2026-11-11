@@ -231,14 +231,15 @@ fi
 # its embedded cover
 if [ -n "$MU_TAGGED" ]; then
 	log="$WORK/music-tags.log"
-	PRESSER_KEYS="y down down a wait wait b wait wait"
+	# B goes up from the album to the music folder, then closes the player
+	PRESSER_KEYS="y down down a wait wait b b wait wait"
 	PRESSER_LOG="$MU_WORK/tags.texts" SMOKE_PRELOAD="$PRESSER"
 	export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
 	run_launcher "$log" "presser: done" || fail "the launcher exited early with the tagged track"
 	unset PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
 	expect "playing $MU_ALBUM/10 Ten.mp3"
 	expect "tags of $MU_ALBUM/10 Ten.mp3: title \"Tenth Song\", artist \"Test Artist\", art /tmp/mosaic-music-art/art-"
-	expect "(embedded)"
+	grep "plugin music: tags of $MU_ALBUM/10 Ten.mp3: " "$log" | grep -qF "(embedded)" || fail "the tagged track's art wasn't its own"
 	expect "showing the art /tmp/mosaic-music-art/art-"
 	grep -qxF "Tenth Song" "$MU_WORK/tags.texts" || fail "the player didn't show the tagged title"
 	grep -qxF "Test Artist" "$MU_WORK/tags.texts" || fail "the player didn't show the artist"
