@@ -545,7 +545,7 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 	HD_duration(recent_total, total, sizeof(total));
 	char games[64];
 	snprintf(games, sizeof(games), trPlural("%i game", "%i games", (unsigned long)recent_games), recent_games);
-	snprintf(row->right, sizeof(row->right), "%s%s%s", games, total[0] ? " \xc2\xb7 " : "", total);
+	snprintf(row->right, sizeof(row->right), "%.40s%s%s", games, total[0] ? " \xc2\xb7 " : "", total);
 
 	int top[MOST_PLAYED_MAX];
 	int n = HD_mostPlayed(times, count, top, MOST_PLAYED_MAX);
@@ -560,7 +560,7 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 		if (sessions > 0) {
 			char count[64];
 			snprintf(count, sizeof(count), trPlural("%i session", "%i sessions", (unsigned long)sessions), sessions);
-			snprintf(row->right, sizeof(row->right), "%s \xc2\xb7 %s", played, count);
+			snprintf(row->right, sizeof(row->right), "%s \xc2\xb7 %.50s", played, count);
 		} else {
 			snprintf(row->right, sizeof(row->right), "%s", played);
 		}

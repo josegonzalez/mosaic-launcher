@@ -702,9 +702,9 @@ static void stateLine(char* out, size_t size) {
 	char pos[16], len[16];
 	MU_formatTime(st.pos_ms, pos, sizeof(pos));
 	MU_formatTime(st.len_ms, len, sizeof(len));
-	char repeat[128];
+	char repeat[64];
 	snprintf(repeat, sizeof(repeat), tr("Repeat %s"), tr(MU_repeatName(st.repeat)));
-	snprintf(out, size, "%s  %s / %s%s%s  %s", st.state == MU_PLAYING ? tr("Playing") : tr("Paused"), pos, len,
+	snprintf(out, size, "%.40s  %s / %s%s%.40s  %s", st.state == MU_PLAYING ? tr("Playing") : tr("Paused"), pos, len,
 		st.shuffle ? "  " : "", st.shuffle ? tr("Shuffle") : "", repeat);
 }
 
@@ -788,7 +788,7 @@ static int playerRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 			box.x += panel_h + pad;
 			box.w -= panel_h + pad;
 		}
-		char title[MU_TAG_TEXT_MAX], line[128];
+		char title[MU_TAG_TEXT_MAX], line[256];
 		nowTitle(title, sizeof(title));
 		int y = panel_y;
 		textCentred(screen, MOSAIC_FONT_LARGE, title, &box, y, fg);
@@ -884,7 +884,7 @@ static int lockRender(MosaicSurface* screen, const MosaicScreenView* view, void*
 	textCentred(screen, MOSAIC_FONT_LARGE, lock_clock, &box, y, fg);
 	y += large * 2;
 	if (st.state != MU_STOPPED) {
-		char title[MU_TAG_TEXT_MAX], line[128];
+		char title[MU_TAG_TEXT_MAX], line[256];
 		nowTitle(title, sizeof(title));
 		textCentred(screen, MOSAIC_FONT_LARGE, title, &box, y, fg);
 		y += large + 4 * s;

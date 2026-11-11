@@ -39,7 +39,8 @@ texts="$WORK/root-names-texts.txt"
 # presser has seen a few frames
 rn_run() {
 	log="$WORK/$1.log"
-	rm -f "$texts"
+	# quick-menu-plus starts awake when the last run left it so
+	rm -f "$texts" /tmp/quick-menu-plus.awake
 	PRESSER_KEYS="wait wait wait wait wait wait wait wait wait wait" PRESSER_LOG="$texts" SMOKE_PRELOAD="$PRESSER"
 	export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
 	run_launcher "$log" "$2" "presser: done" || fail "the launcher exited early with sayer ($1)"
