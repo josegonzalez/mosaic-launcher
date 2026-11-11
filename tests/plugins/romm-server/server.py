@@ -8,11 +8,15 @@ HTTPS with the given certificate and key.
 It writes the port it got to --port-file, and one line per request to
 --log: the method, the path, and for an upload the file name and bytes.
 Rom 1 is sent slowly, about 6 seconds, so a download can be cancelled.
+PlayStation's roms have several files each, sent as a zip as RomM's nginx
+sends one (stored, sizes after each file, with RomM's own <name>.m3u), and
+rom 3 has the state recorded for rom 2 renamed as RetroArch names one.
 """
 
 import argparse
 import base64
 import http.server
+import io
 import json
 import os
 import socketserver
@@ -20,6 +24,7 @@ import ssl
 import sys
 import time
 import urllib.parse
+import zipfile
 
 USER, PASSWORD = "admin", "Pw-86-secret"
 
@@ -27,6 +32,37 @@ USER, PASSWORD = "admin", "Pw-86-secret"
 def content(seed, size):
     line = ("%s " % seed).encode()
     return (line * (size // len(line) + 1))[:size]
+
+
+class Stream:
+    """A file zipfile can't seek in, so it writes sizes after each file
+    (data descriptors), as nginx's mod_zip does."""
+
+    def __init__(self):
+        self.buf = io.BytesIO()
+
+    def write(self, data):
+        return self.buf.write(data)
+
+    def flush(self):
+        pass
+
+
+def rom_zip(rom, name):
+    """The zip RomM serves for a rom of several files asked for as name."""
+    top = rom["full_path"] + "/"
+    stream = Stream()
+    with zipfile.ZipFile(stream, "w", zipfile.ZIP_STORED) as z:
+        inside = []
+        for f in sorted(rom["files"], key=lambda f: f["file_name"]):
+            path = f["full_path"][len(top):]
+            inside.append(path)
+            z.writestr(path, content("%s %s" % (rom["id"], path), f["file_size_bytes"]))
+        # RomM's playlist: every file but a sheet's tracks
+        sheets = any(p.lower().endswith(".cue") for p in inside)
+        discs = [p for p in inside if not (sheets and p.lower().endswith(".bin"))]
+        z.writestr(name + ".m3u", "\n".join(discs))
+    return stream.buf.getvalue()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -61,6 +97,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         with open(os.path.join(self.server.fixtures, name), "rb") as f:
             return f.read()
 
+    def rom3_states(self):
+        """Rom 2's state as rom 3's (state 31), named as RetroArch names slot 1."""
+        state = json.loads(self.fixture("states-rom2.json"))[0]
+        state.update(id=31, rom_id=3, file_name="Mosaic Two Disc (USA).state1", emulator="pcsx_rearmed")
+        return [state]
+
     def authorised(self):
         want = "Basic " + base64.b64encode(("%s:%s" % (USER, PASSWORD)).encode()).decode()
         if self.headers.get("Authorization") == want:
@@ -81,13 +123,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/roms":
             if query.get("platform_ids") == ["1"]:
                 return self.send(200, self.fixture("roms-gb.json"))
+            if query.get("platform_ids") == ["4"]:
+                return self.send(200, self.fixture("roms-psx.json"))
             return self.send(200, b'{"items":[],"total":0,"limit":500,"offset":0}')
         if path.startswith("/api/roms/") and "/content/" in path:
             rom_id = int(path.split("/")[3])
-            roms = json.loads(self.fixture("roms-gb.json"))["items"]
+            roms = json.loads(self.fixture("roms-gb.json"))["items"] + json.loads(self.fixture("roms-psx.json"))["items"]
             rom = next((r for r in roms if r["id"] == rom_id), None)
-            if not rom or path.split("/content/", 1)[1] != rom["fs_name"]:
+            name = path.split("/content/", 1)[1]
+            if not rom or name != rom["fs_name"]:
                 return self.send(404, b"{}")
+            if len(rom["files"]) > 1:
+                return self.send(200, rom_zip(rom, name), "application/zip")
             body = content("rom %d" % rom_id, rom["fs_size_bytes"])
             if rom_id != 1:
                 return self.send(200, body, "application/octet-stream")
@@ -108,11 +155,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             name = "saves-rom2.json" if path == "/api/saves" else "states-rom2.json"
             if query.get("rom_id") == ["2"]:
                 return self.send(200, self.fixture(name))
+            if query.get("rom_id") == ["3"] and path == "/api/states":
+                return self.send(200, json.dumps(self.rom3_states()).encode())
             return self.send(200, b"[]")
         if (path.startswith("/api/saves/") or path.startswith("/api/states/")) and path.endswith("/content"):
             kind = path.split("/")[2]
             asset_id = int(path.split("/")[3])
             assets = json.loads(self.fixture("saves-rom2.json" if kind == "saves" else "states-rom2.json"))
+            if kind == "states":
+                assets += self.rom3_states()
             asset = next((a for a in assets if a["id"] == asset_id), None)
             if not asset:
                 return self.send(404, b"{}")

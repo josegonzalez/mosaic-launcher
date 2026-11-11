@@ -1,7 +1,8 @@
 // The romm plugin's logic that needs neither the launcher nor the network:
 // URLs, HTTP requests and responses as text, a small JSON reader, RomM's
 // platforms, roms, saves and states, the platform to system map, file
-// names from the server, and the plugin's own small files.
+// names from the server, minarch's state layouts, the checks on a zip's
+// entries and a multi-file game's layout, and the plugin's own small files.
 
 #ifndef ROMM_MODEL_H
 #define ROMM_MODEL_H
@@ -134,7 +135,8 @@ typedef struct RMRom {
 	char file[RM_NAME_MAX]; // fs_name, checked with RM_safeName
 	char name[RM_NAME_MAX];
 	long long size;
-	int multi; // more than one file: served as a zip, which the plugin leaves out
+	int multi; // more than one file: served as a zip, unpacked into a folder named file
+	char launch[RM_NAME_MAX]; // a multi rom's file to launch in that folder, from RM_launchFile
 } RMRom;
 
 enum { RM_ASSET_SAVE, RM_ASSET_STATE };
@@ -160,9 +162,12 @@ const char* RM_tagSlug(int index);
 
 // Parses GET /api/platforms. Returns how many went in out (up to max), or -1.
 int RM_parsePlatforms(const char* json, size_t len, RMPlatform* out, int max);
-// Parses a page of GET /api/roms, adding to out from *count up to max, and
-// sets *total to the server's total. Roms with unsafe names are left out.
-// Returns how many this page had, or -1.
+// Parses a page of GET /api/roms (asked with_files=true), adding to out
+// from *count up to max, and sets *total to the server's total. A rom of
+// more than one file is multi, with the file to launch worked out from its
+// files; a rom of one file in a folder takes that file's name. Roms with
+// unsafe names, and multi roms without their files or with nothing to
+// launch, are left out. Returns how many this page had, or -1.
 int RM_parseRoms(const char* json, size_t len, RMRom* out, int* count, int max, int* total);
 // Parses GET /api/saves or /api/states as kind, adding to out from *count
 // up to max. Returns how many this response had, or -1.
@@ -190,9 +195,97 @@ int RM_saveNames(const char* rom_file, char names[3][RM_NAME_MAX]);
 // RM_saveNames exists locally (bit i for names[i]): the existing one,
 // newest kept by the caller, else by the server file's extension.
 int RM_saveTarget(const char* rom_file, const char* server_file, int existing, char* out, size_t size);
-// The slot of a state file in minarch's own format (a name ending in
-// ".st<N>"), or -1 for any other.
+// The slot of a state file from the server, in any of the layouts minarch
+// writes by its State format setting: "<x>.st<N>" (its own), "<x>.state"
+// (slot 0), "<x>.state<N>" and "<x>.state.<N>" for slots 0 to 9, and
+// "<x>.state.auto" (the auto-resume slot, 9). -1 for any other.
 int RM_stateSlot(const char* server_file);
+// The name minarch gives rom_file's state in slot (0 to 9) for its State
+// format setting (stateFormat in .userdata/shared/minuisettings.txt, 0 to
+// 4). Returns 0, or -1.
+int RM_stateName(const char* rom_file, int format, int slot, char* out, size_t size);
+// The stateFormat in minuisettings.txt's text, or 0 (minarch's own) when
+// it isn't there or isn't one minarch knows.
+int RM_stateFormat(const char* settings);
+// The core an emulator pak's launch.sh runs (its EMU_EXE=), which names
+// its state folder .userdata/shared/<tag>-<core>. Returns 0, or -1.
+int RM_emuCore(const char* launch_sh, char* out, size_t size);
+// Which state folder of a tag's to restore into, from the names of the
+// <tag>-<core> folders there are: the pak's core's (even when it isn't
+// there yet), else the only one, else the one for the server state's
+// emulator. Returns 0 with the folder's name, or -1 when it can't tell.
+int RM_stateFolder(const char* tag, const char* const* folders, int count, const char* core, const char* emulator,
+	char* out, size_t size);
+
+///////////////////////////////////////
+// Games of more than one file, which RomM serves as a zip. The zip is
+// untrusted: these check every entry before anything is written.
+
+#define RM_ZIP_ENTRIES_MAX 2048
+#define RM_ZIP_NAME_MAX 512 // bytes in an entry's path
+#define RM_ZIP_DEPTH_MAX 8 // parts in an entry's path
+#define RM_ZIP_FILE_MAX (4LL * 1024 * 1024 * 1024 - 1) // the card's (FAT32's) largest file
+#define RM_ZIP_TOTAL_MAX (16LL * 1024 * 1024 * 1024) // all the files together
+#define RM_ZIP_RATIO_MAX 1032 // deflate can't shrink anything further than this
+#define RM_ZIP_SLACK (64 * 1024) // what a zip may hold past the size RomM gave: its playlist
+#define RM_STOCK_PATH_MAX 256 // NextUI's own path buffers, which a launched path must fit
+
+typedef struct RMZipEntry {
+	const char* name; // as the central directory has it: not NUL-terminated, and may hold NULs
+	size_t name_len;
+	unsigned int method; // 0 stored, 8 deflate
+	unsigned int flags; // the general purpose bits
+	unsigned long external; // the external attributes, a Unix mode in the top 16 bits
+	unsigned long long comp, size;
+} RMZipEntry;
+
+// 1 when the entry is a folder (its name ends in '/')
+int RM_zipIsDir(const RMZipEntry* e);
+// Checks an entry's path: relative, made of '/'-separated parts that are
+// none of "", "." or "..", with no NUL, backslash, control character or
+// character the card can't hold (":*?\"<>|"), no part ending in a dot or a
+// space or starting ".romm-" (the plugin's own temporary names), at most
+// RM_ZIP_DEPTH_MAX parts and RM_ZIP_NAME_MAX bytes, each part under
+// RM_NAME_MAX. A folder's trailing '/' is allowed. Returns 0, or -1 with why.
+int RM_zipNameCheck(const char* name, size_t len, char* why, size_t size);
+// Checks one entry: its name, that it's a plain file or folder (never a
+// link or other kind), not encrypted, stored or deflated, and sizes that
+// add up: a folder is empty, a stored file's sizes match, nothing is over
+// RM_ZIP_FILE_MAX, and nothing claims to inflate past RM_ZIP_RATIO_MAX.
+// Returns 0, or -1 with why.
+int RM_zipEntryCheck(const RMZipEntry* e, char* why, size_t size);
+// Checks the entries together: each one, at most RM_ZIP_ENTRIES_MAX, a
+// total (in *total) under RM_ZIP_TOTAL_MAX and, when expect isn't -1 (the
+// size RomM gave), under expect + RM_ZIP_SLACK, and no two paths the same
+// when case is ignored, as the card ignores it (a file and a folder of the
+// same name, a file twice, or two spellings of a folder). Returns 0, or -1
+// with why.
+int RM_zipCheck(const RMZipEntry* entries, int count, long long expect, long long* total, char* why, size_t size);
+
+// 1 when name is "<game>.m3u" at the top of the game's folder, case
+// ignored: the playlist the plugin writes itself, in place of any in the zip
+int RM_isGameM3u(const char* game, const char* name);
+// The disc number a file's name gives, as RomM reads it: "(Disc 2)",
+// "(CD 2)", "(Disk 1 of 2)", "(Disc 2A)" or "(Disc B)" (B is 2). 0 for none.
+int RM_discNumber(const char* name);
+// The files of a game's folder that are discs to play, by RomM's rule:
+// any but an .m3u, and when there's a .cue, .gdi, .ccd or .mds, none of
+// the tracks those point at (.bin, .raw, .img, .sub, .mdf, .wav, .ogg,
+// .flac, .mp3). Numbered discs first in order, then the rest by name. Fills
+// order with indexes into names; returns how many.
+int RM_discs(const char* const* names, int count, int* order);
+// The file to launch in a game's folder of these files (paths in it, the
+// plugin's own <game>.m3u left out): "<game>.m3u" with two discs or more,
+// else the one disc. Returns how many discs there are (0 with nothing to
+// launch), with out set when there's one or more.
+int RM_launchFile(const char* game, const char* const* names, int count, char* out, size_t size);
+// The .m3u listing the discs, one path per line. Returns its length, or -1
+// when it doesn't fit.
+int RM_m3uText(const char* const* names, const int* order, int discs, char* out, size_t size);
+// "<folder>/<folder's name>.m3u" for a path in folder: where NextUI looks
+// for the playlist that makes a folder one game, and that minarch then
+// names the game's saves and states after. Returns 0, or -1.
+int RM_m3uFor(const char* path, char* out, size_t size);
 
 // A SHA-256 fingerprint as hex, with or without ':' or spaces. Returns 0
 // with the 32 bytes, or -1.

@@ -2,6 +2,9 @@
 # romm: HTTPS with BearSSL, its sources copied into vendor/BearSSL (see
 # VERSION.txt there), compiled with its own flags (none of the plugins') into an archive
 # that only romm's plugin.so links. Its licence goes beside the plugin.
+# Zips with miniz, copied into vendor/miniz the same way, read-only and
+# without zlib's names, its symbols hidden like BearSSL's and its licence
+# beside the plugin too.
 
 BEARSSL := $(abspath ../vendor/BearSSL)
 BEARSSL_OBJ := $(abspath ../build/bearssl/$(ARCH))
@@ -24,7 +27,20 @@ $(BEARSSL_LICENSE): $(BEARSSL)/LICENSE.txt
 	@mkdir -p $(dir $@)
 	cp $< $@
 
-romm: $(BEARSSL_LIB) $(BEARSSL_LICENSE)
-romm: PLUGIN_CFLAGS = -pthread -I$(BEARSSL)/inc
-romm: PLUGIN_LIBS = $(BEARSSL_LIB) -pthread
-romm: PLUGIN_SHIP = $(BEARSSL_LICENSE)
+MINIZ := $(abspath ../vendor/miniz)
+MINIZ_DEFS := -DMINIZ_NO_DEFLATE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES -DMINIZ_NO_TIME
+MINIZ_OBJ := $(abspath ../build/miniz/$(ARCH))/miniz.o
+MINIZ_LICENSE := $(dir $(MINIZ_OBJ))miniz-LICENSE.txt
+
+$(MINIZ_OBJ): $(MINIZ)/miniz.c $(MINIZ)/miniz.h
+	@mkdir -p $(dir $@)
+	$(CC) -O2 -fPIC -fvisibility=hidden -w $(MINIZ_DEFS) -I$(MINIZ) -c $< -o $@
+
+$(MINIZ_LICENSE): $(MINIZ)/LICENSE
+	@mkdir -p $(dir $@)
+	cp $< $@
+
+romm: $(BEARSSL_LIB) $(BEARSSL_LICENSE) $(MINIZ_OBJ) $(MINIZ_LICENSE)
+romm: PLUGIN_CFLAGS = -pthread -I$(BEARSSL)/inc -I$(MINIZ) $(MINIZ_DEFS)
+romm: PLUGIN_LIBS = $(BEARSSL_LIB) $(MINIZ_OBJ) -pthread
+romm: PLUGIN_SHIP = $(BEARSSL_LICENSE) $(MINIZ_LICENSE)

@@ -29,7 +29,11 @@ The bundled romm plugin speaks HTTPS with BearSSL (vendor/BearSSL, its
 sources copied unchanged from https://www.bearssl.org/git/BearSSL at commit
 7bea48e5e850ab4cafbe68d3765cdaba13a86d6f, 2026-04-06), built into that
 plugin alone. MIT License. Its licence also ships beside the plugin as
-BearSSL-LICENSE.txt in its lib folder.
+BearSSL-LICENSE.txt in its lib folder. It unpacks zips with miniz
+(vendor/miniz, copied unchanged from https://github.com/richgel999/miniz at
+release 3.1.2, 2026-07-01), built into that plugin alone, under the miniz
+licence below (MIT License), which also ships beside the plugin as
+miniz-LICENSE.txt.
 
 The bundled music plugin's daemon, musicd, decodes MP3, FLAC and WAV with
 dr_mp3, dr_flac and dr_wav (vendor/dr_libs, copied unchanged from

@@ -2,7 +2,9 @@
 // folder for each platform the launcher has a system for, listing its
 // roms. A rom that isn't on the card yet is a stub: launching it
 // downloads it into Roms/<system>/ (a progress screen and the status
-// pill show how far it's got, and B cancels), then launches it. After a
+// pill show how far it's got, and B cancels), then launches it. A game of
+// several files comes as a zip, unpacked into Roms/<system>/<game>/ with a
+// <game>.m3u when it has more than one disc (romm_zip.c). After a
 // game from RomM returns, its save is uploaded when it changed, and the
 // Flashback screen (the "button" setting, Y by default) lists the game's
 // saves and states on the server, newest first, and restores one after a
@@ -33,6 +35,7 @@
 #include "mosaic_plugin.h"
 #include "romm_model.h"
 #include "romm_net.h"
+#include "romm_zip.h"
 
 #define ID "romm"
 #define DOWNLOAD_SCREEN ID ".download"
@@ -46,6 +49,7 @@
 #define JSON_MAX (32LL * 1024 * 1024)
 #define SAVE_MAX (64LL * 1024 * 1024)
 #define ROM_MAX (4LL * 1024 * 1024 * 1024 - 1)
+#define ZIP_OVERHEAD (16LL * 1024 * 1024) // a zip's headers past the files' size, with room to spare
 #define SAVE_SLOT "mosaic-launcher"
 
 // snprintf, for paths and messages that are cut short rather than
@@ -258,6 +262,10 @@ typedef struct Job {
 	char dir[RM_PATH_MAX];
 	char path[RM_PATH_MAX]; // where it ends up
 	char temp[RM_PATH_MAX];
+	int multi; // a zip, unpacked into unpack, then moved to dir/game
+	volatile int unpacking;
+	char game[RM_NAME_MAX];
+	char unpack[RM_PATH_MAX];
 	char md5[33];
 	long long expect;
 	// what came of it
@@ -327,7 +335,7 @@ static void runRoms(Job* j) {
 		char target[256];
 		put(target, sizeof(target),
 			"/api/roms?platform_ids=%d&limit=500&offset=%d&order_by=name&order_dir=asc"
-			"&with_char_index=false&with_filter_values=false&with_rom_id_index=false",
+			"&with_char_index=false&with_filter_values=false&with_rom_id_index=false&with_files=true",
 			j->platform_id, offset);
 		RNCall call;
 		if (get(j, &call, target, JSON_MAX) != 0) return;
@@ -357,7 +365,9 @@ static void runDownload(Job* j) {
 	memset(&call, 0, sizeof(call));
 	call.method = "GET";
 	put(call.target, sizeof(call.target), "%s", target);
-	call.max_body = j->expect > 0 ? j->expect : ROM_MAX;
+	// a zip has its headers and RomM's .m3u on top of the files
+	if (j->multi) call.max_body = j->expect > 0 ? j->expect + ZIP_OVERHEAD : RM_ZIP_TOTAL_MAX;
+	else call.max_body = j->expect > 0 ? j->expect : ROM_MAX;
 	call.out_path = j->temp;
 	call.cancel = &j->cancel;
 	call.done = &j->done;
@@ -368,6 +378,25 @@ static void runDownload(Job* j) {
 		put(j->error, sizeof(j->error), "%s", call.error);
 	} else if (call.status != 200) {
 		httpError(j, &call, "the rom");
+	} else if (j->multi) {
+		RZJob z;
+		memset(&z, 0, sizeof(z));
+		z.zip = j->temp;
+		z.dir = j->dir;
+		z.game = j->game;
+		z.temp = j->unpack;
+		z.expect = j->expect;
+		z.cancel = &j->cancel;
+		z.done = &j->done;
+		z.total = &j->total;
+		j->unpacking = 1;
+		if (RZ_unpack(&z) != 0) {
+			put(j->error, sizeof(j->error), "%s", z.error);
+		} else {
+			put(j->path, sizeof(j->path), "%s/%s", j->dir, z.launch);
+			j->done = j->total;
+			j->ok = 1;
+		}
 	} else if (j->expect > 0 && j->done != j->expect) {
 		put(j->error, sizeof(j->error), "the download was %lld bytes, not %lld", (long long)j->done, j->expect);
 	} else if (rename(j->temp, j->path) != 0) {
@@ -376,7 +405,7 @@ static void runDownload(Job* j) {
 		j->ok = 1;
 	}
 	RN_free(&call);
-	if (!j->ok) unlink(j->temp);
+	if (!j->ok || j->multi) unlink(j->temp);
 }
 
 static void runUpload(Job* j) {
@@ -646,7 +675,7 @@ static void romsFolder(const char* slug, const char* tag, char* out, size_t size
 }
 
 static void romListSave(const RomList* list) {
-	size_t cap = (size_t)(list->count > 0 ? list->count : 1) * (2 * RM_NAME_MAX + 64);
+	size_t cap = (size_t)(list->count > 0 ? list->count : 1) * (3 * RM_NAME_MAX + 64);
 	char* text = malloc(cap);
 	if (!text) return;
 	size_t len = 0;
@@ -654,7 +683,9 @@ static void romListSave(const RomList* list) {
 		const RMRom* r = &list->roms[i];
 		char name[RM_NAME_MAX];
 		cleanText(r->name, name, sizeof(name));
-		int n = put(text + len, cap - len, "%d\t%lld\t%d\t%s\t%s\n", r->id, r->size, r->multi, r->file, name);
+		char launch[RM_NAME_MAX];
+		cleanText(r->launch, launch, sizeof(launch));
+		int n = put(text + len, cap - len, "%d\t%lld\t%d\t%s\t%s\t%s\n", r->id, r->size, r->multi, r->file, name, launch);
 		if (n > 0 && (size_t)n < cap - len) len += (size_t)n;
 	}
 	char path[RM_PATH_MAX];
@@ -690,25 +721,26 @@ static void romListLoad(RomList* list) {
 	char* save = NULL;
 	for (char* line = strtok_r(text, "\n", &save); line && list->roms && list->count < lines;
 			line = strtok_r(NULL, "\n", &save)) {
-		char* f[5];
+		// id, size, multi, file, name and, since multi-file roms, the file to launch
+		char* f[6] = { NULL };
 		int n = 0;
-		for (char* s = line; n < 5; n++) {
+		for (char* s = line; s && n < 6; n++) {
 			f[n] = s;
-			char* tab = n < 4 ? strchr(s, '\t') : NULL;
-			if (n < 4 && !tab) break;
-			if (tab) {
-				*tab = '\0';
-				s = tab + 1;
-			}
+			s = strchr(s, '\t');
+			if (s) *s++ = '\0';
 		}
 		if (n < 5 || !RM_safeName(f[3])) continue;
 		RMRom* r = &list->roms[list->count];
+		memset(r, 0, sizeof(*r));
 		r->id = atoi(f[0]);
 		r->platform_id = list->platform_id;
 		r->size = atoll(f[1]);
-		r->multi = atoi(f[2]);
+		r->multi = atoi(f[2]) != 0;
 		put(r->file, sizeof(r->file), "%s", f[3]);
 		put(r->name, sizeof(r->name), "%s", f[4]);
+		if (n > 5) put(r->launch, sizeof(r->launch), "%s", f[5]);
+		char why[64];
+		if (r->multi && (!r->launch[0] || RM_zipNameCheck(r->launch, strlen(r->launch), why, sizeof(why)) != 0)) continue;
 		if (r->id > 0) list->count++;
 	}
 	free(text);
@@ -723,12 +755,25 @@ static void platformPath(const RMPlatform* p, char* out, size_t size) {
 	put(out, size, "%s/%s", root_path, name);
 }
 
-// A stub's path, or "" when it can't have one
+// A stub's path, or "" when it can't have one: a game of several files is
+// its folder's file to launch (its .m3u, or its one disc)
 static void stubPath(const RMPlatform* p, RomList* list, const RMRom* r, char* out, size_t size) {
 	out[0] = '\0';
-	if (!p->tag[0] || r->multi) return;
+	if (!p->tag[0]) return;
 	if (!list->folder[0]) romsFolder(p->slug, p->tag, list->folder, sizeof(list->folder));
-	if (list->folder[0]) put(out, size, "%s/Roms/%s/%s", sd, list->folder, r->file);
+	if (!list->folder[0]) return;
+	if (r->multi) put(out, size, "%s/Roms/%s/%s/%s", sd, list->folder, r->file, r->launch);
+	else put(out, size, "%s/Roms/%s/%s", sd, list->folder, r->file);
+	if (strlen(out) >= RM_STOCK_PATH_MAX) out[0] = '\0'; // too long for NextUI to launch
+}
+
+// The path a game is known by, for its record and saves: a file in a
+// folder with that folder's .m3u is the .m3u, as minarch names the
+// game's saves and states after it (and NextUI its recents)
+static void gameKey(const char* path, char* out, size_t size) {
+	char m3u[RM_PATH_MAX];
+	if (RM_m3uFor(path, m3u, sizeof(m3u)) == 0 && isFile(m3u)) put(out, size, "%s", m3u);
+	else put(out, size, "%s", path);
 }
 
 typedef struct Found {
@@ -746,8 +791,11 @@ static int findRom(const char* path, Found* out) {
 	if (strncmp(path, roms, strlen(roms)) != 0) return 0;
 	const char* folder = path + strlen(roms);
 	const char* slash = strchr(folder, '/');
-	if (!slash || strchr(slash + 1, '/')) return 0;
+	if (!slash) return 0;
+	// a single file's name, or a game folder's for anything in it
 	const char* file = slash + 1;
+	const char* inner = strchr(file, '/');
+	size_t file_len = inner ? (size_t)(inner - file) : strlen(file);
 	for (int i = 0; i < platform_count; i++) {
 		const RMPlatform* p = &platforms[i];
 		if (!p->tag[0]) continue;
@@ -759,7 +807,8 @@ static int findRom(const char* path, Found* out) {
 		if (!list) continue;
 		romListLoad(list);
 		for (int k = 0; k < list->count; k++) {
-			if (list->roms[k].multi || strcmp(list->roms[k].file, file) != 0) continue;
+			const RMRom* r = &list->roms[k];
+			if (r->multi != (inner != NULL) || strlen(r->file) != file_len || strncmp(r->file, file, file_len) != 0) continue;
 			out->platform = p;
 			out->list = list;
 			out->rom = &list->roms[k];
@@ -938,22 +987,37 @@ static void startDownload(const Found* f, const char* path) {
 		return;
 	}
 	struct statvfs vfs;
-	if (statvfs(dir, &vfs) == 0 && f->rom->size > 0
-			&& (long long)vfs.f_bavail * (long long)vfs.f_frsize < f->rom->size + 1024 * 1024) {
+	// a zip and what it unpacks to are on the card at once
+	long long need = f->rom->size * (f->rom->multi ? 2 : 1) + 1024 * 1024;
+	if (statvfs(dir, &vfs) == 0 && f->rom->size > 0 && (long long)vfs.f_bavail * (long long)vfs.f_frsize < need) {
 		toast("RomM: not enough space on the card");
 		say("not enough space for the download");
 		return;
+	}
+	if (f->rom->multi) {
+		char game[RM_PATH_MAX];
+		put(game, sizeof(game), "%s/%s", dir, f->rom->file);
+		struct stat st;
+		if (lstat(game, &st) == 0) {
+			// never unpacked over what's there
+			sayf("not downloading into %s: it's already on the card", game);
+			toast("RomM: a folder of that name is already on the card");
+			return;
+		}
 	}
 	Job* j = jobNew(J_DOWNLOAD);
 	if (!j) return;
 	j->rom_id = f->rom->id;
 	j->expect = f->rom->size > 0 ? f->rom->size : -1;
+	j->multi = f->rom->multi;
 	put(j->file, sizeof(j->file), "%s", f->rom->file);
+	put(j->game, sizeof(j->game), "%s", f->rom->file);
 	put(j->name, sizeof(j->name), "%s", f->rom->name);
 	put(j->tag, sizeof(j->tag), "%s", f->platform->tag);
 	put(j->dir, sizeof(j->dir), "%s", dir);
 	put(j->path, sizeof(j->path), "%s", path);
 	put(j->temp, sizeof(j->temp), "%s/.romm-%d.part", dir, f->rom->id);
+	put(j->unpack, sizeof(j->unpack), "%s/.romm-%d.unpack", dir, f->rom->id);
 	// a download goes before lists waiting
 	if (queued >= JOBS_MAX) {
 		jobFree(j);
@@ -963,7 +1027,7 @@ static void startDownload(const Found* f, const char* path) {
 	queue[0] = j;
 	queued++;
 	open_download_screen = 1;
-	sayf("downloading %s (rom %d, %lld bytes) to %s", j->file, j->rom_id, j->expect, path);
+	sayf("downloading %s (rom %d, %lld bytes%s) to %s", j->file, j->rom_id, j->expect, j->multi ? ", a zip" : "", path);
 	statusWrite("running", 0, j->expect > 0 ? j->expect / 1024 : 0, j->name);
 }
 
@@ -1084,7 +1148,7 @@ static int downloadRender(MosaicSurface* screen, const MosaicScreenView* v, void
 		return 0;
 	}
 	char title[RM_NAME_MAX + 32];
-	put(title, sizeof(title), "Downloading %s", j->name);
+	put(title, sizeof(title), "%s %s", j->unpacking ? "Unpacking" : "Downloading", j->name);
 	centred(screen, MOSAIC_FONT_LARGE, title, y, v->area.w, ink);
 	long long done = j->done, total = j->total > 0 ? j->total : j->expect;
 	int bar_w = v->area.w * 2 / 3, bar_h = 8 * scale;
@@ -1104,7 +1168,7 @@ static int downloadRender(MosaicSurface* screen, const MosaicScreenView* v, void
 	MosaicHint cancel = { MOSAIC_BUTTON_B, "CANCEL" };
 	hints(screen, NULL, 0, &cancel, 1);
 	char shown[64];
-	put(shown, sizeof(shown), "%d%%", percent / 25 * 25);
+	put(shown, sizeof(shown), "%s%d%%", j->unpacking ? "unpacking " : "", percent / 25 * 25);
 	if (strcmp(shown, download_shown) != 0) {
 		put(download_shown, sizeof(download_shown), "%s", shown);
 		sayf("download screen: %s, %s", j->file, shown);
@@ -1134,25 +1198,61 @@ static struct {
 	char shown[256];
 } fb;
 
-static int stateDir(const char* tag, char* out, size_t size) {
+// Where minarch keeps the Flashback game's states, read once as it opens:
+// its <tag>-<core> folders in .userdata/shared, the core the system's pak
+// runs, and the State format setting
+#define STATE_FOLDERS_MAX 16
+static struct {
+	char folders[STATE_FOLDERS_MAX][RM_NAME_MAX];
+	const char* names[STATE_FOLDERS_MAX];
+	int count;
+	char core[64];
+	int format;
+} states;
+
+static void statesLoad(const char* tag) {
+	memset(&states, 0, sizeof(states));
 	char shared[RM_PATH_MAX];
 	put(shared, sizeof(shared), "%s/.userdata/shared", sd);
 	DIR* d = opendir(shared);
-	if (!d) return -1;
 	char prefix[RM_TAG_MAX + 2];
 	put(prefix, sizeof(prefix), "%s-", tag);
-	int found = 0;
 	struct dirent* e;
-	while ((e = readdir(d))) {
+	while (d && (e = readdir(d)) && states.count < STATE_FOLDERS_MAX) {
 		if (strncmp(e->d_name, prefix, strlen(prefix)) != 0 || !RM_safeName(e->d_name)) continue;
 		char full[RM_PATH_MAX];
 		put(full, sizeof(full), "%s/%s", shared, e->d_name);
 		if (!isDir(full)) continue;
-		found++;
-		put(out, size, "%s", full);
+		put(states.folders[states.count], RM_NAME_MAX, "%s", e->d_name);
+		states.names[states.count] = states.folders[states.count];
+		states.count++;
 	}
-	closedir(d);
-	return found == 1 ? 0 : -1; // with two cores' folders it can't tell which
+	if (d) closedir(d);
+	// the pak stock launches the system with, as its getEmuPath looks
+	const char* paks[] = { "%s/.system/%s/paks/Emus/%s.pak/launch.sh", "%s/Emus/%s/%s.pak/launch.sh" };
+	for (size_t i = 0; i < sizeof(paks) / sizeof(paks[0]) && !states.core[0]; i++) {
+		char path[RM_PATH_MAX];
+		snprintf(path, sizeof(path), paks[i], sd, host->platform, tag);
+		char* text = readFile(path, 64 * 1024, NULL);
+		if (text && RM_emuCore(text, states.core, sizeof(states.core)) != 0) states.core[0] = '\0';
+		free(text);
+	}
+	char path[RM_PATH_MAX];
+	put(path, sizeof(path), "%s/minuisettings.txt", shared);
+	char* text = readFile(path, 64 * 1024, NULL);
+	states.format = text ? RM_stateFormat(text) : 0;
+	free(text);
+	sayf("states for %s: %d folders, core %s, state format %d", tag, states.count, states.core[0] ? states.core : "unknown",
+		states.format);
+}
+
+// The state folder a state from the server goes in: the pak's core's, the
+// only one there is, or the one for the state's emulator
+static int stateDir(const char* tag, const char* emulator, char* out, size_t size) {
+	char name[RM_NAME_MAX];
+	if (RM_stateFolder(tag, states.names, states.count, states.core, emulator, name, sizeof(name)) != 0) return -1;
+	put(out, size, "%s/.userdata/shared/%s", sd, name);
+	return 0;
 }
 
 // Where a server file goes on the card for the Flashback game, or -1
@@ -1167,10 +1267,12 @@ static int assetTarget(const RMAsset* a, char* out, size_t size) {
 		put(out, size, "%s/Saves/%s/%s", sd, fb.tag, name);
 		return 0;
 	}
+	// any layout minarch writes, put back in the one this device's setting reads
 	int slot = RM_stateSlot(a->file);
-	char dir[RM_PATH_MAX];
-	if (slot < 0 || stateDir(fb.tag, dir, sizeof(dir)) != 0) return -1;
-	put(out, size, "%s/%s.st%d", dir, rom_file, slot);
+	char dir[RM_PATH_MAX], name[RM_NAME_MAX];
+	if (slot < 0 || stateDir(fb.tag, a->emulator, dir, sizeof(dir)) != 0) return -1;
+	if (RM_stateName(rom_file, states.format, slot, name, sizeof(name)) != 0) return -1;
+	put(out, size, "%s/%s", dir, name);
 	return 0;
 }
 
@@ -1353,7 +1455,8 @@ static RMRecord asked_record;
 
 static int selectedGame(RMRecord* out) {
 	const MosaicEntry* entry = host->selected_entry();
-	if (!entry || host->entry_type(entry) != MOSAIC_ENTRY_ROM) return 0;
+	int type = entry ? host->entry_type(entry) : -1;
+	if (type != MOSAIC_ENTRY_ROM && type != MOSAIC_ENTRY_DIR) return 0;
 	const char* path = host->entry_path(entry);
 	if (!path) return 0;
 	if (asked_answer >= 0 && !strcmp(path, asked_path)) {
@@ -1362,15 +1465,26 @@ static int selectedGame(RMRecord* out) {
 	}
 	put(asked_path, sizeof(asked_path), "%s", path);
 	asked_answer = 0;
+	char key[RM_PATH_MAX];
+	if (type == MOSAIC_ENTRY_DIR) {
+		// a game's folder in Roms, which NextUI opens at its .m3u or .cue
+		const char* name = strrchr(path, '/');
+		if (!name) return 0;
+		put(key, sizeof(key), "%s/%s.m3u", path, name + 1);
+		if (!isFile(key)) put(key, sizeof(key), "%s/%s.cue", path, name + 1);
+		if (!isFile(key)) return 0;
+	} else {
+		gameKey(path, key, sizeof(key));
+	}
 	RMRecord r;
 	Found f;
-	if (recordFind(path, &r)) {
+	if (recordFind(key, &r)) {
 		asked_answer = 1;
-	} else if (findRom(path, &f)) {
+	} else if (findRom(key, &f)) {
 		memset(&r, 0, sizeof(r));
 		r.rom_id = f.rom->id;
 		put(r.tag, sizeof(r.tag), "%s", f.platform->tag);
-		put(r.path, sizeof(r.path), "%s", path);
+		put(r.path, sizeof(r.path), "%s", key);
 		asked_answer = 1;
 	}
 	if (asked_answer) {
@@ -1396,6 +1510,7 @@ static void openFlashback(void* data) {
 	const MosaicEntry* entry = host->selected_entry();
 	put(fb.name, sizeof(fb.name), "%s", entry ? host->entry_name(entry) : baseName(r.path));
 	sayf("flashback for rom %d, %s", fb.rom_id, baseName(fb.path));
+	statesLoad(fb.tag);
 	if (host->open_screen(FLASHBACK_SCREEN) != 0) say("couldn't open the flashback screen");
 }
 
@@ -1475,13 +1590,14 @@ static void finished(Job* j) {
 	}
 	case J_DOWNLOAD:
 		if (j->ok) {
-			sayf("downloaded %s: %lld bytes", j->path, (long long)j->done);
+			if (j->multi) sayf("downloaded and unpacked %s: %lld bytes", j->path, (long long)j->done);
+			else sayf("downloaded %s: %lld bytes", j->path, (long long)j->done);
 			RMRecord r = { 0 };
 			r.rom_id = j->rom_id;
 			put(r.tag, sizeof(r.tag), "%s", j->tag);
 			// a save already on the card (eg. from before) isn't the server's
 			put(r.value, sizeof(r.value), "-");
-			put(r.path, sizeof(r.path), "%s", j->path);
+			gameKey(j->path, r.path, sizeof(r.path));
 			recordPut(&r);
 			statusWrite("done", j->expect > 0 ? j->expect / 1024 : 0, j->expect > 0 ? j->expect / 1024 : 0, j->name);
 			put(launch_after, sizeof(launch_after), "%s", j->path);
@@ -1638,8 +1754,11 @@ static MosaicList* virtualDir(const char* path) {
 static int preLaunch(const MosaicLaunch* launch) {
 	if (!configured || launch->type != MOSAIC_ENTRY_ROM || !launch->path) return MOSAIC_LAUNCH_CONTINUE;
 	if (platform_count < 0) platformsLoad();
+	// a disc of a game with an .m3u (NextUI opens a folder at its first) is the game
+	char key[RM_PATH_MAX];
+	gameKey(launch->path, key, sizeof(key));
 	RMRecord record;
-	int known = recordFind(launch->path, &record);
+	int known = recordFind(key, &record);
 	Found f;
 	int listed = findRom(launch->path, &f);
 	if (isFile(launch->path)) {
@@ -1648,15 +1767,15 @@ static int preLaunch(const MosaicLaunch* launch) {
 			record.rom_id = f.rom->id;
 			put(record.tag, sizeof(record.tag), "%s", f.platform->tag);
 			put(record.value, sizeof(record.value), "-");
-			put(record.path, sizeof(record.path), "%s", launch->path);
+			put(record.path, sizeof(record.path), "%s", key);
 			recordPut(&record);
 			known = 1;
 		}
 		if (known) {
 			char file[RM_PATH_MAX];
 			put(file, sizeof(file), "%s/pending.txt", data_dir);
-			writeFile(file, launch->path, strlen(launch->path));
-			sayf("launching %s (rom %d)", launch->path, record.rom_id);
+			writeFile(file, key, strlen(key));
+			sayf("launching %s (rom %d)", key, record.rom_id);
 		}
 		if (activeDownload()) cancelDownload();
 		return MOSAIC_LAUNCH_CONTINUE;
@@ -1714,7 +1833,7 @@ static void tick(unsigned long now) {
 ///////////////////////////////////////
 // starting and stopping
 
-// partial downloads a run stopped in the middle of (a launch or power off)
+// partial downloads and unpacks a run stopped in the middle of (a launch or power off)
 static void removeLeftoversIn(const char* top) {
 	char roms[RM_PATH_MAX];
 	put(roms, sizeof(roms), "%s/%s", sd, top);
@@ -1731,10 +1850,13 @@ static void removeLeftoversIn(const char* top) {
 		while ((f = readdir(inner))) {
 			if (strncmp(f->d_name, ".romm-", 6) != 0) continue;
 			size_t len = strlen(f->d_name);
-			if (len < 5 || strcmp(f->d_name + len - 5, ".part") != 0) continue;
 			char full[RM_PATH_MAX];
 			put(full, sizeof(full), "%s/%s", dir, f->d_name);
-			if (isFile(full)) unlink(full);
+			if (len > 5 && !strcmp(f->d_name + len - 5, ".part") && isFile(full)) unlink(full);
+			// a zip's folder an unpack stopped in the middle of
+			if (len > 7 && !strcmp(f->d_name + len - 7, ".unpack") && isDir(full) && RZ_removeTree(full) != 0) {
+				sayf("couldn't remove all of %s", full);
+			}
 		}
 		closedir(inner);
 	}

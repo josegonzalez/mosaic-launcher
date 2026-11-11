@@ -18,8 +18,10 @@
 #include <unistd.h>
 
 #include "check.h"
+#include "miniz.h"
 #include "romm_model.h"
 #include "romm_net.h"
+#include "romm_zip.h"
 
 static char* readAll(const char* path, size_t* len) {
 	FILE* f = fopen(path, "rb");
@@ -233,7 +235,7 @@ static void testFixtures(void) {
 	char* json = readAll(FIXTURES "/platforms.json", &len);
 	CHECK(json != NULL);
 	RMPlatform p[8];
-	CHECK(RM_parsePlatforms(json, len, p, 8) == 3);
+	CHECK(RM_parsePlatforms(json, len, p, 8) == 4);
 	CHECK(p[0].id == 1 && p[0].rom_count == 2);
 	CHECK_STR(p[0].slug, "gb");
 	CHECK_STR(p[0].name, "Game Boy");
@@ -241,6 +243,8 @@ static void testFixtures(void) {
 	CHECK_STR(p[1].tag, "GBA");
 	CHECK_STR(p[2].slug, "nes");
 	CHECK_STR(p[2].tag, "FC");
+	CHECK_STR(p[3].slug, "psx");
+	CHECK_STR(p[3].tag, "PS");
 	CHECK(RM_parsePlatforms(json, len, p, 1) == 1);
 	CHECK(RM_parsePlatforms("{}", 2, p, 8) == -1);
 	free(json);
@@ -259,13 +263,42 @@ static void testFixtures(void) {
 	CHECK(RM_parseRoms(json, len, roms, &count, 1, &total) == 2); // the page had two, one kept
 	CHECK(count == 1);
 	free(json);
-	// a rom with an unsafe name is left out
+	// a rom with an unsafe name is left out, and so is a zip without its files
 	const char* evil = "{\"items\":[{\"id\":9,\"fs_name\":\"../../evil.gb\"},{\"id\":10,\"fs_name\":\".hidden\"},"
-		"{\"id\":11,\"fs_name\":\"ok.gb\",\"has_multiple_files\":true}],\"total\":3}";
+		"{\"id\":11,\"fs_name\":\"ok.gb\",\"has_multiple_files\":true},{\"id\":12,\"fs_name\":\"ok2.gb\"}],\"total\":4}";
 	count = 0;
-	CHECK(RM_parseRoms(evil, strlen(evil), roms, &count, 8, &total) == 3);
-	CHECK(count == 1 && roms[0].id == 11 && roms[0].multi);
-	CHECK_STR(roms[0].name, "ok.gb");
+	CHECK(RM_parseRoms(evil, strlen(evil), roms, &count, 8, &total) == 4);
+	CHECK(count == 1 && roms[0].id == 12 && !roms[0].multi);
+	CHECK_STR(roms[0].name, "ok2.gb");
+	// a zip whose files would unpack outside its folder, or that has nothing to
+	// launch, is left out; one file in a folder is fetched as that file
+	const char* zips = "{\"items\":["
+		"{\"id\":20,\"fs_name\":\"Bad\",\"full_path\":\"roms/psx/Bad\",\"files\":["
+		"{\"file_name\":\"a.cue\",\"full_path\":\"roms/psx/Bad/../a.cue\"},"
+		"{\"file_name\":\"b.cue\",\"full_path\":\"roms/psx/Bad/b.cue\"}]},"
+		"{\"id\":21,\"fs_name\":\"Lists\",\"full_path\":\"roms/psx/Lists\",\"files\":["
+		"{\"file_name\":\"a.m3u\",\"full_path\":\"roms/psx/Lists/a.m3u\"},"
+		"{\"file_name\":\"b.m3u\",\"full_path\":\"roms/psx/Lists/b.m3u\"}]},"
+		"{\"id\":22,\"fs_name\":\"Nested\",\"full_path\":\"roms/psx/Nested\",\"files\":["
+		"{\"file_name\":\"Nested (USA).chd\",\"full_path\":\"roms/psx/Nested/Nested (USA).chd\"}]}],\"total\":3}";
+	count = 0;
+	CHECK(RM_parseRoms(zips, strlen(zips), roms, &count, 8, &total) == 3);
+	CHECK(count == 1 && roms[0].id == 22 && !roms[0].multi);
+	CHECK_STR(roms[0].file, "Nested (USA).chd");
+
+	// multi-file roms, recorded from RomM 5.4.1 with with_files=true
+	json = readAll(FIXTURES "/roms-psx.json", &len);
+	CHECK(json != NULL);
+	count = 0;
+	CHECK(RM_parseRoms(json, len, roms, &count, 8, &total) == 2);
+	CHECK(count == 2 && total == 2);
+	CHECK(roms[0].id == 4 && roms[0].multi && roms[0].size == 200084);
+	CHECK_STR(roms[0].file, "Mosaic One Disc (USA)");
+	CHECK_STR(roms[0].launch, "Mosaic One Disc (USA).cue");
+	CHECK(roms[1].id == 3 && roms[1].multi && roms[1].size == 600186);
+	CHECK_STR(roms[1].file, "Mosaic Two Disc (USA)");
+	CHECK_STR(roms[1].launch, "Mosaic Two Disc (USA).m3u");
+	free(json);
 
 	setenv("TZ", "UTC", 1);
 	tzset();
@@ -345,7 +378,6 @@ static void testText(void) {
 	CHECK_STR(target, "Tetris (World).sav");
 	CHECK(RM_stateSlot("Game.gb.st3") == 3);
 	CHECK(RM_stateSlot("Game [2026].ST9") == 9);
-	CHECK(RM_stateSlot("Game.state") == -1);
 	CHECK(RM_stateSlot("Game.st") == -1);
 
 	unsigned char pin[32];
@@ -655,6 +687,459 @@ static void testClient(const char* dir) {
 	unsetenv("SSL_CERT_FILE");
 }
 
+///////////////////////////////////////
+// zips
+
+static RMZipEntry entry(const char* name, unsigned long long size) {
+	return (RMZipEntry){ name, strlen(name), 0, 0, 0100644UL << 16, size, size };
+}
+
+static void testZipChecks(void) {
+	char why[160];
+	const char* good[] = { "a.bin", "Disc 1/Game (Disc 1).cue", "folder/", ".DS_Store", "a/b/c/d/e/f/g/h" };
+	for (size_t i = 0; i < sizeof(good) / sizeof(good[0]); i++) CHECK(RM_zipNameCheck(good[i], strlen(good[i]), why, sizeof(why)) == 0);
+	const char* bad[] = { "", "/", "/etc/passwd", "C:x.bin", "../x", "a/../b", "a/./b", "a//b", "a\\..\\b", "a\\b",
+		"\x01.bin", "a:b", "a?b", "trailing.", "trailing ", "a./b", ".romm-part", "x/.romm-3.unpack/y",
+		"a/b/c/d/e/f/g/h/i", "..", "a//", " \xe1//" };
+	for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+		int rc = RM_zipNameCheck(bad[i], strlen(bad[i]), why, sizeof(why));
+		CHECK(rc == -1);
+		if (rc == 0) fprintf(stderr, "  allowed \"%s\"\n", bad[i]);
+	}
+	CHECK(RM_zipNameCheck("a\0b", 3, why, sizeof(why)) == -1);
+	CHECK(strstr(why, "NUL") != NULL);
+	char long_name[RM_ZIP_NAME_MAX + 2];
+	memset(long_name, 'a', sizeof(long_name));
+	CHECK(RM_zipNameCheck(long_name, sizeof(long_name), why, sizeof(why)) == -1);
+	CHECK(RM_zipNameCheck(long_name, RM_NAME_MAX, why, sizeof(why)) == -1); // one part too long
+
+	RMZipEntry e = entry("a.bin", 100);
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == 0);
+	e.external = 0120777UL << 16; // a link
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	CHECK(strstr(why, "link") != NULL);
+	e.external = 0020644UL << 16; // a device
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	e.external = 0040755UL << 16; // a folder that's named as a file
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	e.external = 0x20; // MS-DOS's archive bit only
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == 0);
+	e = entry("a.bin", 100);
+	e.flags = 1; // encrypted
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	e = entry("a.bin", 100);
+	e.method = 12; // bzip2
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	e = entry("a.bin", 100);
+	e.comp = 99; // stored, but the sizes differ
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	e = entry("d/", 0);
+	e.external = 0040755UL << 16;
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == 0);
+	e.size = e.comp = 5; // a folder with data
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	e = entry("big.bin", (unsigned long long)RM_ZIP_FILE_MAX + 1);
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	// a bomb: deflated past what deflate can do, or something from nothing
+	e = entry("bomb.bin", 1000ULL * 1024 * 1024);
+	e.method = 8;
+	e.comp = 1000;
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+	CHECK(strstr(why, "zip bomb") != NULL);
+	e.comp = 1000ULL * 1024 * 1024 / RM_ZIP_RATIO_MAX + 1;
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == 0);
+	e.comp = 0;
+	CHECK(RM_zipEntryCheck(&e, why, sizeof(why)) == -1);
+
+	RMZipEntry set[4] = { entry("Game (Disc 1).cue", 90), entry("Game (Disc 1).bin", 100000), entry("Disc/a", 1),
+		entry("disc/b", 1) };
+	long long total = 0;
+	CHECK(RM_zipCheck(set, 2, 100090, &total, why, sizeof(why)) == 0);
+	CHECK(total == 100090);
+	CHECK(RM_zipCheck(set, 2, 100090 - RM_ZIP_SLACK, &total, why, sizeof(why)) == 0);
+	CHECK(RM_zipCheck(set, 2, 100090 - RM_ZIP_SLACK - 1, &total, why, sizeof(why)) == -1);
+	CHECK(strstr(why, "more than the server said") != NULL);
+	CHECK(RM_zipCheck(set, 2, -1, &total, why, sizeof(why)) == 0);
+	CHECK(RM_zipCheck(set, 4, -1, &total, why, sizeof(why)) == -1); // two spellings of a folder
+	set[3] = entry("Disc/b", 1);
+	CHECK(RM_zipCheck(set, 4, -1, &total, why, sizeof(why)) == 0); // the same folder twice
+	set[3] = entry("disc", 1);
+	CHECK(RM_zipCheck(set, 4, -1, &total, why, sizeof(why)) == -1); // a file and a folder
+	set[3] = entry("GAME (DISC 1).CUE", 1);
+	CHECK(RM_zipCheck(set, 4, -1, &total, why, sizeof(why)) == -1); // a file twice
+	CHECK(strstr(why, "same name") != NULL);
+	set[3] = entry("Game (Disc 1).cue", 1);
+	CHECK(RM_zipCheck(set, 4, -1, &total, why, sizeof(why)) == -1);
+	set[3] = entry("../evil", 1);
+	CHECK(RM_zipCheck(set, 4, -1, &total, why, sizeof(why)) == -1);
+	CHECK(RM_zipCheck(set, RM_ZIP_ENTRIES_MAX + 1, -1, &total, why, sizeof(why)) == -1);
+	RMZipEntry huge[5];
+	for (int i = 0; i < 5; i++) {
+		static char names[5][8];
+		snprintf(names[i], sizeof(names[i]), "%d.bin", i);
+		huge[i] = entry(names[i], (unsigned long long)RM_ZIP_FILE_MAX);
+	}
+	CHECK(RM_zipCheck(huge, 5, -1, &total, why, sizeof(why)) == -1); // over the total
+}
+
+static void testDiscs(void) {
+	const char* two[] = { "Game (USA) (Disc 2).bin", "Game (USA) (Disc 1).cue", "Game (USA).m3u", "Game (USA) (Disc 1).bin",
+		"Game (USA) (Disc 2).cue" };
+	int order[8];
+	CHECK(RM_discs(two, 5, order) == 2);
+	CHECK(order[0] == 1 && order[1] == 4);
+	char launch[RM_NAME_MAX];
+	CHECK(RM_launchFile("Game (USA)", two, 5, launch, sizeof(launch)) == 2);
+	CHECK_STR(launch, "Game (USA).m3u");
+	char m3u[256];
+	CHECK(RM_m3uText(two, order, 2, m3u, sizeof(m3u)) > 0);
+	CHECK_STR(m3u, "Game (USA) (Disc 1).cue\nGame (USA) (Disc 2).cue\n");
+	CHECK(RM_m3uText(two, order, 2, m3u, 10) == -1);
+
+	const char* one[] = { "Game.bin", "Game.cue" };
+	CHECK(RM_launchFile("Game", one, 2, launch, sizeof(launch)) == 1);
+	CHECK_STR(launch, "Game.cue");
+	// numbered first, in number order (10 after 2), then by name; a CHD
+	// stands on its own beside a sheet
+	const char* chds[] = { "x (Disc 10).chd", "extra.chd", "x (Disc 2).chd", "x (CD 1).chd", "t.gdi", "t.bin" };
+	CHECK(RM_discs(chds, 6, order) == 5);
+	CHECK(order[0] == 3 && order[1] == 2 && order[2] == 0 && order[3] == 1 && order[4] == 4);
+	// with no sheet, tracks are discs
+	const char* bins[] = { "b.bin", "a.bin" };
+	CHECK(RM_discs(bins, 2, order) == 2);
+	CHECK(order[0] == 1);
+	const char* none[] = { "a.m3u", "Game.m3u" };
+	CHECK(RM_launchFile("Game", none, 2, launch, sizeof(launch)) == 0);
+	CHECK_STR(launch, "");
+
+	CHECK(RM_discNumber("Game (Disc 2).cue") == 2);
+	CHECK(RM_discNumber("Game (disk 1 of 2).adf") == 1);
+	CHECK(RM_discNumber("Game (Disc 2A).cue") == 2);
+	CHECK(RM_discNumber("Game (Disc B).cue") == 2);
+	CHECK(RM_discNumber("Game (Disque 3).cue") == 3);
+	CHECK(RM_discNumber("Game (CDi).cue") == 0);
+	CHECK(RM_discNumber("Game (Disc).cue") == 0);
+	CHECK(RM_discNumber("Game (Disc 777777777777777777).cue") > 0); // found by fuzzing: no overflow
+	CHECK(RM_discNumber("Disc 2 (Disc 1)/a.cue") == 0); // only the file's own name counts
+
+	CHECK(RM_isGameM3u("Game (USA)", "game (usa).M3U"));
+	CHECK(!RM_isGameM3u("Game (USA)", "sub/Game (USA).m3u"));
+	CHECK(!RM_isGameM3u("Game (USA)", "Game.m3u"));
+
+	char path[RM_PATH_MAX];
+	CHECK(RM_m3uFor("/sd/Roms/PS/Game/Game (Disc 1).cue", path, sizeof(path)) == 0);
+	CHECK_STR(path, "/sd/Roms/PS/Game/Game.m3u");
+	CHECK(RM_m3uFor("/sd/Roms/PS/Game/Game.m3u", path, sizeof(path)) == 0);
+	CHECK_STR(path, "/sd/Roms/PS/Game/Game.m3u");
+	CHECK(RM_m3uFor("Game.cue", path, sizeof(path)) == -1);
+}
+
+static void testStates(void) {
+	CHECK(RM_stateSlot("Game.gb.st0") == 0);
+	CHECK(RM_stateSlot("Game.state") == 0);
+	CHECK(RM_stateSlot("Game.state3") == 3);
+	CHECK(RM_stateSlot("Game.state.4") == 4);
+	CHECK(RM_stateSlot("Game.STATE.AUTO") == 9);
+	CHECK(RM_stateSlot("Game.state10") == -1);
+	CHECK(RM_stateSlot("Game.st10") == -1);
+	CHECK(RM_stateSlot(".state") == -1);
+	CHECK(RM_stateSlot("Game.sav") == -1);
+	CHECK(RM_stateSlot("Game.state.png") == -1);
+
+	char name[RM_NAME_MAX];
+	CHECK(RM_stateName("Game (USA).m3u", 0, 3, name, sizeof(name)) == 0);
+	CHECK_STR(name, "Game (USA).m3u.st3");
+	CHECK(RM_stateName("Game (USA).m3u", 1, 3, name, sizeof(name)) == 0);
+	CHECK_STR(name, "Game (USA).state.3");
+	CHECK(RM_stateName("Game (USA).m3u", 2, 9, name, sizeof(name)) == 0);
+	CHECK_STR(name, "Game (USA).state.auto");
+	CHECK(RM_stateName("Game.gb", 3, 0, name, sizeof(name)) == 0);
+	CHECK_STR(name, "Game.state");
+	CHECK(RM_stateName("Game.gb", 4, 2, name, sizeof(name)) == 0);
+	CHECK_STR(name, "Game.state2");
+	CHECK(RM_stateName("Game.gb", 3, 9, name, sizeof(name)) == 0);
+	CHECK_STR(name, "Game.state.auto");
+	CHECK(RM_stateName("Game.gb", 5, 0, name, sizeof(name)) == -1);
+	CHECK(RM_stateName("Game.gb", 0, 10, name, sizeof(name)) == -1);
+
+	CHECK(RM_stateFormat("saveFormat=1\nstateFormat=3\n") == 3);
+	CHECK(RM_stateFormat("stateFormat=7\n") == 0);
+	CHECK(RM_stateFormat("xstateFormat=3\n") == 0);
+	CHECK(RM_stateFormat("") == 0);
+
+	char core[64];
+	CHECK(RM_emuCore("#!/bin/sh\n\nEMU_EXE=pcsx_rearmed\n\n###\n", core, sizeof(core)) == 0);
+	CHECK_STR(core, "pcsx_rearmed");
+	CHECK(RM_emuCore("  EMU_EXE=\"gambatte\"\n", core, sizeof(core)) == 0);
+	CHECK_STR(core, "gambatte");
+	CHECK(RM_emuCore("EMU_EXE=../x\n", core, sizeof(core)) == -1);
+	CHECK(RM_emuCore("EMU_EXE=\"a b\"\n", core, sizeof(core)) == -1);
+	CHECK(RM_emuCore("echo hi\n", core, sizeof(core)) == -1);
+
+	const char* folders[] = { "PS-pcsx_rearmed", "PS-swanstation" };
+	char folder[RM_NAME_MAX];
+	CHECK(RM_stateFolder("PS", folders, 2, "swanstation", "", folder, sizeof(folder)) == 0);
+	CHECK_STR(folder, "PS-swanstation");
+	CHECK(RM_stateFolder("PS", folders, 0, "pcsx_rearmed", "", folder, sizeof(folder)) == 0); // made when restored
+	CHECK_STR(folder, "PS-pcsx_rearmed");
+	CHECK(RM_stateFolder("PS", folders, 1, "", "", folder, sizeof(folder)) == 0);
+	CHECK_STR(folder, "PS-pcsx_rearmed");
+	CHECK(RM_stateFolder("PS", folders, 2, "", "", folder, sizeof(folder)) == -1);
+	CHECK(RM_stateFolder("PS", folders, 2, "", "swanstation", folder, sizeof(folder)) == 0);
+	CHECK_STR(folder, "PS-swanstation");
+	CHECK(RM_stateFolder("PS", folders, 2, "", "mednafen", folder, sizeof(folder)) == -1);
+}
+
+// A zip made by hand, so it can hold what a real zip tool won't write
+typedef struct TestEntry {
+	const char* name;
+	size_t name_len; // 0 for strlen
+	const char* data;
+	size_t len;
+	int deflate; // as one stored deflate block
+	unsigned long external;
+	unsigned long long claim; // the size it says it has, when not 0
+	int bad_crc;
+} TestEntry;
+
+static void put16(FILE* f, unsigned v) {
+	fputc(v & 255, f);
+	fputc(v >> 8 & 255, f);
+}
+
+static void put32(FILE* f, unsigned long v) {
+	put16(f, v & 0xffff);
+	put16(f, v >> 16 & 0xffff);
+}
+
+static void makeZip(const char* path, const TestEntry* entries, int count) {
+	FILE* f = fopen(path, "wb");
+	unsigned long* offsets = calloc((size_t)count, sizeof(unsigned long));
+	for (int pass = 0; pass < 2; pass++) {
+		long cd_start = ftell(f);
+		for (int i = 0; i < count; i++) {
+			const TestEntry* e = &entries[i];
+			size_t name_len = e->name_len ? e->name_len : strlen(e->name);
+			unsigned long crc = (unsigned long)mz_crc32(MZ_CRC32_INIT, (const unsigned char*)e->data, e->len) ^ (e->bad_crc ? 1 : 0);
+			unsigned long comp = (unsigned long)(e->deflate ? e->len + 5 : e->len);
+			unsigned long size = (unsigned long)(e->claim ? e->claim : e->len);
+			if (!e->deflate && e->claim) comp = size;
+			if (pass == 0) {
+				offsets[i] = (unsigned long)ftell(f);
+				put32(f, 0x04034b50);
+				put16(f, 20);
+				put16(f, 0);
+			} else {
+				put32(f, 0x02014b50);
+				put16(f, 3 << 8 | 20);
+				put16(f, 20);
+				put16(f, 0);
+			}
+			put16(f, e->deflate ? 8 : 0);
+			put16(f, 0);
+			put16(f, 0x21);
+			put32(f, crc);
+			put32(f, comp);
+			put32(f, size);
+			put16(f, (unsigned)name_len);
+			put16(f, 0);
+			if (pass == 1) {
+				put16(f, 0);
+				put16(f, 0);
+				put16(f, 0);
+				put32(f, e->external ? e->external : 0100644UL << 16);
+				put32(f, offsets[i]);
+			}
+			fwrite(e->name, 1, name_len, f);
+			if (pass == 0) {
+				if (e->deflate) {
+					fputc(1, f);
+					put16(f, (unsigned)e->len);
+					put16(f, (unsigned)~e->len & 0xffff);
+				}
+				fwrite(e->data, 1, e->len, f);
+			}
+		}
+		if (pass == 1) {
+			long cd_end = ftell(f);
+			put32(f, 0x06054b50);
+			put16(f, 0);
+			put16(f, 0);
+			put16(f, (unsigned)count);
+			put16(f, (unsigned)count);
+			put32(f, (unsigned long)(cd_end - cd_start));
+			put32(f, (unsigned long)cd_start);
+			put16(f, 0);
+		}
+	}
+	free(offsets);
+	fclose(f);
+}
+
+// the names in a folder, sorted and joined by '|', for checking what's left
+static void listing(const char* dir, char* out, size_t size) {
+	char cmd[RM_PATH_MAX * 2];
+	snprintf(cmd, sizeof(cmd), "cd '%s' && find . | LC_ALL=C sort | tr '\\n' '|'", dir);
+	FILE* p = popen(cmd, "r");
+	size_t n = p ? fread(out, 1, size - 1, p) : 0;
+	out[n] = '\0';
+	if (p) pclose(p);
+}
+
+static int unpack(const char* dir, const char* zip, const char* game, long long expect, int cancel, RZJob* j) {
+	static char temp[RM_PATH_MAX];
+	snprintf(temp, sizeof(temp), "%s/.romm-3.unpack", dir);
+	static volatile int stop;
+	static volatile long long done, total;
+	stop = cancel;
+	memset(j, 0, sizeof(*j));
+	j->zip = zip;
+	j->dir = dir;
+	j->game = game;
+	j->temp = temp;
+	j->expect = expect;
+	j->cancel = &stop;
+	j->done = &done;
+	j->total = &total;
+	return RZ_unpack(j);
+}
+
+static void testUnpack(const char* top) {
+	char dir[512], zip[RM_PATH_MAX], path[RM_PATH_MAX], was[2048], now[2048];
+	snprintf(dir, sizeof(dir), "%s/PS", top);
+	mkdir(dir, 0755);
+	snprintf(zip, sizeof(zip), "%s/game.zip", top);
+	RZJob j;
+	const char* cue1 = "FILE \"G (Disc 1).bin\" BINARY\n";
+	const char* cue2 = "FILE \"G (Disc 2).bin\" BINARY\n";
+
+	// two discs, RomM's own .m3u replaced by the plugin's
+	TestEntry two[] = {
+		{ "G (Disc 1).bin", 0, "disc one", 8, 0, 0, 0, 0 },
+		{ "G (Disc 1).cue", 0, cue1, strlen(cue1), 1, 0, 0, 0 },
+		{ "G (Disc 2).bin", 0, "disc two", 8, 0, 0, 0, 0 },
+		{ "G (Disc 2).cue", 0, cue2, strlen(cue2), 0, 0, 0, 0 },
+		{ "G.m3u", 0, "nonsense\n", 9, 0, 0, 0, 0 },
+	};
+	makeZip(zip, two, 5);
+	CHECK(unpack(dir, zip, "G", 16 + (long long)strlen(cue1) + strlen(cue2), 0, &j) == 0);
+	if (j.error[0]) fprintf(stderr, "  unpack: %s\n", j.error);
+	CHECK_STR(j.launch, "G/G.m3u");
+	CHECK(j.files == 5 && j.discs == 2);
+	listing(dir, now, sizeof(now));
+	CHECK_STR(now, ".|./G|./G/G (Disc 1).bin|./G/G (Disc 1).cue|./G/G (Disc 2).bin|./G/G (Disc 2).cue|./G/G.m3u|");
+	snprintf(path, sizeof(path), "%s/G/G.m3u", dir);
+	size_t len;
+	char* text = readAll(path, &len);
+	CHECK(text && !strcmp(text, "G (Disc 1).cue\nG (Disc 2).cue\n"));
+	free(text);
+	snprintf(path, sizeof(path), "%s/G/G (Disc 1).cue", dir);
+	text = readAll(path, &len);
+	CHECK(text && !strcmp(text, cue1));
+	free(text);
+	// it's there now, so it isn't unpacked over
+	listing(dir, was, sizeof(was));
+	CHECK(unpack(dir, zip, "G", -1, 0, &j) == -1);
+	CHECK(strstr(j.error, "already on the card") != NULL);
+	listing(dir, now, sizeof(now));
+	CHECK_STR(now, was);
+	snprintf(path, sizeof(path), "%s/G", dir);
+	CHECK(RZ_removeTree(path) == 0);
+
+	// a zip of one file lands as that file
+	TestEntry single[] = { { "Solo.chd", 0, "chd", 3, 0, 0, 0, 0 }, { "Solo.m3u", 0, "Solo.chd", 8, 0, 0, 0, 0 } };
+	makeZip(zip, single, 2);
+	CHECK(unpack(dir, zip, "Solo", 11, 0, &j) == 0);
+	CHECK_STR(j.launch, "Solo.chd");
+	listing(dir, now, sizeof(now));
+	CHECK_STR(now, ".|./Solo.chd|");
+	snprintf(path, sizeof(path), "%s/Solo.chd", dir);
+	unlink(path);
+
+	// one disc in a folder: no .m3u, its cue launches; subfolders are kept
+	TestEntry one[] = { { "One.cue", 0, "cue", 3, 0, 0, 0, 0 }, { "tracks/", 0, "", 0, 0, 0040755UL << 16, 0, 0 },
+		{ "tracks/One.bin", 0, "bin", 3, 1, 0, 0, 0 } };
+	makeZip(zip, one, 3);
+	CHECK(unpack(dir, zip, "One", -1, 0, &j) == 0);
+	CHECK_STR(j.launch, "One/One.cue");
+	listing(dir, now, sizeof(now));
+	CHECK_STR(now, ".|./One|./One/One.cue|./One/tracks|./One/tracks/One.bin|");
+	snprintf(path, sizeof(path), "%s/One", dir);
+	RZ_removeTree(path);
+
+	// zips that are refused, leaving nothing behind; RomM said 64 KiB
+	listing(dir, was, sizeof(was));
+	CHECK_STR(was, ".|");
+	static char big[2 * RM_ZIP_SLACK];
+	struct {
+		const char* what;
+		TestEntry entries[3];
+		int count;
+		const char* why;
+	} evil[] = {
+		{ "path traversal", { { "ok.cue", 0, "x", 1, 0, 0, 0, 0 }, { "../../evil.cue", 0, "x", 1, 0, 0, 0, 0 } }, 2, ". or .." },
+		{ "absolute path", { { "ok.cue", 0, "x", 1, 0, 0, 0, 0 }, { "/tmp/evil.cue", 0, "x", 1, 0, 0, 0, 0 } }, 2, "absolute" },
+		{ "backslash", { { "ok.cue", 0, "x", 1, 0, 0, 0, 0 }, { "..\\evil.cue", 0, "x", 1, 0, 0, 0, 0 } }, 2, "backslash" },
+		{ "NUL", { { "ok.cue", 0, "x", 1, 0, 0, 0, 0 }, { "a.cue\0../x", 10, "x", 1, 0, 0, 0, 0 } }, 2, "NUL" },
+		{ "symlink entry",
+			{ { "ok.cue", 0, "x", 1, 0, 0, 0, 0 }, { "link.cue", 0, "/etc/passwd", 11, 0, 0120777UL << 16, 0, 0 } }, 2, "link" },
+		{ "bomb ratio", { { "ok.cue", 0, "x", 1, 0, 0, 0, 0 }, { "bomb.bin", 0, "zzzz", 4, 1, 0, 1ULL << 30, 0 } }, 2,
+			"zip bomb" },
+		{ "duplicate names", { { "a.cue", 0, "x", 1, 0, 0, 0, 0 }, { "A.CUE", 0, "y", 1, 0, 0, 0, 0 } }, 2, "same name" },
+		{ "duplicate folder", { { "d/a.cue", 0, "x", 1, 0, 0, 0, 0 }, { "D/b.cue", 0, "y", 1, 0, 0, 0, 0 } }, 2, "same name" },
+		{ "more than RomM said", { { "a.cue", 0, "x", 1, 0, 0, 0, 0 }, { "b.bin", 0, big, sizeof(big), 0, 0, 0, 0 } }, 2,
+			"more than the server said" },
+		// these get as far as writing: the first file is in before the second fails
+		{ "bad CRC", { { "a.cue", 0, "x", 1, 0, 0, 0, 0 }, { "b.bin", 0, "data", 4, 0, 0, 0, 1 } }, 2, "can't unpack" },
+		{ "inflates past its size", { { "a.cue", 0, "x", 1, 0, 0, 0, 0 }, { "b.bin", 0, "data", 4, 1, 0, 2, 0 } }, 2,
+			"can't unpack" },
+	};
+	for (size_t i = 0; i < sizeof(evil) / sizeof(evil[0]); i++) {
+		makeZip(zip, evil[i].entries, evil[i].count);
+		int rc = unpack(dir, zip, "Evil", 1, 0, &j);
+		CHECK(rc == -1);
+		if (rc != -1 || !strstr(j.error, evil[i].why)) fprintf(stderr, "  %s: %s\n", evil[i].what, j.error);
+		CHECK(strstr(j.error, evil[i].why) != NULL);
+		listing(dir, now, sizeof(now));
+		CHECK_STR(now, was);
+		listing(top, now, sizeof(now));
+		CHECK(strstr(now, "evil") == NULL);
+	}
+
+	// cancelled before the first file: nothing is left
+	makeZip(zip, two, 5);
+	CHECK(unpack(dir, zip, "G", -1, 1, &j) == -1);
+	CHECK_STR(j.error, "cancelled");
+	listing(dir, now, sizeof(now));
+	CHECK_STR(now, was);
+
+	// not a zip at all
+	FILE* f = fopen(zip, "wb");
+	fputs("<html>not a zip</html>", f);
+	fclose(f);
+	CHECK(unpack(dir, zip, "G", -1, 0, &j) == -1);
+	CHECK(strstr(j.error, "isn't a zip") != NULL);
+	// a link where the zip should be is never followed
+	snprintf(path, sizeof(path), "%s/link.zip", top);
+	CHECK(symlink(zip, path) == 0);
+	makeZip(zip, two, 5);
+	CHECK(unpack(dir, path, "G", -1, 0, &j) == -1);
+	unlink(path);
+	listing(dir, now, sizeof(now));
+	CHECK_STR(now, was);
+
+	// RZ_removeTree takes a link away, not what it points at
+	snprintf(path, sizeof(path), "%s/tree/a/b", top);
+	char cmd[RM_PATH_MAX * 4 + 64];
+	snprintf(cmd, sizeof(cmd), "mkdir -p '%s' && touch '%s/f' && ln -s '%s' '%s/../out'", path, path, dir, path);
+	CHECK(system(cmd) == 0);
+	snprintf(path, sizeof(path), "%s/tree", top);
+	CHECK(RZ_removeTree(path) == 0);
+	CHECK(access(path, F_OK) != 0 && access(dir, F_OK) == 0);
+	unlink(zip);
+	rmdir(dir);
+}
+
 // a real RomM, when one is named
 static void testLive(void) {
 	const char* url = getenv("ROMM_TEST_URL");
@@ -702,6 +1187,10 @@ int main(void) {
 	testJson();
 	testFixtures();
 	testText();
+	testZipChecks();
+	testDiscs();
+	testStates();
+	testUnpack(dir);
 	testClient(dir);
 	testLive();
 	rmdir(dir);

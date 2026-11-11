@@ -757,6 +757,44 @@ int RM_parsePlatforms(const char* json, size_t len, RMPlatform* out, int max) {
 	return n;
 }
 
+// A rom's files: how it's served and, for a zip, what to launch from it.
+// Returns 0, or -1 to leave the rom out.
+static int romFiles(const RJDoc* doc, const RJNode* r, RMRom* o) {
+	const RJNode* files = RJ_get(doc, r, "files");
+	int n = files && files->type == RJ_ARRAY ? files->count : 0;
+	if (n == 0) {
+		// no list of files to go by: only a plain rom can be fetched
+		o->multi = RJ_bool(doc, r, "has_multiple_files", 0);
+		return o->multi ? -1 : 0;
+	}
+	if (n == 1) {
+		// one file, maybe in a folder of its own: the server sends just the file
+		const char* name = RJ_string(doc, RJ_first(doc, files), "file_name", "");
+		if (!RM_safeName(name)) return -1;
+		snprintf(o->file, sizeof(o->file), "%s", name);
+		return 0;
+	}
+	if (n > RM_ZIP_ENTRIES_MAX) return -1;
+	const char** names = calloc((size_t)n, sizeof(char*));
+	if (!names) return -1;
+	// a file's path in the zip is its full_path inside the rom's own
+	const char* top = RJ_string(doc, r, "full_path", "");
+	size_t top_len = strlen(top);
+	int k = 0, ok = 1;
+	for (const RJNode* f = RJ_first(doc, files); f && ok; f = RJ_next(doc, f)) {
+		const char* full = RJ_string(doc, f, "full_path", "");
+		const char* name = top_len && !strncmp(full, top, top_len) && full[top_len] == '/' ? full + top_len + 1
+			: RJ_string(doc, f, "file_name", "");
+		char why[64];
+		ok = RM_zipNameCheck(name, strlen(name), why, sizeof(why)) == 0;
+		names[k++] = name;
+	}
+	o->multi = 1;
+	ok = ok && RM_launchFile(o->file, names, k, o->launch, sizeof(o->launch)) > 0;
+	free(names);
+	return ok ? 0 : -1;
+}
+
 int RM_parseRoms(const char* json, size_t len, RMRom* out, int* count, int max, int* total) {
 	RJDoc doc;
 	if (RJ_parse(&doc, json, len, RM_NODES_MAX) != 0) return -1;
@@ -782,7 +820,7 @@ int RM_parseRoms(const char* json, size_t len, RMRom* out, int* count, int max, 
 		if (!name[0]) name = RJ_string(&doc, r, "fs_name_no_ext", file);
 		snprintf(o->name, sizeof(o->name), "%s", name);
 		o->size = RJ_int(&doc, r, "fs_size_bytes", 0);
-		o->multi = RJ_bool(&doc, r, "has_multiple_files", 0);
+		if (romFiles(&doc, r, o) != 0) continue;
 		(*count)++;
 	}
 	RJ_free(&doc);
@@ -940,15 +978,320 @@ int RM_saveTarget(const char* rom_file, const char* server_file, int existing, c
 	return pick;
 }
 
+// 1 when name ends in suffix, case ignored, with something before it
+static int endsWith(const char* name, const char* suffix) {
+	size_t n = strlen(name), s = strlen(suffix);
+	return n > s && !strcasecmp(name + n - s, suffix);
+}
+
 int RM_stateSlot(const char* server_file) {
 	size_t len = strlen(server_file);
-	if (len < 5) return -1;
-	const char* ext = server_file + len - 4;
-	if (ext[0] != '.' || tolower((unsigned char)ext[1]) != 's' || tolower((unsigned char)ext[2]) != 't'
-			|| !isdigit((unsigned char)ext[3])) {
-		return -1;
+	if (endsWith(server_file, ".state.auto")) return 9;
+	if (endsWith(server_file, ".state")) return 0;
+	if (len < 2 || !isdigit((unsigned char)server_file[len - 1])) return -1;
+	int slot = server_file[len - 1] - '0';
+	char rest[RM_NAME_MAX];
+	snprintf(rest, sizeof(rest), "%.*s", (int)(len - 1), server_file);
+	return endsWith(rest, ".st") || endsWith(rest, ".state") || endsWith(rest, ".state.") ? slot : -1;
+}
+
+// mirrors minarch's State_getPath for each State format
+int RM_stateName(const char* rom_file, int format, int slot, char* out, size_t size) {
+	if (slot < 0 || slot > 9 || format < 0 || format > 4) return -1;
+	int base = (int)baseLength(rom_file), n;
+	if (format == 0) n = snprintf(out, size, "%s.st%d", rom_file, slot);
+	else if (slot == 9) n = snprintf(out, size, "%.*s.state.auto", base, rom_file);
+	else if (format <= 2) n = snprintf(out, size, "%.*s.state.%d", base, rom_file, slot);
+	else if (slot == 0) n = snprintf(out, size, "%.*s.state", base, rom_file);
+	else n = snprintf(out, size, "%.*s.state%d", base, rom_file, slot);
+	return n < 0 || (size_t)n >= size ? -1 : 0;
+}
+
+int RM_stateFormat(const char* settings) {
+	for (const char* line = settings; line && *line;) {
+		int v;
+		if (!strncmp(line, "stateFormat=", 12) && sscanf(line + 12, "%d", &v) == 1) return v >= 0 && v <= 4 ? v : 0;
+		line = strchr(line, '\n');
+		if (line) line++;
 	}
-	return ext[3] - '0';
+	return 0;
+}
+
+int RM_emuCore(const char* launch_sh, char* out, size_t size) {
+	for (const char* line = launch_sh; line && *line;) {
+		while (*line == ' ' || *line == '\t') line++;
+		if (!strncmp(line, "EMU_EXE=", 8)) {
+			const char* v = line + 8;
+			int quote = *v == '"' || *v == '\'' ? *v++ : 0;
+			size_t n = 0;
+			while (isalnum((unsigned char)v[n]) || v[n] == '_' || v[n] == '-' || v[n] == '.') n++;
+			if (quote && v[n] != quote) return -1;
+			if (n == 0 || n >= size || v[0] == '.') return -1;
+			snprintf(out, size, "%.*s", (int)n, v);
+			return 0;
+		}
+		line = strchr(line, '\n');
+		if (line) line++;
+	}
+	return -1;
+}
+
+int RM_stateFolder(const char* tag, const char* const* folders, int count, const char* core, const char* emulator,
+	char* out, size_t size) {
+	char want[RM_NAME_MAX];
+	if (core && core[0]) {
+		snprintf(want, sizeof(want), "%s-%s", tag, core);
+		if (!RM_safeName(want)) return -1;
+		snprintf(out, size, "%s", want);
+		return 0;
+	}
+	if (count == 1) {
+		snprintf(out, size, "%s", folders[0]);
+		return 0;
+	}
+	if (emulator && emulator[0]) {
+		snprintf(want, sizeof(want), "%s-%s", tag, emulator);
+		for (int i = 0; i < count; i++) {
+			if (!strcmp(folders[i], want)) {
+				snprintf(out, size, "%s", want);
+				return 0;
+			}
+		}
+	}
+	return -1;
+}
+
+///////////////////////////////////////
+// Zips
+
+int RM_zipIsDir(const RMZipEntry* e) {
+	return e->name_len > 0 && e->name[e->name_len - 1] == '/';
+}
+
+int RM_zipNameCheck(const char* name, size_t len, char* why, size_t size) {
+#define REFUSE(text) \
+	do { \
+		if (why) snprintf(why, size, "%s", text); \
+		return -1; \
+	} while (0)
+	if (len && name[len - 1] == '/') len--; // a folder's
+	if (len == 0) REFUSE("an entry has no name");
+	if (name[len - 1] == '/') REFUSE("an entry's path has an empty part");
+	if (len > RM_ZIP_NAME_MAX) REFUSE("an entry's name is too long");
+	if (memchr(name, '\0', len)) REFUSE("an entry's name holds a NUL");
+	if (name[0] == '/' || (len >= 2 && isalpha((unsigned char)name[0]) && name[1] == ':')) {
+		REFUSE("an entry's path is absolute");
+	}
+	int depth = 0;
+	for (size_t start = 0; start < len;) {
+		size_t end = start;
+		while (end < len && name[end] != '/') end++;
+		size_t part = end - start;
+		const char* p = name + start;
+		if (part == 0) REFUSE("an entry's path has an empty part");
+		if ((part == 1 && p[0] == '.') || (part == 2 && p[0] == '.' && p[1] == '.')) REFUSE("an entry's path has . or ..");
+		if (part >= RM_NAME_MAX) REFUSE("an entry's name is too long");
+		if (part >= 6 && !strncmp(p, ".romm-", 6)) REFUSE("an entry has the plugin's own temporary name");
+		for (size_t i = 0; i < part; i++) {
+			unsigned char c = (unsigned char)p[i];
+			if (c == '\\') REFUSE("an entry's path has a backslash");
+			if (c < 0x20 || c == 0x7f) REFUSE("an entry's name has a control character");
+			if (strchr(":*?\"<>|", c)) REFUSE("an entry's name has a character the card can't hold");
+		}
+		if (p[part - 1] == '.' || p[part - 1] == ' ') REFUSE("an entry's name ends in a dot or a space");
+		if (++depth > RM_ZIP_DEPTH_MAX) REFUSE("an entry is too many folders deep");
+		start = end + 1;
+	}
+	return 0;
+}
+
+int RM_zipEntryCheck(const RMZipEntry* e, char* why, size_t size) {
+	if (RM_zipNameCheck(e->name, e->name_len, why, size) != 0) return -1;
+	int dir = RM_zipIsDir(e);
+	unsigned long type = (e->external >> 16) & 0170000;
+	if (type == 0120000) REFUSE("an entry is a link");
+	if (type != 0 && type != (dir ? 0040000UL : 0100000UL)) REFUSE("an entry isn't a plain file or folder");
+	if (e->flags & (0x0001 | 0x0020 | 0x0040)) REFUSE("an entry is encrypted");
+	if (e->method != 0 && e->method != 8) REFUSE("an entry is packed in a way it can't unpack");
+	if (dir && (e->size || e->comp)) REFUSE("a folder entry has data");
+	if (e->size > (unsigned long long)RM_ZIP_FILE_MAX) REFUSE("an entry is too big for the card");
+	if (e->method == 0 && e->comp != e->size) REFUSE("an entry's sizes don't match");
+	if (e->size > 0 && e->comp == 0) REFUSE("an entry's sizes look like a zip bomb");
+	if (e->method == 8 && e->size / RM_ZIP_RATIO_MAX > e->comp) REFUSE("an entry's sizes look like a zip bomb");
+	return 0;
+}
+
+// fold for the card's case-insensitive names
+static int foldCompare(const char* a, size_t an, const char* b, size_t bn) {
+	size_t n = an < bn ? an : bn;
+	for (size_t i = 0; i < n; i++) {
+		int x = tolower((unsigned char)a[i]), y = tolower((unsigned char)b[i]);
+		if (x != y) return x - y;
+	}
+	return an == bn ? 0 : an < bn ? -1 : 1;
+}
+
+typedef struct PathNode {
+	const char* name;
+	size_t len;
+	int dir;
+} PathNode;
+
+static int nodeOrder(const void* pa, const void* pb) {
+	const PathNode* a = pa;
+	const PathNode* b = pb;
+	return foldCompare(a->name, a->len, b->name, b->len);
+}
+
+int RM_zipCheck(const RMZipEntry* entries, int count, long long expect, long long* total, char* why, size_t size) {
+	if (total) *total = 0;
+	if (count < 0 || count > RM_ZIP_ENTRIES_MAX) REFUSE("the zip has too many entries");
+	unsigned long long sum = 0;
+	for (int i = 0; i < count; i++) {
+		if (RM_zipEntryCheck(&entries[i], why, size) != 0) return -1;
+		sum += entries[i].size;
+		if (sum > (unsigned long long)RM_ZIP_TOTAL_MAX) REFUSE("the zip unpacks to more than the plugin takes");
+	}
+	if (expect >= 0 && sum > (unsigned long long)expect + RM_ZIP_SLACK) REFUSE("the zip holds more than the server said");
+	// every path and the folders it's in, which must not collide once case is folded
+	PathNode* nodes = malloc((size_t)(count ? count : 1) * (RM_ZIP_DEPTH_MAX + 2) * sizeof(PathNode));
+	if (!nodes) REFUSE("out of memory");
+	int n = 0;
+	for (int i = 0; i < count; i++) {
+		const RMZipEntry* e = &entries[i];
+		size_t len = e->name_len;
+		int dir = RM_zipIsDir(e);
+		if (dir) len--;
+		for (size_t k = 0; k < len; k++) {
+			if (e->name[k] == '/') nodes[n++] = (PathNode){ e->name, k, 1 };
+		}
+		nodes[n++] = (PathNode){ e->name, len, dir };
+	}
+	qsort(nodes, (size_t)n, sizeof(PathNode), nodeOrder);
+	for (int i = 1; i < n; i++) {
+		const PathNode* a = &nodes[i - 1];
+		const PathNode* b = &nodes[i];
+		if (nodeOrder(a, b) != 0) continue;
+		if (a->dir && b->dir && !memcmp(a->name, b->name, a->len)) continue; // the same folder again
+		free(nodes);
+		REFUSE("two of the zip's entries have the same name on the card");
+	}
+	free(nodes);
+	if (total) *total = (long long)sum;
+	return 0;
+#undef REFUSE
+}
+
+// the extension of a path's last part, without the dot, or ""
+static const char* extOf(const char* name) {
+	const char* slash = strrchr(name, '/');
+	const char* dot = strrchr(slash ? slash + 1 : name, '.');
+	return dot ? dot + 1 : "";
+}
+
+static int extIn(const char* ext, const char* const* list) {
+	for (; *list; list++) {
+		if (!strcasecmp(ext, *list)) return 1;
+	}
+	return 0;
+}
+
+int RM_isGameM3u(const char* game, const char* name) {
+	size_t g = strlen(game);
+	return !strchr(name, '/') && strlen(name) == g + 4 && !strncasecmp(name, game, g) && !strcasecmp(name + g, ".m3u");
+}
+
+int RM_discNumber(const char* name) {
+	static const char* const words[] = { "disc", "disk", "cd", "disque", NULL };
+	const char* slash = strrchr(name, '/');
+	for (const char* p = strchr(slash ? slash + 1 : name, '('); p; p = strchr(p + 1, '(')) {
+		for (int w = 0; words[w]; w++) {
+			size_t wl = strlen(words[w]);
+			if (strncasecmp(p + 1, words[w], wl) != 0) continue;
+			const char* q = p + 1 + wl;
+			int spaces = 0;
+			while (isspace((unsigned char)*q)) q++, spaces++;
+			int number = 0;
+			if (isdigit((unsigned char)*q)) {
+				for (; isdigit((unsigned char)*q); q++) {
+					if (number < 100000) number = number * 10 + (*q - '0');
+				}
+				if (isalpha((unsigned char)*q)) q++; // "(Disc 2A)"
+			} else if (spaces && isalpha((unsigned char)*q) && !isalpha((unsigned char)q[1])) {
+				number = tolower((unsigned char)*q++) - 'a' + 1; // "(Disc B)"
+			} else {
+				continue;
+			}
+			if (!strncasecmp(q, " of ", 4) && isdigit((unsigned char)q[4])) {
+				q += 4;
+				while (isdigit((unsigned char)*q)) q++;
+			}
+			if (*q == ')' && number > 0) return number;
+		}
+	}
+	return 0;
+}
+
+static int discOrder(const char* a, const char* b) {
+	int na = RM_discNumber(a), nb = RM_discNumber(b);
+	if ((na == 0) != (nb == 0)) return na ? -1 : 1;
+	if (na != nb) return na - nb;
+	return strcmp(a, b);
+}
+
+int RM_discs(const char* const* names, int count, int* order) {
+	static const char* const descriptors[] = { "cue", "gdi", "ccd", "mds", NULL };
+	static const char* const tracks[] = { "bin", "raw", "img", "sub", "mdf", "wav", "ogg", "flac", "mp3", NULL };
+	int sheets = 0;
+	for (int i = 0; i < count; i++) sheets |= extIn(extOf(names[i]), descriptors);
+	int n = 0;
+	for (int i = 0; i < count; i++) {
+		const char* ext = extOf(names[i]);
+		if (!strcasecmp(ext, "m3u") || (sheets && extIn(ext, tracks))) continue;
+		order[n++] = i;
+	}
+	// an insertion sort, as qsort has no way to pass names along without a global
+	for (int i = 1; i < n; i++) {
+		int v = order[i], k = i;
+		while (k > 0 && discOrder(names[order[k - 1]], names[v]) > 0) {
+			order[k] = order[k - 1];
+			k--;
+		}
+		order[k] = v;
+	}
+	return n;
+}
+
+int RM_launchFile(const char* game, const char* const* names, int count, char* out, size_t size) {
+	if (size) out[0] = '\0';
+	int* order = malloc((size_t)(count ? count : 1) * sizeof(int));
+	if (!order) return 0;
+	int discs = RM_discs(names, count, order);
+	if (discs >= 2) snprintf(out, size, "%s.m3u", game);
+	else if (discs == 1) snprintf(out, size, "%s", names[order[0]]);
+	free(order);
+	return discs;
+}
+
+int RM_m3uText(const char* const* names, const int* order, int discs, char* out, size_t size) {
+	size_t used = 0;
+	if (size) out[0] = '\0';
+	for (int i = 0; i < discs; i++) {
+		int n = snprintf(out + used, size - used, "%s\n", names[order[i]]);
+		if (n < 0 || (size_t)n >= size - used) return -1;
+		used += (size_t)n;
+	}
+	return (int)used;
+}
+
+int RM_m3uFor(const char* path, char* out, size_t size) {
+	const char* slash = strrchr(path, '/');
+	if (!slash || slash == path) return -1;
+	const char* dir_start = slash - 1;
+	while (dir_start > path && *dir_start != '/') dir_start--;
+	if (*dir_start == '/') dir_start++;
+	int n = snprintf(out, size, "%.*s/%.*s.m3u", (int)(slash - path), path, (int)(slash - dir_start), dir_start);
+	return n < 0 || (size_t)n >= size ? -1 : 0;
 }
 
 int RM_parsePin(const char* text, unsigned char out[32]) {
