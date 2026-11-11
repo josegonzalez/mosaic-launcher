@@ -914,7 +914,9 @@ static int overlayRender(MosaicSurface* surface, const MosaicScreenView* view) {
 		themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF, 255), 0);
 	if (!overlay_shown) {
 		overlay_shown = 1;
-		say("pill over %s: %s", view->screen ? view->screen : "?", cut);
+		// the whole text, and what fit when it was cut
+		say("pill over %s: %s%s%s%s", view->screen ? view->screen : "?", text, strcmp(cut, text) ? " (cut to fit: " : "",
+			strcmp(cut, text) ? cut : "", strcmp(cut, text) ? ")" : "");
 	}
 	return 0;
 }

@@ -243,7 +243,9 @@ if [ -n "$MU_TAGGED" ]; then
 	expect "showing the art /tmp/mosaic-music-art/art-"
 	grep -qxF "Tenth Song" "$MU_WORK/tags.texts" || fail "the player didn't show the tagged title"
 	grep -qxF "Test Artist" "$MU_WORK/tags.texts" || fail "the player didn't show the artist"
-	grep -qF "Playing: Tenth Song - Test Artist" "$MU_WORK/tags.texts" || fail "the pill didn't show the title and artist"
+	# the pill's whole text, which a small screen cuts to fit, and what it drew
+	expect "pill over gamelist: Playing: Tenth Song - Test Artist"
+	grep -qF "Playing: Tenth Song - " "$MU_WORK/tags.texts" || fail "the pill didn't draw the title and artist"
 fi
 
 mu_stop
