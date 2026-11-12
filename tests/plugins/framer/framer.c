@@ -23,7 +23,7 @@ static int artPath(const MosaicEntry* entry, int kind, char* out, size_t size) {
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(folder, sizeof(folder), "%s/Artist", host->sdcard_path);
-	dir = host->cfg_get(ID, "dir", "");
+	dir = host->cfg_get("dir", "");
 	host->log(ID, "framing");
 	return 0;
 }

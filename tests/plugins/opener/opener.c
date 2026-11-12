@@ -27,7 +27,7 @@ static void tick(unsigned long now) {
 	(void)now;
 	if (!host->current_list()) return;
 	ticks++;
-	if (ticks == 2) say("open rom %i", host->open_path(host->cfg_get(ID, "rom", ""), MOSAIC_ENTRY_ROM));
+	if (ticks == 2) say("open rom %i", host->open_path(host->cfg_get("rom", ""), MOSAIC_ENTRY_ROM));
 	else if (ticks == 20) say("done");
 }
 

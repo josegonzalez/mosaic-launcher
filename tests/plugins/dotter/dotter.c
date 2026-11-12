@@ -95,8 +95,8 @@ static void tick(unsigned long now) {
 static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
-	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get(ID, "folder", "Roms"));
-	open_folder = atoi(host->cfg_get(ID, "open", "1"));
+	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get("folder", "Roms"));
+	open_folder = atoi(host->cfg_get("open", "1"));
 	return 0;
 }
 

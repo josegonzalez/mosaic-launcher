@@ -31,7 +31,7 @@ static void say(const char* message) {
 }
 
 static int isOn(const char* key, const char* fallback) {
-	return strcmp(host->cfg_get(ID, key, fallback), "off") != 0;
+	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
 static void begin(void) {
@@ -42,7 +42,7 @@ static void begin(void) {
 static void remember(const char* address) {
 	if (!strcmp(address, saved)) return;
 	snprintf(saved, sizeof(saved), "%s", address);
-	host->cfg_set(ID, "last", saved);
+	host->cfg_set("last", saved);
 	char message[64];
 	snprintf(message, sizeof(message), "remembering %s", saved);
 	say(message);
@@ -115,7 +115,7 @@ static int init(const MosaicHost* h) {
 	}
 	supported = 1;
 
-	const char* last = host->cfg_get(ID, "last", "");
+	const char* last = host->cfg_get("last", "");
 	if (last[0] && !Br_parseAddress(last, saved)) {
 		say("the last setting isn't a Bluetooth address, so nothing to reconnect until a device connects");
 	}

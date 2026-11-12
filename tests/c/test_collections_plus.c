@@ -36,8 +36,7 @@ static void set(const char* key, const char* value) {
 static void resetSettings(void) {
 	for (int i = 0; i < SETTING_COUNT; i++) settings[i][1] = NULL;
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < SETTING_COUNT; i++) {
 		if (!strcmp(settings[i][0], key) && settings[i][1]) return settings[i][1];
 	}

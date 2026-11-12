@@ -41,7 +41,7 @@ static void say(const char* message) {
 }
 
 static int isOn(const char* key, const char* fallback) {
-	return strcmp(host->cfg_get(ID, key, fallback), "off") != 0;
+	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
 ///////////////////////////////////////

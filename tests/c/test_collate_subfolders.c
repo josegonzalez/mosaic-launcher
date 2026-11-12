@@ -18,8 +18,7 @@ struct MosaicList {
 };
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	(void)key;
 	return fallback;
 }

@@ -130,7 +130,7 @@ static void gliderTick(unsigned long now) {
 static int gliderInit(const MosaicHost* h) {
 	int result = init(h);
 	if (result == 0) {
-		glider_pak = host->cfg_get(ID, "glider_pak", "");
+		glider_pak = host->cfg_get("glider_pak", "");
 		say("duration %i ease %i", duration, ease);
 	}
 	return result;

@@ -593,7 +593,6 @@ static char hostLog[64][400];
 static int hostLogCount;
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	if (hostLogCount < 64) snprintf(hostLog[hostLogCount++], sizeof(hostLog[0]), "%s", message);
 }
 
@@ -604,8 +603,7 @@ static int hostLogged(const char* text) {
 	return 0;
 }
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "theme")) return cfgTheme;
 	for (int i = 0; i < 8 && cfgValues[i][0]; i++) {
 		if (!strcmp(cfgValues[i][0], key)) return cfgValues[i][1];
@@ -613,8 +611,7 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	return fallback;
 }
 
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	(void)id;
+static void fakeCfgSet(const char* key, const char* value) {
 	if (!strcmp(key, "theme")) snprintf(cfgTheme, sizeof(cfgTheme), "%s", value);
 }
 

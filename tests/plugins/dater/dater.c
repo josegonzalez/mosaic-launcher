@@ -78,7 +78,7 @@ static int decorateArt(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	int scale = host->screen_scale();
 	int art_bottom = art->y + art->h;
 	int centre = (left + right + 1) / 2 - (art->x + art->w / 2);
-	const char* text = host->cfg_get(ID, name, "");
+	const char* text = host->cfg_get(name, "");
 	say("band %s under art %i, centred %i, text %i, as wide as \"%s\" %i", name,
 		top >= art_bottom && top <= art_bottom + 3 * scale, centre >= -2 && centre <= 2, ink > 0, text,
 		text[0] && fits(text, right - left + 1));
@@ -106,7 +106,7 @@ static void tick(unsigned long now) {
 static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, decorate_art)) return 1;
-	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get(ID, "folder", "Dater"));
+	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get("folder", "Dater"));
 	return 0;
 }
 

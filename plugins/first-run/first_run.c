@@ -78,7 +78,7 @@ static void say(const char* message) {
 }
 
 static int setting(const char* key, const char* fallback) {
-	return strcmp(host->cfg_get(ID, key, fallback), "off") != 0;
+	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
 static char* readAll(const char* path, size_t limit) {
@@ -344,7 +344,7 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 
 static void markSeen(const char* how) {
 	seen = 1;
-	host->cfg_set(ID, "seen", "on");
+	host->cfg_set("seen", "on");
 	say(how);
 }
 
@@ -435,9 +435,9 @@ static int init(const MosaicHost* h) {
 		say("this launcher has no plugin screens or button hints");
 		return 1;
 	}
-	seen = strcmp(host->cfg_get(ID, "seen", "off"), "on") == 0;
+	seen = strcmp(host->cfg_get("seen", "off"), "on") == 0;
 	tile_on = setting("tile", "on");
-	suggest_count = FR_parseIds(host->cfg_get(ID, "suggest", DEFAULT_SUGGEST), suggest, FR_SUGGEST_MAX);
+	suggest_count = FR_parseIds(host->cfg_get("suggest", DEFAULT_SUGGEST), suggest, FR_SUGGEST_MAX);
 	static const MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),
 		.enter = enter,
@@ -465,7 +465,7 @@ static int init(const MosaicHost* h) {
 		{ "R2", MOSAIC_BUTTON_R2 },
 		{ "SELECT", MOSAIC_BUTTON_SELECT },
 	};
-	const char* name = host->cfg_get(ID, "button", "none");
+	const char* name = host->cfg_get("button", "none");
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (strcmp(name, buttons[i].name) != 0) continue;
 		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, ACTION_ID) != 0) {

@@ -216,8 +216,8 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, plugin_art)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Painter", host->sdcard_path);
 	snprintf(next, sizeof(next), "%s/Next", folder);
-	dir = host->cfg_get(ID, "dir", "");
-	mode = host->cfg_get(ID, "mode", "");
+	dir = host->cfg_get("dir", "");
+	mode = host->cfg_get("mode", "");
 	return 0;
 }
 

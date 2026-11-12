@@ -368,7 +368,7 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a layout");
 		return 1;
 	}
-	slide_setting = strcmp(host->cfg_get(ID, "slide", "on"), "off") != 0;
+	slide_setting = strcmp(host->cfg_get("slide", "on"), "off") != 0;
 	return 0;
 }
 

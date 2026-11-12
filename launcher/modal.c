@@ -1,5 +1,6 @@
 #include "launcher.h"
 #include "kbmodel.h"
+#include "caller.h"
 
 enum { MODAL_NONE, MODAL_CONFIRM, MODAL_MESSAGE, MODAL_KEYBOARD, MODAL_CHOICE };
 
@@ -12,12 +13,28 @@ static void (*confirm_yes)(void* data);
 static void (*keyboard_done)(const char* text, void* data);
 static void (*choice_pick)(int index, void* data);
 static void* callback_data;
+static char callback_caller[64]; // the plugin that opened it, whose code the callback is
+static int callback_plugin = 0;  // and whether one did, rather than the launcher
 static KbModel kb;
 static int kb_hidden = 0; // the field shows a * for each character typed
 static char* choices[MODAL_CHOICES_MAX];
 static int choice_count = 0;
 static int choice_selected = 0;
 static int choice_start = 0; // first visible row
+
+// Remembers who opened the dialog, so its callback runs as them.
+static void keepCaller(void) {
+	const char* id = Caller_current();
+	callback_plugin = id != NULL;
+	snprintf(callback_caller, sizeof(callback_caller), "%s", id ? id : "");
+}
+
+// Who opened it, copied to out (size bytes) since the callback may open
+// another dialog, or NULL for the launcher.
+static const char* takeCaller(char* out, size_t size) {
+	snprintf(out, size, "%s", callback_caller);
+	return callback_plugin ? out : NULL;
+}
 
 static void openModal(int what) {
 	if (kind == MODAL_NONE) return_to = currentScreen;
@@ -38,6 +55,7 @@ void Modal_confirm(const char* text, const char* yes, void (*on_yes)(void* data)
 	snprintf(yes_label, sizeof(yes_label), "%s", yes && yes[0] ? yes : "OK");
 	confirm_yes = on_yes;
 	callback_data = data;
+	keepCaller();
 	openModal(MODAL_CONFIRM);
 }
 
@@ -54,6 +72,7 @@ void Modal_keyboard(const char* heading, const char* initial, void (*on_done)(co
 	kb_hidden = 0;
 	keyboard_done = on_done;
 	callback_data = data;
+	keepCaller();
 	openModal(MODAL_KEYBOARD);
 }
 
@@ -78,6 +97,7 @@ int Modal_choose(const char* heading, const char* const* list, int count, int se
 	choice_start = 0;
 	choice_pick = on_pick;
 	callback_data = data;
+	keepCaller();
 	openModal(MODAL_CHOICE);
 	return 0;
 }
@@ -89,8 +109,10 @@ static void confirmInput(void) {
 	if (PAD_justPressed(BTN_A)) {
 		void (*cb)(void*) = confirm_yes;
 		void* data = callback_data;
+		char caller[sizeof(callback_caller)];
+		const char* by = takeCaller(caller, sizeof(caller));
 		closeModal();
-		if (cb) cb(data); // after closing, so it can open another dialog
+		if (cb) AS_CALLER(by) cb(data); // after closing, so it can open another dialog
 	}
 	else if (PAD_justPressed(BTN_B)) {
 		closeModal();
@@ -107,8 +129,10 @@ static void keyboardFinish(int done) {
 	memset(kb.text, 0, sizeof(kb.text)); // a PIN shouldn't outlive its keyboard
 	void (*cb)(const char*, void*) = keyboard_done;
 	void* data = callback_data;
+	char caller[sizeof(callback_caller)];
+	const char* by = takeCaller(caller, sizeof(caller));
 	closeModal();
-	if (cb) cb(done ? text : NULL, data);
+	if (cb) AS_CALLER(by) cb(done ? text : NULL, data);
 	memset(text, 0, sizeof(text));
 }
 
@@ -141,8 +165,10 @@ static void keyboardInput(void) {
 static void choiceFinish(int index) {
 	void (*cb)(int, void*) = choice_pick;
 	void* data = callback_data;
+	char caller[sizeof(callback_caller)];
+	const char* by = takeCaller(caller, sizeof(caller));
 	closeModal();
-	if (cb) cb(index, data);
+	if (cb) AS_CALLER(by) cb(index, data);
 }
 
 static void choiceInput(void) {

@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "caller.h"
 
 #define MAX_TILES 32
 #define MAX_HIDDEN 32
@@ -100,7 +101,10 @@ const QuickTile* QuickTiles_forEntry(const Entry* entry) {
 }
 
 int QuickTile_isOff(const QuickTile* tile) {
-	return tile && tile->isOn && !tile->isOn(tile->action->data);
+	if (!tile || !tile->isOn) return 0;
+	int on = 1;
+	AS_CALLER(tile->action->plugin_id) on = tile->isOn(tile->action->data);
+	return !on;
 }
 
 void QuickTiles_apply(Array* entries, int row) {

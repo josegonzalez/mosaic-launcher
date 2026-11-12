@@ -261,7 +261,7 @@ static void saveRecents(void) {
 		char key[16];
 		snprintf(key, sizeof(key), "recent%d", i + 1);
 		const char* value = i < recents.count ? recents.items[i] : "";
-		if (strcmp(host->cfg_get(ID, key, ""), value) != 0) host->cfg_set(ID, key, value);
+		if (strcmp(host->cfg_get(key, ""), value) != 0) host->cfg_set(key, value);
 	}
 }
 
@@ -271,7 +271,7 @@ static void loadRecents(void) {
 		char key[16];
 		snprintf(key, sizeof(key), "recent%d", i + 1);
 		char value[SE_QUERY_LEN];
-		snprintf(value, sizeof(value), "%s", host->cfg_get(ID, key, ""));
+		snprintf(value, sizeof(value), "%s", host->cfg_get(key, ""));
 		SE_trim(value);
 		if (value[0]) snprintf(recents.items[recents.count++], SE_QUERY_LEN, "%s", value);
 	}
@@ -284,7 +284,7 @@ static void run(const char* text) {
 	snprintf(typed, sizeof(typed), "%s", text);
 	SE_trim(typed);
 	snprintf(query, sizeof(query), "%s", typed);
-	host->cfg_set(ID, "query", query);
+	host->cfg_set("query", query);
 	if (recents_max > 0) {
 		SE_recentsAdd(&recents, query, recents_max);
 		saveRecents();
@@ -362,7 +362,7 @@ static void searchAction(void* data) {
 // hooks
 
 static void rootEntries(MosaicList* root) {
-	if (!canSearch(NULL) || !strcmp(host->cfg_get(ID, "root", "on"), "off")) return;
+	if (!canSearch(NULL) || !strcmp(host->cfg_get("root", "on"), "off")) return;
 	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Search")));
 }
 
@@ -470,9 +470,9 @@ static int init(const MosaicHost* h) {
 	back_on_cancel = 0;
 	restoring = 0;
 
-	recents_max = strcmp(host->cfg_get(ID, "recents", "on"), "off") ? SE_RECENTS_MAX : 0;
+	recents_max = strcmp(host->cfg_get("recents", "on"), "off") ? SE_RECENTS_MAX : 0;
 	loadRecents();
-	snprintf(query, sizeof(query), "%s", host->cfg_get(ID, "query", ""));
+	snprintf(query, sizeof(query), "%s", host->cfg_get("query", ""));
 	SE_trim(query);
 
 	if (!canSearch(NULL)) {
@@ -492,7 +492,7 @@ static int init(const MosaicHost* h) {
 		{ "R2", MOSAIC_BUTTON_R2 },
 		{ "SELECT", MOSAIC_BUTTON_SELECT },
 	};
-	const char* name = host->cfg_get(ID, "button", "none");
+	const char* name = host->cfg_get("button", "none");
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (strcmp(name, buttons[i].name) != 0) continue;
 		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, "search.open") != 0) {

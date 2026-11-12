@@ -17,7 +17,7 @@ static const MosaicHost* host;
 static BAConfig config;
 
 static int setting(const char* key, int fallback) {
-	return BA_toggle(host->cfg_get(ID, key, fallback ? "on" : "off"), fallback);
+	return BA_toggle(host->cfg_get(key, fallback ? "on" : "off"), fallback);
 }
 
 static int init(const MosaicHost* h) {

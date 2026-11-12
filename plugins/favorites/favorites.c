@@ -327,14 +327,14 @@ static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* d
 
 static int init(const MosaicHost* h) {
 	host = h;
-	const char* collection = host->cfg_get(ID, "collection", "Favorites");
+	const char* collection = host->cfg_get("collection", "Favorites");
 	if (!collection[0] || strchr(collection, '/')) collection = "Favorites";
 	snprintf(folder_name, sizeof(folder_name), "%s", collection);
 	snprintf(folder_path, sizeof(folder_path), "%s/Favorites", host->sdcard_path);
 	snprintf(collections_dir, sizeof(collections_dir), "%s/Collections", host->sdcard_path);
 	snprintf(list_path, sizeof(list_path), "%s/%s.txt", collections_dir, folder_name);
 	snprintf(art_dir, sizeof(art_dir), "%s/%s", collections_dir, folder_name);
-	pin_on = !strcmp(host->cfg_get(ID, "pin", "off"), "on");
+	pin_on = !strcmp(host->cfg_get("pin", "off"), "on");
 	sorted_dir[0] = '\0';
 	migrate();
 	load();

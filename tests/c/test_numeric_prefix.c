@@ -20,8 +20,7 @@ struct MosaicEntry {
 static const char* setting = NULL; // the hide setting, or NULL for the default
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (setting && !strcmp(key, "hide")) return setting;
 	return fallback;
 }

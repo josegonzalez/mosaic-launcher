@@ -84,8 +84,8 @@ static void today(char out[PL_DAY_LEN]) {
 
 static int grantToday(const char* day) {
 	char grant_day[PL_DAY_LEN];
-	snprintf(grant_day, sizeof(grant_day), "%s", host->cfg_get(ID, "grant_day", ""));
-	return PL_grantToday(grant_day, host->cfg_get(ID, "grant_minutes", "0"), day);
+	snprintf(grant_day, sizeof(grant_day), "%s", host->cfg_get("grant_day", ""));
+	return PL_grantToday(grant_day, host->cfg_get("grant_minutes", "0"), day);
 }
 
 // Where today stands: an enum PlState, with the seconds left in *left.
@@ -131,7 +131,7 @@ static void tick(unsigned long now) {
 static void typedCode(const char* text, void* data) {
 	(void)data;
 	if (!text) return; // cancelled
-	if (!PL_codeMatches(host->cfg_get(ID, "code", ""), text)) {
+	if (!PL_codeMatches(host->cfg_get("code", ""), text)) {
 		say("wrong code");
 		toast(tr("Wrong code"));
 		return;
@@ -139,12 +139,12 @@ static void typedCode(const char* text, void* data) {
 	char day[PL_DAY_LEN];
 	today(day);
 	char grant_day[PL_DAY_LEN];
-	snprintf(grant_day, sizeof(grant_day), "%s", host->cfg_get(ID, "grant_day", ""));
-	int total = PL_addGrant(grant_day, host->cfg_get(ID, "grant_minutes", "0"), day, extra);
+	snprintf(grant_day, sizeof(grant_day), "%s", host->cfg_get("grant_day", ""));
+	int total = PL_addGrant(grant_day, host->cfg_get("grant_minutes", "0"), day, extra);
 	char minutes[16];
 	snprintf(minutes, sizeof(minutes), "%i", total);
-	host->cfg_set(ID, "grant_day", day);
-	host->cfg_set(ID, "grant_minutes", minutes);
+	host->cfg_set("grant_day", day);
+	host->cfg_set("grant_minutes", minutes);
 	say("granted %i more minutes today, %i in all", extra, total);
 	char message[256];
 	snprintf(message, sizeof(message), tr("%i more minutes today"), extra);
@@ -169,7 +169,7 @@ static int preLaunch(const MosaicLaunch* launch) {
 		return MOSAIC_LAUNCH_CONTINUE;
 	}
 
-	int has_code = host->cfg_get(ID, "code", "")[0] != '\0';
+	int has_code = host->cfg_get("code", "")[0] != '\0';
 	int can_ask = has_code && extra > 0 && MOSAIC_HOST_HAS(host, confirm) && MOSAIC_HOST_HAS(host, keyboard);
 	say("refused %s: %lld seconds played today, the limit is %i minutes%s", nameOf(launch->path), played,
 		limit + grantToday(day), can_ask ? "; offering extra time behind the code" : "");
@@ -241,9 +241,9 @@ static int init(const MosaicHost* h) {
 		say("unsupported: this launcher has no play history");
 		return 1;
 	}
-	limit = PL_parseMinutes(host->cfg_get(ID, "limit", "off"), 0);
-	warn = PL_parseMinutes(host->cfg_get(ID, "warn", "10"), 0);
-	extra = PL_parseMinutes(host->cfg_get(ID, "extra", "15"), 0);
+	limit = PL_parseMinutes(host->cfg_get("limit", "off"), 0);
+	warn = PL_parseMinutes(host->cfg_get("warn", "10"), 0);
+	extra = PL_parseMinutes(host->cfg_get("extra", "15"), 0);
 	widget_supported = MOSAIC_HOST_HAS(host, decorate_cell) && MOSAIC_HOST_HAS(host, draw_text)
 		&& MOSAIC_HOST_HAS(host, theme_color);
 
@@ -257,7 +257,7 @@ static int init(const MosaicHost* h) {
 
 	if (limit <= 0) say("no daily limit set, so nothing is limited");
 	else say("daily limit %i minutes, warning at %i, %i more behind the code%s", limit, warn, extra,
-		host->cfg_get(ID, "code", "")[0] ? "" : " (no code set)");
+		host->cfg_get("code", "")[0] ? "" : " (no code set)");
 	return 0;
 }
 

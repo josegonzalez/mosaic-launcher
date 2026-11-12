@@ -461,7 +461,6 @@ static char logged[16][512];
 static int logged_count = 0;
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
 	if (logged_count < 16) snprintf(logged[logged_count++], sizeof(logged[0]), "%s", message);
 	logs++;
@@ -474,14 +473,15 @@ static int wasLogged(const char* message) {
 	return 0;
 }
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (strcmp(id, "playtime-captions") == 0) {
-		if (!captions_loaded) return fallback;
-		for (int i = captions_cfg_count - 1; i >= 0; i--) {
-			if (strcmp(captions_cfg[i][0], key) == 0) return captions_cfg[i][1];
-		}
-		return fallback;
+static const char* fakeCfgRead(const char* id, const char* key, const char* fallback) {
+	if (strcmp(id, "playtime-captions") != 0 || !captions_loaded) return fallback;
+	for (int i = captions_cfg_count - 1; i >= 0; i--) {
+		if (strcmp(captions_cfg[i][0], key) == 0) return captions_cfg[i][1];
 	}
+	return fallback;
+}
+
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (strcmp(key, "style") == 0) return style_setting;
 	if (strcmp(key, "captions") == 0) return captions_setting;
 	return fallback;
@@ -583,7 +583,6 @@ static int fakeScale(void) {
 }
 
 static MosaicSurface* fakeScaleSurface(const char* id, const MosaicSurface* src, int w, int h, int fit) {
-	(void)id;
 	(void)fit;
 	scales++;
 	live++;
@@ -596,7 +595,6 @@ static MosaicSurface* fakeScaleSurface(const char* id, const MosaicSurface* src,
 }
 
 static int fakeFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	if (!s || !s->owned) return -1;
 	frees++;
 	live--;
@@ -695,6 +693,7 @@ static void setupHost(void) {
 	fake_host.api_version = MOSAIC_API_VERSION;
 	fake_host.log = fakeLog;
 	fake_host.cfg_get = fakeCfgGet;
+	fake_host.cfg_read = fakeCfgRead;
 	fake_host.request_redraw = fakeRedraw;
 	fake_host.recents_count = fakeCount;
 	fake_host.recent_path = fakePath;

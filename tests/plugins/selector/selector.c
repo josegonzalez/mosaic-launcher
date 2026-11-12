@@ -199,9 +199,9 @@ static int init(const MosaicHost* h) {
 	snprintf(sub, sizeof(sub), "%s/Tiny", folder);
 	snprintf(tiny, sizeof(tiny), "%s/Tiny", host->sdcard_path);
 	snprintf(empty_dir, sizeof(empty_dir), "%s/Empty", folder);
-	fail = atoi(host->cfg_get(ID, "fail", "0"));
-	jump = atoi(host->cfg_get(ID, "jump", "0"));
-	empty = atoi(host->cfg_get(ID, "empty", "0"));
+	fail = atoi(host->cfg_get("fail", "0"));
+	jump = atoi(host->cfg_get("jump", "0"));
+	empty = atoi(host->cfg_get("empty", "0"));
 	say("settle %i", host->selection_settle_ms);
 	return 0;
 }

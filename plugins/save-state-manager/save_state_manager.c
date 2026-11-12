@@ -565,7 +565,7 @@ static int init(const MosaicHost* h) {
 		say("this launcher has no plugin screens or button hints");
 		return 1;
 	}
-	can_delete = strcmp(host->cfg_get(ID, "delete", "on"), "off") != 0 && MOSAIC_HOST_HAS(host, confirm);
+	can_delete = strcmp(host->cfg_get("delete", "on"), "off") != 0 && MOSAIC_HOST_HAS(host, confirm);
 	static const MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),
 		.enter = enter,
@@ -582,7 +582,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't register the save states actions");
 		return 1;
 	}
-	if (strcmp(host->cfg_get(ID, "tile", "on"), "off") != 0
+	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
 			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(OPEN_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
 		say("couldn't add the Save states tile");
 	}
@@ -595,7 +595,7 @@ static int init(const MosaicHost* h) {
 		{ "R2", MOSAIC_BUTTON_R2 },
 		{ "SELECT", MOSAIC_BUTTON_SELECT },
 	};
-	const char* name = host->cfg_get(ID, "button", "Y");
+	const char* name = host->cfg_get("button", "Y");
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (strcmp(name, buttons[i].name) != 0) continue;
 		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, GAME_ID) != 0) {

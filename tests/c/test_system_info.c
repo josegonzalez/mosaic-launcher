@@ -390,14 +390,12 @@ static int level = 85, charging = 0;
 static MosaicRect hole_now;
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
 	size_t used = strlen(all_log);
 	snprintf(all_log + used, sizeof(all_log) - used, "%s\n", message);
 }
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (strcmp(key, "tile") == 0) return tile_setting;
 	if (strcmp(key, "button") == 0) return button_setting;
 	return fallback;
@@ -434,7 +432,6 @@ static int fakeTile(const char* id, int row, const char* icon, const char* icon_
 static int fakeBind(int screen, int button, int trigger, const char* id) {
 	(void)screen;
 	(void)trigger;
-	(void)id;
 	bound_button = button;
 	return 0;
 }

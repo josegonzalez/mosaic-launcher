@@ -280,15 +280,13 @@ static int choice_count = 0;
 static void (*choice_pick)(int, void*);
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < cfg_count; i++) {
 		if (!strcmp(cfg[i].key, key)) return cfg[i].value;
 	}
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	(void)id;
+static void fakeCfgSet(const char* key, const char* value) {
 	cfg_sets++;
 	for (int i = 0; i < cfg_count; i++) {
 		if (!strcmp(cfg[i].key, key)) {
@@ -500,8 +498,8 @@ static void testPlugin(void) {
 	opens = 0;
 	keyboard_done(" mario ", NULL);
 	CHECK(opens == 0 && reloads == 1); // already in the folder
-	CHECK_STR(fakeCfgGet(ID, "query", ""), "mario");
-	CHECK_STR(fakeCfgGet(ID, "recent1", ""), "mario");
+	CHECK_STR(fakeCfgGet("query", ""), "mario");
+	CHECK_STR(fakeCfgGet("recent1", ""), "mario");
 	list = listSearch(p);
 	CHECK(list != NULL);
 	if (list) {
@@ -574,10 +572,10 @@ static void testPlugin(void) {
 	list = listSearch(p);
 	CHECK(list && list->count == 0);
 	freeList(list);
-	CHECK_STR(fakeCfgGet(ID, "recent1", ""), "luigi");
-	CHECK_STR(fakeCfgGet(ID, "recent2", ""), "tool");
-	CHECK_STR(fakeCfgGet(ID, "recent5", ""), "POK\xc3\x89MON");
-	CHECK_STR(fakeCfgGet(ID, "recent6", ""), "mario");
+	CHECK_STR(fakeCfgGet("recent1", ""), "luigi");
+	CHECK_STR(fakeCfgGet("recent2", ""), "tool");
+	CHECK_STR(fakeCfgGet("recent5", ""), "POK\xc3\x89MON");
+	CHECK_STR(fakeCfgGet("recent6", ""), "mario");
 
 	// a recent runs again; from elsewhere it opens the folder
 	snprintf(current, sizeof(current), "%s", GB);
@@ -590,9 +588,9 @@ static void testPlugin(void) {
 	choice_pick(6, NULL);
 	CHECK(opens == 1);
 	CHECK_STR(opened, SEARCH);
-	CHECK_STR(fakeCfgGet(ID, "query", ""), "mario");
-	CHECK_STR(fakeCfgGet(ID, "recent1", ""), "mario");
-	CHECK_STR(fakeCfgGet(ID, "recent2", ""), "luigi");
+	CHECK_STR(fakeCfgGet("query", ""), "mario");
+	CHECK_STR(fakeCfgGet("recent1", ""), "mario");
+	CHECK_STR(fakeCfgGet("recent2", ""), "luigi");
 	// the folder it opened doesn't ask again
 	keyboards = chooses = 0;
 	p->tick(0);
@@ -629,7 +627,7 @@ static void testPlugin(void) {
 	keyboard_done("   ", NULL); // nothing typed is a cancel too
 	CHECK(runs == 2);
 	CHECK_STR(current, CARD);
-	CHECK_STR(fakeCfgGet(ID, "query", ""), "mario");
+	CHECK_STR(fakeCfgGet("query", ""), "mario");
 	p->quit();
 
 	// started in the folder, it lists the same results without asking
@@ -712,9 +710,9 @@ static void testPlugin(void) {
 	p->quit();
 
 	// settings: no root row, no recents, a button
-	fakeCfgSet(ID, "root", "off");
-	fakeCfgSet(ID, "recents", "off");
-	fakeCfgSet(ID, "button", "L2");
+	fakeCfgSet("root", "off");
+	fakeCfgSet("recents", "off");
+	fakeCfgSet("button", "L2");
 	CHECK(p->init(&fake) == 0);
 	CHECK(bound_button == MOSAIC_BUTTON_L2);
 	root = fake.list_new();
@@ -726,12 +724,12 @@ static void testPlugin(void) {
 	action_run(NULL);
 	CHECK(keyboards == 1 && chooses == 0);
 	keyboard_done("kirby", NULL);
-	CHECK_STR(fakeCfgGet(ID, "query", ""), "kirby");
-	CHECK_STR(fakeCfgGet(ID, "recent1", ""), "mario"); // not remembered
+	CHECK_STR(fakeCfgGet("query", ""), "kirby");
+	CHECK_STR(fakeCfgGet("recent1", ""), "mario"); // not remembered
 	p->quit();
 
 	// without choose, the keyboard alone
-	fakeCfgSet(ID, "recents", "on");
+	fakeCfgSet("recents", "on");
 	fake.choose = NULL;
 	CHECK(p->init(&fake) == 0);
 	keyboards = chooses = 0;

@@ -332,7 +332,7 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	snprintf(roms, sizeof(roms), "%s/Roms", host->sdcard_path);
-	prefer_preview = strcmp(host->cfg_get(ID, "prefer_preview", "on"), "off") != 0;
+	prefer_preview = strcmp(host->cfg_get("prefer_preview", "on"), "off") != 0;
 	state_for[0] = '\0';
 	preview[0] = '\0';
 	return 0;

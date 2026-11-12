@@ -506,11 +506,19 @@ typedef struct MosaicHost {
 
 	void (*log)(const char* plugin_id, const char* message);
 
-	// Per-plugin settings in .userdata/<platform>/launcher/<id>.cfg.
-	// cfg_get returns fallback when the key isn't set. The returned string
-	// stays valid until the next cfg_set for that plugin.
-	const char* (*cfg_get)(const char* plugin_id, const char* key, const char* fallback);
-	void (*cfg_set)(const char* plugin_id, const char* key, const char* value);
+	// The calling plugin's own settings, in
+	// .userdata/<platform>/launcher/<id>.cfg: the launcher knows which
+	// plugin is calling from the hook or callback it's running, so there's
+	// no id to pass. cfg_get returns fallback when the key isn't set. The
+	// returned string stays valid until the plugin's next cfg_set. They
+	// work from init, hooks and callbacks (actions, dialogs, screens) on
+	// the launcher's thread; from a thread of the plugin's own, or anywhere
+	// the calling plugin can't be told, they're refused (cfg_get returns
+	// fallback, cfg_set does nothing) and the launcher logs it once. Read
+	// what a thread needs first, and hand it over. Another plugin's
+	// settings are read with cfg_read.
+	const char* (*cfg_get)(const char* key, const char* fallback);
+	void (*cfg_set)(const char* key, const char* value);
 
 	// Entries. A new entry belongs to whoever it's pushed into.
 	MosaicEntry* (*entry_new)(const char* path, int type, const char* name);
@@ -1198,6 +1206,15 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, plugin_info).
 	int (*plugins_count)(void);
 	int (*plugin_info)(int index, MosaicPluginInfo* out);
+
+	// Another plugin's setting, read only: the value of plugin_id's key
+	// when that plugin is loaded and its plugin.txt marks the setting
+	// public, else fallback, as for an unset key. Everything else is
+	// private to its plugin, protected and secret settings always. The
+	// returned string stays valid until that plugin's next cfg_set. It
+	// works where cfg_get does. Check for it with
+	// MOSAIC_HOST_HAS(host, cfg_read).
+	const char* (*cfg_read)(const char* plugin_id, const char* key, const char* fallback);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

@@ -308,10 +308,10 @@ static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
 	snprintf(roms_path, sizeof(roms_path), "%s/Roms", host->sdcard_path);
-	min_systems = atoi(host->cfg_get(ID, "min", "1"));
+	min_systems = atoi(host->cfg_get("min", "1"));
 	if (min_systems < 1) min_systems = 1;
-	snprintf(skip, sizeof(skip), "%s", host->cfg_get(ID, "skip", ""));
-	tags = GV_tagsMode(host->cfg_get(ID, "tags", "shared"));
+	snprintf(skip, sizeof(skip), "%s", host->cfg_get("skip", ""));
+	tags = GV_tagsMode(host->cfg_get("tags", "shared"));
 	return 0;
 }
 

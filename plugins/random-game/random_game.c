@@ -78,7 +78,7 @@ static int endsWith(const char* s, const char* suffix) {
 }
 
 static int isOn(const char* key, const char* fallback) {
-	return strcmp(host->cfg_get(ID, key, fallback), "off") != 0;
+	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
 static char* readFile(const char* path) {

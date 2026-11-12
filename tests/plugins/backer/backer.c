@@ -121,8 +121,8 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, plugin_art)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Backer", host->sdcard_path);
 	snprintf(empty, sizeof(empty), "%s/Empty", folder);
-	bg = host->cfg_get(ID, "bg", "");
-	fail = host->cfg_get(ID, "fail", "");
+	bg = host->cfg_get("bg", "");
+	fail = host->cfg_get("fail", "");
 	return 0;
 }
 

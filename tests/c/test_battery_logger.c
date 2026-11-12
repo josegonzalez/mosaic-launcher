@@ -19,8 +19,7 @@ static char cfg_min[8] = "", cfg_max[8] = "", cfg_charged[8] = "";
 static char logged[256];
 
 static void fakeLog(const char* id, const char* m) { (void)id; snprintf(logged, sizeof(logged), "%s", m); }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "min_minutes") && cfg_min[0]) return cfg_min;
 	if (!strcmp(key, "max_kb") && cfg_max[0]) return cfg_max;
 	if (!strcmp(key, "charged") && cfg_charged[0]) return cfg_charged;

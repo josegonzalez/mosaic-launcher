@@ -77,10 +77,10 @@ static int init(const MosaicHost* h) {
 	}
 	supported = 1;
 
-	mode = Ls_parseMode(host->cfg_get(ID, "mode", "battery"));
-	theme_index = Ls_parseThemeColor(host->cfg_get(ID, "theme_color", "accent"));
-	int low_at = Ls_parseNumber(host->cfg_get(ID, "low_at", "20"), 1, 99, LS_LOW_DEFAULT);
-	int mid_at = Ls_parseNumber(host->cfg_get(ID, "mid_at", "50"), 1, 99, LS_MID_DEFAULT);
+	mode = Ls_parseMode(host->cfg_get("mode", "battery"));
+	theme_index = Ls_parseThemeColor(host->cfg_get("theme_color", "accent"));
+	int low_at = Ls_parseNumber(host->cfg_get("low_at", "20"), 1, 99, LS_LOW_DEFAULT);
+	int mid_at = Ls_parseNumber(host->cfg_get("mid_at", "50"), 1, 99, LS_MID_DEFAULT);
 	if (mode == LS_MODE_BATTERY && low_at >= mid_at) say("low_at isn't below mid_at, so there's no yellow");
 	LsBattery_init(&battery, low_at, mid_at);
 	return 0;

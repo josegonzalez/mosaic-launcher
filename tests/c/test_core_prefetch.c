@@ -120,8 +120,7 @@ static char logged[1024];
 static char cfg_rom[8] = "", cfg_mb[8] = "", cfg_ms[8] = "";
 
 static void fakeLog(const char* id, const char* m) { (void)id; snprintf(logged, sizeof(logged), "%s", m); }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "rom") && cfg_rom[0]) return cfg_rom;
 	if (!strcmp(key, "max_mb") && cfg_mb[0]) return cfg_mb;
 	if (!strcmp(key, "max_ms") && cfg_ms[0]) return cfg_ms;

@@ -266,7 +266,7 @@ static int init(const MosaicHost* h) {
 	loaded.st_size = -1; // so the first refresh reads the file
 	refresh();
 
-	const char* name = host->cfg_get(ID, "button", "Y");
+	const char* name = host->cfg_get("button", "Y");
 	int button = MOSAIC_BUTTON_Y;
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;

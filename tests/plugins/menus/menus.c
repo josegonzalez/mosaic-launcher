@@ -67,7 +67,7 @@ static void tick(unsigned long now) {
 	}
 	say("root %s", names);
 
-	const char* moved = host->cfg_get(ID, "moved", "");
+	const char* moved = host->cfg_get("moved", "");
 	int set = host->recent_set(0, moved);
 	say("recent_set %i, first %s", set, shown(host->recent_path(0)));
 	say("recent_set bad index %i, off the card %i", host->recent_set(9, moved), host->recent_set(0, "/elsewhere/Game.gb"));
@@ -97,7 +97,7 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "the launcher is missing a host call");
 		return 1;
 	}
-	plugin.root_with_entries = atoi(host->cfg_get(ID, "keep", "1"));
+	plugin.root_with_entries = atoi(host->cfg_get("keep", "1"));
 
 	host->register_action("menus.one", "ONE", always, runOne, NULL);
 	host->register_action("menus.two", "TWO", always, runTwo, NULL);

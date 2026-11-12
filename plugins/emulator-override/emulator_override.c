@@ -242,9 +242,9 @@ static int init(const MosaicHost* h) {
 	refreshMap();
 	forgetCheck();
 	picking[0] = '\0';
-	list_all = strcmp(host->cfg_get(ID, "all", "off"), "on") == 0;
+	list_all = strcmp(host->cfg_get("all", "off"), "on") == 0;
 
-	const char* name = host->cfg_get(ID, "button", "Y");
+	const char* name = host->cfg_get("button", "Y");
 	int button = MOSAIC_BUTTON_Y;
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;

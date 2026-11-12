@@ -27,8 +27,7 @@ static const char* setting = NULL; // same_system, or NULL for the default
 static int set_names = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (setting && !strcmp(key, "same_system")) return setting;
 	return fallback;
 }

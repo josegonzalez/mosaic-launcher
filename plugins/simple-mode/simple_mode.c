@@ -30,7 +30,7 @@ static const char* tr(const char* text) {
 
 static int isOn(void* data) {
 	(void)data;
-	return Simple_isOn(host->cfg_get(ID, "on", "on"));
+	return Simple_isOn(host->cfg_get("on", "on"));
 }
 
 static int always(void* data) {
@@ -47,13 +47,13 @@ static void toast(const char* message) {
 static void hideTiles(int hide) {
 	if (!MOSAIC_HOST_HAS(host, hide_quick_tile)) return;
 	const char* names[SIMPLE_TILES_MAX];
-	int hide_settings = strcmp(host->cfg_get(ID, "settings", "on"), "off") != 0;
+	int hide_settings = strcmp(host->cfg_get("settings", "on"), "off") != 0;
 	int count = Simple_tiles(hide ? hide_settings : 1, names);
 	for (int i = 0; i < count; i++) host->hide_quick_tile(names[i], hide);
 }
 
 static void setOn(int on) {
-	host->cfg_set(ID, "on", on ? "on" : "off");
+	host->cfg_set("on", on ? "on" : "off");
 	hideTiles(on);
 	toast(on ? tr("Simple mode on") : tr("Simple mode off"));
 	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
@@ -74,7 +74,7 @@ static void checkedPin(int result, void* data) {
 static void typedPin(const char* text, void* data) {
 	(void)data;
 	if (!text) return; // cancelled
-	if (Simple_pinMatches(host->cfg_get(ID, "pin", ""), text)) setOn(0);
+	if (Simple_pinMatches(host->cfg_get("pin", ""), text)) setOn(0);
 	else toast(tr("Wrong PIN"));
 }
 
@@ -88,7 +88,7 @@ static void toggle(void* data) {
 		else if (MOSAIC_HOST_HAS(host, confirm)) host->confirm(tr("Leave simple mode?"), tr("LEAVE"), leave, NULL);
 		else setOn(0);
 	}
-	else if (Simple_leaveStep(host->cfg_get(ID, "pin", "")) == SIMPLE_LEAVE_PIN) {
+	else if (Simple_leaveStep(host->cfg_get("pin", "")) == SIMPLE_LEAVE_PIN) {
 		if (MOSAIC_HOST_HAS(host, keyboard)) host->keyboard(tr("PIN to leave simple mode"), "", typedPin, NULL);
 		else host->log(ID, "this launcher has no keyboard to type the PIN on; turn simple mode off from the Launcher pak");
 	}

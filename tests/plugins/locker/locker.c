@@ -110,9 +110,9 @@ static int init(const MosaicHost* h) {
 	}
 	snprintf(folder_a, sizeof(folder_a), "%s/Locker A", host->sdcard_path);
 	snprintf(folder_b, sizeof(folder_b), "%s/Locker B", host->sdcard_path);
-	unsigned long ms = strtoul(host->cfg_get(ID, "hold", "1300"), NULL, 10);
+	unsigned long ms = strtoul(host->cfg_get("hold", "1300"), NULL, 10);
 	if (ms) hold = ms;
-	unlock = atoi(host->cfg_get(ID, "unlock", "1"));
+	unlock = atoi(host->cfg_get("unlock", "1"));
 	return 0;
 }
 

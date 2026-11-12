@@ -189,9 +189,9 @@ static int init(const MosaicHost* h) {
 		host->log("sayer", "no tr");
 		return 1;
 	}
-	bad = !strcmp(host->cfg_get("sayer", "mode", ""), "bad");
-	crash = !strcmp(host->cfg_get("sayer", "mode", ""), "crash");
-	root = !strcmp(host->cfg_get("sayer", "mode", ""), "root");
+	bad = !strcmp(host->cfg_get("mode", ""), "bad");
+	crash = !strcmp(host->cfg_get("mode", ""), "crash");
+	root = !strcmp(host->cfg_get("mode", ""), "root");
 	// from init, before the slot is settled: English, and no plugins listed
 	say("init tr Hello = %s%s", host->tr("sayer", NULL, "Hello"), "");
 	MosaicPluginInfo info = { .size = sizeof(info) };

@@ -324,11 +324,9 @@ static const char* shelves_cfg = "auto";
 static char logged[256];
 
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	snprintf(logged, sizeof(logged), "%s", m);
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "animate")) return animate_cfg;
 	if (!strcmp(key, "shelves")) return shelves_cfg;
 	return fallback;
@@ -413,7 +411,6 @@ static int fakeSurfaceSize(const MosaicSurface* s, int* w, int* h) {
 	return 0;
 }
 static MosaicSurface* fakeSurfaceScale(const char* id, const MosaicSurface* src, int w, int h, int fit) {
-	(void)id;
 	scales++;
 	last_fit = fit;
 	if (scale_fail || copy_count >= 128) return NULL;
@@ -422,7 +419,6 @@ static MosaicSurface* fakeSurfaceScale(const char* id, const MosaicSurface* src,
 	return s;
 }
 static int fakeSurfaceFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	if (!s->owned) return -1;
 	s->owned = 0;
 	frees++;

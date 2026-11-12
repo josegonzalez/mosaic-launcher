@@ -190,11 +190,11 @@ static int init(const MosaicHost* h) {
 		say("unsupported: this launcher has no header widgets");
 		return 1;
 	}
-	snprintf(profile, sizeof(profile), "%s", host->cfg_get(ID, "profile", ""));
+	snprintf(profile, sizeof(profile), "%s", host->cfg_get("profile", ""));
 	want[HI_PROFILE] = profile[0] != '\0';
-	want[HI_STORAGE] = Hi_parseToggle(host->cfg_get(ID, "storage", "on"), 1);
-	want[HI_FPS] = Hi_parseToggle(host->cfg_get(ID, "fps", "off"), 0);
-	want[HI_SSH] = Hi_parseToggle(host->cfg_get(ID, "ssh", "off"), 0);
+	want[HI_STORAGE] = Hi_parseToggle(host->cfg_get("storage", "on"), 1);
+	want[HI_FPS] = Hi_parseToggle(host->cfg_get("fps", "off"), 0);
+	want[HI_SSH] = Hi_parseToggle(host->cfg_get("ssh", "off"), 0);
 
 	storage[0] = '\0';
 	ssh_on = 0;

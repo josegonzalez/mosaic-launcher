@@ -188,7 +188,6 @@ static int toggle_value[4] = { 1, 0, 1, -1 }; // notify_adjustments unknown
 static char hint_text[256];
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	size_t used = strlen(all_log);
 	snprintf(all_log + used, sizeof(all_log) - used, "%s\n", message);
 }
@@ -199,8 +198,7 @@ static int logged(const char* line) {
 	return strstr(all_log, want) != NULL;
 }
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	CHECK_STR(id, ID);
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "seen")) return cfg_seen;
 	if (!strcmp(key, "toggles")) return cfg_toggles;
 	if (!strcmp(key, "pin")) return cfg_pin;
@@ -208,8 +206,7 @@ static const char* fakeCfgGet(const char* id, const char* key, const char* fallb
 	return fallback;
 }
 
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	CHECK_STR(id, ID);
+static void fakeCfgSet(const char* key, const char* value) {
 	CHECK_STR(key, "seen");
 	snprintf(cfg_seen, sizeof(cfg_seen), "%s", value);
 }
@@ -275,7 +272,6 @@ static int fakeTile(const char* id, int row, const char* icon, const char* icon_
 static int fakeBind(int screen, int button, int trigger, const char* id) {
 	(void)screen;
 	(void)trigger;
-	(void)id;
 	bound_button = button;
 	return 0;
 }

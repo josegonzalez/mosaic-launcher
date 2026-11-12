@@ -88,7 +88,7 @@ static int init(const MosaicHost* h) {
 	for (int i = 0; i < GAMES; i++) {
 		char key[8];
 		snprintf(key, sizeof(key), "game%i", i + 1);
-		snprintf(games[i], sizeof(games[i]), "%s", host->cfg_get(ID, key, ""));
+		snprintf(games[i], sizeof(games[i]), "%s", host->cfg_get(key, ""));
 	}
 	return 0;
 }

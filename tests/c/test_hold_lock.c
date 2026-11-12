@@ -145,12 +145,10 @@ static const char* cfg_chord = NULL;
 static const char* cfg_switch = NULL;
 
 static void fakeLog(const char* id, const char* m) {
-	CHECK(!strcmp(id, ID));
 	snprintf(last_log, sizeof(last_log), "%s", m);
 	logs++;
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	CHECK(!strcmp(id, ID));
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "chord") && cfg_chord) return cfg_chord;
 	if (!strcmp(key, "switch") && cfg_switch) return cfg_switch;
 	return fallback;

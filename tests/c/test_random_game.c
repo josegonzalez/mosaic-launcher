@@ -41,14 +41,13 @@ static int bound_button = -1;
 static char tile_action[64];
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "root") && cfg_root[0]) return cfg_root;
 	if (!strcmp(key, "tile") && cfg_tile[0]) return cfg_tile;
 	if (!strcmp(key, "unplayed") && cfg_unplayed[0]) return cfg_unplayed;
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) { (void)id; (void)key; (void)value; }
+static void fakeCfgSet(const char* key, const char* value) { (void)key; (void)value; }
 static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
 	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);

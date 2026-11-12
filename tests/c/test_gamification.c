@@ -467,7 +467,6 @@ static int meetsHole(const MosaicRect* r) {
 }
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
 	size_t used = strlen(logs);
 	snprintf(logs + used, sizeof(logs) - used, "%s\n", message);
@@ -477,8 +476,7 @@ static int logged(const char* text) {
 	return strstr(logs, text) != NULL;
 }
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	CHECK_STR(id, "gamification");
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (strcmp(key, "button") == 0) return button_setting;
 	if (strcmp(key, "toasts") == 0) return toasts_setting;
 	if (strcmp(key, "daily_minutes") == 0) return "20";

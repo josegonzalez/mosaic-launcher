@@ -40,8 +40,7 @@ static char toasted[160];
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static void fakeToast(const char* m) { snprintf(toasted, sizeof(toasted), "%s", m); }
 static void fakeRedraw(void) {}
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (labels_setting && !strcmp(key, "labels")) return labels_setting;
 	if (hide_setting && !strcmp(key, "hide")) return hide_setting;
 	if (awake_setting && !strcmp(key, "awake_tile")) return awake_setting;

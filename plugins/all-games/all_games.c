@@ -279,7 +279,7 @@ static void tick(unsigned long now) {
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(roms_path, sizeof(roms_path), "%s/Roms", host->sdcard_path);
-	tags = strcmp(host->cfg_get(ID, "tags", "on"), "off") != 0;
+	tags = strcmp(host->cfg_get("tags", "on"), "off") != 0;
 	AG_indexInit(&index_);
 	scanned = 0;
 	replaced = 0;

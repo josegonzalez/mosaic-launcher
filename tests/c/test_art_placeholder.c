@@ -248,8 +248,7 @@ static int finds = 0;
 static int themed = 1;
 static const char* style_value = "title";
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	return !strcmp(key, "style") ? style_value : fallback;
 }
 static void fakeLog(const char* id, const char* message) { (void)id; (void)message; }
@@ -270,7 +269,6 @@ static int fakeTheme(int index) {
 	}
 }
 static MosaicSurface* fakeSurfaceNew(const char* id, int w, int h) {
-	(void)id;
 	if (surface_count >= 8) return NULL;
 	MosaicSurface* s = &surfaces[surface_count++];
 	s->w = w;

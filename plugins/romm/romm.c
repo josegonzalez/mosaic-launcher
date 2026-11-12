@@ -176,12 +176,12 @@ static int insideCard(const char* dir, const char* top) {
 static void loadSettings(void) {
 	configured = 0;
 	memset(&net, 0, sizeof(net));
-	const char* url = host->cfg_get(ID, "url", "");
-	const char* user = host->cfg_get(ID, "user", "");
+	const char* url = host->cfg_get("url", "");
+	const char* user = host->cfg_get("user", "");
 	char user_copy[256];
 	put(user_copy, sizeof(user_copy), "%s", user);
-	sync_saves = strcmp(host->cfg_get(ID, "sync", "on"), "off") != 0;
-	keep_saves = atoi(host->cfg_get(ID, "keep", "10"));
+	sync_saves = strcmp(host->cfg_get("sync", "on"), "off") != 0;
+	keep_saves = atoi(host->cfg_get("keep", "10"));
 	if (keep_saves < 1 || keep_saves > 1000) keep_saves = 10;
 	if (!url[0]) {
 		say("no server set, so it does nothing");
@@ -192,10 +192,10 @@ static void loadSettings(void) {
 		sayf("the server setting is unusable: %s", error);
 		return;
 	}
-	const char* secret = host->cfg_get(ID, "password", "");
+	const char* secret = host->cfg_get("password", "");
 	RM_authHeader(user_copy, secret, net.auth, sizeof(net.auth));
 	int have_secret = secret[0] != '\0';
-	const char* pin = host->cfg_get(ID, "pin", "");
+	const char* pin = host->cfg_get("pin", "");
 	if (pin[0]) {
 		if (RM_parsePin(pin, net.pin) != 0) {
 			say("the certificate fingerprint setting isn't a SHA-256 fingerprint");
@@ -204,7 +204,7 @@ static void loadSettings(void) {
 			net.have_pin = 1;
 		}
 	}
-	const char* ca = host->cfg_get(ID, "ca_file", "");
+	const char* ca = host->cfg_get("ca_file", "");
 	if (ca[0]) put(net.ca_file, sizeof(net.ca_file), "%s", ca);
 	else RN_systemCa(sd, host->platform, net.ca_file, sizeof(net.ca_file));
 	net.connect_ms = 8000;
@@ -1921,7 +1921,7 @@ static int init(const MosaicHost* h) {
 				{ "R2", MOSAIC_BUTTON_R2 },
 				{ "SELECT", MOSAIC_BUTTON_SELECT },
 			};
-			const char* name = host->cfg_get(ID, "button", "Y");
+			const char* name = host->cfg_get("button", "Y");
 			for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 				if (strcmp(name, buttons[i].name) != 0) continue;
 				if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, FLASHBACK_ACTION) != 0) {

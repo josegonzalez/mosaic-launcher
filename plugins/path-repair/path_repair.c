@@ -289,8 +289,8 @@ static void tick(unsigned long now) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	recents_on = strcmp(host->cfg_get(ID, "recents", "on"), "off") != 0;
-	collections_on = strcmp(host->cfg_get(ID, "collections", "on"), "off") != 0;
+	recents_on = strcmp(host->cfg_get("recents", "on"), "off") != 0;
+	collections_on = strcmp(host->cfg_get("collections", "on"), "off") != 0;
 	if (collections_on) repairCollections();
 	return 0;
 }

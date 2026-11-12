@@ -355,8 +355,7 @@ struct MosaicEntry {
 static char cfg_keys[8][32];
 static char cfg_values[8][32];
 static int cfg_count = 0;
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < cfg_count; i++) {
 		if (!strcmp(cfg_keys[i], key)) return cfg_values[i];
 	}

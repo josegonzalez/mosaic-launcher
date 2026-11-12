@@ -30,13 +30,16 @@ static int reloads = 0;
 static char toasted[64];
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
+static const char* fakeCfgRead(const char* id, const char* key, const char* fallback) {
 	if (!strcmp(id, "favorites") && !strcmp(key, "collection") && favorites_collection) return favorites_collection;
-	if (!strcmp(id, "focus-mode") && !strcmp(key, "on") && focus_on[0]) return focus_on;
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	if (!strcmp(id, "focus-mode") && !strcmp(key, "on")) snprintf(focus_on, sizeof(focus_on), "%s", value);
+static const char* fakeCfgGet(const char* key, const char* fallback) {
+	if (!strcmp(key, "on") && focus_on[0]) return focus_on;
+	return fallback;
+}
+static void fakeCfgSet(const char* key, const char* value) {
+	if (!strcmp(key, "on")) snprintf(focus_on, sizeof(focus_on), "%s", value);
 }
 static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
 	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
@@ -75,6 +78,7 @@ static const MosaicHost fake = {
 	.log = fakeLog,
 	.cfg_get = fakeCfgGet,
 	.cfg_set = fakeCfgSet,
+	.cfg_read = fakeCfgRead,
 	.entry_new = fakeEntryNew,
 	.list_new = fakeListNew,
 	.list_push = fakeListPush,

@@ -200,8 +200,7 @@ static int replaced_index = -1; // the entry it's for, or -1 for none
 static int replacement_asks = 0, blits_of_video = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "slide")) return slide_cfg;
 	return fallback;
 }
@@ -271,7 +270,6 @@ static MosaicSurface* fakeSurfaceScale(const char* id, const MosaicSurface* src,
 	return s;
 }
 static int fakeSurfaceFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	if (!s->owned) return -1;
 	s->owned = 0;
 	frees++;

@@ -21,10 +21,10 @@
 // end, and shows nothing when even one doesn't fit.
 //
 // The game switcher's captions are switcher-plus's, with its captions
-// setting: it reads these settings with cfg_get while this plugin is
-// loaded, and writes the caption with a copy of captions_model.c's
-// formatter, so a change here goes there too. The built-in switcher gets
-// none.
+// setting: it reads these settings, which are public, with cfg_read while
+// this plugin is loaded, and writes the caption with a copy of
+// captions_model.c's formatter, so a change here goes there too. The
+// built-in switcher gets none.
 
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +36,11 @@
 #define MUTE_PERCENT 40
 
 static const MosaicHost* host;
+
+// Another plugin's setting, when it marks it public, else fallback.
+static const char* publicSetting(const char* id, const char* key, const char* fallback) {
+	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
+}
 
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
@@ -53,7 +58,7 @@ static int badge_reserve = 0; // room after the name for row-badges' dots, in un
 static int badge_corner = 0;  // room at the top of a cell with no name for them
 
 static int isOn(const char* key, const char* fallback) {
-	return !strcmp(host->cfg_get(ID, key, fallback), "on");
+	return !strcmp(host->cfg_get(key, fallback), "on");
 }
 
 // row-badges' dots go after the name: 4 units from it, up to 36 wide with
@@ -63,8 +68,8 @@ static int isOn(const char* key, const char* fallback) {
 static void readBadges(void) {
 	if (badges_known) return;
 	badges_known = 1;
-	int unplayed = !strcmp(host->cfg_get("row-badges", "unplayed", "off"), "on");
-	int tiers = !strcmp(host->cfg_get("row-badges", "tiers", "off"), "on");
+	int unplayed = !strcmp(publicSetting("row-badges", "unplayed", "off"), "on");
+	int tiers = !strcmp(publicSetting("row-badges", "tiers", "off"), "on");
 	int width = tiers ? 36 : unplayed ? 4 : 0;
 	badge_reserve = width ? 4 + width + 6 : 6;
 	badge_corner = width ? 10 : 0;
@@ -124,7 +129,7 @@ static int init(const MosaicHost* h) {
 	}
 	options.parts = (isOn("time", "on") ? PC_PART_TIME : 0) | (isOn("last", "on") ? PC_PART_LAST : 0) |
 		(isOn("sessions", "off") ? PC_PART_SESSIONS : 0);
-	options.format = PC_formatOf(host->cfg_get(ID, "format", "relative"));
+	options.format = PC_formatOf(host->cfg_get("format", "relative"));
 	options.never = isOn("never", "off");
 	if (isOn("achievements", "off")) {
 		if (MOSAIC_HOST_HAS(host, achievements)) options.parts |= PC_PART_ACHIEVEMENTS;

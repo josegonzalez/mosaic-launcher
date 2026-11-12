@@ -53,8 +53,8 @@ static void tick(unsigned long now) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get(ID, "folder", "Roms"));
-	step_ms = strtoul(host->cfg_get(ID, "step", "2500"), NULL, 10);
+	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get("folder", "Roms"));
+	step_ms = strtoul(host->cfg_get("step", "2500"), NULL, 10);
 	return 0;
 }
 

@@ -269,7 +269,7 @@ static const char* translatePlural(const char* plugin_id, const char* context, c
 // Works out the fallback font from the settings and the language.
 static void findFont(void) {
 	font[0] = '\0';
-	const char* f = host->cfg_get(ID, "font", "");
+	const char* f = host->cfg_get("font", "");
 	if (f[0]) {
 		if (f[0] == '/') snprintf(font, sizeof(font), "%s", f);
 		else snprintf(font, sizeof(font), "%s/%s", host->sdcard_path, f);
@@ -557,14 +557,14 @@ static int init(const MosaicHost* h) {
 	writes = NULL;
 	findRes();
 
-	const char* f = host->cfg_get(ID, "folder", "Languages");
+	const char* f = host->cfg_get("folder", "Languages");
 	if (f[0] == '/') snprintf(folder, sizeof(folder), "%s", f);
 	else snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, f);
 	size_t len = strlen(folder);
 	while (len > 1 && folder[len - 1] == '/') folder[--len] = '\0';
 
-	const char* language = host->cfg_get(ID, "language", "off");
-	if (!strcmp(language, "other")) language = host->cfg_get(ID, "code", "");
+	const char* language = host->cfg_get("language", "off");
+	if (!strcmp(language, "other")) language = host->cfg_get("code", "");
 	if (!language[0] || !strcmp(language, "off")) {
 		say("language off, so nothing is translated");
 		findFont();
@@ -588,7 +588,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't register " MAP_ACTION);
 		return 0;
 	}
-	tile_on = strcmp(host->cfg_get(ID, "tile", "off"), "on") == 0;
+	tile_on = strcmp(host->cfg_get("tile", "off"), "on") == 0;
 	if (tile_on && (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(MAP_ACTION, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
 		say("couldn't add the map.txt tile");
 	}
@@ -601,7 +601,7 @@ static int init(const MosaicHost* h) {
 		{ "R2", MOSAIC_BUTTON_R2 },
 		{ "SELECT", MOSAIC_BUTTON_SELECT },
 	};
-	const char* name = host->cfg_get(ID, "button", "none");
+	const char* name = host->cfg_get("button", "none");
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (strcmp(name, buttons[i].name) != 0) continue;
 		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, MAP_ACTION) != 0) {

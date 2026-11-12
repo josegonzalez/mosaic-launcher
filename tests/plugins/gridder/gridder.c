@@ -236,10 +236,10 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, draw_text) || !MOSAIC_HOST_HAS(host, select_index) || !MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Gridder", host->sdcard_path);
-	fail = host->cfg_get(ID, "fail", "");
-	art = atoi(host->cfg_get(ID, "art", "0")) && MOSAIC_HOST_HAS(host, decorate_art);
-	swap = atoi(host->cfg_get(ID, "swap", "0")) && MOSAIC_HOST_HAS(host, art_replacement);
-	open_folder = atoi(host->cfg_get(ID, "open", "1"));
+	fail = host->cfg_get("fail", "");
+	art = atoi(host->cfg_get("art", "0")) && MOSAIC_HOST_HAS(host, decorate_art);
+	swap = atoi(host->cfg_get("swap", "0")) && MOSAIC_HOST_HAS(host, art_replacement);
+	open_folder = atoi(host->cfg_get("open", "1"));
 	return 0;
 }
 

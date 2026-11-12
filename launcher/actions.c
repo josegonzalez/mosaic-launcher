@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "caller.h"
 
 static const Action* registry[ACTIONS_MAX];
 static int registered = 0;
@@ -52,12 +53,16 @@ static int fired(const Binding* binding) {
 	return triggered(binding) && (!binding->allows || binding->allows(binding->button));
 }
 
+// A plugin's action runs as that plugin (see caller.h).
 int Action_available(const Action* action) {
-	return action && (!action->available || action->available(action->data));
+	if (!action) return 0;
+	int available = 1;
+	if (action->available) AS_CALLER(action->plugin_id) available = action->available(action->data);
+	return available;
 }
 
 void Action_run(const Action* action) {
-	if (action && action->run) action->run(action->data);
+	if (action && action->run) AS_CALLER(action->plugin_id) action->run(action->data);
 }
 
 int Bindings_dispatch(const Binding* bindings, int count) {

@@ -323,11 +323,10 @@ struct MosaicEntry {
 static char cfg_mode[32] = "dashboard";
 static char logged[4096];
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	snprintf(logged + strlen(logged), sizeof(logged) - strlen(logged), "%s\n", m);
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (!strcmp(id, ID) && !strcmp(key, "mode")) return cfg_mode;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
+	if (!strcmp(key, "mode")) return cfg_mode;
 	return fallback;
 }
 static int entries_made = 0;

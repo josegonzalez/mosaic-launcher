@@ -137,8 +137,7 @@ static int logs = 0;
 static const char* settings[8][2];
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; logs++; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	CHECK(strcmp(id, ID) == 0);
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < 8 && settings[i][0]; i++) {
 		if (!strcmp(settings[i][0], key)) return settings[i][1];
 	}
@@ -148,7 +147,6 @@ static int fakeBattery(void) { return battery_now; }
 static int fakeCharging(void) { return 0; }
 static int fakeLedCount(void) { return leds; }
 static int fakeSet(const char* id, unsigned int rgb) {
-	CHECK(strcmp(id, ID) == 0);
 	CHECK(rgb <= 0xFFFFFF);
 	sets++;
 	if (refuse) return -1;

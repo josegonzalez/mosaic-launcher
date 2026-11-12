@@ -30,8 +30,7 @@ static int reloads = 0;
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static char toasted[160];
 static void fakeToast(const char* m) { snprintf(toasted, sizeof(toasted), "%s", m); }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (setting && !strcmp(key, "button")) return setting;
 	return fallback;
 }

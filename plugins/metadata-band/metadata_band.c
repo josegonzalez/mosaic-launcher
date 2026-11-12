@@ -106,7 +106,7 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw under the art, so there's no band");
 		return 1;
 	}
-	field_count = MB_fields(host->cfg_get(ID, "fields", "year,publisher,genre"), fields);
+	field_count = MB_fields(host->cfg_get("fields", "year,publisher,genre"), fields);
 	memset(&cache, 0, sizeof(cache));
 	cache.font = -1;
 	char keys[128] = "";

@@ -213,10 +213,10 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, art_replacement) || !MOSAIC_HOST_HAS(host, surface_write)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Reeler", host->sdcard_path);
-	frames = atoi(host->cfg_get(ID, "frames", "30"));
+	frames = atoi(host->cfg_get("frames", "30"));
 	if (frames < 1) frames = 1;
-	by_art = !strcmp(host->cfg_get(ID, "read", "cell"), "art");
-	plain = atoi(host->cfg_get(ID, "plain", "0"));
+	by_art = !strcmp(host->cfg_get("read", "cell"), "art");
+	plain = atoi(host->cfg_get("plain", "0"));
 	frame = host->surface_new(ID, FRAME_W, FRAME_H);
 	return frame ? 0 : 1;
 }

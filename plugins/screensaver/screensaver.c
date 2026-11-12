@@ -53,6 +53,11 @@
 
 static const MosaicHost* host;
 
+// Another plugin's setting, when it marks it public, else fallback.
+static const char* publicSetting(const char* id, const char* key, const char* fallback) {
+	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
+}
+
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
@@ -148,7 +153,7 @@ static void readCharging(unsigned long now) {
 }
 
 static int chargingWins(void) {
-	return SS_chargingWins(charging_on, host->cfg_get(CHARGING_ID, "idle", "60"), charging);
+	return SS_chargingWins(charging_on, publicSetting(CHARGING_ID, "idle", "60"), charging);
 }
 
 ///////////////////////////////////////
@@ -499,19 +504,19 @@ static int init(const MosaicHost* h) {
 	fake_path = getenv(FAKE_ENV);
 	if (fake_path && !fake_path[0]) fake_path = NULL;
 
-	unsigned long idle_ms = SS_parseIdle(host->cfg_get(ID, "idle", "30"));
-	source = SS_parseSource(host->cfg_get(ID, "source", "games"));
-	art = SS_parseArt(host->cfg_get(ID, "art", "box"));
-	effect = SS_parseEffect(host->cfg_get(ID, "effect", "fade"));
-	clock_mode = SS_parseClock(host->cfg_get(ID, "clock", "off"));
-	interval_ms = SS_parseInterval(host->cfg_get(ID, "interval", "10"));
+	unsigned long idle_ms = SS_parseIdle(host->cfg_get("idle", "30"));
+	source = SS_parseSource(host->cfg_get("source", "games"));
+	art = SS_parseArt(host->cfg_get("art", "box"));
+	effect = SS_parseEffect(host->cfg_get("effect", "fade"));
+	clock_mode = SS_parseClock(host->cfg_get("clock", "off"));
+	interval_ms = SS_parseInterval(host->cfg_get("interval", "10"));
 	SsIdle_init(&idle, idle_ms);
 	if (!idle_ms) {
 		say("idle is off, so the screen never opens");
 		return 0;
 	}
 	if (source == SS_SOURCE_FOLDER
-		&& SS_folderPath(host->sdcard_path, host->cfg_get(ID, "folder", "Screensaver"), folder, sizeof(folder)) != 0) {
+		&& SS_folderPath(host->sdcard_path, host->cfg_get("folder", "Screensaver"), folder, sizeof(folder)) != 0) {
 		say("the folder setting isn't a folder on the card, so there are no images");
 	}
 
@@ -522,7 +527,7 @@ static int init(const MosaicHost* h) {
 	charging_on = SS_pluginOn(text, CHARGING_ID);
 	free(text);
 	snprintf(collection_path, sizeof(collection_path), "%s/Collections/%s.txt", host->sdcard_path,
-		SS_collectionName(host->cfg_get("favorites", "collection", "Favorites")));
+		SS_collectionName(publicSetting("favorites", "collection", "Favorites")));
 
 	MosaicScreenHooks hooks = {
 		.size = sizeof(hooks),

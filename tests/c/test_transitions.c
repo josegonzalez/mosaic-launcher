@@ -171,12 +171,10 @@ static const char* cfg_speed = NULL;
 static const char* cfg_ease = NULL;
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	snprintf(logged, sizeof(logged), "%s", message);
 }
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	const char* value = !strcmp(key, "style") ? cfg_style : !strcmp(key, "speed") ? cfg_speed : !strcmp(key, "ease") ? cfg_ease : NULL;
 	return value ? value : fallback;
 }

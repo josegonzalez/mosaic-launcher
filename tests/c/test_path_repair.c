@@ -15,12 +15,10 @@ static char cfg_recents[8] = "", cfg_collections[8] = "";
 static int logged = 0;
 
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	(void)m;
 	logged++;
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "recents") && cfg_recents[0]) return cfg_recents;
 	if (!strcmp(key, "collections") && cfg_collections[0]) return cfg_collections;
 	return fallback;

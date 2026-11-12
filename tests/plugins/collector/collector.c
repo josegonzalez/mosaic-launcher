@@ -29,7 +29,7 @@ static void say(const char* fmt, ...) {
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(collections, sizeof(collections), "%s/Collections", host->sdcard_path);
-	snprintf(collection, sizeof(collection), "%s/%s", host->sdcard_path, host->cfg_get(ID, "collection", ""));
+	snprintf(collection, sizeof(collection), "%s/%s", host->sdcard_path, host->cfg_get("collection", ""));
 	return 0;
 }
 

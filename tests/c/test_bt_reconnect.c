@@ -194,12 +194,10 @@ static int logs = 0;
 static char settings[8][2][64];
 
 static void fakeLog(const char* id, const char* m) {
-	CHECK(strcmp(id, ID) == 0);
 	(void)m;
 	logs++;
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	CHECK(strcmp(id, ID) == 0);
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < 8 && settings[i][0][0]; i++) {
 		if (!strcmp(settings[i][0], key)) return settings[i][1];
 	}
@@ -211,8 +209,7 @@ static void setting(const char* key, const char* value) {
 	snprintf(settings[i][0], sizeof(settings[i][0]), "%s", key);
 	snprintf(settings[i][1], sizeof(settings[i][1]), "%s", value);
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	CHECK(strcmp(id, ID) == 0);
+static void fakeCfgSet(const char* key, const char* value) {
 	sets++;
 	setting(key, value);
 }
@@ -276,16 +273,16 @@ static void testRemember(void) {
 	ticks(&now, 20000);
 	// saved once, not every frame
 	CHECK(sets == 1);
-	CHECK_STR(fakeCfgGet(ID, "last", ""), "AA:BB:CC:DD:EE:FF");
+	CHECK_STR(fakeCfgGet("last", ""), "AA:BB:CC:DD:EE:FF");
 	strcpy(connected_now, "11:22:33:44:55:66");
 	ticks(&now, 30000);
 	CHECK(sets == 2);
-	CHECK_STR(fakeCfgGet(ID, "last", ""), "11:22:33:44:55:66");
+	CHECK_STR(fakeCfgGet("last", ""), "11:22:33:44:55:66");
 	// gone again: the last one stays
 	connected_now[0] = '\0';
 	ticks(&now, 40000);
 	CHECK(sets == 2);
-	CHECK_STR(fakeCfgGet(ID, "last", ""), "11:22:33:44:55:66");
+	CHECK_STR(fakeCfgGet("last", ""), "11:22:33:44:55:66");
 	CHECK(connects == 0);
 }
 
@@ -322,7 +319,7 @@ static void testAlreadyConnected(void) {
 	ticks(&now, 300000);
 	CHECK(connects == 0);
 	// another device is the one to reconnect now
-	CHECK_STR(fakeCfgGet(ID, "last", ""), "11:22:33:44:55:66");
+	CHECK_STR(fakeCfgGet("last", ""), "11:22:33:44:55:66");
 }
 
 static void testGivesUp(void) {
@@ -449,7 +446,7 @@ static void testForgotten(void) {
 	CHECK(connects == 0);
 	strcpy(connected_now, "AA:BB:CC:DD:EE:FF");
 	ticks(&now, 700000);
-	CHECK_STR(fakeCfgGet(ID, "last", ""), "AA:BB:CC:DD:EE:FF");
+	CHECK_STR(fakeCfgGet("last", ""), "AA:BB:CC:DD:EE:FF");
 }
 
 static void testUnsupported(void) {

@@ -138,10 +138,10 @@ static int init(const MosaicHost* h) {
 	for (int i = 0; i < GAMES; i++) {
 		char key[8];
 		snprintf(key, sizeof(key), "game%i", i + 1);
-		snprintf(games[i], sizeof(games[i]), "%s", host->cfg_get(ID, key, ""));
+		snprintf(games[i], sizeof(games[i]), "%s", host->cfg_get(key, ""));
 	}
-	snprintf(db, sizeof(db), "%s", host->cfg_get(ID, "db", ""));
-	history = !strcmp(host->cfg_get(ID, "history", "0"), "1");
+	snprintf(db, sizeof(db), "%s", host->cfg_get("db", ""));
+	history = !strcmp(host->cfg_get("history", "0"), "1");
 	if (history && !MOSAIC_HOST_HAS(host, play_time_on)) {
 		say("no whole play history");
 		return 1;

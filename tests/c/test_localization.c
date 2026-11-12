@@ -444,12 +444,10 @@ static int tiles = 0;
 static void (*action_run)(void*) = NULL;
 
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	size_t len = strlen(logged);
 	snprintf(logged + len, sizeof(logged) - len, "%s\n", m);
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "language") && cfg_language[0]) return cfg_language;
 	if (!strcmp(key, "code") && cfg_code[0]) return cfg_code;
 	if (!strcmp(key, "folder") && cfg_folder[0]) return cfg_folder;

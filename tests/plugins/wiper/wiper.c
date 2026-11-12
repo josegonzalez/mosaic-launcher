@@ -212,7 +212,7 @@ static int init(const MosaicHost* h) {
 	snprintf(folder, sizeof(folder), "%s/Wiper", host->sdcard_path);
 	snprintf(inner, sizeof(inner), "%s/Inner", folder);
 	snprintf(inner_prefix, sizeof(inner_prefix), "%s/", inner);
-	lib = host->cfg_get(ID, "lib", "");
+	lib = host->cfg_get("lib", "");
 	pushEvent = (int (*)(Event*))dlsym(RTLD_DEFAULT, "SDL_PushEvent");
 	return 0;
 }

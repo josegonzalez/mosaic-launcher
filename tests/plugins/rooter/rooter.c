@@ -44,7 +44,7 @@ static MosaicList* virtualDir(const char* path) {
 	if (strcmp(path, folder) != 0) return NULL;
 	listed++;
 	MosaicList* list = host->list_new();
-	host->list_push(list, host->entry_new(host->cfg_get(ID, "rom", ""), MOSAIC_ENTRY_ROM, "Game"));
+	host->list_push(list, host->entry_new(host->cfg_get("rom", ""), MOSAIC_ENTRY_ROM, "Game"));
 	return list;
 }
 
@@ -67,7 +67,7 @@ static void tick(unsigned long now) {
 		say("recents %i, first %s", host->recents_count(), shown(host->recent_path(0)));
 		say("past the end %s", shown(host->recent_path(99)));
 
-		const char* rom = host->cfg_get(ID, "rom", "");
+		const char* rom = host->cfg_get("rom", "");
 		say("open rom %i", host->open_path(rom, MOSAIC_ENTRY_ROM));
 		say("open missing %i", host->open_path("/nowhere/Missing.gb", MOSAIC_ENTRY_ROM));
 		int opened = host->open_path(folder, MOSAIC_ENTRY_DIR);

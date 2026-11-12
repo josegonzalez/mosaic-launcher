@@ -43,13 +43,13 @@ static char cfg[8][2][32];
 static int cfg_count = 0;
 static int badges_loaded = 0;
 static char badge_unplayed[8] = "off", badge_tiers[8] = "off";
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (!strcmp(id, "row-badges")) {
-		if (!badges_loaded) return fallback;
-		if (!strcmp(key, "unplayed")) return badge_unplayed;
-		if (!strcmp(key, "tiers")) return badge_tiers;
-		return fallback;
-	}
+static const char* fakeCfgRead(const char* id, const char* key, const char* fallback) {
+	if (strcmp(id, "row-badges") || !badges_loaded) return fallback;
+	if (!strcmp(key, "unplayed")) return badge_unplayed;
+	if (!strcmp(key, "tiers")) return badge_tiers;
+	return fallback;
+}
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = cfg_count - 1; i >= 0; i--) {
 		if (!strcmp(cfg[i][0], key)) return cfg[i][1];
 	}
@@ -114,6 +114,7 @@ static MosaicHost fake = {
 	.api_version = MOSAIC_API_VERSION,
 	.log = fakeLog,
 	.cfg_get = fakeCfgGet,
+	.cfg_read = fakeCfgRead,
 	.entry_path = fakeEntryPath,
 	.entry_type = fakeEntryType,
 	.theme_color = fakeThemeColor,

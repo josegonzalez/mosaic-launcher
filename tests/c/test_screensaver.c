@@ -343,14 +343,14 @@ static const char* home = NULL;
 static int blits = 0, alpha_blits = 0;
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
 	size_t len = strlen(logs);
 	snprintf(logs + len, sizeof(logs) - len, "%s\n", message);
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (!strcmp(id, "charging-screen")) return !strcmp(key, "idle") ? cfg_charging_idle : fallback;
-	if (strcmp(id, ID)) return fallback;
+static const char* fakeCfgRead(const char* id, const char* key, const char* fallback) {
+	return !strcmp(id, "charging-screen") && !strcmp(key, "idle") ? cfg_charging_idle : fallback;
+}
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "idle")) return "30";
 	if (!strcmp(key, "source")) return cfg_source;
 	if (!strcmp(key, "folder")) return cfg_folder;
@@ -416,7 +416,6 @@ static MosaicSurface* fakeScaleSurface(const char* id, const MosaicSurface* src,
 	return newFake(w, h, 0);
 }
 static int fakeFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	FakeSurface* f = (FakeSurface*)s;
 	CHECK(f->live && !f->cached);
 	f->live = 0;
@@ -461,6 +460,7 @@ static MosaicHost fakeHost(void) {
 		.userdata_path = userdata,
 		.log = fakeLog,
 		.cfg_get = fakeCfgGet,
+		.cfg_read = fakeCfgRead,
 		.request_redraw = fakeRedraw,
 		.recents_count = fakeRecents,
 		.is_charging = fakeCharging,

@@ -34,10 +34,10 @@
 // such as "2h 15m · 3 days ago", for the selected recent from the play
 // history calls with its path: on a smaller pill under the title in full,
 // under the name pill in strip, and under the preview in list. Its parts
-// and format are playtime-captions' settings, read with cfg_get each time
-// the switcher opens, which only answer while that plugin is loaded, so
-// they're its defaults otherwise. The text is the same as that plugin's,
-// from a copy of its formatter (see SP_captionFit).
+// and format are playtime-captions' settings, public ones read with cfg_read
+// each time the switcher opens, which only answer while that plugin is
+// loaded, so they're its defaults otherwise. The text is the same as that
+// plugin's, from a copy of its formatter (see SP_captionFit).
 
 #include <stdio.h>
 #include <string.h>
@@ -51,6 +51,11 @@
 #define TAP_MS 250 // stock's SELECT tap
 
 static const MosaicHost* host;
+
+// Another plugin's setting, when it marks it public, else fallback.
+static const char* publicSetting(const char* id, const char* key, const char* fallback) {
+	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
+}
 static int style = SP_STYLE_FULL;
 static SPRecents recents;
 static int selected = 0;
@@ -228,9 +233,9 @@ static void pill(MosaicSurface* screen, const MosaicRect* rect, const char* text
 
 // playtime-captions' settings, its defaults while it isn't loaded
 static void readCaptions(void) {
-	captions = SP_captions(host->cfg_get(CAPTIONS_ID, "time", "on"), host->cfg_get(CAPTIONS_ID, "last", "on"),
-		host->cfg_get(CAPTIONS_ID, "sessions", "off"), host->cfg_get(CAPTIONS_ID, "format", "relative"),
-		host->cfg_get(CAPTIONS_ID, "never", "off"), host->cfg_get(CAPTIONS_ID, "achievements", "off"));
+	captions = SP_captions(publicSetting(CAPTIONS_ID, "time", "on"), publicSetting(CAPTIONS_ID, "last", "on"),
+		publicSetting(CAPTIONS_ID, "sessions", "off"), publicSetting(CAPTIONS_ID, "format", "relative"),
+		publicSetting(CAPTIONS_ID, "never", "off"), publicSetting(CAPTIONS_ID, "achievements", "off"));
 	static const char* names[] = { "relative", "compact", "date" };
 	char message[sizeof(captions_logged)];
 	snprintf(message, sizeof(message), "captions time %s, last %s, sessions %s, format %s, never %s, achievements %s",
@@ -563,10 +568,10 @@ static int init(const MosaicHost* h) {
 		say("this launcher has no switcher slot or button hints");
 		return 1;
 	}
-	style = SP_style(host->cfg_get(ID, "style", "full"));
+	style = SP_style(host->cfg_get("style", "full"));
 	// the play history and achievements calls came before draw_hints, so
 	// every launcher that gets here has them
-	captions_on = strcmp(host->cfg_get(ID, "captions", "off"), "on") == 0;
+	captions_on = strcmp(host->cfg_get("captions", "off"), "on") == 0;
 	captions_logged[0] = '\0';
 	static const MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),

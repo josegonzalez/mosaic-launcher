@@ -405,12 +405,10 @@ static const char* delete_setting = "on";
 static MosaicRect hole_now;
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
 }
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (strcmp(key, "tile") == 0) return tile_setting;
 	if (strcmp(key, "button") == 0) return button_setting ? button_setting : fallback;
 	if (strcmp(key, "delete") == 0) return delete_setting;
@@ -510,7 +508,6 @@ static int fakeScale(void) {
 }
 
 static MosaicSurface* fakeScaleSurface(const char* id, const MosaicSurface* src, int w, int h, int fit) {
-	(void)id;
 	(void)src;
 	(void)fit;
 	if (++live > peak) peak = live;
@@ -522,7 +519,6 @@ static MosaicSurface* fakeScaleSurface(const char* id, const MosaicSurface* src,
 }
 
 static int fakeFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	if (!s || !s->owned) return -1;
 	live--;
 	free(s);

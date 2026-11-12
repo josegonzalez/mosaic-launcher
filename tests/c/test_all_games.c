@@ -30,11 +30,11 @@ static int selected_row = -1;
 static const char* newest_recent = NULL;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (!strcmp(id, "all-games") && !strcmp(key, "tags") && tags_setting[0]) return tags_setting;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
+	if (!strcmp(key, "tags") && tags_setting[0]) return tags_setting;
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) { (void)id; (void)key; (void)value; }
+static void fakeCfgSet(const char* key, const char* value) { (void)key; (void)value; }
 static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
 	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);

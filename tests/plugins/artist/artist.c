@@ -208,7 +208,7 @@ static void normal(void) {
 			if (!waitFrames()) return;
 			// an image by its path alone
 			const MosaicSurface* art = NULL;
-			int state = host->art_load(host->cfg_get(ID, "image", ""), &art);
+			int state = host->art_load(host->cfg_get("image", ""), &art);
 			if (polls++ == 0) say("load first %i", state);
 			if (state == MOSAIC_ART_LOADING && polls < 600) {
 				waited = WAIT;
@@ -274,8 +274,8 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, art_get) || !MOSAIC_HOST_HAS(host, select_index)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Artist", host->sdcard_path);
-	dir = host->cfg_get(ID, "dir", "");
-	mode = host->cfg_get(ID, "mode", "");
+	dir = host->cfg_get("dir", "");
+	mode = host->cfg_get("mode", "");
 	return 0;
 }
 

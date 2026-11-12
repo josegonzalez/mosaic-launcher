@@ -198,13 +198,13 @@ static int init(const MosaicHost* h) {
 	}
 	snprintf(folder_a, sizeof(folder_a), "%s/Filterer A", host->sdcard_path);
 	snprintf(folder_b, sizeof(folder_b), "%s/Filterer B", host->sdcard_path);
-	take = parseTake(host->cfg_get(ID, "take", ""));
-	const char* p = host->cfg_get(ID, "press", "");
+	take = parseTake(host->cfg_get("take", ""));
+	const char* p = host->cfg_get("press", "");
 	press = named(p, (int)strlen(p));
-	hold = strtoul(host->cfg_get(ID, "hold", "0"), NULL, 10);
-	confirm = atoi(host->cfg_get(ID, "confirm", "0"));
-	fail = atoi(host->cfg_get(ID, "fail", "0"));
-	const char* w = host->cfg_get(ID, "wake", "");
+	hold = strtoul(host->cfg_get("hold", "0"), NULL, 10);
+	confirm = atoi(host->cfg_get("confirm", "0"));
+	fail = atoi(host->cfg_get("fail", "0"));
+	const char* w = host->cfg_get("wake", "");
 	if (*w) wake_ms = strtol(w, NULL, 10);
 	pushEvent = (int (*)(Event*))dlsym(RTLD_DEFAULT, "SDL_PushEvent");
 	if (press && !pushEvent) say("no SDL_PushEvent");

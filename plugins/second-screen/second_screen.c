@@ -447,7 +447,7 @@ static int init(const MosaicHost* h) {
 		say("this launcher can't draw the frame or say when the selection changes, so the second screen doesn't start");
 		return 1;
 	}
-	const char* size = host->cfg_get(ID, "size", SS_SIZE_DEFAULT);
+	const char* size = host->cfg_get("size", SS_SIZE_DEFAULT);
 	if (!SS_parseSize(size, &frame_w, &frame_h)) {
 		say("size \"%s\" isn't <width>x<height>, so using %s", size, SS_SIZE_DEFAULT);
 		SS_parseSize(SS_SIZE_DEFAULT, &frame_w, &frame_h);

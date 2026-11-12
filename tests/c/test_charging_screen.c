@@ -184,11 +184,9 @@ static const char* top = "gamelist";
 static const char* home = NULL;
 
 static void fakeLog(const char* id, const char* message) {
-	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "idle")) return cfg_idle;
 	if (!strcmp(key, "clock")) return "off";
 	return fallback;

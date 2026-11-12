@@ -102,7 +102,7 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't take generated art, not loading");
 		return 1;
 	}
-	style = PA_style(host->cfg_get(ID, "style", "title"));
+	style = PA_style(host->cfg_get("style", "title"));
 	scale = host->screen_scale();
 	return 0;
 }

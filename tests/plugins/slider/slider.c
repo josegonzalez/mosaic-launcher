@@ -210,12 +210,12 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, transition_max_ms) || !MOSAIC_HOST_HAS(host, blit_alpha)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Slider", host->sdcard_path);
 	snprintf(inner, sizeof(inner), "%s/Inner", folder);
-	style = host->cfg_get(ID, "style", "custom");
-	fail = host->cfg_get(ID, "fail", "");
-	pak = host->cfg_get(ID, "pak", "");
-	duration = atoi(host->cfg_get(ID, "duration", "200"));
-	ease = atoi(host->cfg_get(ID, "ease", "0"));
-	if (sscanf(host->cfg_get(ID, "probe", ""), "%i,%i", &probe_x, &probe_y) != 2) probe_x = probe_y = -1;
+	style = host->cfg_get("style", "custom");
+	fail = host->cfg_get("fail", "");
+	pak = host->cfg_get("pak", "");
+	duration = atoi(host->cfg_get("duration", "200"));
+	ease = atoi(host->cfg_get("ease", "0"));
+	if (sscanf(host->cfg_get("probe", ""), "%i,%i", &probe_x, &probe_y) != 2) probe_x = probe_y = -1;
 	red = host->surface_new(ID, 8, 8);
 	host->fill_rect(red, NULL, mosaic_color(0xFF0000, 255));
 	if (!strcmp(style, "noframe")) plugin.transition_frame = NULL;

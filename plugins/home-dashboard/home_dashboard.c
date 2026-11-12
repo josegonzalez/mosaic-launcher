@@ -46,6 +46,11 @@
 
 static const MosaicHost* host;
 
+// Another plugin's setting, when it marks it public, else fallback.
+static const char* publicSetting(const char* id, const char* key, const char* fallback) {
+	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
+}
+
 // settings
 static int mode = HD_MODE_DASHBOARD;
 static int pinned_on = 1;
@@ -851,7 +856,7 @@ static void tick(unsigned long now) {
 }
 
 static int setting(const char* key, const char* fallback) {
-	return !strcmp(host->cfg_get(ID, key, fallback), "on");
+	return !strcmp(host->cfg_get(key, fallback), "on");
 }
 
 static int init(const MosaicHost* h) {
@@ -862,11 +867,11 @@ static int init(const MosaicHost* h) {
 		say("needs a launcher with plugin screens, the home slot and draw_hints");
 		return -1;
 	}
-	mode = HD_modeOf(host->cfg_get(ID, "mode", "dashboard"));
+	mode = HD_modeOf(host->cfg_get("mode", "dashboard"));
 	pinned_on = setting("pinned", "on");
 	stats_on = setting("stats", "on");
 	shelf_on = setting("shelf", "on");
-	snprintf(pico_tags, sizeof(pico_tags), "%s", host->cfg_get(ID, "pico8_tags", "P8,PICO8,PICO"));
+	snprintf(pico_tags, sizeof(pico_tags), "%s", host->cfg_get("pico8_tags", "P8,PICO8,PICO"));
 
 	char path[MAX_PATH_LEN];
 	snprintf(path, sizeof(path), "%s/launcher/plugins.txt", host->userdata_path);
@@ -874,7 +879,7 @@ static int init(const MosaicHost* h) {
 	favorites_loaded = HD_pluginOn(text, "favorites");
 	free(text);
 	snprintf(collection_path, sizeof(collection_path), "%s/Collections/%s.txt", host->sdcard_path,
-		HD_collectionName(host->cfg_get("favorites", "collection", "Favorites")));
+		HD_collectionName(publicSetting("favorites", "collection", "Favorites")));
 
 	MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),

@@ -116,7 +116,7 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 
-	const char* name = host->cfg_get(ID, "button", "Y");
+	const char* name = host->cfg_get("button", "Y");
 	int button = MOSAIC_BUTTON_Y;
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
@@ -128,7 +128,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't bind a button; clear recents from the quick menu");
 	}
 
-	if (strcmp(host->cfg_get(ID, "tile", "on"), "off") != 0) {
+	if (strcmp(host->cfg_get("tile", "on"), "off") != 0) {
 		if (host->register_action("clear-recents.tile", "Clear recents", hasRecents, clearAll, NULL) != 0
 				|| !MOSAIC_HOST_HAS(host, quick_tile)
 				|| host->quick_tile("clear-recents.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {

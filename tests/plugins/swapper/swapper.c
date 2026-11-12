@@ -221,21 +221,21 @@ static void tick(unsigned long now) {
 		small = host->surface_new(ID, 90, 60);
 		paint(small, 90, 60, 0x0000FF);
 		say("show small %i", host->art_replace(ID, small));
-		host->cfg_set(ID, "hold", "1");
+		host->cfg_set("hold", "1");
 		go(7);
 		break;
 	case 7:
 		// taker is refused while this one's shows
 		if (waited < 10) break;
 		say("free small %i", host->surface_free(ID, small));
-		host->cfg_set(ID, "hold", "2");
+		host->cfg_set("hold", "2");
 		go(8);
 		break;
 	case 8:
 		// taker's shows once this one's surface is gone
 		if (waited < 10) break;
 		say("while taker's shows %i", host->art_replace(ID, frame));
-		host->cfg_set(ID, "hold", "3");
+		host->cfg_set("hold", "3");
 		go(9);
 		break;
 	case 9:
@@ -259,8 +259,8 @@ static int init(const MosaicHost* h) {
 	snprintf(next1, sizeof(next1), "%s/Next", folder);
 	snprintf(next2, sizeof(next2), "%s/Next", next1);
 	snprintf(empty, sizeof(empty), "%s/Empty", next2);
-	once = atoi(host->cfg_get(ID, "once", "0"));
-	host->cfg_set(ID, "hold", "0");
+	once = atoi(host->cfg_get("once", "0"));
+	host->cfg_set("hold", "0");
 	frame = host->surface_new(ID, FRAME_W, FRAME_H);
 	paint(frame, FRAME_W, FRAME_H, 0x00FF00);
 	say("init %i", host->art_replace(ID, frame));

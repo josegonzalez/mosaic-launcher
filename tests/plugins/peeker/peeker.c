@@ -101,7 +101,7 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Peeker", host->sdcard_path);
-	dirs = !strcmp(host->cfg_get(ID, "dirs", "off"), "on");
+	dirs = !strcmp(host->cfg_get("dirs", "off"), "on");
 	return 0;
 }
 

@@ -25,7 +25,7 @@ static int call_count = 0;
 static int bound = 0;
 
 static int isOn(const char* key) {
-	return !strcmp(host->cfg_get(ID, key, "off"), "on");
+	return !strcmp(host->cfg_get(key, "off"), "on");
 }
 
 static char message[320];
@@ -35,7 +35,7 @@ static void readTable(void) {
 	Remap_presets(&table, isOn("resume_with_a"), isOn("resume_on_press"));
 	for (int button = 0; button < REMAP_BUTTONS; button++) {
 		const char* key = Remap_key(button);
-		const char* value = host->cfg_get(ID, key, "");
+		const char* value = host->cfg_get(key, "");
 		RemapButton b;
 		int parsed = Remap_parse(value, &b);
 		if (parsed == REMAP_SET) table.buttons[button] = b;

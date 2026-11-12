@@ -34,7 +34,7 @@ static void tick(unsigned long now) {
 		host->quick_tile("decliner.act", MOSAIC_QUICK_TOP, NULL, NULL, NULL),
 		host->quick_tile(ID ".act", MOSAIC_QUICK_BOTTOM, NULL, NULL, NULL));
 	say("show_recents %i", host->show_recents());
-	const char* power = host->cfg_get(ID, "power", "");
+	const char* power = host->cfg_get("power", "");
 	if (!strcmp(power, "off")) host->power_off(0);
 	else if (!strcmp(power, "reboot")) host->power_off(1);
 }

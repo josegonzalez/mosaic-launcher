@@ -20,6 +20,11 @@
 #define FAVORITES_ID "favorites"
 
 static const MosaicHost* host;
+
+// Another plugin's setting, when it marks it public, else fallback.
+static const char* publicSetting(const char* id, const char* key, const char* fallback) {
+	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
+}
 static FocusList favorites;
 static FocusRow rows[FOCUS_MAX + 1];
 
@@ -35,7 +40,7 @@ static const char* tr(const char* text) {
 
 static int isOn(void* data) {
 	(void)data;
-	return strcmp(host->cfg_get(ID, "on", "on"), "off") != 0;
+	return strcmp(host->cfg_get("on", "on"), "off") != 0;
 }
 
 static int always(void* data) {
@@ -45,7 +50,7 @@ static int always(void* data) {
 
 static void toggle(void* data) {
 	int on = !isOn(data);
-	host->cfg_set(ID, "on", on ? "on" : "off");
+	host->cfg_set("on", on ? "on" : "off");
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(on ? tr("Focus mode on") : tr("Focus mode off"));
 	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	host->request_redraw();
@@ -56,7 +61,7 @@ static MosaicList* rootReplace(void) {
 
 	// read here, not in init: favorites may load after this plugin
 	char path[FOCUS_PATH_LEN];
-	Focus_listPath(host->sdcard_path, host->cfg_get(FAVORITES_ID, "collection", "Favorites"), path, sizeof(path));
+	Focus_listPath(host->sdcard_path, publicSetting(FAVORITES_ID, "collection", "Favorites"), path, sizeof(path));
 	Focus_load(&favorites, path);
 	int count = Focus_rows(&favorites, host->sdcard_path, exists, rows);
 	if (count == 0) return NULL;

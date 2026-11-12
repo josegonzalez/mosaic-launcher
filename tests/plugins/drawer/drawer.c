@@ -102,13 +102,13 @@ static int init(const MosaicHost* h) {
 	say("theme fill %i", accent >= 0 && c.r == ((accent >> 16) & 0xFF) && c.g == ((accent >> 8) & 0xFF) && c.b == (accent & 0xFF));
 
 	// images
-	const char* art = host->cfg_get(ID, "art", "");
+	const char* art = host->cfg_get("art", "");
 	MosaicSurface* img = keep(host->image_load(ID, art));
 	host->surface_size(img, &w, &ht);
 	say("image %s %ix%i, left %s, right %s", made(img), w, ht, pixel(img, 0, 0), pixel(img, 3, 1));
 	say("image dir %s, missing %s, not an image %s, fifo %s, null %s, not loaded %s",
-		made(host->image_load(ID, host->cfg_get(ID, "dir", ""))), made(host->image_load(ID, "/nonexistent/art.png")),
-		made(host->image_load(ID, host->cfg_get(ID, "text", ""))), made(host->image_load(ID, host->cfg_get(ID, "fifo", ""))),
+		made(host->image_load(ID, host->cfg_get("dir", ""))), made(host->image_load(ID, "/nonexistent/art.png")),
+		made(host->image_load(ID, host->cfg_get("text", ""))), made(host->image_load(ID, host->cfg_get("fifo", ""))),
 		made(host->image_load(ID, NULL)), made(host->image_load("nobody", art)));
 
 	// scaling
@@ -167,7 +167,7 @@ static int init(const MosaicHost* h) {
 		host->fill_rect(round, NULL, red), host->blit(canvas, round, NULL, NULL));
 
 	say("leaving %i surfaces", left);
-	if (!strcmp(host->cfg_get(ID, "decline", "0"), "1")) {
+	if (!strcmp(host->cfg_get("decline", "0"), "1")) {
 		say("declining");
 		return 1;
 	}
@@ -177,7 +177,7 @@ static int init(const MosaicHost* h) {
 static void tick(unsigned long now) {
 	static int done = 0;
 	(void)now;
-	const char* pak = host->cfg_get(ID, "pak", "");
+	const char* pak = host->cfg_get("pak", "");
 	if (done || !pak[0]) return;
 	done = 1;
 	say("open pak %i", host->open_path(pak, MOSAIC_ENTRY_PAK));

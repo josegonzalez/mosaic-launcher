@@ -28,15 +28,14 @@ static void (*keyboard_done)(const char*, void*) = NULL;
 static void (*confirm_yes)(void*) = NULL;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (strcmp(id, "simple-mode") != 0) return fallback;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "on") && cfg_on[0]) return cfg_on;
 	if (!strcmp(key, "settings") && cfg_settings[0]) return cfg_settings;
 	if (!strcmp(key, "pin") && has_pin) return cfg_pin;
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	if (!strcmp(id, "simple-mode") && !strcmp(key, "on")) snprintf(cfg_on, sizeof(cfg_on), "%s", value);
+static void fakeCfgSet(const char* key, const char* value) {
+	if (!strcmp(key, "on")) snprintf(cfg_on, sizeof(cfg_on), "%s", value);
 	// the plugin never writes the PIN, or anything else
 	else CHECK(0);
 }

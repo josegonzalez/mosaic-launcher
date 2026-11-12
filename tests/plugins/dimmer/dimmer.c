@@ -140,9 +140,9 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, plugin_art)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Dimmer", host->sdcard_path);
 	snprintf(inner, sizeof(inner), "%s/Inner", folder);
-	backdrop = host->cfg_get(ID, "backdrop", "");
-	shot = host->cfg_get(ID, "shot", "");
-	if (sscanf(host->cfg_get(ID, "probe", ""), "%d,%d", &probe_x, &probe_y) != 2) probe_x = probe_y = -1;
+	backdrop = host->cfg_get("backdrop", "");
+	shot = host->cfg_get("shot", "");
+	if (sscanf(host->cfg_get("probe", ""), "%d,%d", &probe_x, &probe_y) != 2) probe_x = probe_y = -1;
 	return 0;
 }
 

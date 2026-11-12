@@ -183,6 +183,34 @@ int main(void) {
 	CHECK(Manifest_parse("id=s\nsetting.note=text|Note|||secret\n", &only_secret) == 0);
 	CHECK(!Manifest_isProtected(&only_secret));
 
+	// public, for other plugins' cfg_read, but never on a protected or secret setting
+	PluginManifest pub = { .bundled = 1 };
+	CHECK(Manifest_parse(
+		"id=pub\n"
+		"setting.dot=toggle|Dot|off||public\n"
+		"setting.name=text|Name|Favorites||public\n"
+		"setting.format=choice|Format|a|a,b|public\n"
+		"setting.limit=choice|Limit|off|off,15|protected,public\n"
+		"setting.code=text|Code|||public,secret\n"
+		"setting.plain=toggle|Plain|on\n", &pub) == 0);
+	CHECK(pub.setting_count == 6);
+	CHECK(pub.settings[0].flags == SETTING_PUBLIC);
+	CHECK(pub.settings[1].flags == SETTING_PUBLIC);
+	CHECK(pub.settings[2].flags == SETTING_PUBLIC);
+	CHECK(pub.settings[3].flags == SETTING_PROTECTED);
+	CHECK(pub.settings[4].flags == SETTING_SECRET);
+	// the Plugins page shows and edits a public setting like any other
+	CHECK(pub.settings[1].type == SETTING_TEXT);
+	CHECK_STR(pub.settings[1].label, "Name");
+	CHECK_STR(pub.settings[1].fallback, "Favorites");
+	CHECK_STR(pub.settings[2].options, "a,b");
+	CHECK(Manifest_isProtected(&pub)); // limit still asks for the PIN
+	CHECK(Manifest_isPublic(&pub, "dot") && Manifest_isPublic(&pub, "name") && Manifest_isPublic(&pub, "format"));
+	CHECK(!Manifest_isPublic(&pub, "limit") && !Manifest_isPublic(&pub, "code"));
+	CHECK(!Manifest_isPublic(&pub, "plain"));
+	CHECK(!Manifest_isPublic(&pub, "unlisted"));
+	CHECK(!Manifest_isPublic(&pub, NULL) && !Manifest_isPublic(NULL, "dot"));
+
 	// on or off, by the same rule as loading
 	CHECK(!PluginSet_isOn(NULL, &s)); // bundled starts off
 	CHECK(PluginSet_isOn("fav=on\n", &s));

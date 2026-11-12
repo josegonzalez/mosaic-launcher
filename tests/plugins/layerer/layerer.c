@@ -34,7 +34,7 @@ static int init(const MosaicHost* h) {
 		say("no open_screen");
 		return 1;
 	}
-	fail = atoi(host->cfg_get(ID, "fail", "0"));
+	fail = atoi(host->cfg_get("fail", "0"));
 	return 0;
 }
 

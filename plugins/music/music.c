@@ -1008,13 +1008,13 @@ static int playerInput(const MosaicInput* in, void* data) {
 		command(MU_CMD_SEEK, "+10000");
 	} else if (PRESSED(SELECT)) {
 		shuffle = !shuffle;
-		host->cfg_set(ID, "shuffle", shuffle ? "on" : "off");
+		host->cfg_set("shuffle", shuffle ? "on" : "off");
 		say("shuffle %s", shuffle ? "on" : "off");
 		restoredSettings();
 		command(MU_CMD_SHUFFLE, shuffle ? "on" : "off");
 	} else if (PRESSED(START)) {
 		repeat = (repeat + 1) % 3;
-		host->cfg_set(ID, "repeat", MU_repeatName(repeat));
+		host->cfg_set("repeat", MU_repeatName(repeat));
 		say("repeat %s", MU_repeatName(repeat));
 		restoredSettings();
 		command(MU_CMD_REPEAT, MU_repeatName(repeat));
@@ -1215,16 +1215,16 @@ static int init(const MosaicHost* h) {
 		say("this launcher has no plugin screens, overlays or input filters");
 		return 1;
 	}
-	const char* folder = host->cfg_get(ID, "folder", "Music");
+	const char* folder = host->cfg_get("folder", "Music");
 	if (folder[0] == '/') snprintf(root, sizeof(root), "%s", folder);
 	else snprintf(root, sizeof(root), "%s/%s", host->sdcard_path, folder);
 	size_t root_len = strlen(root);
 	while (root_len > 1 && root[root_len - 1] == '/') root[--root_len] = '\0';
-	games_play = !strcmp(host->cfg_get(ID, "games", "pause"), "play");
-	awake = strcmp(host->cfg_get(ID, "awake", "on"), "off") != 0;
-	shuffle = !strcmp(host->cfg_get(ID, "shuffle", "off"), "on");
-	repeat = MU_parseRepeat(host->cfg_get(ID, "repeat", "off"));
-	const char* overlay_setting = host->cfg_get(ID, "overlay", "5");
+	games_play = !strcmp(host->cfg_get("games", "pause"), "play");
+	awake = strcmp(host->cfg_get("awake", "on"), "off") != 0;
+	shuffle = !strcmp(host->cfg_get("shuffle", "off"), "on");
+	repeat = MU_parseRepeat(host->cfg_get("repeat", "off"));
+	const char* overlay_setting = host->cfg_get("overlay", "5");
 	MuOverlay_init(&overlay, MU_parseOverlay(overlay_setting));
 	overlay_shown = 0;
 	findDaemon();
@@ -1237,7 +1237,7 @@ static int init(const MosaicHost* h) {
 	snprintf(resume_path, sizeof(resume_path), "%s/launcher/" ID, host->userdata_path);
 	mkdir(resume_path, 0755);
 	snprintf(resume_path, sizeof(resume_path), "%s/launcher/" ID "/" MU_RESUME_NAME, host->userdata_path);
-	int resume = strcmp(host->cfg_get(ID, "resume", "on"), "off") != 0;
+	int resume = strcmp(host->cfg_get("resume", "on"), "off") != 0;
 	if (!resume) {
 		// nothing kept to play on from once it's turned back on
 		unlink(resume_path);
@@ -1271,7 +1271,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't register its actions");
 		return 1;
 	}
-	if (strcmp(host->cfg_get(ID, "tile", "on"), "off") != 0
+	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
 		&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(OPEN_ACTION, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
 		say("couldn't add the Music tile");
 	}
@@ -1284,7 +1284,7 @@ static int init(const MosaicHost* h) {
 		{ "R2", MOSAIC_BUTTON_R2 },
 		{ "SELECT", MOSAIC_BUTTON_SELECT },
 	};
-	const char* button = host->cfg_get(ID, "button", "none");
+	const char* button = host->cfg_get("button", "none");
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (strcmp(button, buttons[i].name) != 0) continue;
 		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, OPEN_ACTION) != 0) {

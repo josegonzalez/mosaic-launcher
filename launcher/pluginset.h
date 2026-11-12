@@ -19,6 +19,7 @@ enum PluginSettingType {
 enum PluginSettingFlag {
 	SETTING_PROTECTED = 1 << 0, // the Plugins page asks for the launcher's PIN first, when one is set
 	SETTING_SECRET = 1 << 1,    // text only: never shown once set, only replaced
+	SETTING_PUBLIC = 1 << 2,    // other plugins may read it with cfg_read; never on a protected or secret one
 };
 
 // One setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]] line.
@@ -55,6 +56,10 @@ int Manifest_parse(const char* text, PluginManifest* out);
 
 // True when any of the plugin's settings is protected.
 int Manifest_isProtected(const PluginManifest* m);
+
+// True when the plugin's setting key is public, so other plugins may read
+// it with cfg_read.
+int Manifest_isPublic(const PluginManifest* m, const char* key);
 
 // The index'th of a choice setting's comma-separated options, as the
 // Plugins page lists them: leading spaces dropped, empty ones skipped.

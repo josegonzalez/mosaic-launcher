@@ -232,8 +232,7 @@ static int art_decorated = 0, art_decorated_index = -1;
 static MosaicRect art_decorated_rect;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "prefer_preview")) return prefer_cfg;
 	return fallback;
 }
@@ -310,7 +309,6 @@ static MosaicSurface* fakeSurfaceScale(const char* id, const MosaicSurface* src,
 	return s;
 }
 static int fakeSurfaceFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	if (!s->owned) return -1;
 	s->owned = 0;
 	frees++;

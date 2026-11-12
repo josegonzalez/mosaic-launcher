@@ -30,7 +30,7 @@ static char roms[MAX_PATH_LEN];
 static RBSet played;
 
 static int isOn(const char* key) {
-	return !strcmp(host->cfg_get(ID, key, "off"), "on");
+	return !strcmp(host->cfg_get(key, "off"), "on");
 }
 
 // Adds what each file in dir names, as parse reads it, under tag.

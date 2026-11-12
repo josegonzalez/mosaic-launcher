@@ -39,7 +39,7 @@ static void say(const char* message) {
 }
 
 static long setting(const char* key, const char* fallback, long lo, long hi) {
-	const char* text = host->cfg_get(ID, key, fallback);
+	const char* text = host->cfg_get(key, fallback);
 	char* end;
 	long v = strtol(text, &end, 10);
 	if (end == text || *end || v < lo || v > hi) v = strtol(fallback, NULL, 10);
@@ -117,7 +117,7 @@ static int preLaunch(const MosaicLaunch* launch) {
 		say(message);
 	}
 
-	if (!strcmp(host->cfg_get(ID, "rom", "on"), "on")) {
+	if (!strcmp(host->cfg_get("rom", "on"), "on")) {
 		char roms[CP_MAX_FILES][CP_PATH_LEN];
 		int n = CP_romFiles(launch->path, roms, CP_MAX_FILES - count);
 		for (int i = 0; i < n && count < CP_MAX_FILES; i++) {

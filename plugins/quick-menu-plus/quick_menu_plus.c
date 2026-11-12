@@ -54,14 +54,14 @@ static void toast(const char* message) {
 }
 
 static int isOn(const char* key, const char* fallback) {
-	return strcmp(host->cfg_get(ID, key, fallback), "off") != 0;
+	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
 ///////////////////////////////////////
 // labels and hidden tiles
 
 static void applyLabels(void) {
-	const char* setting = host->cfg_get(ID, "labels", "");
+	const char* setting = host->cfg_get("labels", "");
 	if (!setting[0]) return;
 	if (!MOSAIC_HOST_HAS(host, rename_quick_tile)) {
 		say("this launcher can't relabel quick menu tiles");
@@ -85,7 +85,7 @@ static void applyLabels(void) {
 }
 
 static void applyHidden(void) {
-	const char* setting = host->cfg_get(ID, "hide", "");
+	const char* setting = host->cfg_get("hide", "");
 	if (!setting[0]) return;
 	if (!MOSAIC_HOST_HAS(host, hide_quick_tile)) {
 		say("this launcher can't hide quick menu tiles");
@@ -237,7 +237,7 @@ static void addTile(const char* id, const char* label, int (*available)(void*), 
 
 // A tile per toggle the toggles setting names that the launcher knows.
 static void addStockToggles(void) {
-	const char* setting = host->cfg_get(ID, "toggles", QMP_TOGGLES_DEFAULT);
+	const char* setting = host->cfg_get("toggles", QMP_TOGGLES_DEFAULT);
 	if (!setting[0]) return;
 	if (!MOSAIC_HOST_HAS(host, stock_toggle_get) || !MOSAIC_HOST_HAS(host, stock_toggle_set)) {
 		say("this launcher can't change stock settings; no toggle tiles");

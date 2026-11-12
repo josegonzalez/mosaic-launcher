@@ -96,7 +96,7 @@ static int init(const MosaicHost* h) {
 	NumCache_init(&numbers);
 	root_replaced = 0;
 	root_listed = 1;
-	hide_number = strcmp(host->cfg_get(ID, "hide", "on"), "off") != 0;
+	hide_number = strcmp(host->cfg_get("hide", "on"), "off") != 0;
 	return 0;
 }
 

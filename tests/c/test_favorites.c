@@ -39,8 +39,7 @@ static void sayYes(void) {
 	answer_yes = NULL;
 }
 static const char* pin_setting = NULL; // the "pin" setting, or NULL for its default
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "pin") && pin_setting) return pin_setting;
 	return fallback;
 }

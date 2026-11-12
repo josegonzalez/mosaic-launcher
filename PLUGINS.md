@@ -33,8 +33,8 @@ conflicts=
 ```
 
 - `id` must match the `id` in the plugin's `MosaicPlugin`.
-- `setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]]` declares a setting the Launcher pak's Plugins page shows and edits. `type` is `toggle` (`on` or `off`), `choice` (one of the comma-separated `options`) or `text` (typed on the on-screen keyboard). The plugin reads the value with `host->cfg_get(id, key, default)`. Changes take effect the next time the launcher starts, which is when the user leaves the Launcher pak. The plugin's `name`, each `label` and a choice's `options` are translated on the Plugins page by the `strings` slot's owner as the plugin's own text, with its id and no context, as `host->tr` translates it, so they go in the plugin's own language packs (see [Translations](#translations)). A choice is still saved as its option in English, and a text setting's value shows as typed.
-- `flags`, after the options (leave the options empty for a toggle or text setting, as in `text|Code|||protected,secret`), is a comma-separated list of markers. `protected` makes the Plugins page ask for the launcher's PIN before it shows or changes that setting, and before it turns the plugin off (or turns the whole launcher off while the plugin is on); with no PIN set, a protected setting behaves like any other. `secret`, for `text` settings, makes the value write-only: once it's set, the page shows only Set or Not set, and its keyboard starts empty, so the value is replaced rather than edited. Words the launcher doesn't know are ignored, and a setting without flags behaves as before. An older launcher ignores the field, showing the setting as an ordinary one.
+- `setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]]` declares a setting the Launcher pak's Plugins page shows and edits. `type` is `toggle` (`on` or `off`), `choice` (one of the comma-separated `options`) or `text` (typed on the on-screen keyboard). The plugin reads the value with `host->cfg_get(key, default)`. Changes take effect the next time the launcher starts, which is when the user leaves the Launcher pak. The plugin's `name`, each `label` and a choice's `options` are translated on the Plugins page by the `strings` slot's owner as the plugin's own text, with its id and no context, as `host->tr` translates it, so they go in the plugin's own language packs (see [Translations](#translations)). A choice is still saved as its option in English, and a text setting's value shows as typed.
+- `flags`, after the options (leave the options empty for a toggle or text setting, as in `text|Code|||protected,secret`), is a comma-separated list of markers. `protected` makes the Plugins page ask for the launcher's PIN before it shows or changes that setting, and before it turns the plugin off (or turns the whole launcher off while the plugin is on); with no PIN set, a protected setting behaves like any other. `secret`, for `text` settings, makes the value write-only: once it's set, the page shows only Set or Not set, and its keyboard starts empty, so the value is replaced rather than edited. `public` lets other plugins read the setting with `cfg_read` (see [Plugins' settings](#plugins-settings)); it's ignored on a protected or secret setting, which stays private, and the Plugins page shows a public setting like any other. Words the launcher doesn't know are ignored, and a setting without flags behaves as before. An older launcher ignores the field, showing the setting as an ordinary one.
 - `api` is the `MOSAIC_API_VERSION` the plugin was built against. A plugin for a different version is skipped.
 - `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, `transition` and `launch` for the `transition_*` hooks, `background` for `background_render`, `home` for a screen in place of the root list, `switcher` for a screen in place of the game switcher, `strings` for `translate`, or `theme` for `theme`. Only one plugin can own a slot.
 - `requires` lists plugins that must also load. `conflicts` lists plugins that can't load alongside it.
@@ -192,6 +192,14 @@ The PIN row at the end of the Plugins page sets the launcher's one PIN, which si
 
 A forgotten PIN is cleared off the device: put the card in a computer and delete `.userdata/<platform>/launcher/pin.txt`. Protected settings then behave like any other, and simple mode leaves after a confirm. Simple mode can also be left by setting `on=off` in `simple-mode.cfg` or `simple-mode=off` in `plugins.txt`.
 
+### Plugins' settings
+
+`host->cfg_get(key, fallback)` and `host->cfg_set(key, value)` act only on the calling plugin's own settings, its `<id>.cfg`; they take no plugin id. The launcher knows which plugin is calling from the hook or callback it's running for it (`init`, every `MosaicPlugin` hook, screens' hooks, actions, quick menu tiles and the dialogs' callbacks), on the launcher's thread. A call from a thread of the plugin's own, or anywhere else the launcher can't tell who's calling, is refused rather than guessed at: `cfg_get` returns the fallback, `cfg_set` saves nothing, and the launcher logs the first one. Read what a thread needs before starting it, and hand it over.
+
+Another plugin's settings are read, never written, with `host->cfg_read(other_id, key, fallback)`, and only those that plugin's `plugin.txt` marks `public`, while it's loaded. Every other setting, its protected and secret ones always, as well as keys its `plugin.txt` doesn't list, is private: `cfg_read` returns the fallback, as for a key that isn't set. A plugin's own `cfg_get` still sees all of its settings. The bundled plugins that read each other's settings mark those public: favorites' `collection` (read by home-dashboard, screensaver and focus-mode), row-badges' `unplayed` and `tiers` (playtime-captions), playtime-captions' parts and `format` (switcher-plus) and charging-screen's `idle` (screensaver).
+
+These rules keep plugins honest, but they aren't a sandbox. Plugins run in the launcher's own process, so a plugin can read the card's files, including every plugin's `.cfg` and the launcher's PIN file, and the launcher's memory directly. Only install plugins you trust. Secret settings, such as a password, aren't encrypted on the card: secret only keeps them off the Plugins page and out of other plugins' `cfg_read`.
+
 ## Features added since the first API
 
 Newer host fields may be missing on an older launcher. Check before calling:
@@ -289,12 +297,12 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   // in tick: remember the device while it's connected
   char address[18];
   if (host->bt_connected_address(address, sizeof(address))
-      && strcmp(address, host->cfg_get("bt-reconnect", "last", "")) != 0) {
-      host->cfg_set("bt-reconnect", "last", address);
+      && strcmp(address, host->cfg_get("last", "")) != 0) {
+      host->cfg_set("last", address);
   }
 
   // in init and after_resume: ask for it back
-  const char* last = host->cfg_get("bt-reconnect", "last", "");
+  const char* last = host->cfg_get("last", "");
   if (host->bt_enabled() && last[0]) host->bt_connect(last);
   ```
 - Drawing calls let a plugin draw with the launcher's own fonts, theme colours and scale, without linking SDL or launcher code. Check for them with `MOSAIC_HOST_HAS(host, draw_text)`. Nothing here draws on the screen by itself: plugins draw on surfaces of their own, and the render hooks that come later hand a plugin the surface to draw on, such as the screen, with the area it may draw in, so a plugin can draw a whole layout or a row's badge with the same calls. Plugins call them on the main thread, from any hook. Every call checks its arguments: a `NULL`, a surface the launcher doesn't know (such as one already freed, or one a hook handed over after the hook returned), or a size or rect out of range is refused, with -1 or `NULL`, rather than drawn or crashed on.
@@ -795,6 +803,7 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
       return language_needs_cjk ? cjk_font_path : NULL;
   }
   ```
+- `cfg_read(other_id, key, fallback)` reads another plugin's setting when that plugin's `plugin.txt` marks it `public`, and returns the fallback otherwise (see [Plugins' settings](#plugins-settings)). Check for it with `MOSAIC_HOST_HAS(host, cfg_read)`. With it, `cfg_get` and `cfg_set` stopped taking a plugin id: they always act on the calling plugin's own settings.
 
 ## Without writing C
 

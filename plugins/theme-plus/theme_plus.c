@@ -83,11 +83,11 @@ static const char* kindName(int kind) {
 
 static int theme(MosaicTheme* t) {
 	loadCatalog();
-	const char* name = host->cfg_get(ID, "theme", "stock");
-	TPOverrides overrides = TP_overrides(host->cfg_get(ID, "background", "theme"), host->cfg_get(ID, "text_size", "theme"),
-		host->cfg_get(ID, "contrast", "theme"), host->cfg_get(ID, "ui_size", "theme"), host->cfg_get(ID, "margins", "theme"),
+	const char* name = host->cfg_get("theme", "stock");
+	TPOverrides overrides = TP_overrides(host->cfg_get("background", "theme"), host->cfg_get("text_size", "theme"),
+		host->cfg_get("contrast", "theme"), host->cfg_get("ui_size", "theme"), host->cfg_get("margins", "theme"),
 		logLine, (void*)"settings");
-	TP_overrideFallback(&overrides, host->sdcard_path, host->cfg_get(ID, "fallback_font", ""), logLine, (void*)"settings");
+	TP_overrideFallback(&overrides, host->sdcard_path, host->cfg_get("fallback_font", ""), logLine, (void*)"settings");
 	const TPEntry* entry = NULL;
 	if (strcmp(name, "stock") != 0) {
 		entry = TP_find(&catalog, name);
@@ -127,7 +127,7 @@ static int theme(MosaicTheme* t) {
 static void picked(int index, void* data) {
 	(void)data;
 	if (index < 0 || index >= CHOICES_MAX) return;
-	host->cfg_set(ID, "theme", pickIds[index]);
+	host->cfg_set("theme", pickIds[index]);
 	say("picked %s", pickIds[index]);
 	host->reload_lists();
 }
@@ -136,7 +136,7 @@ static void pick(void* data) {
 	(void)data;
 	loadCatalog();
 	const char* labels[CHOICES_MAX];
-	const char* current = host->cfg_get(ID, "theme", "stock");
+	const char* current = host->cfg_get("theme", "stock");
 	const TPEntry* selected = TP_find(&catalog, current);
 	int count = 0;
 	int cursor = 0;
@@ -162,7 +162,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't register " ACTION_ID);
 		return 0;
 	}
-	if (strcmp(host->cfg_get(ID, "tile", "on"), "off") != 0
+	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
 			&& host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
 		say("couldn't add the Theme tile");
 	}
@@ -175,7 +175,7 @@ static int init(const MosaicHost* h) {
 		{ "R2", MOSAIC_BUTTON_R2 },
 		{ "SELECT", MOSAIC_BUTTON_SELECT },
 	};
-	const char* name = host->cfg_get(ID, "button", "none");
+	const char* name = host->cfg_get("button", "none");
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (strcmp(name, buttons[i].name) != 0) continue;
 		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, ACTION_ID) != 0) {

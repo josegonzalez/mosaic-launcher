@@ -92,15 +92,15 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	unsigned int chord = 0;
-	const char* setting = host->cfg_get(ID, "chord", DEFAULT_CHORD);
+	const char* setting = host->cfg_get("chord", DEFAULT_CHORD);
 	if (!HL_parseChord(setting, &chord)) {
 		char message[160];
 		snprintf(message, sizeof(message), "unknown chord \"%.64s\", using " DEFAULT_CHORD, setting);
 		say(message);
 		HL_parseChord(DEFAULT_CHORD, &chord);
 	}
-	unsigned long hold_ms = HL_parseHoldMs(host->cfg_get(ID, "hold", "1"), HL_HOLD_MS_DEFAULT);
-	const char* use = host->cfg_get(ID, "switch", "off");
+	unsigned long hold_ms = HL_parseHoldMs(host->cfg_get("hold", "1"), HL_HOLD_MS_DEFAULT);
+	const char* use = host->cfg_get("switch", "off");
 	int use_switch = !strcmp(use, "on") || !strcmp(use, "1");
 	HL_init(&lock, chord, hold_ms, use_switch);
 	logged = 0;

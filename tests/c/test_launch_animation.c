@@ -130,11 +130,9 @@ static const char* cfg_ease = NULL;
 static char last_log[256];
 
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", m);
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "duration") && cfg_duration) return cfg_duration;
 	if (!strcmp(key, "ease") && cfg_ease) return cfg_ease;
 	return fallback;

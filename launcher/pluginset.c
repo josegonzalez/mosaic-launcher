@@ -59,12 +59,14 @@ static void eachLine(const char* text, void (*fn)(const char* key, const char* v
 	}
 }
 
-// The comma-separated flags field: protected and secret. Unknown words are
-// left for newer launchers, and secret only means something on text.
+// The comma-separated flags field: protected, secret and public. Unknown
+// words are left for newer launchers, secret only means something on text,
+// and a protected or secret setting is never public.
 static int settingFlags(const char* field, int type) {
 	int flags = 0;
 	if (csvHas(field, "protected")) flags |= SETTING_PROTECTED;
 	if (type == SETTING_TEXT && csvHas(field, "secret")) flags |= SETTING_SECRET;
+	if (!flags && csvHas(field, "public")) flags |= SETTING_PUBLIC;
 	return flags;
 }
 
@@ -140,6 +142,14 @@ int Manifest_res(const PluginManifest* m, char* out, size_t size) {
 int Manifest_isProtected(const PluginManifest* m) {
 	for (int i = 0; i < m->setting_count; i++) {
 		if (m->settings[i].flags & SETTING_PROTECTED) return 1;
+	}
+	return 0;
+}
+
+int Manifest_isPublic(const PluginManifest* m, const char* key) {
+	if (!m || !key) return 0;
+	for (int i = 0; i < m->setting_count; i++) {
+		if (!strcmp(m->settings[i].key, key)) return (m->settings[i].flags & SETTING_PUBLIC) != 0;
 	}
 	return 0;
 }

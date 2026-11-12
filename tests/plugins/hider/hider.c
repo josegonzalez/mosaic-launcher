@@ -156,8 +156,8 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, hide_names)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Hider", host->sdcard_path);
 	snprintf(art, sizeof(art), "%s/art.png", folder);
-	hide = strcmp(host->cfg_get(ID, "hide", "some"), "none") != 0;
-	give_art = strcmp(host->cfg_get(ID, "art", "some"), "none") != 0;
+	hide = strcmp(host->cfg_get("hide", "some"), "none") != 0;
+	give_art = strcmp(host->cfg_get("art", "some"), "none") != 0;
 	return 0;
 }
 

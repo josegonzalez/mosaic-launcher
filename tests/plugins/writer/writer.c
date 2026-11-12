@@ -132,7 +132,7 @@ static int init(const MosaicHost* h) {
 		host->surface_write("nobody", mine, NULL, whole, 16), host->surface_write(NULL, mine, NULL, whole, 16));
 
 	// a loaded image is its own too, and a freed surface isn't
-	MosaicSurface* img = host->image_load(ID, host->cfg_get(ID, "art", ""));
+	MosaicSurface* img = host->image_load(ID, host->cfg_get("art", ""));
 	int img_wrote = host->surface_write(ID, img, &(MosaicRect){ 0, 0, 1, 1 }, whole, 4);
 	say("image %i %s", img_wrote, pixel(img, 0, 0));
 	host->surface_free(ID, canvas);
@@ -161,13 +161,13 @@ static void tick(unsigned long now) {
 	if (!other_done) {
 		// another loaded plugin's id can't write into this one's surface
 		other_done = 1;
-		const char* other = host->cfg_get(ID, "other", "");
+		const char* other = host->cfg_get("other", "");
 		say("other %i, own %i", host->surface_write(other, mine, &(MosaicRect){ 0, 0, 1, 1 }, px, 4),
 			host->surface_write(ID, mine, &(MosaicRect){ 0, 0, 1, 1 }, px, 4));
 	}
 	if (!art_done) {
 		const MosaicSurface* art = NULL;
-		int got = host->art_load(host->cfg_get(ID, "art", ""), &art);
+		int got = host->art_load(host->cfg_get("art", ""), &art);
 		if (got == MOSAIC_ART_READY) {
 			art_done = 1;
 			say("art %i %s", host->surface_write(ID, (MosaicSurface*)art, &(MosaicRect){ 0, 0, 1, 1 }, px, 4),

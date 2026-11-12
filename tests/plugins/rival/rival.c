@@ -26,7 +26,7 @@ static void runY(void* data) {
 
 static int preLaunch(const MosaicLaunch* launch) {
 	(void)launch;
-	say("replace %i", host->replace_launch(host->cfg_get(ID, "emu", ""), NULL, 0));
+	say("replace %i", host->replace_launch(host->cfg_get("emu", ""), NULL, 0));
 	return MOSAIC_LAUNCH_REPLACE;
 }
 

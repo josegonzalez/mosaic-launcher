@@ -561,12 +561,11 @@ static int reloads = 0;
 static char cfg_saves[8] = "";
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "saves") && cfg_saves[0]) return cfg_saves;
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) { (void)id; (void)key; (void)value; }
+static void fakeCfgSet(const char* key, const char* value) { (void)key; (void)value; }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
 static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
 static int fakeEntryType(const MosaicEntry* e) { return e->type; }

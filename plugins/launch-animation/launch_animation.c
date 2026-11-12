@@ -55,8 +55,8 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't animate launches");
 		return 1;
 	}
-	duration = LA_duration(host->cfg_get(ID, "duration", "350"), host->transition_max_ms);
-	ease = LA_ease(host->cfg_get(ID, "ease", "out"));
+	duration = LA_duration(host->cfg_get("duration", "350"), host->transition_max_ms);
+	ease = LA_ease(host->cfg_get("ease", "out"));
 	return 0;
 }
 

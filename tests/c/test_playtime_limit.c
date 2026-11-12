@@ -151,20 +151,17 @@ static char drawn[64];
 static unsigned int pill_rgb = 0, ink_rgb = 0;
 
 static void fakeLog(const char* id, const char* m) {
-	CHECK(strcmp(id, ID) == 0);
 	snprintf(last_log, sizeof(last_log), "%s", m);
 	if (strstr(m, CODE)) code_logged = 1;
 	logs++;
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	CHECK(strcmp(id, ID) == 0);
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < key_count; i++) {
 		if (!strcmp(keys[i], key)) return values[i];
 	}
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	CHECK(strcmp(id, ID) == 0);
+static void fakeCfgSet(const char* key, const char* value) {
 	for (int i = 0; i < key_count; i++) {
 		if (!strcmp(keys[i], key)) {
 			snprintf(values[i], sizeof(values[i]), "%s", value);
@@ -176,7 +173,7 @@ static void fakeCfgSet(const char* id, const char* key, const char* value) {
 	key_count++;
 }
 static void setCfg(const char* key, const char* value) {
-	fakeCfgSet(ID, key, value);
+	fakeCfgSet(key, value);
 }
 static void fakeRedraw(void) { redraws++; }
 static void fakeToast(const char* message) { snprintf(last_toast, sizeof(last_toast), "%s", message); }
@@ -333,13 +330,13 @@ static void testUnderAndOver(void) {
 	CHECK_STR(last_log, "granted 15 more minutes today, 15 in all");
 	char day[PL_DAY_LEN];
 	today(day);
-	CHECK_STR(fakeCfgGet(ID, "grant_day", ""), day);
-	CHECK_STR(fakeCfgGet(ID, "grant_minutes", ""), "15");
+	CHECK_STR(fakeCfgGet("grant_day", ""), day);
+	CHECK_STR(fakeCfgGet("grant_minutes", ""), "15");
 	CHECK(launch(GAME, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK_STR(last_log, "allowed Tetris.gb: 15 of 75 minutes left today");
 	// a second grant adds up
 	keyboard_done(CODE, NULL);
-	CHECK_STR(fakeCfgGet(ID, "grant_minutes", ""), "30");
+	CHECK_STR(fakeCfgGet("grant_minutes", ""), "30");
 
 	// back from a game with the time up: a warning
 	today_played = 90 * 60;
@@ -369,7 +366,7 @@ static void testGrantExpires(void) {
 	// a new grant starts from 0 today
 	confirm_yes(NULL);
 	keyboard_done(CODE, NULL);
-	CHECK_STR(fakeCfgGet(ID, "grant_minutes", ""), "15");
+	CHECK_STR(fakeCfgGet("grant_minutes", ""), "15");
 	CHECK(launch(GAME, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(!code_logged);
 }

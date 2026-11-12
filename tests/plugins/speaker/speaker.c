@@ -188,8 +188,8 @@ static int init(const MosaicHost* h) {
 		say("no audio_open");
 		return 1;
 	}
-	mode = host->cfg_get(ID, "mode", "");
-	pak = host->cfg_get(ID, "pak", "");
+	mode = host->cfg_get("mode", "");
+	pak = host->cfg_get("pak", "");
 	pushEvent = (int (*)(Event*))dlsym(RTLD_DEFAULT, "SDL_PushEvent");
 	wasInit = (unsigned int (*)(unsigned int))dlsym(RTLD_DEFAULT, "SDL_WasInit");
 	for (int i = 0; i < CHUNK; i++) {

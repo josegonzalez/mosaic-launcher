@@ -254,12 +254,11 @@ struct MosaicList {
 
 static char logged[8192];
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	snprintf(logged + strlen(logged), sizeof(logged) - strlen(logged), "%s\n", m);
 }
 static const char* cfg_root = "on";
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (!strcmp(id, ID) && !strcmp(key, "root")) return cfg_root;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
+	if (!strcmp(key, "root")) return cfg_root;
 	return fallback;
 }
 static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {

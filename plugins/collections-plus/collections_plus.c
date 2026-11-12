@@ -63,7 +63,7 @@ static int isFile(const char* path) {
 }
 
 static int on(const char* key, const char* fallback) {
-	return !strcmp(host->cfg_get(ID, key, fallback), "on");
+	return !strcmp(host->cfg_get(key, fallback), "on");
 }
 
 // The card-relative form of path, or NULL if it isn't on the card.
@@ -253,9 +253,9 @@ static void quit(void) {
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(collections_dir, sizeof(collections_dir), "%s/Collections", host->sdcard_path);
-	CP_parseNames(host->cfg_get(ID, "order", ""), &order);
+	CP_parseNames(host->cfg_get("order", ""), &order);
 	order.all = 0; // "*" means nothing as an order
-	CP_parseNames(host->cfg_get(ID, "promote", ""), &promote);
+	CP_parseNames(host->cfg_get("promote", ""), &promote);
 	hide_folder = on("hide_folder", "off");
 	file_order = on("file_order", "on");
 	own_map = on("own_map", "on");

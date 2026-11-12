@@ -31,8 +31,8 @@ static int preLaunch(const MosaicLaunch* launch) {
 	say("pre_launch %s", launch->path);
 	const char* args[] = { "--core", "x's.so" };
 	say("replace missing %i", host->replace_launch("/nowhere/emu.sh", args, 2));
-	say("replace %i", host->replace_launch(host->cfg_get(ID, "emu", ""), args, 2));
-	host->cfg_set(ID, "launched", "1");
+	say("replace %i", host->replace_launch(host->cfg_get("emu", ""), args, 2));
+	host->cfg_set("launched", "1");
 	return MOSAIC_LAUNCH_REPLACE;
 }
 
@@ -45,8 +45,8 @@ static void tick(unsigned long now) {
 	ticks++;
 	if (ticks != 1) return;
 	say("override from tick %i", host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L2, MOSAIC_TRIGGER_PRESS, "gamelist.open"));
-	if (strcmp(host->cfg_get(ID, "launched", "0"), "1") == 0) return;
-	say("open rom %i", host->open_path(host->cfg_get(ID, "rom", ""), MOSAIC_ENTRY_ROM));
+	if (strcmp(host->cfg_get("launched", "0"), "1") == 0) return;
+	say("open rom %i", host->open_path(host->cfg_get("rom", ""), MOSAIC_ENTRY_ROM));
 }
 
 static int init(const MosaicHost* h) {
@@ -67,7 +67,7 @@ static int init(const MosaicHost* h) {
 	say("repeat %i %i, bind repeat %i", MOSAIC_HOST_HAS(host, override_repeat),
 		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, MOSAIC_TRIGGER_REPEAT, "gamelist.prev_letter"),
 		host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L2, MOSAIC_TRIGGER_REPEAT, "gamelist.open"));
-	say("replace from init %i", host->replace_launch(host->cfg_get(ID, "emu", ""), NULL, 0));
+	say("replace from init %i", host->replace_launch(host->cfg_get("emu", ""), NULL, 0));
 	say("rename %i, bottom row %i", host->rename_quick_tile("Games", "Library"), host->rename_quick_tile("Wifi", "Net"));
 	return 0;
 }

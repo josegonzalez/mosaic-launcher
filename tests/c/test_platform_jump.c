@@ -148,11 +148,9 @@ static void show(const char* path, const MosaicList* list, int selected) {
 }
 
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	(void)m;
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "root") && cfg_root[0]) return cfg_root;
 	if (!strcmp(key, "lists") && cfg_lists[0]) return cfg_lists;
 	if (!strcmp(key, "wrap") && cfg_wrap[0]) return cfg_wrap;

@@ -43,14 +43,12 @@ static int replaced_count = -1, replace_result = 0;
 static int launch_result = -1;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "port") && cfg_port[0]) return cfg_port;
 	if (!strcmp(key, "last_address") && cfg_address[0]) return cfg_address;
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	(void)id;
+static void fakeCfgSet(const char* key, const char* value) {
 	if (!strcmp(key, "last_address")) snprintf(cfg_address, sizeof(cfg_address), "%s", value);
 }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }

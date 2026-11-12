@@ -164,8 +164,7 @@ static const char* sleep_off_setting = NULL;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static void fakeToast(const char* m) { snprintf(toasted, sizeof(toasted), "%s", m); toasts++; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (sleep_off_setting && !strcmp(key, "sleep_off")) return sleep_off_setting;
 	return fallback;
 }

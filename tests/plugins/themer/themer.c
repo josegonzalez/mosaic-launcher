@@ -58,7 +58,7 @@ static long ms(void) {
 }
 
 static void copyCfg(char* out, size_t size, const char* key) {
-	snprintf(out, size, "%s", host->cfg_get(ID, key, ""));
+	snprintf(out, size, "%s", host->cfg_get(key, ""));
 }
 
 static int theme(MosaicTheme* t) {
@@ -251,8 +251,8 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, ui_size)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Themer", host->sdcard_path);
 	snprintf(inner, sizeof(inner), "%s/Inner", folder);
-	mode = host->cfg_get(ID, "mode", "good");
-	still = !strcmp(host->cfg_get(ID, "still", ""), "1");
+	mode = host->cfg_get("mode", "good");
+	still = !strcmp(host->cfg_get("still", ""), "1");
 	// the theme isn't asked before init
 	say("init %s, asked %d", mode, asked);
 	return 0;

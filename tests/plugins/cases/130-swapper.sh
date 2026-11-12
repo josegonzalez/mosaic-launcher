@@ -14,9 +14,13 @@ cp "$ROOT/tests/plugins/drawer/art.png" "$SWAP_DIR/.media/Apple.png"
 cp "$ROOT/tests/plugins/drawer/art.png" "$SWAP_DIR/Next/.media/Cherry.png"
 cp "$ROOT/tests/plugins/drawer/art.png" "$SWAP_DIR/Next/Next/.media/Dog.png"
 build_plugin hello 'id=hello\nname=Hello\napi=1\n'
-build_plugin swapper 'id=swapper\nname=Swapper\napi=1\nslots=transition\n'
+# taker reads swapper's hold, which is public; the rest of swapper's
+# settings are private to it, and secret ones are even when marked public
+build_plugin swapper 'id=swapper\nname=Swapper\napi=1\nslots=transition\nsetting.hold=text|Hold|0||public\nsetting.note=text|Note|\nsetting.code=text|Code|||secret,public\n'
 build_plugin taker 'id=taker\nname=Taker\napi=1\n'
 printf 'hello=on\nswapper=on\ntaker=on\n' >"$STATE/plugins.txt"
+printf 'hold=0\nnote=hush\ncode=1234\nextra=x\n' >"$STATE/swapper.cfg"
+rm -f "$STATE/taker.cfg"
 run_launcher "$WORK/swapper.log" "plugin swapper: done" || fail "the launcher exited early with swapper loaded"
 log="$WORK/swapper.log"
 plugin=swapper
@@ -42,6 +46,13 @@ expect "art Dog rect 519,154 460x460"
 expect "push 3 Dog left FF0000"
 expect "empty -1"
 plugin=taker
+expect "reads hold 0, note private, code private, extra private, nobody's none"
+expect "own hold 9, swapper's 0, from a thread refused"
+grep -qF "plugins: cfg_get refused" "$log" || fail "cfg_get from taker's own thread wasn't logged as refused"
+grep -q "^hold=9$" "$STATE/taker.cfg" || fail "taker's cfg_set didn't save to its own cfg"
+grep -q "^hold=9$" "$STATE/swapper.cfg" && fail "taker's cfg_set wrote swapper's cfg"
+grep -q "^thread=" "$STATE/taker.cfg" && fail "cfg_set from taker's own thread was saved"
+grep -q "^code=1234$" "$STATE/swapper.cfg" || fail "swapper's own settings were lost"
 expect "refused -1"
 expect "shown 0"
 expect "cleared 0"

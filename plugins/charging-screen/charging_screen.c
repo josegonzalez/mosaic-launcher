@@ -284,8 +284,8 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 
-	unsigned long idle_ms = CS_parseIdle(host->cfg_get(ID, "idle", "60"));
-	clock_mode = CS_parseClock(host->cfg_get(ID, "clock", "24h"));
+	unsigned long idle_ms = CS_parseIdle(host->cfg_get("idle", "60"));
+	clock_mode = CS_parseClock(host->cfg_get("clock", "24h"));
 	CsIdle_init(&idle, idle_ms);
 	if (!idle_ms) {
 		say("idle is off, so the screen never opens");

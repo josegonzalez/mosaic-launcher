@@ -49,9 +49,9 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher has no transition styles");
 		return 1;
 	}
-	const char* style_value = host->cfg_get(ID, "style", "slide");
-	const char* speed_value = host->cfg_get(ID, "speed", "normal");
-	const char* ease_value = host->cfg_get(ID, "ease", "out");
+	const char* style_value = host->cfg_get("style", "slide");
+	const char* speed_value = host->cfg_get("speed", "normal");
+	const char* ease_value = host->cfg_get("ease", "out");
 	style = TR_style(style_value);
 	duration_ms = TR_duration(TR_speed(speed_value), host->transition_max_ms);
 	ease = TR_ease(ease_value);

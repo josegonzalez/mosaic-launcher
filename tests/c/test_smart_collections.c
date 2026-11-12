@@ -44,15 +44,13 @@ static void sayYes(void) {
 static char cfg_keys[8][32];
 static char cfg_values[8][1024];
 static int cfg_count = 0;
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < cfg_count; i++) {
 		if (!strcmp(cfg_keys[i], key)) return cfg_values[i];
 	}
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	(void)id;
+static void fakeCfgSet(const char* key, const char* value) {
 	int i = 0;
 	while (i < cfg_count && strcmp(cfg_keys[i], key)) i++;
 	if (i == cfg_count) snprintf(cfg_keys[cfg_count++], 32, "%s", key);
@@ -366,7 +364,7 @@ static void testPlugin(void) {
 	sayYes();
 	CHECK_STR(toasted, "Dismissed Mario");
 	CHECK(reloads == 1);
-	CHECK_STR(fakeCfgGet(ID, "dismissed", ""), "Mario");
+	CHECK_STR(fakeCfgGet("dismissed", ""), "Mario");
 	MosaicList* after = p->virtual_dir(FOLDER);
 	CHECK(after->count == 3);
 	CHECK(named(after, "Mario") == NULL);
@@ -379,7 +377,7 @@ static void testPlugin(void) {
 
 	// still dismissed on the next start, and the folder stays on the root
 	// even when every collection is dismissed
-	fakeCfgSet(ID, "dismissed", "Mario,Zelda,Final Fantasy,Street Fighter");
+	fakeCfgSet("dismissed", "Mario,Zelda,Final Fantasy,Street Fighter");
 	p->quit();
 	actions = 0;
 	CHECK(p->init(&fake) == 0);
@@ -393,7 +391,7 @@ static void testPlugin(void) {
 	CHECK(pressY());
 	CHECK_STR(asked, "Bring back 4 dismissed collections?");
 	sayYes();
-	CHECK_STR(fakeCfgGet(ID, "dismissed", "x"), "");
+	CHECK_STR(fakeCfgGet("dismissed", "x"), "");
 	CHECK(p->virtual_dir(FOLDER)->count == 4);
 	CHECK(!pressY()); // nothing left to bring back
 
@@ -404,7 +402,7 @@ static void testPlugin(void) {
 	// settings: a bigger minimum, extra franchises, no built-ins
 	p->quit();
 	actions = 0;
-	fakeCfgSet(ID, "min", "3");
+	fakeCfgSet("min", "3");
 	CHECK(p->init(&fake) == 0);
 	CHECK(p->virtual_dir(FOLDER)->count == 0);
 	root = fakeListNew();
@@ -413,9 +411,9 @@ static void testPlugin(void) {
 
 	p->quit();
 	actions = 0;
-	fakeCfgSet(ID, "min", "2");
-	fakeCfgSet(ID, "builtin", "off");
-	fakeCfgSet(ID, "extra", "Super, Legend");
+	fakeCfgSet("min", "2");
+	fakeCfgSet("builtin", "off");
+	fakeCfgSet("extra", "Super, Legend");
 	CHECK(p->init(&fake) == 0);
 	MosaicList* mine = p->virtual_dir(FOLDER);
 	CHECK(mine->count == 2);

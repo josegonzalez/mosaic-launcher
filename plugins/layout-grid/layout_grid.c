@@ -299,8 +299,8 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a layout");
 		return 1;
 	}
-	columns_setting = LG_count(host->cfg_get(ID, "columns", "auto"), 1, LG_MAX_COLUMNS);
-	rows_setting = LG_count(host->cfg_get(ID, "rows", "auto"), 1, LG_MAX_ROWS);
+	columns_setting = LG_count(host->cfg_get("columns", "auto"), 1, LG_MAX_COLUMNS);
+	rows_setting = LG_count(host->cfg_get("rows", "auto"), 1, LG_MAX_ROWS);
 	return 0;
 }
 

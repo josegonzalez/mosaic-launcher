@@ -59,7 +59,7 @@ static const char* fallbackFont(void) {
 
 static int theme(MosaicTheme* t) {
 	if (MOSAIC_THEME_HAS(t, fallback_font))
-		snprintf(t->fallback_font, sizeof(t->fallback_font), "%s", host->cfg_get(ID, "theme_font", ""));
+		snprintf(t->fallback_font, sizeof(t->fallback_font), "%s", host->cfg_get("theme_font", ""));
 	return 0;
 }
 
@@ -143,8 +143,8 @@ static void tick(unsigned long now) {
 static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, ui_size)) return 1;
-	snprintf(strings_font, sizeof(strings_font), "%s", host->cfg_get(ID, "strings_font", ""));
-	reload = !strcmp(host->cfg_get(ID, "reload", ""), "1");
+	snprintf(strings_font, sizeof(strings_font), "%s", host->cfg_get("strings_font", ""));
+	reload = !strcmp(host->cfg_get("reload", ""), "1");
 	return 0;
 }
 

@@ -467,8 +467,8 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a layout");
 		return 1;
 	}
-	shelves_setting = LS_count(host->cfg_get(ID, "shelves", "auto"), 1, LS_MAX_SHELVES);
-	lift_setting = strcmp(host->cfg_get(ID, "animate", "on"), "off") != 0;
+	shelves_setting = LS_count(host->cfg_get("shelves", "auto"), 1, LS_MAX_SHELVES);
+	lift_setting = strcmp(host->cfg_get("animate", "on"), "off") != 0;
 	return 0;
 }
 

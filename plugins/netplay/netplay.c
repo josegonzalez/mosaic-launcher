@@ -52,7 +52,7 @@ static int isFile(const char* path) {
 }
 
 static int port(void) {
-	return NP_port(host->cfg_get(ID, "port", "55435"), NP_DEFAULT_PORT);
+	return NP_port(host->cfg_get("port", "55435"), NP_DEFAULT_PORT);
 }
 
 // The emulator pak's launch.sh for a game, where stock looks: the
@@ -84,14 +84,14 @@ static void addressTyped(const char* text, void* data) {
 		toast(tr("Type a host name or IP address, with :port for another port"));
 		return;
 	}
-	host->cfg_set(ID, "last_address", text);
+	host->cfg_set("last_address", text);
 	launch(NP_JOIN, address, at);
 }
 
 static void modePicked(int index, void* data) {
 	(void)data;
 	if (index == 0) launch(NP_HOST, NULL, port());
-	else if (index == 1) host->keyboard(tr("Host address"), host->cfg_get(ID, "last_address", ""), addressTyped, NULL);
+	else if (index == 1) host->keyboard(tr("Host address"), host->cfg_get("last_address", ""), addressTyped, NULL);
 }
 
 static int canOpen(void* data) {

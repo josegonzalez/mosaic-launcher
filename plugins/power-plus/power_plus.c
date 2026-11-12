@@ -87,7 +87,7 @@ static void toast(const char* message) {
 }
 
 static int isOn(const char* key, const char* fallback) {
-	return strcmp(host->cfg_get(ID, key, fallback), "off") != 0;
+	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
 static int charging(void) {
@@ -220,15 +220,15 @@ static int init(const MosaicHost* h) {
 	supported = 1;
 
 	guard_on = isOn("guard", "on");
-	int warn_at = Pp_parseNumber(host->cfg_get(ID, "warn_at", "5"), 1, 99, PP_WARN_DEFAULT);
-	int off_at = Pp_parseNumber(host->cfg_get(ID, "off_at", "2"), 1, 99, PP_OFF_DEFAULT);
+	int warn_at = Pp_parseNumber(host->cfg_get("warn_at", "5"), 1, 99, PP_WARN_DEFAULT);
+	int off_at = Pp_parseNumber(host->cfg_get("off_at", "2"), 1, 99, PP_OFF_DEFAULT);
 	if (off_at >= warn_at) say("off_at isn't below warn_at, so the power off countdown is the only warning");
 	PpGuard_init(&guard, warn_at, off_at);
 
 	sleep_period = 0;
 	if (isOn("sleep_off", "off")) {
 		if (access(PP_WAKEALARM_PATH, W_OK) == 0) {
-			sleep_period = 3600L * Pp_parseNumber(host->cfg_get(ID, "sleep_hours", "4"), 1, 72, PP_HOURS_DEFAULT);
+			sleep_period = 3600L * Pp_parseNumber(host->cfg_get("sleep_hours", "4"), 1, 72, PP_HOURS_DEFAULT);
 		}
 		else {
 			say("no writable wake alarm, so power off after sleep is off");

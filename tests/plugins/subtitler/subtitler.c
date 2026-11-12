@@ -59,7 +59,7 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	} else {
 		int scale = host->screen_scale();
 		int edge = r->x + r->w - 4 * scale - 1 - right;
-		const char* text = host->cfg_get(ID, name, "");
+		const char* text = host->cfg_get(name, "");
 		int want = text[0] ? host->text_width(MOSAIC_FONT_SMALL, text) : 0;
 		int width = right - left + 1;
 		int name_end = row->name.w > 0 ? row->name.x + row->name.w : r->x;
@@ -85,8 +85,8 @@ static void tick(unsigned long now) {
 static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
-	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get(ID, "folder", "Roms"));
-	open_folder = atoi(host->cfg_get(ID, "open", "1"));
+	snprintf(folder, sizeof(folder), "%s/%s", host->sdcard_path, host->cfg_get("folder", "Roms"));
+	open_folder = atoi(host->cfg_get("open", "1"));
 	int hint = host->theme_color(MOSAIC_COLOR_HINT), background = host->theme_color(MOSAIC_COLOR_BACKGROUND);
 	for (int shift = 16; shift >= 0; shift -= 8) {
 		int a = hint >> shift & 0xFF, b = background >> shift & 0xFF;

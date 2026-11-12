@@ -176,13 +176,13 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a background");
 		return 1;
 	}
-	const char* style_name = host->cfg_get(ID, "style", "gradient");
-	const char* height = host->cfg_get(ID, "height", "full");
+	const char* style_name = host->cfg_get("style", "gradient");
+	const char* height = host->cfg_get("height", "full");
 	style = BD_style(style_name);
-	dim = BD_dim(host->cfg_get(ID, "dim", "50"));
+	dim = BD_dim(host->cfg_get("dim", "50"));
 	divisor = BD_height(height);
-	kind_count = BD_kinds(strcmp(host->cfg_get(ID, "screenshot", "on"), "off") != 0,
-		strcmp(host->cfg_get(ID, "thumbnail", "on"), "off") != 0, strcmp(host->cfg_get(ID, "box", "on"), "off") != 0,
+	kind_count = BD_kinds(strcmp(host->cfg_get("screenshot", "on"), "off") != 0,
+		strcmp(host->cfg_get("thumbnail", "on"), "off") != 0, strcmp(host->cfg_get("box", "on"), "off") != 0,
 		kinds);
 	none_path[0] = '\0';
 	char message[128];

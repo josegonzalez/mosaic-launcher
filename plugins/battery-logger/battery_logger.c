@@ -49,7 +49,7 @@ static void say(const char* message) {
 }
 
 static long setting(const char* key, const char* fallback, long lo, long hi) {
-	const char* text = host->cfg_get(ID, key, fallback);
+	const char* text = host->cfg_get(key, fallback);
 	char* end;
 	long v = strtol(text, &end, 10);
 	if (end == text || *end || v < lo || v > hi) v = strtol(fallback, NULL, 10);
@@ -119,7 +119,7 @@ static void postReturn(void) {
 	if (takeStart(&start) != 0) return; // a pak, or nothing to log
 
 	long long min_seconds = setting("min_minutes", "1", 0, 24 * 60) * 60;
-	int log_charged = !strcmp(host->cfg_get(ID, "charged", "off"), "on");
+	int log_charged = !strcmp(host->cfg_get("charged", "off"), "on");
 	BLSession session;
 	switch (BL_session(&start, host->battery_level(), host->is_charging(), mono_now(),
 			min_seconds, log_charged, &session)) {

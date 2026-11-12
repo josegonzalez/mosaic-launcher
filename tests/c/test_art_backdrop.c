@@ -164,8 +164,7 @@ static const char* cfg[][2] = {
 	{ "style", NULL }, { "dim", NULL }, { "height", NULL }, { "screenshot", NULL }, { "thumbnail", NULL }, { "box", NULL },
 };
 
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (size_t i = 0; i < sizeof(cfg) / sizeof(cfg[0]); i++) {
 		if (!strcmp(cfg[i][0], key)) return cfg[i][1] ? cfg[i][1] : fallback;
 	}
@@ -191,7 +190,6 @@ static int fakeReadPixel(const MosaicSurface* s, int x, int y, MosaicColor* out)
 	return 0;
 }
 static MosaicSurface* fakeScale(const char* id, const MosaicSurface* src, int w, int h, int fit) {
-	(void)id;
 	CHECK(src == &art && fit == MOSAIC_FIT_COVER);
 	scales++;
 	if (scale_fail || pool_count >= 16) return NULL;
@@ -200,7 +198,6 @@ static MosaicSurface* fakeScale(const char* id, const MosaicSurface* src, int w,
 	return s;
 }
 static int fakeFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	CHECK(s->mine && !s->freed);
 	s->freed = 1;
 	frees++;

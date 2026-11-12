@@ -218,8 +218,8 @@ static int init(const MosaicHost* h) {
 		say("unsupported: this launcher can't show a plugin's pictures in place of art, or play its sound");
 		return 1;
 	}
-	delay_ms = VP_parseDelayMs(host->cfg_get(ID, "delay", "2"), VP_DELAY_MS_DEFAULT);
-	with_sound = VP_parseToggle(host->cfg_get(ID, "sound", "on"), 1);
+	delay_ms = VP_parseDelayMs(host->cfg_get("delay", "2"), VP_DELAY_MS_DEFAULT);
+	with_sound = VP_parseToggle(host->cfg_get("sound", "on"), 1);
 	VP_disarm(&arm);
 	playing = 0;
 	audio_open = 0;

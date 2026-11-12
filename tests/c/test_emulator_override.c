@@ -276,15 +276,13 @@ static int refuse_replace = 0;
 static LaunchCmd replaced;
 
 static void fakeLog(const char* id, const char* m) {
-	(void)id;
 	snprintf(logged, sizeof(logged), "%s", m);
 }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "all") && cfg_all[0]) return cfg_all;
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) { (void)id; (void)key; (void)value; }
+static void fakeCfgSet(const char* key, const char* value) { (void)key; (void)value; }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
 static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
 static int fakeEntryType(const MosaicEntry* e) { return e->type; }

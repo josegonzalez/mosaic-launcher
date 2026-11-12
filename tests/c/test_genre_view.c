@@ -21,8 +21,7 @@ static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static char cfg_keys[8][32];
 static char cfg_values[8][256];
 static int cfg_count = 0;
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < cfg_count; i++) {
 		if (!strcmp(cfg_keys[i], key)) return cfg_values[i];
 	}
@@ -34,8 +33,7 @@ static void setCfg(const char* key, const char* value) {
 	if (i == cfg_count) snprintf(cfg_keys[cfg_count++], 32, "%s", key);
 	snprintf(cfg_values[i], 256, "%s", value);
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	(void)id;
+static void fakeCfgSet(const char* key, const char* value) {
 	setCfg(key, value);
 }
 

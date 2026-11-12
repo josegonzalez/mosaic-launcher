@@ -21,6 +21,8 @@
 #include "pin.h"
 #include "audiomodel.h"
 #include "screenmodel.h"
+#include "caller.h"
+#include "plugincfg.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -37,7 +39,7 @@ typedef struct LoadedPlugin {
 	const MosaicPlugin* plugin;
 	const PluginManifest* manifest; // its plugin.txt, for plugin_info
 	char id[64];
-	Hash* cfg; // loaded on first cfg_get or cfg_set
+	PluginCfg cfg; // its own settings, read on first use
 	int owns_root; // claims the root slot, so its root_replace is asked
 	int owns_layout; // claims the layout slot, so its layout_* hooks are called
 	int owns_transition; // claims the transition slot, so it's asked about pushes, pops and screen changes
@@ -85,6 +87,10 @@ static const MosaicScreenView* hints_view = NULL; // and its view
 static int switcher_declined = 0; // the switcher screen's enter declined, so the built-in switcher shows until it closes
 
 #define SCREEN_COUNT 3
+
+// Runs the statement after it as loaded plugin i, so host calls such as
+// cfg_get act on its settings. Every call into a plugin goes through it.
+#define AS_PLUGIN(i) AS_CALLER(loaded[i].id)
 
 static void dropOverrides(int owner);
 static void saveBindings(int* counts);
@@ -220,63 +226,38 @@ static void hostLog(const char* plugin_id, const char* message) {
 	LOG_info("plugin %s: %s\n", plugin_id ? plugin_id : "?", message ? message : "");
 }
 
-static void cfgPath(const char* plugin_id, char* out, size_t size) {
-	snprintf(out, size, PLUGIN_STATE_DIR "/%s.cfg", plugin_id);
+// The loaded plugin whose hook or callback is running on this thread, which
+// is the plugin calling. call is logged when there's none, such as from a
+// plugin's own thread, rather than guessing.
+static LoadedPlugin* callingPlugin(const char* call) {
+	const char* id = Caller_current();
+	LoadedPlugin* p = id ? loadedById(id) : NULL;
+	if (!p) {
+		static int logged = 0;
+		if (!logged) LOG_warn("plugins: %s refused: it only works from a plugin's init, hooks and callbacks, on the launcher's thread\n", call);
+		logged = 1;
+	}
+	return p;
 }
 
-static Hash* cfgFor(const char* plugin_id) {
-	LoadedPlugin* p = loadedById(plugin_id);
-	if (!p) return NULL;
-	if (p->cfg) return p->cfg;
-	p->cfg = Hash_new();
-	char path[512];
-	cfgPath(plugin_id, path, sizeof(path));
-	FILE* f = fopen(path, "r");
-	if (!f) return p->cfg;
-	char line[512];
-	while (fgets(line, sizeof(line), f)) {
-		normalizeNewline(line);
-		trimTrailingNewlines(line);
-		char* eq = strchr(line, '=');
-		if (!eq) continue;
-		*eq = '\0';
-		Hash_set(p->cfg, line, eq + 1);
-	}
-	fclose(f);
-	return p->cfg;
+// Its own settings: everything in its cfg.
+static const char* hostCfgGet(const char* key, const char* fallback) {
+	LoadedPlugin* p = callingPlugin("cfg_get");
+	return p ? PluginCfg_get(&p->cfg, key, fallback) : fallback;
 }
 
-static const char* hostCfgGet(const char* plugin_id, const char* key, const char* fallback) {
-	Hash* cfg = cfgFor(plugin_id);
-	if (!cfg || !key) return fallback;
-	// the last value set wins
-	for (int i = cfg->keys->count - 1; i >= 0; i--) {
-		if (!strcmp(cfg->keys->items[i], key)) return cfg->values->items[i];
-	}
-	return fallback;
-}
-
-static void hostCfgSet(const char* plugin_id, const char* key, const char* value) {
-	Hash* cfg = cfgFor(plugin_id);
-	if (!cfg || !key || !value || strchr(key, '=') || strchr(key, '\n') || strchr(value, '\n')) return;
-	for (int i = 0; i < cfg->keys->count; i++) {
-		if (!strcmp(cfg->keys->items[i], key)) {
-			free(cfg->values->items[i]);
-			cfg->values->items[i] = strdup(value);
-			goto save;
-		}
-	}
-	Hash_set(cfg, (char*)key, (char*)value);
-save:
+static void hostCfgSet(const char* key, const char* value) {
+	LoadedPlugin* p = callingPlugin("cfg_set");
+	if (!p) return;
 	Plugins_ensureStateDir();
-	char path[512];
-	cfgPath(plugin_id, path, sizeof(path));
-	FILE* f = fopen(path, "w");
-	if (!f) return;
-	for (int i = 0; i < cfg->keys->count; i++) {
-		fprintf(f, "%s=%s\n", (char*)cfg->keys->items[i], (char*)cfg->values->items[i]);
-	}
-	fclose(f);
+	if (PluginCfg_set(&p->cfg, key, value) != 0) LOG_warn("plugins: %s couldn't save %s\n", p->id, key ? key : "(null)");
+}
+
+// Another plugin's settings: only those its plugin.txt marks public.
+static const char* hostCfgRead(const char* plugin_id, const char* key, const char* fallback) {
+	if (!callingPlugin("cfg_read") || !plugin_id) return fallback;
+	LoadedPlugin* owner = loadedById(plugin_id);
+	return owner ? PluginCfg_readPublic(&owner->cfg, owner->manifest, key, fallback) : fallback;
 }
 
 static MosaicEntry* hostEntryNew(const char* path, int type, const char* name) {
@@ -357,8 +338,10 @@ static int hostRegisterAction(const char* id, const char* label,
 	action->available = available;
 	action->run = run;
 	action->data = data;
-	// its label is the plugin's own text, translated as its id's
-	action->plugin_id = initializing >= 0 ? strdup(loaded[initializing].id) : NULL;
+	// its label is the plugin's own text, translated as its id's, and it
+	// runs as that plugin
+	const char* owner = Caller_current();
+	action->plugin_id = owner ? strdup(owner) : NULL;
 	Actions_register(action);
 	return 0;
 }
@@ -1121,6 +1104,7 @@ static const MosaicHost host = {
 	.ui_size = Theme_uiSize,
 	.plugins_count = hostPluginsCount,
 	.plugin_info = hostPluginInfo,
+	.cfg_read = hostCfgRead,
 };
 
 ///////////////////////////////////////
@@ -1159,6 +1143,9 @@ static void load(const PluginManifest* m) {
 	p->plugin = plugin;
 	p->manifest = m;
 	snprintf(p->id, sizeof(p->id), "%s", m->id);
+	char cfg[512];
+	snprintf(cfg, sizeof(cfg), PLUGIN_STATE_DIR "/%s.cfg", m->id);
+	PluginCfg_init(&p->cfg, cfg);
 	p->owns_root = csvHas(m->slots, ROOT_SLOT);
 	if (!p->owns_root && Plugin_has(plugin, root_replace) && plugin->root_replace) {
 		LOG_warn("plugins: %s has root_replace but no slots=" ROOT_SLOT ", so it won't be asked\n", m->id);
@@ -1214,7 +1201,8 @@ static void load(const PluginManifest* m) {
 	int power_off = state.power_off;
 
 	initializing = loaded_count - 1;
-	int declined = Plugin_has(plugin, init) && plugin->init && plugin->init(&host) != 0;
+	int declined = 0;
+	if (Plugin_has(plugin, init) && plugin->init) AS_PLUGIN(initializing) declined = plugin->init(&host) != 0;
 	initializing = -1;
 	if (declined) {
 		LOG_warn("plugins: %s declined to start\n", m->id);
@@ -1243,7 +1231,7 @@ static void load(const PluginManifest* m) {
 		ScreenSet_dropOwner(&screens, loaded_count - 1);
 		freeSurfaces(m->id);
 		Audio_closeFor(m->id, "as it declined to start");
-		if (p->cfg) Hash_free(p->cfg);
+		PluginCfg_free(&p->cfg);
 		dlclose(handle);
 		loaded_count--;
 		return;
@@ -1368,7 +1356,8 @@ static void fallbackRefresh(void) {
 	else if (strings_owner >= 0) {
 		LoadedPlugin* owner = &loaded[strings_owner];
 		if (Plugin_has(owner->plugin, fallback_font) && owner->plugin->fallback_font) {
-			const char* given = owner->plugin->fallback_font();
+			const char* given = NULL;
+			AS_CALLER(owner->id) given = owner->plugin->fallback_font();
 			if (given && given[0] && Fallback_check(owner->id, "fallback font", given, path, sizeof(path)) == 0)
 				snprintf(from, sizeof(from), "%s", owner->id);
 		}
@@ -1385,7 +1374,8 @@ int Plugins_themeRefresh(void) {
 	LoadedPlugin* owner = &loaded[theme_owner];
 	MosaicTheme theme;
 	Theme_blank(&theme);
-	int result = owner->plugin->theme(&theme);
+	int result = 0;
+	AS_CALLER(owner->id) result = owner->plugin->theme(&theme);
 	if (result != 0) {
 		LOG_warn("plugins: %s's theme failed (%d), using stock's until the launcher restarts\n", owner->id, result);
 		theme_failed = 1;
@@ -1537,7 +1527,7 @@ static void start(void) {
 		PlayHistory_invalidate();
 		for (int i = 0; i < loaded_count; i++) {
 			const MosaicPlugin* p = loaded[i].plugin;
-			if (Plugin_has(p, post_return) && p->post_return) p->post_return();
+			if (Plugin_has(p, post_return) && p->post_return) AS_PLUGIN(i) p->post_return();
 		}
 	}
 }
@@ -1568,11 +1558,11 @@ void Plugins_quit(void) {
 	Audio_hostClose("at quit", 0);
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
-		if (Plugin_has(p->plugin, quit) && p->plugin->quit) p->plugin->quit();
+		if (Plugin_has(p->plugin, quit) && p->plugin->quit) AS_PLUGIN(i) p->plugin->quit();
 		// turning a plugin off, or a launch, gives the user's colour back
 		hostLedClear(p->id);
 		freeSurfaces(p->id);
-		if (p->cfg) Hash_free(p->cfg);
+		PluginCfg_free(&p->cfg);
 		dlclose(p->handle);
 	}
 	loaded_count = 0;
@@ -1780,9 +1770,11 @@ int Plugins_overrides(int screen, const Binding** bindings) {
 ///////////////////////////////////////
 // hooks
 
+// Each loaded plugin with the hook, run as that plugin (see caller.h).
 #define EACH_PLUGIN_WITH(field) \
 	for (int i_ = 0; i_ < loaded_count; i_++) \
-		for (const MosaicPlugin* p = loaded[i_].plugin; p && Plugin_has(p, field) && p->field; p = NULL)
+		for (const MosaicPlugin* p = loaded[i_].plugin; p && Plugin_has(p, field) && p->field; p = NULL) \
+			AS_PLUGIN(i_)
 
 void Plugins_rootEntries(Array* root) {
 	EACH_PLUGIN_WITH(root_entries) p->root_entries((MosaicList*)root);
@@ -1795,7 +1787,8 @@ Array* Plugins_rootReplace(int* with_entries) {
 		if (!loaded[i].owns_root) continue;
 		// slot resolution lets only one plugin claim it
 		if (!Plugin_has(p, root_replace) || !p->root_replace) return NULL;
-		Array* root = (Array*)p->root_replace();
+		Array* root = NULL;
+		AS_PLUGIN(i) root = (Array*)p->root_replace();
 		if (root && Plugin_has(p, root_with_entries)) *with_entries = p->root_with_entries;
 		return root;
 	}
@@ -1846,11 +1839,28 @@ int Plugins_displayNames(Array* entries) {
 	return renamed;
 }
 
+// The plugins with a sort_compare, in load order, while a sort runs. Each
+// is asked as itself, so the chain is one compare over all of them.
+static int sorters[PLUGIN_MAX];
+static int sorter_count = 0;
+
+static int pluginsCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
+	for (int k = 0; k < sorter_count; k++) {
+		int order = 0;
+		AS_PLUGIN(sorters[k]) order = loaded[sorters[k]].plugin->sort_compare(a, b, dir_path);
+		if (order) return order;
+	}
+	return 0;
+}
+
 void Plugins_sort(Array* entries, const char* dir_path) {
-	ListSortCompare compares[PLUGIN_MAX];
-	int count = 0;
-	EACH_PLUGIN_WITH(sort_compare) compares[count++] = p->sort_compare;
-	if (count > 0) ListSort_chain(entries, compares, count, dir_path);
+	sorter_count = 0;
+	for (int i = 0; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (Plugin_has(p, sort_compare) && p->sort_compare) sorters[sorter_count++] = i;
+	}
+	ListSortCompare compare = pluginsCompare;
+	if (sorter_count > 0) ListSort_chain(entries, &compare, 1, dir_path);
 }
 
 int Plugins_listReady(Array* entries, const char* dir_path) {
@@ -1866,11 +1876,27 @@ int Plugins_listReady(Array* entries, const char* dir_path) {
 	return renamed;
 }
 
+// The plugins with a hide_name, like sorters.
+static int hiders[PLUGIN_MAX];
+static int hider_count = 0;
+
+static int pluginsHide(const MosaicEntry* entry, const char* dir_path) {
+	for (int k = 0; k < hider_count; k++) {
+		int hide = 0;
+		AS_PLUGIN(hiders[k]) hide = loaded[hiders[k]].plugin->hide_name(entry, dir_path);
+		if (hide) return 1;
+	}
+	return 0;
+}
+
 unsigned char* Plugins_hideNames(Array* entries, const char* dir_path) {
-	ListHideName hides[PLUGIN_MAX];
-	int count = 0;
-	EACH_PLUGIN_WITH(hide_name) hides[count++] = p->hide_name;
-	return ListHide_chain(entries, hides, count, dir_path);
+	hider_count = 0;
+	for (int i = 0; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (Plugin_has(p, hide_name) && p->hide_name) hiders[hider_count++] = i;
+	}
+	ListHideName hide = pluginsHide;
+	return ListHide_chain(entries, &hide, hider_count > 0 ? 1 : 0, dir_path);
 }
 
 // The replacement for the launch in progress: the one pre_launch kept, and
@@ -1910,7 +1936,8 @@ int Plugins_preLaunch(const char* path, int type) {
 		if (!Plugin_has(p, pre_launch) || !p->pre_launch) continue;
 		launching = i;
 		pending_set = 0;
-		int result = p->pre_launch(&launch);
+		int result = MOSAIC_LAUNCH_CONTINUE;
+		AS_PLUGIN(i) result = p->pre_launch(&launch);
 		launching = -1;
 		if (result == MOSAIC_LAUNCH_CANCEL) {
 			LOG_info("plugins: launch of %s cancelled by a plugin\n", path);
@@ -1979,7 +2006,8 @@ SDL_Surface* Plugins_artSurface(const Entry* entry, int kind) {
 	for (int i = 0; i < loaded_count; i++) {
 		if (!generates(i)) continue;
 		generating = 1;
-		MosaicSurface* made = loaded[i].plugin->art_surface((const MosaicEntry*)entry, mosaic_kind);
+		MosaicSurface* made = NULL;
+		AS_PLUGIN(i) made = loaded[i].plugin->art_surface((const MosaicEntry*)entry, mosaic_kind);
 		generating = 0;
 		if (!made) continue;
 		// the launcher's from now on, so the plugin can't draw on it or free it
@@ -2067,7 +2095,8 @@ static int layoutReady(const MosaicListView* view) {
 	if (!LayoutSlot_active(&layout)) return 0;
 	if (!LayoutSlot_needsInit(&layout)) return 1;
 	const MosaicPlugin* p = loaded[layout.owner].plugin;
-	int rc = Plugin_has(p, layout_init) && p->layout_init ? p->layout_init(view) : 0;
+	int rc = 0;
+	if (Plugin_has(p, layout_init) && p->layout_init) AS_PLUGIN(layout.owner) rc = p->layout_init(view);
 	if (LayoutSlot_result(&layout, rc)) return 1;
 	LOG_warn("plugins: %s declined the " LAYOUT_SLOT " slot (layout_init returned %i), using the built-in list\n",
 		loaded[layout.owner].id, rc);
@@ -2081,7 +2110,8 @@ void Plugins_layoutInput(const MosaicListView* view) {
 	MosaicInput input;
 	LayoutInput_fill(&input, layoutButtons, LAYOUT_BUTTONS, pad.just_pressed, pad.just_repeated, pad.just_released, pad.is_pressed);
 	unsigned int consumed = 0;
-	int rc = p->layout_input(&input, view, &consumed);
+	int rc = 0;
+	AS_PLUGIN(layout.owner) rc = p->layout_input(&input, view, &consumed);
 	if (!layoutResult("layout_input", rc)) return;
 	// the game list never sees what the layout handled; what's held stays
 	// held, so the next frame's presses and releases are as the pad has them
@@ -2124,7 +2154,8 @@ void Plugins_inputFilter(unsigned long now) {
 		MosaicInput input;
 		LayoutInput_fill(&input, map, count, pressed & ~taken, repeated & ~taken, released & ~taken, pad.is_pressed);
 		unsigned int consumed = 0;
-		int rc = loaded[i].plugin->input_filter(&input, &consumed);
+		int rc = 0;
+		AS_PLUGIN(i) rc = loaded[i].plugin->input_filter(&input, &consumed);
 		if (rc != 0) {
 			loaded[i].filter_off = 1;
 			LOG_warn("plugins: %s's input_filter returned %i, no longer filtering input with it until the launcher restarts\n",
@@ -2156,7 +2187,8 @@ int Plugins_layoutRender(SDL_Surface* surface, const MosaicListView* view, ListS
 	layout_area = view->area;
 	ListSelection_clear(&layout_selected);
 	swap_drawn = 0;
-	int rc = p->layout_render(lent, view);
+	int rc = 0;
+	AS_PLUGIN(layout.owner) rc = p->layout_render(lent, view);
 	layout_rendering = 0;
 	layout_lent = NULL;
 	PluginDraw_unlend(lent);
@@ -2211,7 +2243,8 @@ int Plugins_transitionBegin(int kind, SDL_Surface* old_frame, SDL_Surface* new_f
 
 	const MosaicPlugin* p = loaded[owner].plugin;
 	int has_frame = Plugin_has(p, transition_frame) && p->transition_frame;
-	int rc = p->transition_begin(&transition);
+	int rc = 0;
+	AS_PLUGIN(owner) rc = p->transition_begin(&transition);
 	int style = Transition_checkStyle(rc, has_frame);
 	if (style < 0) {
 		if (rc == MOSAIC_STYLE_CUSTOM) {
@@ -2244,7 +2277,8 @@ int Plugins_transitionFrame(SDL_Surface* surface, float progress) {
 		LOG_warn("plugins: a transition's screen is already lent, so %s can't draw it\n", loaded[transition_owner].id);
 		return -1;
 	}
-	int rc = loaded[transition_owner].plugin->transition_frame(lent, &transition, progress);
+	int rc = 0;
+	AS_PLUGIN(transition_owner) rc = loaded[transition_owner].plugin->transition_frame(lent, &transition, progress);
 	PluginDraw_unlend(lent);
 	if (rc != 0) transitionFailed("transition_frame", rc);
 	return rc == 0 ? 0 : -1;
@@ -2274,7 +2308,8 @@ int Plugins_backgroundRender(SDL_Surface* surface, const Entry* selected, unsign
 		return 0;
 	}
 	backgrounding = 1;
-	int rc = loaded[background.owner].plugin->background_render(lent, (const MosaicEntry*)selected);
+	int rc = 0;
+	AS_PLUGIN(background.owner) rc = loaded[background.owner].plugin->background_render(lent, (const MosaicEntry*)selected);
 	backgrounding = 0;
 	PluginDraw_unlend(lent);
 	if (BackgroundSlot_result(&background, rc, serial)) return 1;
@@ -2312,7 +2347,8 @@ static void decorate(MosaicSurface* lent, const Entry* entry, const MosaicRow* r
 	decorating = 1;
 	for (int i = 0; i < loaded_count; i++) {
 		if (!decorates(i)) continue;
-		int rc = loaded[i].plugin->decorate_row(lent, (const MosaicEntry*)entry, row);
+		int rc = 0;
+		AS_PLUGIN(i) rc = loaded[i].plugin->decorate_row(lent, (const MosaicEntry*)entry, row);
 		if (rc == 0) continue;
 		loaded[i].rows_off = 1;
 		LOG_warn("plugins: %s's decorate_row returned %i, leaving its decorations out until the launcher restarts\n",
@@ -2369,7 +2405,8 @@ static void decorateArt(MosaicSurface* lent, const Entry* entry, const MosaicRec
 	decorating = 1;
 	for (int i = 0; i < loaded_count; i++) {
 		if (!decoratesArt(i)) continue;
-		int rc = loaded[i].plugin->decorate_art(lent, (const MosaicEntry*)entry, art, below);
+		int rc = 0;
+		AS_PLUGIN(i) rc = loaded[i].plugin->decorate_art(lent, (const MosaicEntry*)entry, art, below);
 		if (rc == 0) continue;
 		loaded[i].art_deco_off = 1;
 		LOG_warn("plugins: %s's decorate_art returned %i, leaving its art decorations out until the launcher restarts\n",
@@ -2420,7 +2457,8 @@ void Plugins_header(SDL_Surface* surface, HeaderRow* row) {
 		if (room <= 0) return;
 		const MosaicPlugin* p = loaded[i].plugin;
 		decorating = 1;
-		int want = p->header_width(room, row->h);
+		int want = 0;
+		AS_PLUGIN(i) want = p->header_width(room, row->h);
 		decorating = 0;
 		if (want < 0) {
 			headerOff(i, "header_width", want);
@@ -2434,7 +2472,8 @@ void Plugins_header(SDL_Surface* surface, HeaderRow* row) {
 			return;
 		}
 		decorating = 1;
-		int rc = p->header_widget(lent, &rect);
+		int rc = 0;
+		AS_PLUGIN(i) rc = p->header_widget(lent, &rect);
 		decorating = 0;
 		PluginDraw_unlend(lent);
 		if (rc != 0) headerOff(i, "header_widget", rc);
@@ -2467,7 +2506,8 @@ void Plugins_selection(unsigned long now) {
 	selecting = 1;
 	for (int i = 0; i < loaded_count; i++) {
 		if (!notifies(i)) continue;
-		int rc = loaded[i].plugin->selection_changed((const MosaicEntry*)entry);
+		int rc = 0;
+		AS_PLUGIN(i) rc = loaded[i].plugin->selection_changed((const MosaicEntry*)entry);
 		if (rc == 0) continue;
 		loaded[i].selection_off = 1;
 		LOG_warn("plugins: %s's selection_changed returned %i, no longer telling it about the selection until the launcher restarts\n",
@@ -2542,7 +2582,8 @@ static int openScreen(int index, int slide) {
 	PluginScreen* s = &screens.screens[index];
 	if (s->hooks.enter) {
 		screen_hook = 1;
-		int rc = s->hooks.enter(s->hooks.data);
+		int rc = 0;
+		AS_PLUGIN(s->owner) rc = s->hooks.enter(s->hooks.data);
 		screen_hook = 0;
 		if (rc != 0) {
 			LOG_info("plugins: %s's screen %s didn't open (enter returned %i)\n", loaded[s->owner].id, s->id, rc);
@@ -2580,7 +2621,7 @@ static int hostOpenScreen(const char* id) {
 static void runExit(PluginScreen* s) {
 	if (!s->hooks.exit) return;
 	screen_hook = 1;
-	s->hooks.exit(s->hooks.data);
+	AS_PLUGIN(s->owner) s->hooks.exit(s->hooks.data);
 	screen_hook = 0;
 }
 
@@ -2681,7 +2722,7 @@ void Plugins_screenInput(void) {
 		int count = screenButtons(map);
 		MosaicInput input;
 		LayoutInput_fill(&input, map, count, pad.just_pressed, pad.just_repeated, pad.just_released, pad.is_pressed);
-		rc = s->hooks.input(&input, s->hooks.data);
+		AS_PLUGIN(s->owner) rc = s->hooks.input(&input, s->hooks.data);
 	}
 	else rc = PAD_justPressed(BTN_B) ? MOSAIC_SCREEN_CLOSE : MOSAIC_SCREEN_STAY;
 	if (rc != MOSAIC_SCREEN_STAY && rc != MOSAIC_SCREEN_CLOSE) screenFailed(s, "input", rc);
@@ -2696,7 +2737,9 @@ void Plugins_screenInput(void) {
 	int now_top = ScreenSet_top(&screens);
 	if (currentScreen != SCREEN_PLUGIN || now_top < 0) return;
 	PluginScreen* shown = &screens.screens[now_top];
-	if (!shown->off && shown->hooks.animating && shown->hooks.animating(shown->hooks.data)) state.dirty = 1;
+	int animating = 0;
+	if (!shown->off && shown->hooks.animating) AS_PLUGIN(shown->owner) animating = shown->hooks.animating(shown->hooks.data);
+	if (animating) state.dirty = 1;
 }
 
 void Plugins_screenRender(SDL_Surface* surface, const MosaicScreenView* view) {
@@ -2711,7 +2754,8 @@ void Plugins_screenRender(SDL_Surface* surface, const MosaicScreenView* view) {
 	screen_drawing = 1;
 	hints_screen = lent;
 	hints_view = view;
-	int rc = s->hooks.render(lent, view, s->hooks.data);
+	int rc = 0;
+	AS_PLUGIN(s->owner) rc = s->hooks.render(lent, view, s->hooks.data);
 	hints_screen = NULL;
 	hints_view = NULL;
 	screen_drawing = 0;
@@ -2828,7 +2872,8 @@ void Plugins_overlays(SDL_Surface* surface, const MosaicScreenView* view) {
 	for (int i = 0; i < loaded_count; i++) {
 		const MosaicPlugin* p = loaded[i].plugin;
 		if (loaded[i].overlay_off || !Plugin_has(p, overlay_render) || !p->overlay_render) continue;
-		int rc = p->overlay_render(lent, view);
+		int rc = 0;
+		AS_PLUGIN(i) rc = p->overlay_render(lent, view);
 		if (rc == 0) continue;
 		loaded[i].overlay_off = 1;
 		LOG_warn("plugins: %s's overlay_render returned %i, leaving its overlay out until the launcher restarts\n",

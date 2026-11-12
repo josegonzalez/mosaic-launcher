@@ -312,18 +312,18 @@ static int init(const MosaicHost* h) {
 		say("no open_screen");
 		return 1;
 	}
-	snprintf(steps, sizeof(steps), "%s", host->cfg_get(ID, "steps", ""));
+	snprintf(steps, sizeof(steps), "%s", host->cfg_get("steps", ""));
 	for (const char* p = steps; *p; p++) {
 		if (*p == ',' || p == steps) step_count++;
 	}
-	fail = host->cfg_get(ID, "fail", "");
-	hints = host->cfg_get(ID, "hints", "");
+	fail = host->cfg_get("fail", "");
+	hints = host->cfg_get("hints", "");
 	pushEvent = (int (*)(Event*))dlsym(RTLD_DEFAULT, "SDL_PushEvent");
 	if (!pushEvent) say("no SDL_PushEvent");
 
-	const char* home = host->cfg_get(ID, "home", "");
-	switcher = host->cfg_get(ID, "switcher", "");
-	declines = atoi(host->cfg_get(ID, "decline", "0"));
+	const char* home = host->cfg_get("home", "");
+	switcher = host->cfg_get("switcher", "");
+	declines = atoi(host->cfg_get("decline", "0"));
 	int game_switcher = MOSAIC_SCREEN_GAME_SWITCHER;
 	registerScreen(&main_screen, (!strcmp(home, "main") ? MOSAIC_SCREEN_HOME : 0) | (!strcmp(switcher, "main") ? game_switcher : 0), 1);
 	registerScreen(&bare_screen, !strcmp(switcher, "bare") ? game_switcher : 0, 0);

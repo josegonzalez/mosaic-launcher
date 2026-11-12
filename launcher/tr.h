@@ -35,7 +35,7 @@ typedef struct TrOwner {
 	const char* (*translate)(const char* plugin_id, const char* context, const char* text);
 	const char* (*translate_plural)(const char* plugin_id, const char* context, const char* singular, const char* plural,
 		unsigned long n);
-	const char* id;                   // for logs
+	const char* id;                   // for logs, and the plugin translate runs as
 	void (*log)(const char* message); // a line for the log, without its newline
 } TrOwner;
 

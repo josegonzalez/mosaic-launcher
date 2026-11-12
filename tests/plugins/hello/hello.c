@@ -8,10 +8,10 @@ static const MosaicHost* host;
 static int init(const MosaicHost* h) {
 	host = h;
 	char message[256];
-	const char* greeting = host->cfg_get("hello", "greeting", "hello");
+	const char* greeting = host->cfg_get("greeting", "hello");
 	snprintf(message, sizeof(message), "%s from %s", greeting, host->platform);
 	host->log("hello", message);
-	host->cfg_set("hello", "started", "yes");
+	host->cfg_set("started", "yes");
 	return 0;
 }
 

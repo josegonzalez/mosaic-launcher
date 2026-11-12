@@ -55,7 +55,7 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't rename entries");
 		return 1;
 	}
-	same_system = strcmp(host->cfg_get(ID, "same_system", "on"), "off") != 0;
+	same_system = strcmp(host->cfg_get("same_system", "on"), "off") != 0;
 	snprintf(roms, sizeof(roms), "%s/Roms", host->sdcard_path);
 	return 0;
 }

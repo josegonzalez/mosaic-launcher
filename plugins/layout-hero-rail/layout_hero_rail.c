@@ -590,10 +590,10 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a layout");
 		return 1;
 	}
-	const char* size = host->cfg_get(ID, "cards", "medium");
+	const char* size = host->cfg_get("cards", "medium");
 	percent = HR_cardPercent(size);
-	tint = HR_tint(host->cfg_get(ID, "tint", "20"));
-	fade_ms = HR_fadeMs(host->cfg_get(ID, "fade", "300"));
+	tint = HR_tint(host->cfg_get("tint", "20"));
+	fade_ms = HR_fadeMs(host->cfg_get("fade", "300"));
 	settles = MOSAIC_HOST_HAS(host, selection_settle_ms);
 	settled_path[0] = '\0';
 	fading = 0;

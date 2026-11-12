@@ -20,8 +20,7 @@ struct MosaicEntry {
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 
 static char cfg_unplayed[8] = "off", cfg_tiers[8] = "off";
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "unplayed")) return cfg_unplayed;
 	if (!strcmp(key, "tiers")) return cfg_tiers;
 	return fallback;

@@ -118,6 +118,8 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `kbmodel.c` | the on-screen keyboard's layout and typing, apart from drawing |
 | `modal.c` | the confirm, message, keyboard and choice list dialogs |
 | `cfgfile.c` | reading and writing a plugin's `key=value` settings file |
+| `plugincfg.c` | the SDL-free half of plugins' `cfg_get`, `cfg_set` and `cfg_read`: each plugin's settings, read from its file on first use and kept in memory, and the settings another plugin may read, those its `plugin.txt` marks public |
+| `caller.c` | which plugin's code runs on this thread: `AS_CALLER` (`AS_PLUGIN` in `plugins.c`) sets it around every hook and callback the launcher calls, so `cfg_get` and `cfg_set` act on that plugin's settings, and a plugin's own thread has none |
 | `settings.c` | the Launcher pak's screens, shown by `nextui.elf --settings`, and asking for the PIN before protected plugin settings |
 | `pin.c` | the launcher's PIN file (`pin.txt` beside `plugins.txt`): reading, checking and saving it, and taking over simple mode's old one |
 | `listsort.c` | sorting a list by plugins' chained `sort_compare` hooks |

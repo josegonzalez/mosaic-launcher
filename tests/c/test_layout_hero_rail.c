@@ -268,8 +268,7 @@ static int replaced_index = -1; // the entry it's for, or -1 for none
 static int blits_of_video = 0, screen_tinted = 0, screen_banded = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	(void)id;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "cards")) return cards_cfg;
 	if (!strcmp(key, "fade")) return fade_cfg;
 	return fallback;
@@ -362,7 +361,6 @@ static MosaicSurface* fakeMake(int w, int h) {
 	return s;
 }
 static MosaicSurface* fakeSurfaceNew(const char* id, int w, int h) {
-	(void)id;
 	news++;
 	return fakeMake(w, h);
 }
@@ -372,7 +370,6 @@ static MosaicSurface* fakeSurfaceScale(const char* id, const MosaicSurface* src,
 	return fakeMake(w, h);
 }
 static int fakeSurfaceFree(const char* id, MosaicSurface* s) {
-	(void)id;
 	if (!s->owned) return -1;
 	s->owned = 0;
 	frees++;

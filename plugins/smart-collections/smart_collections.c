@@ -179,7 +179,7 @@ static int collectionAt(const char* path) {
 static void saveDismissed(void) {
 	char list[SM_MAX_FRANCHISES * SM_NAME_LEN];
 	SM_setFormat(&dismissed, list, sizeof(list));
-	host->cfg_set(ID, "dismissed", list);
+	host->cfg_set("dismissed", list);
 }
 
 static void changed(const char* message) {
@@ -297,11 +297,11 @@ static int init(const MosaicHost* h) {
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
 
 	SM_catalogInit(&catalog);
-	if (strcmp(host->cfg_get(ID, "builtin", "on"), "off") != 0) SM_catalogAddBuiltin(&catalog);
-	SM_catalogAddList(&catalog, host->cfg_get(ID, "extra", ""));
-	min_games = atoi(host->cfg_get(ID, "min", "2"));
+	if (strcmp(host->cfg_get("builtin", "on"), "off") != 0) SM_catalogAddBuiltin(&catalog);
+	SM_catalogAddList(&catalog, host->cfg_get("extra", ""));
+	min_games = atoi(host->cfg_get("min", "2"));
 	if (min_games < 1) min_games = 1;
-	SM_setParse(&dismissed, host->cfg_get(ID, "dismissed", ""));
+	SM_setParse(&dismissed, host->cfg_get("dismissed", ""));
 	SM_indexInit(&index_);
 	scanned = 0;
 

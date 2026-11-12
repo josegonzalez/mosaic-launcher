@@ -356,7 +356,7 @@ static void quit(void) {
 }
 
 static int settingOn(const char* key) {
-	return strcmp(host->cfg_get(ID, key, "on"), "off") != 0;
+	return strcmp(host->cfg_get(key, "on"), "off") != 0;
 }
 
 static const struct {
@@ -392,7 +392,7 @@ static int init(const MosaicHost* h) {
 	checked[0] = '\0';
 	with_saves = settingOn("saves");
 
-	const char* name = host->cfg_get(ID, "button", "Y");
+	const char* name = host->cfg_get("button", "Y");
 	int button = MOSAIC_BUTTON_Y;
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;

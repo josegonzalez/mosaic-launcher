@@ -35,15 +35,14 @@ static int refuse_button = -1; // override_button refuses this one, as if anothe
 static const char* unknown_action = NULL; // bind_button and override_button refuse this one
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; logs++; }
-static const char* fakeCfgGet(const char* id, const char* key, const char* fallback) {
-	if (strcmp(id, "button-remap") != 0) return fallback;
+static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = cfg_count - 1; i >= 0; i--) {
 		if (!strcmp(cfg_keys[i], key)) return cfg_values[i];
 	}
 	return fallback;
 }
-static void fakeCfgSet(const char* id, const char* key, const char* value) {
-	(void)id; (void)key; (void)value;
+static void fakeCfgSet(const char* key, const char* value) {
+	(void)key; (void)value;
 	CHECK(0); // the plugin never writes its settings
 }
 static void record(Call* calls, int* count, int button, int trigger, const char* id) {

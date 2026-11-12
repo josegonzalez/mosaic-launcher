@@ -2,6 +2,7 @@
 #include <string.h>
 #include "tr.h"
 #include "trmodel.h"
+#include "caller.h"
 
 static TrOwner owner;
 static int owned = 0;
@@ -41,10 +42,12 @@ static char* lookup(const char* plugin_id, const char* context, const char* text
 	if (hit) return hit->value ? hit->value : (char*)english;
 
 	asking = 1;
-	const char* got;
-	if (!plural) got = owner.translate(plugin_id, context, text);
-	else if (owner.translate_plural) got = owner.translate_plural(plugin_id, context, text, plural, n);
-	else got = owner.translate(plugin_id, context, english);
+	const char* got = NULL;
+	AS_CALLER(owner.id) {
+		if (!plural) got = owner.translate(plugin_id, context, text);
+		else if (owner.translate_plural) got = owner.translate_plural(plugin_id, context, text, plural, n);
+		else got = owner.translate(plugin_id, context, english);
+	}
 	asking = 0;
 
 	int check = Tr_check(text, plural, got);

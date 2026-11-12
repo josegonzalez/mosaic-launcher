@@ -135,7 +135,7 @@ static void tick(unsigned long now) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	snprintf(steps, sizeof(steps), "%s", host->cfg_get(ID, "steps", ""));
+	snprintf(steps, sizeof(steps), "%s", host->cfg_get("steps", ""));
 	step_count = steps[0] ? 1 : 0;
 	for (const char* p = steps; *p; p++) {
 		if (*p == ',') step_count++;
