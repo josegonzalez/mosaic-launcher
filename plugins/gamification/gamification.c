@@ -48,6 +48,16 @@
 #define STATE_MAX 16384
 
 static const MosaicHost* host;
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
 static GMState state;
 static char state_dir[GM_PATH_MAX];
 static char state_path[GM_PATH_MAX + 16];
@@ -185,7 +195,7 @@ static int settle(int newly[GM_QUESTS]) {
 	int best = state.best_streak;
 	int n = GM_settle(&state, today, progress, longest > streak ? longest : streak, newly);
 	for (int i = 0; i < n; i++) {
-		char title[160], message[200];
+		char title[256], message[320];
 		GM_title(newly[i], &targets, title, sizeof(title));
 		snprintf(message, sizeof(message), "quest done: %s (%s)", GM_questId(newly[i]), title);
 		say(message);
@@ -245,7 +255,7 @@ static void postReturn(void) {
 	int newly[GM_QUESTS];
 	int n = settle(newly);
 	int cheer = had && streak > 0 && played[0] >= targets.streak_seconds && state.cheered != today;
-	char text[200];
+	char text[512];
 	GM_toast(newly, n, &targets, streak, cheer, text, sizeof(text));
 	if (!text[0]) return;
 	if (n == 0 && cheer) {
@@ -284,7 +294,7 @@ static void drawTop(MosaicSurface* screen, const MosaicRect* room) {
 	int pad = 10 * scale;
 	int small_h = host->text_height(MOSAIC_FONT_SMALL);
 	int large_h = host->text_height(MOSAIC_FONT_LARGE);
-	char text[64], summary[96];
+	char text[128], summary[256];
 	GM_streakText(streak, text, sizeof(text));
 	GM_summary(state.best_streak, state.completed, summary, sizeof(summary));
 	int w = host->text_width(MOSAIC_FONT_LARGE, text) + 2 * pad;
@@ -307,7 +317,7 @@ static void drawQuest(MosaicSurface* screen, const MosaicRect* r, int quest) {
 	int small_h = host->text_height(MOSAIC_FONT_SMALL);
 	int large_h = host->text_height(MOSAIC_FONT_LARGE);
 	const GMProgress* p = &progress[quest];
-	char title[160], cut[160], value[64];
+	char title[256], cut[256], value[128];
 	GM_title(quest, &targets, title, sizeof(title));
 	GM_value(quest, p, value, sizeof(value));
 	int bar_h = 2 * scale;
@@ -350,7 +360,7 @@ static void drawHints(MosaicSurface* screen) {
 
 // What the screen shows, for tests and bug reports.
 static void describe(char* out, size_t size) {
-	char text[64], summary[96];
+	char text[128], summary[256];
 	GM_streakText(streak, text, sizeof(text));
 	GM_summary(state.best_streak, state.completed, summary, sizeof(summary));
 	size_t used = (size_t)snprintf(out, size, "%s, %s;", text, summary);
@@ -426,6 +436,8 @@ static void openQuests(void* data) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const GMWords words = { tr, trPlural };
+	GM_setWords(&words);
 	if (!MOSAIC_HOST_HAS(host, draw_hints)) {
 		say("this launcher has no plugin screens with button hints");
 		return 1;

@@ -1284,17 +1284,17 @@ static int assetTarget(const RMAsset* a, char* out, size_t size) {
 }
 
 static void assetLabel(const RMAsset* a, char* out, size_t size) {
-	char when[32], bytes[32];
+	char when[64], bytes[64];
 	RM_formatTime(a->updated, when, sizeof(when));
 	RM_formatSize(a->size, bytes, sizeof(bytes));
 	int slot = a->kind == RM_ASSET_STATE ? RM_stateSlot(a->file) : -1;
-	char kind[32];
-	if (a->kind == RM_ASSET_SAVE) put(kind, sizeof(kind), "Save");
-	else if (slot >= 0) put(kind, sizeof(kind), "State %d", slot);
-	else put(kind, sizeof(kind), "State");
+	char kind[128];
+	if (a->kind == RM_ASSET_SAVE) put(kind, sizeof(kind), "%s", tr("Save"));
+	else if (slot >= 0) put(kind, sizeof(kind), tr("State %d"), slot);
+	else put(kind, sizeof(kind), "%s", tr("State"));
 	char target[RM_PATH_MAX];
 	int here = assetTarget(a, target, sizeof(target)) == 0;
-	put(out, size, "%s  %s  %s%s", when, kind, bytes, here ? "" : "  (can't restore)");
+	put(out, size, "%s  %s  %s%s%s", when, kind, bytes, here ? "" : "  ", here ? "" : tr("(can't restore)"));
 }
 
 static void flashbackLoad(void) {
@@ -1303,7 +1303,7 @@ static void flashbackLoad(void) {
 	fb.count = -1;
 	fb.error[0] = '\0';
 	if (!networkReady(0)) {
-		put(fb.error, sizeof(fb.error), "No network");
+		put(fb.error, sizeof(fb.error), "%s", tr("No network"));
 		fb.count = 0;
 		return;
 	}
@@ -1311,7 +1311,7 @@ static void flashbackLoad(void) {
 	if (!j) return;
 	j->rom_id = fb.rom_id;
 	if (jobAdd(j) != 0) {
-		put(fb.error, sizeof(fb.error), "Busy, try again");
+		put(fb.error, sizeof(fb.error), "%s", tr("Busy, try again"));
 		fb.count = 0;
 	}
 }
@@ -1878,6 +1878,8 @@ static void removeLeftovers(void) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const RMWords words = { tr };
+	RM_setWords(&words);
 	put(sd, sizeof(sd), "%s", host->sdcard_path);
 	put(data_dir, sizeof(data_dir), "%s/launcher/romm", host->userdata_path);
 	put(root_path, sizeof(root_path), "%s/RomM", host->sdcard_path);

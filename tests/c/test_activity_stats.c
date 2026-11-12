@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/activity-stats/activity_stats.c"
 
 #define CARD TEST_SDCARD_PATH
@@ -721,10 +722,52 @@ static void testScreen(void) {
 	mosaic_plugin_get(&fake_host)->quit();
 }
 
+// the text in the words it's given, and English again without them
+static void testWords(void) {
+	static const char* const words[] = { "%lldm", "%lld min", "%lldh %lldm", "%lld h %lld min", "<1m", "<1 min",
+		"%i days: %s", "%i d\xc3\xad" "as: %s", "%s a day", "%s al d\xc3\xad" "a", "%i days: no play history",
+		"%i d\xc3\xad" "as: sin historial", "Unknown game", "Juego desconocido", "Mon", "lun", NULL };
+	static const char* const plurals[] = { "%lld session", "%lld sesi\xc3\xb3n", "%lld sesiones", "%i game", "%i juego",
+		"%i juegos", NULL };
+	fake_words = words;
+	fake_plurals = plurals;
+	ASWords set = { fakeTr, fakePlural };
+	AS_setWords(&set);
+	char out[128];
+	AS_duration(7500, out, sizeof(out));
+	CHECK_STR(out, "2 h 5 min");
+	AS_duration(30, out, sizeof(out));
+	CHECK_STR(out, "<1 min");
+	AS_sessions(1, out, sizeof(out));
+	CHECK_STR(out, "1 sesi\xc3\xb3n");
+	AS_sessions(4, out, sizeof(out));
+	CHECK_STR(out, "4 sesiones");
+	AS_listCaption(3, 9000, 1, out, sizeof(out));
+	CHECK_STR(out, "3 juegos \xc2\xb7 2 h 30 min \xc2\xb7 1 sesi\xc3\xb3n");
+	long long week[7] = { 900, 1600, 7200, 50, 300, 0, 0 };
+	AS_chartCaption(week, 7, out, sizeof(out));
+	CHECK_STR(out, "7 d\xc3\xad" "as: 2 h 47 min \xc2\xb7 23 min al d\xc3\xad" "a");
+	long long none[2] = { -1, -1 };
+	AS_chartCaption(none, 2, out, sizeof(out));
+	CHECK_STR(out, "2 d\xc3\xad" "as: sin historial");
+	AS_name("", "", out, sizeof(out));
+	CHECK_STR(out, "Juego desconocido");
+	AS_dayLabel(localTime(2026, 11, 9, 12, 0), 7, 0, out, sizeof(out)); // a Monday
+	CHECK_STR(out, "lun");
+	AS_setWords(NULL);
+	AS_duration(7500, out, sizeof(out));
+	CHECK_STR(out, "2h 5m");
+	AS_sessions(1, out, sizeof(out));
+	CHECK_STR(out, "1 session");
+	AS_listCaption(1, 60, 1, out, sizeof(out));
+	CHECK_STR(out, "1 game \xc2\xb7 1m \xc2\xb7 1 session");
+}
+
 int main(void) {
 	testName();
 	testRank();
 	testFormat();
+	testWords();
 	testDays();
 	testChart();
 	testTabs();

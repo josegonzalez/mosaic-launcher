@@ -52,6 +52,12 @@
 #define GAMES_MAX 64     // recent and favorite games looked at, at most
 
 static const MosaicHost* host;
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static int supported = 0;
 
 // settings
@@ -478,6 +484,8 @@ static void quit(void) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const SSWords words = { tr, NULL };
+	SS_setWords(&words);
 	supported = 0;
 	showing = activity = close_pressed = resumed = refused = yielding = 0;
 	filter = (SsFilter){0};

@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "check.h"
+#include "words.h"
 #include "miniz.h"
 #include "romm_model.h"
 #include "romm_net.h"
@@ -346,6 +347,18 @@ static void testText(void) {
 	CHECK_STR(out, "32.0 KB");
 	RM_formatSize(3 * 1024 * 1024 / 2, out, sizeof(out));
 	CHECK_STR(out, "1.5 MB");
+	// in the words they're given, then English again
+	static const char* const words[] = { "unknown time", "hora desconocida", "KB", "kB", NULL };
+	fake_words = words;
+	RMWords set = { fakeTr, fakePlural };
+	RM_setWords(&set);
+	RM_formatTime(0, out, sizeof(out));
+	CHECK_STR(out, "hora desconocida");
+	RM_formatSize(32768, out, sizeof(out));
+	CHECK_STR(out, "32.0 kB");
+	RM_setWords(NULL);
+	RM_formatSize(32768, out, sizeof(out));
+	CHECK_STR(out, "32.0 KB");
 
 	CHECK(RM_safeName("Mosaic Test One (World).gb"));
 	CHECK(RM_safeName("Pok\xc3\xa9mon.gb"));

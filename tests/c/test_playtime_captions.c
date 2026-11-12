@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/playtime-captions/playtime_captions.c"
 
 struct MosaicEntry {
@@ -231,6 +232,41 @@ int main(void) {
 	CHECK_STR(out, "4 sessions");
 	PC_sessions(4, PC_FORMAT_COMPACT, out, sizeof(out));
 	CHECK_STR(out, "4x");
+
+	// in the words it's given, then English again
+	static const char* const words[] = { "%lldh %lldm", "%lld h %lld min", "today", "hoy", "%id", "%i d",
+		"Nov", "nov", "Never played", "Sin jugar", NULL };
+	static const char* const plurals[] = { "%i day ago", "hace %i d\xc3\xad" "a", "hace %i d\xc3\xad" "as",
+		"%i session", "%i sesi\xc3\xb3n", "%i sesiones", NULL };
+	fake_words = words;
+	fake_plurals = plurals;
+	PCWords set = { fakeTr, fakePlural };
+	PC_setWords(&set);
+	PC_duration(2 * 3600 + 15 * 60, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "2 h 15 min");
+	PC_lastPlayed(now - 3600, now, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "hoy");
+	PC_lastPlayed(now - 86400, now, PC_FORMAT_COMPACT, out, sizeof(out));
+	CHECK_STR(out, "1 d");
+	PC_lastPlayed(now - 3 * 86400, now, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "hace 3 d\xc3\xad" "as");
+	PC_lastPlayed(at(2026, 11, 5, 9, 0), now, PC_FORMAT_DATE, out, sizeof(out));
+	CHECK_STR(out, "nov 5");
+	PC_sessions(1, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "1 sesi\xc3\xb3n");
+	PC_sessions(4, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "4 sesiones");
+	PCStats seen = { 2 * 3600 + 15 * 60, now - 86400 * 1, 4 };
+	CHECK(PC_build(&seen, now, PC_PART_TIME | PC_PART_SESSIONS, PC_FORMAT_RELATIVE, 0, 3, out, sizeof(out)) == 2);
+	CHECK_STR(out, "2 h 15 min \xC2\xB7 4 sesiones");
+	PCStats unplayed = { 0, 0, 0 };
+	CHECK(PC_build(&unplayed, now, PC_PART_TIME, PC_FORMAT_RELATIVE, 1, 3, out, sizeof(out)) == 1);
+	CHECK_STR(out, "Sin jugar");
+	PC_setWords(NULL);
+	PC_lastPlayed(now - 3 * 86400, now, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "3 days ago");
+	PC_sessions(1, PC_FORMAT_RELATIVE, out, sizeof(out));
+	CHECK_STR(out, "1 session");
 
 	// building the caption
 	PCStats tetris = { 2 * 3600 + 15 * 60, now - 3 * 86400, 4 };

@@ -13,6 +13,23 @@
 #define MAX_FILE_BYTES (1024 * 1024) // the most of a collection or names file read
 #define MAX_DEPTH 8                  // how deep a system folder is searched or a game folder deleted
 
+static GAWords words; // none set: English
+
+void GA_setWords(const GAWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text and a count's form in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (words.tr_plural) return words.tr_plural(singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 ///////////////////////////////////////
 // paths
 
@@ -574,24 +591,29 @@ int GA_planDelete(const GACard* card, const char* path, GAPlan* plan) {
 	return 0;
 }
 
-static void plural(char* out, size_t size, int n, const char* one, const char* many) {
-	fmt(out, size, "%i %s", n, n == 1 ? one : many);
-}
-
 void GA_planSummary(const GAPlan* plan, char* out, size_t size) {
-	char parts[6][64];
+	char parts[6][128];
 	int n = 0;
-	if (plan->counts[GA_DISC]) plural(parts[n++], sizeof(parts[0]), plan->counts[GA_DISC], "disc file", "disc files");
-	if (plan->counts[GA_SAVE]) plural(parts[n++], sizeof(parts[0]), plan->counts[GA_SAVE], "save", "saves");
-	if (plan->counts[GA_STATE]) plural(parts[n++], sizeof(parts[0]), plan->counts[GA_STATE], "state", "states");
-	else if (plan->counts[GA_SLOT]) fmt(parts[n++], sizeof(parts[0]), "its resume files");
-	if (plan->counts[GA_ART]) fmt(parts[n++], sizeof(parts[0]), "its art");
-	if (plan->counts[GA_CONFIG]) fmt(parts[n++], sizeof(parts[0]), "its settings");
+	int count = plan->counts[GA_DISC];
+	if (count) fmt(parts[n++], sizeof(parts[0]), trPlural("%i disc file", "%i disc files", (unsigned long)count), count);
+	count = plan->counts[GA_SAVE];
+	if (count) fmt(parts[n++], sizeof(parts[0]), trPlural("%i save", "%i saves", (unsigned long)count), count);
+	count = plan->counts[GA_STATE];
+	if (count) fmt(parts[n++], sizeof(parts[0]), trPlural("%i state", "%i states", (unsigned long)count), count);
+	else if (plan->counts[GA_SLOT]) fmt(parts[n++], sizeof(parts[0]), "%s", tr("its resume files"));
+	if (plan->counts[GA_ART]) fmt(parts[n++], sizeof(parts[0]), "%s", tr("its art"));
+	if (plan->counts[GA_CONFIG]) fmt(parts[n++], sizeof(parts[0]), "%s", tr("its settings"));
 	if (size) out[0] = '\0';
+	// "a, b and c": the parts but the last two joined by ", ", and those two by "%s and %s"
 	for (int i = 0; i < n; i++) {
 		size_t len = strlen(out);
-		const char* join = i == 0 ? "" : i == n - 1 ? " and " : ", ";
-		fmt(out + len, size - len, "%s%s", join, parts[i]);
+		if (i == 0) fmt(out, size, "%s", parts[i]);
+		else if (i < n - 1) fmt(out + len, size - len, ", %s", parts[i]);
+		else {
+			char head[512];
+			fmt(head, sizeof(head), "%s", out);
+			fmt(out, size, tr("%s and %s"), head, parts[i]);
+		}
 	}
 }
 

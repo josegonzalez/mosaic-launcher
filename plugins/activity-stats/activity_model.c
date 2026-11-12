@@ -8,6 +8,23 @@
 #define TR_MARK(text) (text)
 #include "activity_model.h"
 
+static ASWords words; // none set: English
+
+void AS_setWords(const ASWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text and a count's form in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (words.tr_plural) return words.tr_plural(singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 // stock's sizes, in its units
 #define PADDING 10
 #define PILL_SIZE 30
@@ -25,7 +42,7 @@ void AS_name(const char* name, const char* path, char* out, size_t size) {
 	const char* base = path ? strrchr(path, '/') : NULL;
 	base = base ? base + 1 : path;
 	if (!base || !base[0]) {
-		snprintf(out, size, "Unknown game");
+		snprintf(out, size, "%s", tr("Unknown game"));
 		return;
 	}
 	const char* dot = strrchr(base, '.');
@@ -97,17 +114,17 @@ void AS_duration(long long seconds, char* out, size_t size) {
 		return;
 	}
 	if (seconds > 0 && seconds < 60) {
-		snprintf(out, size, "<1m");
+		snprintf(out, size, "%s", tr("<1m"));
 		return;
 	}
 	long long hours = seconds / 3600, minutes = seconds % 3600 / 60;
-	if (!hours) snprintf(out, size, "%lldm", minutes);
-	else if (!minutes) snprintf(out, size, "%lldh", hours);
-	else snprintf(out, size, "%lldh %lldm", hours, minutes);
+	if (!hours) snprintf(out, size, tr("%lldm"), minutes);
+	else if (!minutes) snprintf(out, size, tr("%lldh"), hours);
+	else snprintf(out, size, tr("%lldh %lldm"), hours, minutes);
 }
 
 void AS_sessions(long long count, char* out, size_t size) {
-	snprintf(out, size, "%lld %s", count, count == 1 ? "session" : "sessions");
+	snprintf(out, size, trPlural("%lld session", "%lld sessions", (unsigned long)count), count);
 }
 
 #define DOT " \xc2\xb7 "
@@ -124,7 +141,9 @@ void AS_listCaption(int games, long long seconds, long long sessions, char* out,
 	char played[32], counted[32];
 	AS_duration(seconds, played, sizeof(played));
 	AS_sessions(sessions, counted, sizeof(counted));
-	snprintf(out, size, "%i %s" DOT "%s" DOT "%s", games, games == 1 ? "game" : "games", played, counted);
+	char count[64];
+	snprintf(count, sizeof(count), trPlural("%i game", "%i games", (unsigned long)games), games);
+	snprintf(out, size, "%s" DOT "%s" DOT "%s", count, played, counted);
 }
 
 void AS_chartCaption(const long long* day, int days, char* out, size_t size) {
@@ -136,13 +155,16 @@ void AS_chartCaption(const long long* day, int days, char* out, size_t size) {
 		known++;
 	}
 	if (!known) {
-		snprintf(out, size, "%i days: no play history", days);
+		snprintf(out, size, tr("%i days: no play history"), days);
 		return;
 	}
 	char sum[32], average[32];
 	AS_duration(total, sum, sizeof(sum));
 	AS_duration(total / known, average, sizeof(average));
-	snprintf(out, size, "%i days: %s" DOT "%s a day", days, sum, average);
+	char head[128], tail[128];
+	snprintf(head, sizeof(head), tr("%i days: %s"), days, sum);
+	snprintf(tail, sizeof(tail), tr("%s a day"), average);
+	snprintf(out, size, "%s" DOT "%s", head, tail);
 }
 
 void AS_dayOf(time_t now, int days_ago, struct tm* out) {
@@ -158,13 +180,14 @@ void AS_dayOf(time_t now, int days_ago, struct tm* out) {
 }
 
 void AS_dayLabel(time_t now, int days, int days_ago, char* out, size_t size) {
-	static const char* weekdays[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+	static const char* weekdays[] = { TR_MARK("Sun"), TR_MARK("Mon"), TR_MARK("Tue"), TR_MARK("Wed"), TR_MARK("Thu"),
+		TR_MARK("Fri"), TR_MARK("Sat") };
 	if (!size) return;
 	out[0] = '\0';
 	if (days_ago < 0 || days_ago >= days) return;
 	struct tm tm;
 	AS_dayOf(now, days_ago, &tm);
-	if (days <= AS_WEEK) snprintf(out, size, "%s", weekdays[tm.tm_wday % 7]);
+	if (days <= AS_WEEK) snprintf(out, size, "%s", tr(weekdays[tm.tm_wday % 7]));
 	else if (days_ago % 7 == 0) snprintf(out, size, "%i", tm.tm_mday);
 }
 

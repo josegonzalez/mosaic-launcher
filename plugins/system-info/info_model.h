@@ -14,6 +14,17 @@
 #define SI_SESSIONS_MAX 64 // the most recent battery-logger sessions the graph shows
 #define SI_ADDRS_MAX 4     // IP addresses shown
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until Si_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct SiWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} SiWords;
+void Si_setWords(const SiWords* words);
+
 // The rows, in the order they're drawn from the top.
 enum SiRow {
 	SI_BATTERY,

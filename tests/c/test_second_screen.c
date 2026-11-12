@@ -3,6 +3,7 @@
 // lines and the frame file's header.
 
 #include "check.h"
+#include "words.h"
 #include "../../plugins/second-screen/ss_model.h"
 
 // ten pixels a byte, so widths are easy to work out
@@ -177,6 +178,17 @@ int main(void) {
 	CHECK(SS_infoLines(infoGet, "tier=3", info, SS_INFO_COUNT) == 0);
 	CHECK(SS_infoLines(infoGet, "", info, SS_INFO_COUNT) == 0);
 	CHECK(SS_infoLines(NULL, "", info, SS_INFO_COUNT) == 0);
+	// in the words it's given, then English again
+	static const char* const words[] = { "Year", "A\xc3\xb1o", NULL };
+	fake_words = words;
+	SSWords set = { fakeTr, fakePlural };
+	SS_setWords(&set);
+	CHECK(SS_infoLines(infoGet, "year=1994\nplayers=2", info, SS_INFO_COUNT) == 2);
+	CHECK_STR(info[0], "A\xc3\xb1o: 1994");
+	CHECK_STR(info[1], "Players: 2");
+	SS_setWords(NULL);
+	CHECK(SS_infoLines(infoGet, "year=1994", info, SS_INFO_COUNT) == 1);
+	CHECK_STR(info[0], "Year: 1994");
 
 	// what an entry is
 	CHECK_STR(SS_kindLabel(MOSAIC_ENTRY_ROM), "Game");

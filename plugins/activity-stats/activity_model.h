@@ -16,6 +16,17 @@
 #define AS_DAYS 30
 #define AS_WEEK 7
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until AS_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct ASWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} ASWords;
+void AS_setWords(const ASWords* words);
+
 // One game from the play history.
 typedef struct ASGame {
 	char path[AS_PATH_MAX]; // its full path on the card, or "" for an orphan

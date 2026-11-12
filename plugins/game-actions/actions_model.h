@@ -3,6 +3,17 @@
 
 #include <stddef.h>
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until GA_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct GAWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} GAWords;
+void GA_setWords(const GAWords* words);
+
 // The game actions' logic, with no SDL and no host: what deleting a game
 // removes, editing collection files, and per-entry name overrides. Paths
 // are full paths on the card unless a comment says card-relative.

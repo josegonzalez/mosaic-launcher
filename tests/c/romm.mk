@@ -21,7 +21,7 @@ $(ROMM_BEARSSL_OBJ)/libbearssl.a: $(ROMM_BEARSSL_OBJECTS)
 	rm -f $@
 	$(AR) rcs $@ $^
 
-$(BUILD)/test_romm: test_romm.c $(wildcard $(ROMM)/*.c $(ROMM)/*.h) $(SDK)/mosaic_plugin.h check.h $(ROMM_BEARSSL_OBJ)/libbearssl.a $(BUILD)/miniz/miniz.o
+$(BUILD)/test_romm: test_romm.c $(wildcard $(ROMM)/*.c $(ROMM)/*.h) $(SDK)/mosaic_plugin.h check.h words.h $(ROMM_BEARSSL_OBJ)/libbearssl.a $(BUILD)/miniz/miniz.o
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(ROMM) -I$(ROMM_BEARSSL)/inc -I$(ROMM_MINIZ) $(ROMM_MINIZ_DEFS) \
 		-DFIXTURES=\"$(abspath fixtures/romm)\" test_romm.c $(ROMM)/romm_model.c $(ROMM)/romm_net.c \

@@ -702,7 +702,7 @@ static void stateLine(char* out, size_t size) {
 	char pos[16], len[16];
 	MU_formatTime(st.pos_ms, pos, sizeof(pos));
 	MU_formatTime(st.len_ms, len, sizeof(len));
-	char repeat[64];
+	char repeat[128];
 	snprintf(repeat, sizeof(repeat), tr("Repeat %s"), tr(MU_repeatName(st.repeat)));
 	snprintf(out, size, "%.40s  %s / %s%s%.40s  %s", st.state == MU_PLAYING ? tr("Playing") : tr("Paused"), pos, len,
 		st.shuffle ? "  " : "", st.shuffle ? tr("Shuffle") : "", repeat);
@@ -896,7 +896,7 @@ static int lockRender(MosaicSurface* screen, const MosaicScreenView* view, void*
 		stateLine(line, sizeof(line));
 		textCentred(screen, MOSAIC_FONT_SMALL, line, &box, y, hint);
 	}
-	textCentred(screen, MOSAIC_FONT_SMALL, "Locked: SELECT then START to unlock", &box,
+	textCentred(screen, MOSAIC_FONT_SMALL, tr("Locked: SELECT then START to unlock"), &box,
 		area.y + area.h - 10 * s - small, hint);
 	return 0;
 }

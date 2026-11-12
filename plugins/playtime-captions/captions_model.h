@@ -9,6 +9,17 @@
 #include <stddef.h>
 #include "mosaic_plugin.h"
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until PC_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct PCWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} PCWords;
+void PC_setWords(const PCWords* words);
+
 // How the parts read.
 enum PCFormat {
 	PC_FORMAT_RELATIVE, // "2h 15m · 3 days ago · 4 sessions"

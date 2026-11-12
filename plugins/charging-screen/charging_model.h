@@ -3,6 +3,17 @@
 
 #include <stddef.h>
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until CS_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct CSWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} CSWords;
+void CS_setWords(const CSWords* words);
+
 // What the charging screen decides, apart from the host, the clock and the
 // card, so the host tests can check it on its own.
 

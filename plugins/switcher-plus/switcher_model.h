@@ -10,6 +10,17 @@
 #include <stddef.h>
 #include "mosaic_plugin.h"
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until SP_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct SPWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} SPWords;
+void SP_setWords(const SPWords* words);
+
 // recents kept, at most; stock keeps 24
 #define SP_MAX_RECENTS 64
 #define SP_PATH_MAX 512

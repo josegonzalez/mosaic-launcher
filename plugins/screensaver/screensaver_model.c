@@ -7,6 +7,18 @@
 #include <sys/stat.h>
 #include "screensaver_model.h"
 
+static SSWords words; // none set: English
+
+void SS_setWords(const SSWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
 ///////////////////////////////////////
 // Settings
 
@@ -81,7 +93,7 @@ void SS_formatClock(int hour, int minute, int mode, char* out, size_t size) {
 	if (mode == SS_CLOCK_OFF || hour < 0 || hour > 23 || minute < 0 || minute > 59) return;
 	if (mode == SS_CLOCK_12H) {
 		int h = hour % 12;
-		snprintf(out, size, "%d:%02d %s", h ? h : 12, minute, hour < 12 ? "AM" : "PM");
+		snprintf(out, size, "%d:%02d %s", h ? h : 12, minute, hour < 12 ? tr("AM") : tr("PM"));
 	}
 	else snprintf(out, size, "%02d:%02d", hour, minute);
 }

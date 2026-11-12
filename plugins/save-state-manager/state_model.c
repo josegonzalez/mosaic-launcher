@@ -8,6 +8,18 @@
 #include <unistd.h>
 #include "state_model.h"
 
+static SMWords words; // none set: English
+
+void SM_setWords(const SMWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
 // stock's sizes, at scale 1
 #define PADDING 10
 #define PILL_SIZE 30
@@ -121,9 +133,9 @@ void SM_displayName(const char* name, char* out, size_t size) {
 }
 
 void SM_slotLabel(int slot, char* out, size_t size) {
-	if (slot == SM_DEFAULT_SLOT) snprintf(out, size, "Default");
-	else if (slot == SM_AUTO_SLOT) snprintf(out, size, "Auto");
-	else snprintf(out, size, "Slot %d", slot + 1);
+	if (slot == SM_DEFAULT_SLOT) snprintf(out, size, "%s", tr("Default"));
+	else if (slot == SM_AUTO_SLOT) snprintf(out, size, "%s", tr("Auto"));
+	else snprintf(out, size, tr("Slot %d"), slot + 1);
 }
 
 int SM_slotOf(const char* text) {

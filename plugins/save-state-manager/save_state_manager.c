@@ -71,6 +71,7 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -182,7 +183,7 @@ static void title(MosaicSurface* screen, const MosaicScreenView* v, const Mosaic
 
 // "Tetris · Slot 3", with the date too when with_date is 1
 static void slotTitle(const SMGame* game, const SMSlot* slot, int with_date, char* out, size_t size) {
-	char label[32], date[32];
+	char label[128], date[32];
 	SM_slotLabel(slot->slot, label, sizeof(label));
 	SM_date(slot->saved, date, sizeof(date));
 	if (with_date && date[0]) snprintf(out, size, "%s \xc2\xb7 %s \xc2\xb7 %s", game->display, label, date);
@@ -214,7 +215,7 @@ static int renderFull(MosaicSurface* screen, const MosaicScreenView* v, const Mo
 	if (got < 0) centred(screen, MOSAIC_FONT_LARGE, tr("No preview"), &v->area, mosaic_color(0xFFFFFF, 255));
 	prefetch(game, slot_sel + 1, &v->area);
 	prefetch(game, slot_sel - 1, &v->area);
-	char text[SM_NAME_MAX + 128];
+	char text[SM_NAME_MAX + 256];
 	slotTitle(game, slot, 1, text, sizeof(text));
 	title(screen, v, hole, text);
 	return got;
@@ -290,7 +291,7 @@ static void logShown(int shown_view, int got) {
 		snprintf(line, sizeof(line), "no save states");
 	} else {
 		const SMSlot* s = &game->slots[slot_sel];
-		char label[32], date[32];
+		char label[128], date[32];
 		SM_slotLabel(s->slot, label, sizeof(label));
 		SM_date(s->saved, date, sizeof(date));
 		if (shown_view == SM_VIEW_FULL) {
@@ -318,9 +319,9 @@ static void deleteConfirmed(void* data) {
 			if (game->slots[i].slot == pending.slot) at = i;
 		}
 	}
-	char label[32];
+	char label[128];
 	SM_slotLabel(pending.slot, label, sizeof(label));
-	char message[SM_NAME_MAX + 128];
+	char message[SM_NAME_MAX + 256];
 	char preview[SM_PATH_MAX];
 	snprintf(preview, sizeof(preview), "%s", at >= 0 ? game->slots[at].preview : "");
 	int removed = at < 0 ? -1 : SM_remove(&card, game, at);
@@ -359,7 +360,7 @@ static void askDelete(void) {
 	snprintf(pending.tag, sizeof(pending.tag), "%s", game->tag);
 	snprintf(pending.name, sizeof(pending.name), "%s", game->name);
 	pending.slot = game->slots[slot_sel].slot;
-	char text[SM_NAME_MAX + 128];
+	char text[SM_NAME_MAX + 256];
 	slotTitle(game, &game->slots[slot_sel], 1, text, sizeof(text));
 	char question[sizeof(text) + 256];
 	snprintf(question, sizeof(question), tr("Delete this save state?\n%s"), text);
@@ -375,7 +376,7 @@ static int enter(void* data) {
 	game_sel = game_row = 0;
 	deleted = 0;
 	shown[0] = '\0';
-	char message[SM_NAME_MAX + 128];
+	char message[SM_NAME_MAX + 256];
 	if (all) {
 		view = SM_VIEW_GAMES;
 		int count = SM_scanAll(&card, &list);
@@ -462,7 +463,7 @@ static int render(MosaicSurface* screen, const MosaicScreenView* v, void* data) 
 		got = renderGrid(screen, v, &hole, count, slot_sel, &slot_row);
 		if (got < 0) shown_view = SM_VIEW_FULL; // too small for a grid: the full view stands in
 		else {
-			char text[SM_NAME_MAX + 128];
+			char text[SM_NAME_MAX + 256];
 			slotTitle(game, &game->slots[slot_sel], 0, text, sizeof(text));
 			title(screen, v, &hole, text);
 		}
@@ -551,6 +552,8 @@ static void openAll(void* data) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const SMWords words = { tr, NULL };
+	SM_setWords(&words);
 	SM_cardInit(&card, host->sdcard_path);
 	snprintf(roms, sizeof(roms), "%s/Roms", host->sdcard_path);
 	SM_listInit(&list);

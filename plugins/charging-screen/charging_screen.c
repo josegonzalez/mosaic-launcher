@@ -67,6 +67,7 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -266,6 +267,8 @@ static void afterResume(void) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const CSWords words = { tr, NULL };
+	CS_setWords(&words);
 	supported = 0;
 	showing = activity = close_pressed = resumed = refused = 0;
 	filter = (CsFilter){0};

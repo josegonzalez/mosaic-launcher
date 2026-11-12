@@ -17,6 +17,23 @@
 #define BUTTON_PADDING 12
 #define GRAPH_MIN 20 // the shortest graph worth drawing
 
+static SiWords words; // none set: English
+
+void Si_setWords(const SiWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text and a count's form in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (words.tr_plural) return words.tr_plural(singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 const char* Si_label(int row) {
 	static const char* labels[SI_ROWS] = {
 		TR_MARK("Battery"), TR_MARK("Wi-Fi"), TR_MARK("IP address"), TR_MARK("Storage"), TR_MARK("Memory"), TR_MARK("Uptime"),
@@ -33,7 +50,7 @@ int Si_changed(const SiValues* a, const SiValues* b) {
 }
 
 void Si_formatSize(unsigned long long bytes, char* out, size_t size) {
-	static const char* units[] = { "KB", "MB", "GB", "TB", "PB" };
+	static const char* units[] = { TR_MARK("KB"), TR_MARK("MB"), TR_MARK("GB"), TR_MARK("TB"), TR_MARK("PB") };
 	if (!out || !size) return;
 	double value = (double)bytes / 1024.0;
 	int unit = 0;
@@ -42,19 +59,19 @@ void Si_formatSize(unsigned long long bytes, char* out, size_t size) {
 		value /= 1024.0;
 		unit++;
 	}
-	if (value < 99.95) snprintf(out, size, "%.1f %s", value, units[unit]);
-	else snprintf(out, size, "%.0f %s", value, units[unit]);
+	if (value < 99.95) snprintf(out, size, "%.1f %s", value, tr(units[unit]));
+	else snprintf(out, size, "%.0f %s", value, tr(units[unit]));
 }
 
 static void ofTotal(unsigned long long part, unsigned long long total, char* out, size_t size) {
 	if (!total) {
-		snprintf(out, size, "unavailable");
+		snprintf(out, size, "%s", tr("unavailable"));
 		return;
 	}
 	char a[32], b[32];
 	Si_formatSize(part, a, sizeof(a));
 	Si_formatSize(total, b, sizeof(b));
-	snprintf(out, size, "%s free of %s", a, b);
+	snprintf(out, size, tr("%s free of %s"), a, b);
 }
 
 void Si_formatStorage(unsigned long long free_bytes, unsigned long long total_bytes, char* out, size_t size) {
@@ -107,32 +124,35 @@ long long Si_parseUptime(const char* text) {
 
 void Si_formatUptime(long long seconds, char* out, size_t size) {
 	if (seconds < 0) {
-		snprintf(out, size, "unavailable");
+		snprintf(out, size, "%s", tr("unavailable"));
 		return;
 	}
 	long long minutes = seconds / 60, hours = minutes / 60, days = hours / 24;
-	if (days) snprintf(out, size, "%lldd %lldh %lldm", days, hours % 24, minutes % 60);
-	else if (hours) snprintf(out, size, "%lldh %lldm", hours, minutes % 60);
-	else snprintf(out, size, "%lldm", minutes);
+	if (days) snprintf(out, size, tr("%lldd %lldh %lldm"), days, hours % 24, minutes % 60);
+	else if (hours) snprintf(out, size, tr("%lldh %lldm"), hours, minutes % 60);
+	else snprintf(out, size, tr("%lldm"), minutes);
 }
 
 void Si_formatWifi(int supported, int enabled, int rc, const MosaicWifi* w, char* out, size_t size) {
-	if (supported != 1) snprintf(out, size, "unavailable");
-	else if (enabled == 0) snprintf(out, size, "off");
-	else if (rc < 0 || !w) snprintf(out, size, "checking");
-	else if (rc == 0) snprintf(out, size, "not connected");
+	if (supported != 1) snprintf(out, size, "%s", tr("unavailable"));
+	else if (enabled == 0) snprintf(out, size, "%s", tr("off"));
+	else if (rc < 0 || !w) snprintf(out, size, "%s", tr("checking"));
+	else if (rc == 0) snprintf(out, size, "%s", tr("not connected"));
 	else {
-		char signal[32] = "";
+		char signal[64] = "", bars[48];
 		if (w->rssi < 0) snprintf(signal, sizeof(signal), ", %i dBm", w->rssi);
-		else if (w->bars > 0) snprintf(signal, sizeof(signal), ", %i of 3 bars", w->bars);
-		snprintf(out, size, "%.63s, %.47s%s", w->ssid[0] ? w->ssid : "hidden network", w->ip[0] ? w->ip : "no address yet",
-			signal);
+		else if (w->bars > 0) {
+			snprintf(bars, sizeof(bars), tr("%i of 3 bars"), w->bars);
+			snprintf(signal, sizeof(signal), ", %s", bars);
+		}
+		snprintf(out, size, "%.63s, %.47s%s", w->ssid[0] ? w->ssid : tr("hidden network"),
+			w->ip[0] ? w->ip : tr("no address yet"), signal);
 	}
 }
 
 void Si_formatBattery(int level, int charging, char* out, size_t size) {
-	if (level < 0) snprintf(out, size, "unavailable");
-	else if (charging == 1) snprintf(out, size, "%i%%, charging", level);
+	if (level < 0) snprintf(out, size, "%s", tr("unavailable"));
+	else if (charging == 1) snprintf(out, size, tr("%i%%, charging"), level);
 	else snprintf(out, size, "%i%%", level);
 }
 
@@ -160,7 +180,7 @@ int Si_formatVersion(const char* text, char* out, size_t size) {
 		takeLine(&p, commit, sizeof(commit));
 	}
 	if (!release[0]) {
-		snprintf(out, size, "unavailable");
+		snprintf(out, size, "%s", tr("unavailable"));
 		return -1;
 	}
 	if (commit[0]) snprintf(out, size, "%s (%s)", release, commit);
@@ -189,7 +209,7 @@ void Si_formatAddrs(const SiAddrs* a, char* out, size_t size) {
 	if (!size) return;
 	out[0] = '\0';
 	if (!a->count) {
-		snprintf(out, size, "none");
+		snprintf(out, size, "%s", tr("none"));
 		return;
 	}
 	size_t used = 0;
@@ -348,9 +368,10 @@ void Si_graphCaption(const SiHistory* h, char* out, size_t size) {
 		snprintf(out, size, "%s", "");
 		return;
 	}
-	char play[32];
+	char play[64];
 	Si_formatUptime(Si_historySeconds(h), play, sizeof(play));
-	snprintf(out, size, "Battery over the last %i game%s, %s of play", h->count, h->count == 1 ? "" : "s", play);
+	snprintf(out, size, trPlural("Battery over the last %i game, %s of play", "Battery over the last %i games, %s of play",
+		(unsigned long)h->count), h->count, play);
 }
 
 ///////////////////////////////////////

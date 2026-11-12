@@ -6,6 +6,21 @@
 #include <string.h>
 #include <strings.h>
 
+// English the caller's words translate, for make pot
+#define TR_MARK(text) (text)
+
+static RMWords words; // none set: English
+
+void RM_setWords(const RMWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
 ///////////////////////////////////////
 // URLs
 
@@ -923,15 +938,15 @@ time_t RM_parseTime(const char* text) {
 void RM_formatTime(time_t when, char* out, size_t size) {
 	struct tm tm;
 	if (!when || !localtime_r(&when, &tm) || !strftime(out, size, "%Y-%m-%d %H:%M", &tm)) {
-		snprintf(out, size, "unknown time");
+		snprintf(out, size, "%s", tr("unknown time"));
 	}
 }
 
 void RM_formatSize(long long bytes, char* out, size_t size) {
-	if (bytes < 1024) snprintf(out, size, "%lld B", bytes < 0 ? 0 : bytes);
-	else if (bytes < 1024 * 1024) snprintf(out, size, "%.1f KB", bytes / 1024.0);
-	else if (bytes < 1024LL * 1024 * 1024) snprintf(out, size, "%.1f MB", bytes / (1024.0 * 1024));
-	else snprintf(out, size, "%.1f GB", bytes / (1024.0 * 1024 * 1024));
+	if (bytes < 1024) snprintf(out, size, "%lld %s", bytes < 0 ? 0 : bytes, tr(TR_MARK("B")));
+	else if (bytes < 1024 * 1024) snprintf(out, size, "%.1f %s", bytes / 1024.0, tr(TR_MARK("KB")));
+	else if (bytes < 1024LL * 1024 * 1024) snprintf(out, size, "%.1f %s", bytes / (1024.0 * 1024), tr(TR_MARK("MB")));
+	else snprintf(out, size, "%.1f %s", bytes / (1024.0 * 1024 * 1024), tr(TR_MARK("GB")));
 }
 
 int RM_safeName(const char* name) {

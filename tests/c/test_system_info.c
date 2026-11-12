@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/system-info/system_info.c"
 #include "../../plugins/battery-logger/battery_model.h" // its header row
 
@@ -192,6 +193,47 @@ static void testRows(void) {
 	CHECK(Si_parseRow("2026-11-08 14:03:05,A,B,60,50", &s) == -1);
 	CHECK(Si_parseRow("2026-11-08 14:03:05,\"A,B,60,50,49", &s) == -1);
 	CHECK(Si_parseRow("2026-11-08 14:03:05,\"A\"x,B,60,50,49,1,60.0,no", &s) == -1);
+}
+
+// the values in the words they're given, then English again
+static void testWords(void) {
+	static const char* const words[] = { "%s free of %s", "%s libres de %s", "%lldh %lldm", "%lld h %lld min", "%lldm", "%lld min",
+		"unavailable", "no disponible", "%i of 3 bars", "%i de 3 barras", "no address yet", "sin direcci\xc3\xb3n a\xc3\xban",
+		"%i%%, charging", "%i%%, cargando", NULL };
+	static const char* const plurals[] = { "Battery over the last %i game, %s of play",
+		"Bater\xc3\xad" "a en la \xc3\xbaltima partida (%i), %s de juego",
+		"Bater\xc3\xad" "a en las \xc3\xbaltimas %i partidas, %s de juego", NULL };
+	fake_words = words;
+	fake_plurals = plurals;
+	SiWords set = { fakeTr, fakePlural };
+	Si_setWords(&set);
+	char out[SI_TEXT_MAX * 2];
+	Si_formatStorage(12ULL << 30, 59ULL << 30, out, sizeof(out));
+	CHECK_STR(out, "12.0 GB libres de 59.0 GB");
+	Si_formatStorage(0, 0, out, sizeof(out));
+	CHECK_STR(out, "no disponible");
+	Si_formatUptime(4 * 3600 + 12 * 60, out, sizeof(out));
+	CHECK_STR(out, "4 h 12 min");
+	Si_formatBattery(80, 1, out, sizeof(out));
+	CHECK_STR(out, "80%, cargando");
+	MosaicWifi w;
+	memset(&w, 0, sizeof(w));
+	w.size = sizeof(w);
+	snprintf(w.ssid, sizeof(w.ssid), "Home Net");
+	w.bars = 2;
+	Si_formatWifi(1, 1, 1, &w, out, sizeof(out));
+	CHECK_STR(out, "Home Net, sin direcci\xc3\xb3n a\xc3\xban, 2 de 3 barras");
+	SiHistory h;
+	Si_historyInit(&h);
+	Si_historyAdd(&h, BL_HEADER "2026-11-08 10:00:00,A,a,300,100,70,30,360.0,no\n"
+		"2026-11-08 12:00:00,B,b,100,50,40,10,360.0,no\n");
+	Si_graphCaption(&h, out, sizeof(out));
+	CHECK_STR(out, "Bater\xc3\xad" "a en las \xc3\xbaltimas 2 partidas, 6 min de juego");
+	Si_setWords(NULL);
+	Si_graphCaption(&h, out, sizeof(out));
+	CHECK_STR(out, "Battery over the last 2 games, 6m of play");
+	Si_formatBattery(80, 1, out, sizeof(out));
+	CHECK_STR(out, "80%, charging");
 }
 
 static void testHistory(void) {
@@ -718,6 +760,7 @@ static void testSettings(void) {
 
 int main(void) {
 	testFormats();
+	testWords();
 	testProc();
 	testAddrs();
 	testRows();

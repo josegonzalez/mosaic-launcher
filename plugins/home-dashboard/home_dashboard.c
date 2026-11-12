@@ -856,6 +856,8 @@ static int setting(const char* key, const char* fallback) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const HDWords words = { tr, trPlural };
+	HD_setWords(&words);
 	if (!MOSAIC_HOST_HAS(host, draw_hints)) {
 		say("needs a launcher with plugin screens, the home slot and draw_hints");
 		return -1;

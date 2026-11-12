@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/gamification/gamification.c"
 
 #define DIR TEST_DIR
@@ -341,6 +342,52 @@ static void testText(void) {
 	CHECK_STR(out, "");
 	GM_toast(NULL, 0, &TARGETS, 0, 1, out, sizeof(out));
 	CHECK_STR(out, "");
+}
+
+// the text in the words it's given, then English again
+static void testWords(void) {
+	static const char* const words[] = { "%lldm", "%lld min", "Done", "Hecho", "No streak", "Sin racha",
+		"Quest done: %s", "Misi\xc3\xb3n cumplida: %s", NULL };
+	static const char* const plurals[] = {
+		"Play %i different games today", "Juega a %i juego distinto hoy", "Juega a %i juegos distintos hoy",
+		"%i day streak", "Racha de %i d\xc3\xad" "a", "Racha de %i d\xc3\xad" "as",
+		"Best %i day", "Mejor: %i d\xc3\xad" "a", "Mejor: %i d\xc3\xad" "as",
+		"%i quest done", "%i misi\xc3\xb3n cumplida", "%i misiones cumplidas", NULL };
+	fake_words = words;
+	fake_plurals = plurals;
+	GMWords set = { fakeTr, fakePlural };
+	GM_setWords(&set);
+	char out[256];
+	GMTargets one_game = TARGETS;
+	one_game.daily_games = 1;
+	GM_title(GM_Q_GAMES, &one_game, out, sizeof(out));
+	CHECK_STR(out, "Juega a 1 juego distinto hoy");
+	GM_title(GM_Q_GAMES, &TARGETS, out, sizeof(out));
+	CHECK_STR(out, "Juega a 3 juegos distintos hoy");
+	GMProgress p = { 12, 30, 0 };
+	GM_value(GM_Q_PLAY, &p, out, sizeof(out));
+	CHECK_STR(out, "12 min / 30 min");
+	p.done = 1;
+	GM_value(GM_Q_PLAY, &p, out, sizeof(out));
+	CHECK_STR(out, "Hecho");
+	GM_streakText(1, out, sizeof(out));
+	CHECK_STR(out, "Racha de 1 d\xc3\xad" "a");
+	GM_streakText(0, out, sizeof(out));
+	CHECK_STR(out, "Sin racha");
+	GM_summary(7, 1, out, sizeof(out));
+	CHECK_STR(out, "Mejor: 7 d\xc3\xad" "as \xc2\xb7 1 misi\xc3\xb3n cumplida");
+	int one[] = { GM_Q_GAMES }, two[] = { GM_Q_PLAY, GM_Q_FRESH };
+	GM_toast(one, 1, &TARGETS, 3, 1, out, sizeof(out));
+	CHECK_STR(out, "Misi\xc3\xb3n cumplida: Juega a 3 juegos distintos hoy");
+	GM_toast(two, 2, &TARGETS, 3, 1, out, sizeof(out));
+	CHECK_STR(out, "2 misiones cumplidas");
+	GM_setWords(NULL);
+	GM_title(GM_Q_GAMES, &one_game, out, sizeof(out));
+	CHECK_STR(out, "Play 1 different games today");
+	GM_toast(one, 1, &TARGETS, 3, 1, out, sizeof(out));
+	CHECK_STR(out, "Quest done: Play 3 different games today");
+	GM_summary(1, 1, out, sizeof(out));
+	CHECK_STR(out, "Best 1 day \xc2\xb7 1 quest done");
 }
 
 static void testLayout(void) {
@@ -824,6 +871,7 @@ int main(void) {
 	testStreak();
 	testProgress();
 	testText();
+	testWords();
 	testLayout();
 	testInit();
 	testLaunches();

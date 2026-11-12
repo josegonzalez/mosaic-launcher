@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/charging-screen/charging_screen.c"
 
 #define BIT MOSAIC_BUTTON_BIT
@@ -130,6 +131,16 @@ static void testFormat(void) {
 	CHECK_STR(out, "09:05");
 	CS_formatClock(23, 59, CS_CLOCK_24H, out, sizeof(out));
 	CHECK_STR(out, "23:59");
+	// in the words it's given, then English again
+	static const char* const words[] = { "PM", "p. m.", NULL };
+	fake_words = words;
+	CSWords set = { fakeTr, fakePlural };
+	CS_setWords(&set);
+	CS_formatClock(23, 59, CS_CLOCK_12H, out, sizeof(out));
+	CHECK_STR(out, "11:59 p. m.");
+	CS_setWords(NULL);
+	CS_formatClock(23, 59, CS_CLOCK_12H, out, sizeof(out));
+	CHECK_STR(out, "11:59 PM");
 	CS_formatClock(0, 0, CS_CLOCK_12H, out, sizeof(out));
 	CHECK_STR(out, "12:00 AM");
 	CS_formatClock(12, 30, CS_CLOCK_12H, out, sizeof(out));

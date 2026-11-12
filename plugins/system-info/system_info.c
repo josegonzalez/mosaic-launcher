@@ -64,6 +64,11 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -314,7 +319,7 @@ static void drawGraph(MosaicSurface* screen, const SiLayout* layout) {
 		logGraph("no battery history");
 		return;
 	}
-	char caption[160];
+	char caption[320];
 	Si_graphCaption(&history, caption, sizeof(caption));
 	text(screen, MOSAIC_FONT_TINY, caption, layout->caption.x, layout->caption.y, layout->caption.w, ink);
 	host->fill_rect(screen, &layout->graph, themeColor(MOSAIC_COLOR_ACCENT2, 0x333333));
@@ -450,6 +455,8 @@ static void openInfo(void* data) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const SiWords words = { tr, trPlural };
+	Si_setWords(&words);
 	showing = 0;
 	if (!MOSAIC_HOST_HAS(host, draw_hints) || !MOSAIC_HOST_HAS(host, open_screen)) {
 		say("this launcher has no plugin screens or button hints");

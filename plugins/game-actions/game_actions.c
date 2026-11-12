@@ -49,6 +49,11 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
@@ -245,7 +250,7 @@ static void delete_(void* data) {
 	// name the game as the list shows it, cut to fit the dialog
 	const char* shown = host->entry_name(host->selected_entry());
 	if (!shown || !shown[0]) shown = plan.name;
-	char summary[160];
+	char summary[320];
 	GA_planSummary(&plan, summary, sizeof(summary));
 	char also[512];
 	if (plan.items[0].is_dir) snprintf(also, sizeof(also), tr("Also deletes its folder%s%s.\n"), summary[0] ? ", " : "", summary);
@@ -374,6 +379,8 @@ static void add(const char* id, const char* label, int (*available)(void*), void
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const GAWords words = { tr, trPlural };
+	GA_setWords(&words);
 	snprintf(state_dir, sizeof(state_dir), "%s/launcher", host->userdata_path);
 	snprintf(names_path, sizeof(names_path), "%s/game-actions-names.txt", state_dir);
 	snprintf(collections_dir, sizeof(collections_dir), "%s/Collections", host->sdcard_path);

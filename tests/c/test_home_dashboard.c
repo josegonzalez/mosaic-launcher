@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/home-dashboard/home_dashboard.c"
 
 #ifndef TEST_SDCARD_PATH
@@ -156,6 +157,32 @@ static void testText(void) {
 	CHECK_STR(HD_openLabel(MOSAIC_ENTRY_ROM, 1), "RESUME");
 	CHECK_STR(HD_openLabel(MOSAIC_ENTRY_ROM, 0), "PLAY");
 	CHECK_STR(HD_openLabel(MOSAIC_ENTRY_PAK, 1), "OPEN");
+}
+
+// the text in the words it's given, then English again
+static void testWords(void) {
+	static const char* const words[] = { "%lldh %lldm", "%lld h %lld min", "yesterday", "ayer", "%s played", "%s jugado",
+		"%i/%i points", "%i/%i puntos", NULL };
+	static const char* const plurals[] = { "%i day ago", "hace %i d\xc3\xad" "a", "hace %i d\xc3\xad" "as", NULL };
+	fake_words = words;
+	fake_plurals = plurals;
+	HDWords set = { fakeTr, fakePlural };
+	HD_setWords(&set);
+	setenv("TZ", "UTC", 1);
+	tzset();
+	long long now = at(2026, 11, 8, 12, 0);
+	char out[128];
+	HD_playLine(2 * 3600 + 15 * 60, at(2026, 11, 7, 20, 0), now, out, sizeof(out));
+	CHECK_STR(out, "2 h 15 min jugado \xc2\xb7 ayer");
+	HD_lastPlayed(at(2026, 11, 5, 13, 0), now, out, sizeof(out));
+	CHECK_STR(out, "hace 3 d\xc3\xad" "as");
+	HD_achievementLine(12, 40, 150, 400, out, sizeof(out));
+	CHECK_STR(out, "12/40 \xc2\xb7 150/400 puntos");
+	HD_setWords(NULL);
+	HD_playLine(2 * 3600 + 15 * 60, at(2026, 11, 7, 20, 0), now, out, sizeof(out));
+	CHECK_STR(out, "2h 15m played \xc2\xb7 yesterday");
+	HD_lastPlayed(at(2026, 11, 5, 13, 0), now, out, sizeof(out));
+	CHECK_STR(out, "3 days ago");
 }
 
 static void testMostPlayed(void) {
@@ -529,6 +556,7 @@ int main(void) {
 	testHomeMove();
 	testLists();
 	testText();
+	testWords();
 	testMostPlayed();
 	testPico();
 	testFavorites();

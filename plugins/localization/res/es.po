@@ -1,5 +1,6 @@
-# Spanish for mosaic-launcher, from po/launcher.pot, and the localization
-# plugin's own strings under msgctxt "localization".
+# Spanish for mosaic-launcher, from po/launcher.pot, and the bundled
+# plugins' strings from po/plugins.pot under msgctxt set to each plugin's
+# id. Not reviewed by a native speaker.
 # Strings left out (Bluetooth, Launcher, OK, PIN, Plugins, Pak Store, Wifi,
 # the BRGHT and CLTMP abbreviations, SWITCHER and "%s %lld%%") show in
 # English.
@@ -215,25 +216,1821 @@ msgstr "PIN incorrecto"
 msgid "unknown"
 msgstr "desconocido"
 
-msgctxt "localization"
-msgid "Write map.txt names"
-msgstr "Escribir nombres en map.txt"
+#, c-format
+msgctxt "activity-stats"
+msgid "%i days: %s"
+msgstr "%i días: %s"
 
-msgctxt "localization"
-msgid "WRITE"
-msgstr "ESCRIBIR"
+#, c-format
+msgctxt "activity-stats"
+msgid "%i days: no play history"
+msgstr "%i días: sin historial de juego"
 
-msgctxt "localization"
-msgid "Lines already in a map.txt are kept."
-msgstr "Las líneas que ya están en un map.txt se mantienen."
+#, c-format
+msgctxt "activity-stats"
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] "%i juego"
+msgstr[1] "%i juegos"
 
-msgctxt "localization"
-msgid "No names lists for this language"
-msgstr "No hay listas de nombres para este idioma"
+#, c-format
+msgctxt "activity-stats"
+msgid "%lld session"
+msgid_plural "%lld sessions"
+msgstr[0] "%lld sesión"
+msgstr[1] "%lld sesiones"
 
-msgctxt "localization"
-msgid "No names to add to map.txt"
-msgstr "No hay nombres que añadir a map.txt"
+#, c-format
+msgctxt "activity-stats"
+msgid "%lldh"
+msgstr "%lld h"
+
+#, c-format
+msgctxt "activity-stats"
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgctxt "activity-stats"
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgctxt "activity-stats"
+msgid "%s a day"
+msgstr "%s al día"
+
+msgctxt "activity-stats"
+msgid "30 days"
+msgstr "30 días"
+
+msgctxt "activity-stats"
+msgid "7 days"
+msgstr "7 días"
+
+msgctxt "activity-stats"
+msgid "<1m"
+msgstr "<1 min"
+
+msgctxt "activity-stats"
+msgid "Activity"
+msgstr "Actividad"
+
+msgctxt "activity-stats"
+msgid "Activity button"
+msgstr "Botón de actividad"
+
+msgctxt "activity-stats"
+msgid "Activity stats"
+msgstr "Estadísticas de actividad"
+
+#, c-format
+msgctxt "activity-stats"
+msgid "Couldn't open %s"
+msgstr "No se pudo abrir %s"
+
+msgctxt "activity-stats"
+msgid "Fri"
+msgstr "vie"
+
+msgctxt "activity-stats"
+msgid "Games"
+msgstr "Juegos"
+
+msgctxt "activity-stats"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "activity-stats"
+msgid "Launches"
+msgstr "Inicios"
+
+msgctxt "activity-stats"
+msgid "Mon"
+msgstr "lun"
+
+msgctxt "activity-stats"
+msgid "No play history"
+msgstr "Sin historial de juego"
+
+msgctxt "activity-stats"
+msgid "Nothing played yet"
+msgstr "Aún no se ha jugado nada"
+
+msgctxt "activity-stats"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "activity-stats"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "activity-stats"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "activity-stats"
+msgid "Sat"
+msgstr "sáb"
+
+msgctxt "activity-stats"
+msgid "Sun"
+msgstr "dom"
+
+msgctxt "activity-stats"
+msgid "Thu"
+msgstr "jue"
+
+msgctxt "activity-stats"
+msgid "Tue"
+msgstr "mar"
+
+msgctxt "activity-stats"
+msgid "Unknown game"
+msgstr "Juego desconocido"
+
+msgctxt "activity-stats"
+msgid "Wed"
+msgstr "mié"
+
+msgctxt "activity-stats"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "activity-stats"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "all-games"
+msgid "All games"
+msgstr "Todos los juegos"
+
+msgctxt "all-games"
+msgid "Show the system on shared names"
+msgstr "Mostrar el sistema en nombres compartidos"
+
+msgctxt "all-games"
+msgid "Systems"
+msgstr "Sistemas"
+
+msgctxt "art-backdrop"
+msgid "0"
+msgstr "0"
+
+msgctxt "art-backdrop"
+msgid "25"
+msgstr "25"
+
+msgctxt "art-backdrop"
+msgid "50"
+msgstr "50"
+
+msgctxt "art-backdrop"
+msgid "75"
+msgstr "75"
+
+msgctxt "art-backdrop"
+msgid "Art backdrop"
+msgstr "Fondo con arte"
+
+msgctxt "art-backdrop"
+msgid "Dim"
+msgstr "Atenuar"
+
+msgctxt "art-backdrop"
+msgid "Fall back to the box"
+msgstr "Usar la caja si no hay"
+
+msgctxt "art-backdrop"
+msgid "Fall back to the screenshot"
+msgstr "Usar la captura si no hay"
+
+msgctxt "art-backdrop"
+msgid "Fall back to the thumbnail"
+msgstr "Usar la miniatura si no hay"
+
+msgctxt "art-backdrop"
+msgid "Height"
+msgstr "Altura"
+
+msgctxt "art-backdrop"
+msgid "Style"
+msgstr "Estilo"
+
+msgctxt "art-backdrop"
+msgid "full"
+msgstr "completo"
+
+msgctxt "art-backdrop"
+msgid "gradient"
+msgstr "degradado"
+
+msgctxt "art-backdrop"
+msgid "half"
+msgstr "mitad"
+
+msgctxt "art-backdrop"
+msgid "third"
+msgstr "tercio"
+
+msgctxt "art-boxart"
+msgid ".res folders"
+msgstr "Carpetas .res"
+
+msgctxt "art-boxart"
+msgid "Box art"
+msgstr "Carátulas"
+
+msgctxt "art-boxart"
+msgid "Box, wheel and screenshot in .media"
+msgstr "Caja, logo y captura en .media"
+
+msgctxt "art-boxart"
+msgid "Folder covers"
+msgstr "Portadas de carpetas"
+
+msgctxt "art-boxart"
+msgid "Hide art folders"
+msgstr "Ocultar carpetas de arte"
+
+msgctxt "art-boxart"
+msgid "Hide covered folder names"
+msgstr "Ocultar nombres de carpetas con portada"
+
+msgctxt "art-boxart"
+msgid "Images folders"
+msgstr "Carpetas Images"
+
+msgctxt "art-boxart"
+msgid "Imgs folders"
+msgstr "Carpetas Imgs"
+
+msgctxt "art-boxart"
+msgid "Use as the thumbnail"
+msgstr "Usar como miniatura"
+
+msgctxt "art-placeholder"
+msgid "Placeholder art"
+msgstr "Arte provisional"
+
+msgctxt "art-placeholder"
+msgid "Style"
+msgstr "Estilo"
+
+msgctxt "art-placeholder"
+msgid "pattern"
+msgstr "patrón"
+
+msgctxt "art-placeholder"
+msgid "title"
+msgstr "título"
+
+msgctxt "battery-logger"
+msgid "0"
+msgstr "0"
+
+msgctxt "battery-logger"
+msgid "1"
+msgstr "1"
+
+msgctxt "battery-logger"
+msgid "10"
+msgstr "10"
+
+msgctxt "battery-logger"
+msgid "1024"
+msgstr "1024"
+
+msgctxt "battery-logger"
+msgid "256"
+msgstr "256"
+
+msgctxt "battery-logger"
+msgid "5"
+msgstr "5"
+
+msgctxt "battery-logger"
+msgid "64"
+msgstr "64"
+
+msgctxt "battery-logger"
+msgid "Battery logger (unsupported on desktop)"
+msgstr "Registro de batería (no disponible en escritorio)"
+
+msgctxt "battery-logger"
+msgid "Largest log size (KB)"
+msgstr "Tamaño máximo del registro (KB)"
+
+msgctxt "battery-logger"
+msgid "Log sessions that charged"
+msgstr "Registrar sesiones con carga"
+
+msgctxt "battery-logger"
+msgid "Shortest session to log (minutes)"
+msgstr "Sesión mínima a registrar (minutos)"
+
+msgctxt "bt-reconnect"
+msgid "Bluetooth reconnect (unsupported on desktop)"
+msgstr "Reconexión Bluetooth (no disponible en escritorio)"
+
+msgctxt "bt-reconnect"
+msgid "Device to reconnect"
+msgstr "Dispositivo a reconectar"
+
+msgctxt "bt-reconnect"
+msgid "Reconnect after sleep"
+msgstr "Reconectar tras la suspensión"
+
+msgctxt "bt-reconnect"
+msgid "Reconnect at start"
+msgstr "Reconectar al iniciar"
+
+msgctxt "button-remap"
+msgid "A button"
+msgstr "Botón A"
+
+msgctxt "button-remap"
+msgid "Button remap"
+msgstr "Reasignar botones"
+
+msgctxt "button-remap"
+msgid "L2 button"
+msgstr "Botón L2"
+
+msgctxt "button-remap"
+msgid "R2 button"
+msgstr "Botón R2"
+
+msgctxt "button-remap"
+msgid "Resume on press"
+msgstr "Reanudar al pulsar"
+
+msgctxt "button-remap"
+msgid "Resume with A"
+msgstr "Reanudar con A"
+
+msgctxt "button-remap"
+msgid "START button"
+msgstr "Botón START"
+
+msgctxt "button-remap"
+msgid "X button"
+msgstr "Botón X"
+
+msgctxt "button-remap"
+msgid "Y button"
+msgstr "Botón Y"
+
+msgctxt "charging-screen"
+msgid "120"
+msgstr "120"
+
+msgctxt "charging-screen"
+msgid "12h"
+msgstr "12 h"
+
+msgctxt "charging-screen"
+msgid "24h"
+msgstr "24 h"
+
+msgctxt "charging-screen"
+msgid "30"
+msgstr "30"
+
+msgctxt "charging-screen"
+msgid "300"
+msgstr "300"
+
+msgctxt "charging-screen"
+msgid "60"
+msgstr "60"
+
+msgctxt "charging-screen"
+msgid "AM"
+msgstr "a. m."
+
+msgctxt "charging-screen"
+msgid "Charged"
+msgstr "Cargada"
+
+msgctxt "charging-screen"
+msgid "Charging"
+msgstr "Cargando"
+
+msgctxt "charging-screen"
+msgid "Charging screen (unsupported on desktop)"
+msgstr "Pantalla de carga (no disponible en escritorio)"
+
+msgctxt "charging-screen"
+msgid "Clock"
+msgstr "Reloj"
+
+msgctxt "charging-screen"
+msgid "PM"
+msgstr "p. m."
+
+msgctxt "charging-screen"
+msgid "Show after idle on a charger (seconds)"
+msgstr "Mostrar tras inactividad cargando (segundos)"
+
+msgctxt "charging-screen"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "clear-recents"
+msgid "CLEAR"
+msgstr "BORRAR"
+
+msgctxt "clear-recents"
+msgid "CLEAR ALL"
+msgstr "BORRAR TODO"
+
+msgctxt "clear-recents"
+msgid "Clear all recently played games?"
+msgstr "¿Borrar todos los juegos recientes?"
+
+msgctxt "clear-recents"
+msgid "Clear recents"
+msgstr "Borrar recientes"
+
+msgctxt "clear-recents"
+msgid "Clear recents tile on the quick menu"
+msgstr "Icono de borrar recientes en el menú rápido"
+
+msgctxt "clear-recents"
+msgid "Couldn't remove that"
+msgstr "No se pudo quitar"
+
+msgctxt "clear-recents"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "clear-recents"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "clear-recents"
+msgid "REMOVE"
+msgstr "QUITAR"
+
+msgctxt "clear-recents"
+msgid "Recently Played button"
+msgstr "Botón de recientes"
+
+msgctxt "clear-recents"
+msgid "Recents cleared"
+msgstr "Recientes borrados"
+
+msgctxt "clear-recents"
+msgid "Removed from recents"
+msgstr "Quitado de recientes"
+
+msgctxt "clear-recents"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "collate-subfolders"
+msgid "Collate subfolders"
+msgstr "Agrupar subcarpetas"
+
+msgctxt "collections-plus"
+msgid "Collection art"
+msgstr "Arte de colecciones"
+
+msgctxt "collections-plus"
+msgid "Collection map.txt"
+msgstr "map.txt de colecciones"
+
+msgctxt "collections-plus"
+msgid "Collections plus"
+msgstr "Colecciones plus"
+
+msgctxt "collections-plus"
+msgid "Hide Collections folder"
+msgstr "Ocultar la carpeta Colecciones"
+
+msgctxt "collections-plus"
+msgid "Hide Games tile"
+msgstr "Ocultar el icono Juegos"
+
+msgctxt "collections-plus"
+msgid "Keep file order"
+msgstr "Mantener el orden del archivo"
+
+msgctxt "collections-plus"
+msgid "On the root"
+msgstr "En la raíz"
+
+msgctxt "collections-plus"
+msgid "Order"
+msgstr "Orden"
+
+msgctxt "core-prefetch"
+msgid "10"
+msgstr "10"
+
+msgctxt "core-prefetch"
+msgid "100"
+msgstr "100"
+
+msgctxt "core-prefetch"
+msgid "16"
+msgstr "16"
+
+msgctxt "core-prefetch"
+msgid "20"
+msgstr "20"
+
+msgctxt "core-prefetch"
+msgid "32"
+msgstr "32"
+
+msgctxt "core-prefetch"
+msgid "4"
+msgstr "4"
+
+msgctxt "core-prefetch"
+msgid "50"
+msgstr "50"
+
+msgctxt "core-prefetch"
+msgid "64"
+msgstr "64"
+
+msgctxt "core-prefetch"
+msgid "8"
+msgstr "8"
+
+msgctxt "core-prefetch"
+msgid "Core prefetch (unsupported on desktop)"
+msgstr "Precarga de núcleos (no disponible en escritorio)"
+
+msgctxt "core-prefetch"
+msgid "Longest it waits (ms)"
+msgstr "Espera máxima (ms)"
+
+msgctxt "core-prefetch"
+msgid "Most to read ahead (MB)"
+msgstr "Máximo a leer por adelantado (MB)"
+
+msgctxt "core-prefetch"
+msgid "Warm the game too"
+msgstr "Precargar también el juego"
+
+msgctxt "emulator-override"
+msgid "Couldn't list the emulators"
+msgstr "No se pudieron listar los emuladores"
+
+msgctxt "emulator-override"
+msgid "Couldn't save the emulator"
+msgstr "No se pudo guardar el emulador"
+
+#, c-format
+msgctxt "emulator-override"
+msgid "Default (%s)"
+msgstr "Predeterminado (%s)"
+
+msgctxt "emulator-override"
+msgid "EMULATOR"
+msgstr "EMULADOR"
+
+msgctxt "emulator-override"
+msgid "Emulator"
+msgstr "Emulador"
+
+msgctxt "emulator-override"
+msgid "Emulator button"
+msgstr "Botón de emulador"
+
+msgctxt "emulator-override"
+msgid "Emulator override"
+msgstr "Cambiar emulador"
+
+#, c-format
+msgctxt "emulator-override"
+msgid "Emulator set to %s"
+msgstr "Emulador: %s"
+
+msgctxt "emulator-override"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "emulator-override"
+msgid "List every emulator pak"
+msgstr "Listar todos los paks de emulador"
+
+msgctxt "emulator-override"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "emulator-override"
+msgid "Using the default emulator"
+msgstr "Usando el emulador predeterminado"
+
+msgctxt "emulator-override"
+msgid "Y"
+msgstr "Y"
+
+#, c-format
+msgctxt "favorites"
+msgid "%s is full"
+msgstr "%s está llena"
+
+#, c-format
+msgctxt "favorites"
+msgid "Added to %s"
+msgstr "Añadido a %s"
+
+msgctxt "favorites"
+msgid "Collection"
+msgstr "Colección"
+
+#, c-format
+msgctxt "favorites"
+msgid "Couldn't save %s"
+msgstr "No se pudo guardar %s"
+
+msgctxt "favorites"
+msgid "FAVORITE"
+msgstr "FAVORITO"
+
+msgctxt "favorites"
+msgid "Favorites"
+msgstr "Favoritos"
+
+msgctxt "favorites"
+msgid "Pin to top"
+msgstr "Fijar arriba"
+
+msgctxt "favorites"
+msgid "REMOVE"
+msgstr "QUITAR"
+
+#, c-format
+msgctxt "favorites"
+msgid "Remove %.120s from %.60s?"
+msgstr "¿Quitar %.120s de %.60s?"
+
+#, c-format
+msgctxt "favorites"
+msgid "Removed from %s"
+msgstr "Quitado de %s"
+
+#, c-format
+msgctxt "first-run"
+msgid "%i of %i"
+msgstr "%i de %i"
+
+msgctxt "first-run"
+msgid "A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins."
+msgstr "Un PIN impide a otros salir del modo simple y cambiar los ajustes protegidos de los plugins. Ponlo o cámbialo en la fila PIN de Herramientas > Launcher > Plugins."
+
+msgctxt "first-run"
+msgid "All set"
+msgstr "Todo listo"
+
+msgctxt "first-run"
+msgid "Already shown"
+msgstr "Ya mostrado"
+
+msgctxt "first-run"
+msgid "First run"
+msgstr "Primer inicio"
+
+msgctxt "first-run"
+msgid "First run button"
+msgstr "Botón de primer inicio"
+
+msgctxt "first-run"
+msgid "Haptic feedback"
+msgstr "Vibración"
+
+msgctxt "first-run"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "first-run"
+msgid "Left and right change the selected setting, saved at once. Settings has them too."
+msgstr "Izquierda y derecha cambian el ajuste elegido, que se guarda al momento. También están en Ajustes."
+
+msgctxt "first-run"
+msgid "Off"
+msgstr "No"
+
+msgctxt "first-run"
+msgid "On"
+msgstr "Sí"
+
+msgctxt "first-run"
+msgid "Once it's done or skipped it won't open by itself again."
+msgstr "Una vez terminado u omitido no volverá a abrirse solo."
+
+msgctxt "first-run"
+msgid "Once it's done or skipped it won't open by itself again. The First run tile on the quick menu opens it."
+msgstr "Una vez terminado u omitido no volverá a abrirse solo. El icono Primer inicio del menú rápido lo abre."
+
+msgctxt "first-run"
+msgid "PIN"
+msgstr "PIN"
+
+msgctxt "first-run"
+msgid "PIN page"
+msgstr "Página del PIN"
+
+msgctxt "first-run"
+msgid "Plugins"
+msgstr "Plugins"
+
+msgctxt "first-run"
+msgid "Plugins to try:"
+msgstr "Plugins para probar:"
+
+msgctxt "first-run"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "first-run"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "first-run"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "first-run"
+msgid "Settings"
+msgstr "Ajustes"
+
+msgctxt "first-run"
+msgid "Settings page"
+msgstr "Página de ajustes"
+
+msgctxt "first-run"
+msgid "Show battery percentage"
+msgstr "Mostrar el porcentaje de batería"
+
+msgctxt "first-run"
+msgid "Show clock"
+msgstr "Mostrar el reloj"
+
+msgctxt "first-run"
+msgid "Suggested plugins"
+msgstr "Plugins sugeridos"
+
+msgctxt "first-run"
+msgid "That's it."
+msgstr "Eso es todo."
+
+msgctxt "first-run"
+msgid "That's it. The First run tile on the quick menu opens this again."
+msgstr "Eso es todo. El icono Primer inicio del menú rápido vuelve a abrir esto."
+
+msgctxt "first-run"
+msgid "The launcher has a PIN."
+msgstr "El launcher tiene un PIN."
+
+msgctxt "first-run"
+msgid "The launcher has no PIN."
+msgstr "El launcher no tiene PIN."
+
+msgctxt "first-run"
+msgid "This goes over a few settings and plugins. A goes on, B goes back, and Y skips the rest."
+msgstr "Esto repasa algunos ajustes y plugins. A avanza, B retrocede e Y omite el resto."
+
+msgctxt "first-run"
+msgid "Turn them on in Tools > Launcher > Plugins. They start the next time the launcher does."
+msgstr "Actívalos en Herramientas > Launcher > Plugins. Se inician la próxima vez que lo haga el launcher."
+
+msgctxt "first-run"
+msgid "Volume and display notifications"
+msgstr "Avisos de volumen y pantalla"
+
+msgctxt "first-run"
+msgid "Welcome"
+msgstr "Bienvenida"
+
+msgctxt "first-run"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "first-run"
+msgid "a Favorites folder, Y adds a game"
+msgstr "una carpeta Favoritos; Y añade un juego"
+
+msgctxt "first-run"
+msgid "a home screen with your last game"
+msgstr "una pantalla de inicio con tu último juego"
+
+msgctxt "first-run"
+msgid "more game switcher styles"
+msgstr "más estilos del selector de juegos"
+
+msgctxt "first-run"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "first-run"
+msgid "search every game by name"
+msgstr "buscar cualquier juego por su nombre"
+
+msgctxt "focus-mode"
+msgid "All systems"
+msgstr "Todos los sistemas"
+
+msgctxt "focus-mode"
+msgid "Focus"
+msgstr "Enfoque"
+
+msgctxt "focus-mode"
+msgid "Focus mode"
+msgstr "Modo enfoque"
+
+msgctxt "focus-mode"
+msgid "Focus mode off"
+msgstr "Modo enfoque desactivado"
+
+msgctxt "focus-mode"
+msgid "Focus mode on"
+msgstr "Modo enfoque activado"
+
+msgctxt "focus-mode"
+msgid "Focus on favorites"
+msgstr "Enfocar en favoritos"
+
+#, c-format
+msgctxt "game-actions"
+msgid "%i disc file"
+msgid_plural "%i disc files"
+msgstr[0] "%i archivo de disco"
+msgstr[1] "%i archivos de disco"
+
+#, c-format
+msgctxt "game-actions"
+msgid "%i save"
+msgid_plural "%i saves"
+msgstr[0] "%i partida guardada"
+msgstr[1] "%i partidas guardadas"
+
+#, c-format
+msgctxt "game-actions"
+msgid "%i state"
+msgid_plural "%i states"
+msgstr[0] "%i estado"
+msgstr[1] "%i estados"
+
+#, c-format
+msgctxt "game-actions"
+msgid "%s and %s"
+msgstr "%s y %s"
+
+msgctxt "game-actions"
+msgid "ADD TO COLLECTION"
+msgstr "AÑADIR A COLECCIÓN"
+
+msgctxt "game-actions"
+msgid "Add to collection"
+msgstr "Añadir a colección"
+
+#, c-format
+msgctxt "game-actions"
+msgid "Added to %s"
+msgstr "Añadido a %s"
+
+#, c-format
+msgctxt "game-actions"
+msgid "Already in %s"
+msgstr "Ya está en %s"
+
+#, c-format
+msgctxt "game-actions"
+msgid "Also deletes %s.\n"
+msgstr "También borra %s.\n"
+
+#, c-format
+msgctxt "game-actions"
+msgid "Also deletes its folder%s%s.\n"
+msgstr "También borra su carpeta%s%s.\n"
+
+msgctxt "game-actions"
+msgid "Can't delete that"
+msgstr "No se puede borrar"
+
+#, c-format
+msgctxt "game-actions"
+msgid "Couldn't add to %s"
+msgstr "No se pudo añadir a %s"
+
+msgctxt "game-actions"
+msgid "Couldn't delete everything"
+msgstr "No se pudo borrar todo"
+
+msgctxt "game-actions"
+msgid "Couldn't list collections"
+msgstr "No se pudieron listar las colecciones"
+
+msgctxt "game-actions"
+msgid "Couldn't rename that"
+msgstr "No se pudo renombrar"
+
+msgctxt "game-actions"
+msgid "Couldn't save the name"
+msgstr "No se pudo guardar el nombre"
+
+msgctxt "game-actions"
+msgid "DELETE"
+msgstr "BORRAR"
+
+#, c-format
+msgctxt "game-actions"
+msgid "Delete %.40s%s?\n%sThis can't be undone."
+msgstr "¿Borrar %.40s%s?\n%sNo se puede deshacer."
+
+msgctxt "game-actions"
+msgid "Delete game"
+msgstr "Borrar juego"
+
+msgctxt "game-actions"
+msgid "Delete saves and states with a game"
+msgstr "Borrar partidas y estados con el juego"
+
+msgctxt "game-actions"
+msgid "Deleted"
+msgstr "Borrado"
+
+msgctxt "game-actions"
+msgid "Game actions"
+msgstr "Acciones de juego"
+
+msgctxt "game-actions"
+msgid "Game actions button"
+msgstr "Botón de acciones de juego"
+
+msgctxt "game-actions"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "game-actions"
+msgid "Name restored"
+msgstr "Nombre restaurado"
+
+msgctxt "game-actions"
+msgid "New collection"
+msgstr "Nueva colección"
+
+msgctxt "game-actions"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "game-actions"
+msgid "RENAME"
+msgstr "RENOMBRAR"
+
+msgctxt "game-actions"
+msgid "Rename"
+msgstr "Renombrar"
+
+msgctxt "game-actions"
+msgid "Renamed"
+msgstr "Renombrado"
+
+msgctxt "game-actions"
+msgid "That name can't be a collection"
+msgstr "Ese nombre no puede ser una colección"
+
+msgctxt "game-actions"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "game-actions"
+msgid "its art"
+msgstr "su arte"
+
+msgctxt "game-actions"
+msgid "its resume files"
+msgstr "sus archivos de reanudación"
+
+msgctxt "game-actions"
+msgid "its settings"
+msgstr "sus ajustes"
+
+#, c-format
+msgctxt "gamification"
+msgid "%i day streak"
+msgid_plural "%i day streak"
+msgstr[0] "Racha de %i día"
+msgstr[1] "Racha de %i días"
+
+#, c-format
+msgctxt "gamification"
+msgid "%i quest done"
+msgid_plural "%i quests done"
+msgstr[0] "%i misión cumplida"
+msgstr[1] "%i misiones cumplidas"
+
+#, c-format
+msgctxt "gamification"
+msgid "%lldh"
+msgstr "%lld h"
+
+#, c-format
+msgctxt "gamification"
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgctxt "gamification"
+msgid "%lldm"
+msgstr "%lld min"
+
+msgctxt "gamification"
+msgid "1"
+msgstr "1"
+
+msgctxt "gamification"
+msgid "10"
+msgstr "10"
+
+msgctxt "gamification"
+msgid "120"
+msgstr "120"
+
+msgctxt "gamification"
+msgid "14"
+msgstr "14"
+
+msgctxt "gamification"
+msgid "15"
+msgstr "15"
+
+msgctxt "gamification"
+msgid "2"
+msgstr "2"
+
+msgctxt "gamification"
+msgid "20"
+msgstr "20"
+
+msgctxt "gamification"
+msgid "3"
+msgstr "3"
+
+msgctxt "gamification"
+msgid "30"
+msgstr "30"
+
+msgctxt "gamification"
+msgid "4"
+msgstr "4"
+
+msgctxt "gamification"
+msgid "45"
+msgstr "45"
+
+msgctxt "gamification"
+msgid "5"
+msgstr "5"
+
+msgctxt "gamification"
+msgid "6"
+msgstr "6"
+
+msgctxt "gamification"
+msgid "60"
+msgstr "60"
+
+msgctxt "gamification"
+msgid "7"
+msgstr "7"
+
+msgctxt "gamification"
+msgid "90"
+msgstr "90"
+
+#, c-format
+msgctxt "gamification"
+msgid "Best %i day"
+msgid_plural "Best %i days"
+msgstr[0] "Mejor racha: %i día"
+msgstr[1] "Mejor racha: %i días"
+
+msgctxt "gamification"
+msgid "Daily games"
+msgstr "Juegos diarios"
+
+msgctxt "gamification"
+msgid "Daily play (minutes)"
+msgstr "Juego diario (minutos)"
+
+msgctxt "gamification"
+msgid "Days a week"
+msgstr "Días a la semana"
+
+msgctxt "gamification"
+msgid "Done"
+msgstr "Hecho"
+
+msgctxt "gamification"
+msgid "Gamification"
+msgstr "Gamificación"
+
+#, c-format
+msgctxt "gamification"
+msgid "Go back to a game you haven't played in %i days"
+msgstr "Vuelve a un juego que no hayas jugado en %i días"
+
+msgctxt "gamification"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "gamification"
+msgid "No streak"
+msgstr "Sin racha"
+
+#, c-format
+msgctxt "gamification"
+msgid "Play %i different games today"
+msgid_plural "Play %i different games today"
+msgstr[0] "Juega a %i juego distinto hoy"
+msgstr[1] "Juega a %i juegos distintos hoy"
+
+#, c-format
+msgctxt "gamification"
+msgid "Play for %i hour this week"
+msgid_plural "Play for %i hours this week"
+msgstr[0] "Juega %i hora esta semana"
+msgstr[1] "Juega %i horas esta semana"
+
+#, c-format
+msgctxt "gamification"
+msgid "Play for %i hour today"
+msgid_plural "Play for %i hours today"
+msgstr[0] "Juega %i hora hoy"
+msgstr[1] "Juega %i horas hoy"
+
+#, c-format
+msgctxt "gamification"
+msgid "Play for %i minutes today"
+msgid_plural "Play for %i minutes today"
+msgstr[0] "Juega %i minuto hoy"
+msgstr[1] "Juega %i minutos hoy"
+
+#, c-format
+msgctxt "gamification"
+msgid "Play on %i days this week"
+msgid_plural "Play on %i days this week"
+msgstr[0] "Juega %i día esta semana"
+msgstr[1] "Juega %i días esta semana"
+
+#, c-format
+msgctxt "gamification"
+msgid "Quest done: %s"
+msgstr "Misión cumplida: %s"
+
+msgctxt "gamification"
+msgid "Quests"
+msgstr "Misiones"
+
+msgctxt "gamification"
+msgid "Quests button"
+msgstr "Botón de misiones"
+
+msgctxt "gamification"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "gamification"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "gamification"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "gamification"
+msgid "Start a game you've never played"
+msgstr "Empieza un juego que nunca hayas jugado"
+
+msgctxt "gamification"
+msgid "Streak day (minutes)"
+msgstr "Día de racha (minutos)"
+
+msgctxt "gamification"
+msgid "Toasts"
+msgstr "Avisos"
+
+msgctxt "gamification"
+msgid "Weekly play (hours)"
+msgstr "Juego semanal (horas)"
+
+msgctxt "gamification"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "gamification"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "genre-view"
+msgid "1"
+msgstr "1"
+
+msgctxt "genre-view"
+msgid "2"
+msgstr "2"
+
+msgctxt "genre-view"
+msgid "3"
+msgstr "3"
+
+msgctxt "genre-view"
+msgid "4"
+msgstr "4"
+
+msgctxt "genre-view"
+msgid "Consoles a genre needs"
+msgstr "Consolas que necesita un género"
+
+msgctxt "genre-view"
+msgid "Folders that aren't genres"
+msgstr "Carpetas que no son géneros"
+
+msgctxt "genre-view"
+msgid "Genre view"
+msgstr "Vista por géneros"
+
+msgctxt "genre-view"
+msgid "Genres"
+msgstr "Géneros"
+
+msgctxt "genre-view"
+msgid "Show the system"
+msgstr "Mostrar el sistema"
+
+msgctxt "genre-view"
+msgid "always"
+msgstr "siempre"
+
+msgctxt "genre-view"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "genre-view"
+msgid "shared"
+msgstr "compartido"
+
+msgctxt "header-indicators"
+msgid "FPS"
+msgstr "FPS"
+
+msgctxt "header-indicators"
+msgid "Free storage"
+msgstr "Espacio libre"
+
+msgctxt "header-indicators"
+msgid "Header indicators"
+msgstr "Indicadores de cabecera"
+
+msgctxt "header-indicators"
+msgid "Profile badge"
+msgstr "Distintivo de perfil"
+
+msgctxt "header-indicators"
+msgid "SSH dot"
+msgstr "Punto de SSH"
+
+msgctxt "hidden"
+msgid "Couldn't hide that"
+msgstr "No se pudo ocultar"
+
+msgctxt "hidden"
+msgid "Couldn't save hidden games"
+msgstr "No se pudieron guardar los juegos ocultos"
+
+msgctxt "hidden"
+msgid "HIDE"
+msgstr "OCULTAR"
+
+msgctxt "hidden"
+msgid "Hidden"
+msgstr "Ocultos"
+
+msgctxt "hidden"
+msgid "Hidden games"
+msgstr "Juegos ocultos"
+
+msgctxt "hidden"
+msgid "Hide button"
+msgstr "Botón de ocultar"
+
+msgctxt "hidden"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "hidden"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "hidden"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "hidden"
+msgid "UNHIDE"
+msgstr "MOSTRAR"
+
+msgctxt "hidden"
+msgid "Unhidden"
+msgstr "Mostrado"
+
+msgctxt "hidden"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "hold-lock"
+msgid "1"
+msgstr "1"
+
+msgctxt "hold-lock"
+msgid "2"
+msgstr "2"
+
+msgctxt "hold-lock"
+msgid "3"
+msgstr "3"
+
+msgctxt "hold-lock"
+msgid "Hold lock"
+msgstr "Bloqueo con pulsación"
+
+msgctxt "hold-lock"
+msgid "Hold the chord for (seconds)"
+msgstr "Mantener la combinación (segundos)"
+
+msgctxt "hold-lock"
+msgid "Lock chord"
+msgstr "Combinación de bloqueo"
+
+msgctxt "hold-lock"
+msgid "Lock with the hold switch"
+msgstr "Bloquear con el interruptor"
+
+msgctxt "hold-lock"
+msgid "l1+r1"
+msgstr "l1+r1"
+
+msgctxt "hold-lock"
+msgid "l2+r2"
+msgstr "l2+r2"
+
+msgctxt "hold-lock"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "hold-lock"
+msgid "select+start"
+msgstr "select+start"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] "hace %i día"
+msgstr[1] "hace %i días"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] "%i juego"
+msgstr[1] "%i juegos"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] "%i sesión"
+msgstr[1] "%i sesiones"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i/%i points"
+msgstr "%i/%i puntos"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "%s played"
+msgstr "%s jugado"
+
+msgctxt "home-dashboard"
+msgid "<1m"
+msgstr "<1 min"
+
+msgctxt "home-dashboard"
+msgid "Achievements"
+msgstr "Logros"
+
+msgctxt "home-dashboard"
+msgid "CONTINUE"
+msgstr "CONTINUAR"
+
+msgctxt "home-dashboard"
+msgid "Checking achievements"
+msgstr "Comprobando logros"
+
+#, c-format
+msgctxt "home-dashboard"
+msgid "Couldn't open %s"
+msgstr "No se pudo abrir %s"
+
+msgctxt "home-dashboard"
+msgid "Games"
+msgstr "Juegos"
+
+msgctxt "home-dashboard"
+msgid "Home"
+msgstr "Inicio"
+
+msgctxt "home-dashboard"
+msgid "Home dashboard"
+msgstr "Panel de inicio"
+
+msgctxt "home-dashboard"
+msgid "Home mode"
+msgstr "Modo de inicio"
+
+msgctxt "home-dashboard"
+msgid "Its emulator isn't installed"
+msgstr "Su emulador no está instalado"
+
+msgctxt "home-dashboard"
+msgid "MOST PLAYED"
+msgstr "MÁS JUGADOS"
+
+msgctxt "home-dashboard"
+msgid "No Pico-8 carts"
+msgstr "No hay cartuchos de Pico-8"
+
+msgctxt "home-dashboard"
+msgid "No achievements on the card yet"
+msgstr "Aún no hay logros en la tarjeta"
+
+msgctxt "home-dashboard"
+msgid "No favorites yet"
+msgstr "Aún no hay favoritos"
+
+msgctxt "home-dashboard"
+msgid "No play history yet"
+msgstr "Aún no hay historial de juego"
+
+msgctxt "home-dashboard"
+msgid "Nothing played yet"
+msgstr "Aún no se ha jugado nada"
+
+msgctxt "home-dashboard"
+msgid "Pico-8 folder tags"
+msgstr "Etiquetas de carpetas de Pico-8"
+
+msgctxt "home-dashboard"
+msgid "Pinned"
+msgstr "Fijados"
+
+msgctxt "home-dashboard"
+msgid "Pinned tab"
+msgstr "Pestaña de fijados"
+
+msgctxt "home-dashboard"
+msgid "Played today"
+msgstr "Jugado hoy"
+
+msgctxt "home-dashboard"
+msgid "Recently played"
+msgstr "Jugados recientemente"
+
+msgctxt "home-dashboard"
+msgid "Stats"
+msgstr "Estadísticas"
+
+msgctxt "home-dashboard"
+msgid "Stats tab"
+msgstr "Pestaña de estadísticas"
+
+msgctxt "home-dashboard"
+msgid "Top shelf"
+msgstr "Estante superior"
+
+msgctxt "home-dashboard"
+msgid "dashboard"
+msgstr "panel"
+
+msgctxt "home-dashboard"
+msgid "minui"
+msgstr "minui"
+
+msgctxt "home-dashboard"
+msgid "pico8"
+msgstr "pico8"
+
+msgctxt "home-dashboard"
+msgid "retroachievements"
+msgstr "retroachievements"
+
+msgctxt "home-dashboard"
+msgid "today"
+msgstr "hoy"
+
+msgctxt "home-dashboard"
+msgid "yesterday"
+msgstr "ayer"
+
+msgctxt "launch-animation"
+msgid "200"
+msgstr "200"
+
+msgctxt "launch-animation"
+msgid "350"
+msgstr "350"
+
+msgctxt "launch-animation"
+msgid "500"
+msgstr "500"
+
+msgctxt "launch-animation"
+msgid "Duration"
+msgstr "Duración"
+
+msgctxt "launch-animation"
+msgid "Ease"
+msgstr "Suavizado"
+
+msgctxt "launch-animation"
+msgid "Launch animation"
+msgstr "Animación de inicio"
+
+msgctxt "launch-animation"
+msgid "in"
+msgstr "entrada"
+
+msgctxt "launch-animation"
+msgid "in-out"
+msgstr "entrada y salida"
+
+msgctxt "launch-animation"
+msgid "linear"
+msgstr "lineal"
+
+msgctxt "launch-animation"
+msgid "out"
+msgstr "salida"
+
+msgctxt "layout-carousel"
+msgid "Carousel layout"
+msgstr "Diseño en carrusel"
+
+msgctxt "layout-carousel"
+msgid "Slide between games"
+msgstr "Deslizar entre juegos"
+
+msgctxt "layout-fancy"
+msgid "Fancy layout"
+msgstr "Diseño vistoso"
+
+msgctxt "layout-fancy"
+msgid "Prefer state preview"
+msgstr "Preferir la vista del estado"
+
+msgctxt "layout-grid"
+msgid "1"
+msgstr "1"
+
+msgctxt "layout-grid"
+msgid "2"
+msgstr "2"
+
+msgctxt "layout-grid"
+msgid "3"
+msgstr "3"
+
+msgctxt "layout-grid"
+msgid "4"
+msgstr "4"
+
+msgctxt "layout-grid"
+msgid "5"
+msgstr "5"
+
+msgctxt "layout-grid"
+msgid "6"
+msgstr "6"
+
+msgctxt "layout-grid"
+msgid "7"
+msgstr "7"
+
+msgctxt "layout-grid"
+msgid "8"
+msgstr "8"
+
+msgctxt "layout-grid"
+msgid "Columns"
+msgstr "Columnas"
+
+msgctxt "layout-grid"
+msgid "Grid layout"
+msgstr "Diseño en cuadrícula"
+
+msgctxt "layout-grid"
+msgid "Rows"
+msgstr "Filas"
+
+msgctxt "layout-grid"
+msgid "auto"
+msgstr "auto"
+
+msgctxt "layout-hero-rail"
+msgid "0"
+msgstr "0"
+
+msgctxt "layout-hero-rail"
+msgid "150"
+msgstr "150"
+
+msgctxt "layout-hero-rail"
+msgid "20"
+msgstr "20"
+
+msgctxt "layout-hero-rail"
+msgid "300"
+msgstr "300"
+
+msgctxt "layout-hero-rail"
+msgid "40"
+msgstr "40"
+
+msgctxt "layout-hero-rail"
+msgid "600"
+msgstr "600"
+
+msgctxt "layout-hero-rail"
+msgid "Card size"
+msgstr "Tamaño de las tarjetas"
+
+msgctxt "layout-hero-rail"
+msgid "Hero and card rail layout"
+msgstr "Diseño destacado con fila de tarjetas"
+
+msgctxt "layout-hero-rail"
+msgid "Logo fade"
+msgstr "Fundido del logo"
+
+msgctxt "layout-hero-rail"
+msgid "Tint"
+msgstr "Tinte"
+
+msgctxt "layout-hero-rail"
+msgid "large"
+msgstr "grande"
+
+msgctxt "layout-hero-rail"
+msgid "medium"
+msgstr "mediano"
+
+msgctxt "layout-hero-rail"
+msgid "small"
+msgstr "pequeño"
+
+msgctxt "layout-shelf"
+msgid "1"
+msgstr "1"
+
+msgctxt "layout-shelf"
+msgid "2"
+msgstr "2"
+
+msgctxt "layout-shelf"
+msgid "3"
+msgstr "3"
+
+msgctxt "layout-shelf"
+msgid "4"
+msgstr "4"
+
+msgctxt "layout-shelf"
+msgid "Animate the lift"
+msgstr "Animar al levantar"
+
+msgctxt "layout-shelf"
+msgid "Cartridge shelf layout"
+msgstr "Diseño de estantería de cartuchos"
+
+msgctxt "layout-shelf"
+msgid "Shelves"
+msgstr "Estantes"
+
+msgctxt "layout-shelf"
+msgid "auto"
+msgstr "auto"
+
+msgctxt "led-status"
+msgid "10"
+msgstr "10"
+
+msgctxt "led-status"
+msgid "15"
+msgstr "15"
+
+msgctxt "led-status"
+msgid "20"
+msgstr "20"
+
+msgctxt "led-status"
+msgid "25"
+msgstr "25"
+
+msgctxt "led-status"
+msgid "30"
+msgstr "30"
+
+msgctxt "led-status"
+msgid "40"
+msgstr "40"
+
+msgctxt "led-status"
+msgid "50"
+msgstr "50"
+
+msgctxt "led-status"
+msgid "60"
+msgstr "60"
+
+msgctxt "led-status"
+msgid "70"
+msgstr "70"
+
+msgctxt "led-status"
+msgid "LED colour follows"
+msgstr "El color del LED sigue"
+
+msgctxt "led-status"
+msgid "LED status (unsupported on desktop)"
+msgstr "Estado por LED (no disponible en escritorio)"
+
+msgctxt "led-status"
+msgid "Red at or below (%)"
+msgstr "Rojo en o por debajo de (%)"
+
+msgctxt "led-status"
+msgid "Theme colour"
+msgstr "Color del tema"
+
+msgctxt "led-status"
+msgid "Yellow at or below (%)"
+msgstr "Amarillo en o por debajo de (%)"
+
+msgctxt "led-status"
+msgid "accent"
+msgstr "accent"
+
+msgctxt "led-status"
+msgid "accent2"
+msgstr "accent2"
+
+msgctxt "led-status"
+msgid "background"
+msgstr "fondo"
+
+msgctxt "led-status"
+msgid "battery"
+msgstr "batería"
+
+msgctxt "led-status"
+msgid "hint"
+msgstr "pista"
+
+msgctxt "led-status"
+msgid "list_text"
+msgstr "list_text"
+
+msgctxt "led-status"
+msgid "list_text_selected"
+msgstr "list_text_selected"
+
+msgctxt "led-status"
+msgid "main"
+msgstr "principal"
+
+msgctxt "led-status"
+msgid "theme"
+msgstr "tema"
 
 #, c-format
 msgctxt "localization"
@@ -248,3 +2045,2226 @@ msgid "Added names to map.txt in %d folder"
 msgid_plural "Added names to map.txt in %d folders"
 msgstr[0] "Nombres añadidos a map.txt en %d carpeta"
 msgstr[1] "Nombres añadidos a map.txt en %d carpetas"
+
+msgctxt "localization"
+msgid "Fallback font"
+msgstr "Fuente de respaldo"
+
+msgctxt "localization"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "localization"
+msgid "Language"
+msgstr "Idioma"
+
+msgctxt "localization"
+msgid "Language pack folder"
+msgstr "Carpeta de paquetes de idioma"
+
+msgctxt "localization"
+msgid "Lines already in a map.txt are kept."
+msgstr "Las líneas que ya están en un map.txt se mantienen."
+
+msgctxt "localization"
+msgid "Localization"
+msgstr "Localización"
+
+msgctxt "localization"
+msgid "No names lists for this language"
+msgstr "No hay listas de nombres para este idioma"
+
+msgctxt "localization"
+msgid "No names to add to map.txt"
+msgstr "No hay nombres que añadir a map.txt"
+
+msgctxt "localization"
+msgid "Other language code"
+msgstr "Otro código de idioma"
+
+msgctxt "localization"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "localization"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "localization"
+msgid "WRITE"
+msgstr "ESCRIBIR"
+
+msgctxt "localization"
+msgid "Write map.txt names"
+msgstr "Escribir nombres en map.txt"
+
+msgctxt "localization"
+msgid "Write map.txt names button"
+msgstr "Botón de escribir nombres en map.txt"
+
+msgctxt "localization"
+msgid "Write map.txt names tile"
+msgstr "Icono de escribir nombres en map.txt"
+
+msgctxt "localization"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "localization"
+msgid "ca"
+msgstr "ca"
+
+msgctxt "localization"
+msgid "cs"
+msgstr "cs"
+
+msgctxt "localization"
+msgid "da"
+msgstr "da"
+
+msgctxt "localization"
+msgid "de"
+msgstr "de"
+
+msgctxt "localization"
+msgid "el"
+msgstr "el"
+
+msgctxt "localization"
+msgid "es"
+msgstr "es"
+
+msgctxt "localization"
+msgid "fi"
+msgstr "fi"
+
+msgctxt "localization"
+msgid "fr"
+msgstr "fr"
+
+msgctxt "localization"
+msgid "hu"
+msgstr "hu"
+
+msgctxt "localization"
+msgid "it"
+msgstr "it"
+
+msgctxt "localization"
+msgid "ja"
+msgstr "ja"
+
+msgctxt "localization"
+msgid "ko"
+msgstr "ko"
+
+msgctxt "localization"
+msgid "nl"
+msgstr "nl"
+
+msgctxt "localization"
+msgid "no"
+msgstr "no"
+
+msgctxt "localization"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "localization"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "localization"
+msgid "other"
+msgstr "otro"
+
+msgctxt "localization"
+msgid "pl"
+msgstr "pl"
+
+msgctxt "localization"
+msgid "pt"
+msgstr "pt"
+
+msgctxt "localization"
+msgid "pt_BR"
+msgstr "pt_BR"
+
+msgctxt "localization"
+msgid "ru"
+msgstr "ru"
+
+msgctxt "localization"
+msgid "sv"
+msgstr "sv"
+
+msgctxt "localization"
+msgid "tr"
+msgstr "tr"
+
+msgctxt "localization"
+msgid "uk"
+msgstr "uk"
+
+msgctxt "localization"
+msgid "zh_CN"
+msgstr "zh_CN"
+
+msgctxt "localization"
+msgid "zh_TW"
+msgstr "zh_TW"
+
+msgctxt "metadata-band"
+msgid "Fields"
+msgstr "Campos"
+
+msgctxt "metadata-band"
+msgid "Metadata band"
+msgstr "Banda de metadatos"
+
+msgctxt "music"
+msgid "10"
+msgstr "10"
+
+msgctxt "music"
+msgid "3"
+msgstr "3"
+
+msgctxt "music"
+msgid "5"
+msgstr "5"
+
+msgctxt "music"
+msgid "During games"
+msgstr "Durante los juegos"
+
+msgctxt "music"
+msgid "Lock screen"
+msgstr "Bloquear pantalla"
+
+msgctxt "music"
+msgid "Locked: SELECT then START to unlock"
+msgstr "Bloqueado: SELECT y luego START para desbloquear"
+
+msgctxt "music"
+msgid "Music"
+msgstr "Música"
+
+msgctxt "music"
+msgid "Music can't play"
+msgstr "La música no puede sonar"
+
+msgctxt "music"
+msgid "Music can't play on"
+msgstr "La música no puede seguir"
+
+msgctxt "music"
+msgid "Music can't play that"
+msgstr "La música no puede reproducir eso"
+
+msgctxt "music"
+msgid "Music folder"
+msgstr "Carpeta de música"
+
+#, c-format
+msgctxt "music"
+msgid "No music in %s"
+msgstr "No hay música en %s"
+
+msgctxt "music"
+msgid "Now playing pill (seconds)"
+msgstr "Píldora de reproducción (segundos)"
+
+msgctxt "music"
+msgid "Paused"
+msgstr "En pausa"
+
+msgctxt "music"
+msgid "Play or pause music"
+msgstr "Reproducir o pausar la música"
+
+msgctxt "music"
+msgid "Playing"
+msgstr "Reproduciendo"
+
+msgctxt "music"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "music"
+msgid "Repeat"
+msgstr "Repetir"
+
+#, c-format
+msgctxt "music"
+msgid "Repeat %s"
+msgstr "Repetir: %s"
+
+msgctxt "music"
+msgid "Resume after power-off"
+msgstr "Reanudar tras apagar"
+
+msgctxt "music"
+msgid "Shuffle"
+msgstr "Aleatorio"
+
+msgctxt "music"
+msgid "Stay awake while playing"
+msgstr "No suspender mientras suena"
+
+msgctxt "music"
+msgid "all"
+msgstr "todo"
+
+msgctxt "music"
+msgid "always"
+msgstr "siempre"
+
+msgctxt "music"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "music"
+msgid "one"
+msgstr "una"
+
+msgctxt "music"
+msgid "pause"
+msgstr "pausar"
+
+msgctxt "music"
+msgid "play"
+msgstr "seguir"
+
+msgctxt "netplay"
+msgid "Host a game"
+msgstr "Crear partida"
+
+msgctxt "netplay"
+msgid "Host address"
+msgstr "Dirección del anfitrión"
+
+msgctxt "netplay"
+msgid "Join a game"
+msgstr "Unirse a una partida"
+
+msgctxt "netplay"
+msgid "NETPLAY"
+msgstr "NETPLAY"
+
+msgctxt "netplay"
+msgid "Netplay"
+msgstr "Juego en red"
+
+msgctxt "netplay"
+msgid "Netplay (needs NextUI netplay)"
+msgstr "Juego en red (necesita el netplay de NextUI)"
+
+msgctxt "netplay"
+msgid "Netplay couldn't start this game"
+msgstr "El juego en red no pudo iniciar este juego"
+
+msgctxt "netplay"
+msgid "No emulator for netplay"
+msgstr "No hay emulador para juego en red"
+
+msgctxt "netplay"
+msgid "Port"
+msgstr "Puerto"
+
+msgctxt "netplay"
+msgid "Type a host name or IP address, with :port for another port"
+msgstr "Escribe un nombre de host o una dirección IP, con :puerto para otro puerto"
+
+msgctxt "numeric-prefix"
+msgid "Hide the number"
+msgstr "Ocultar el número"
+
+msgctxt "numeric-prefix"
+msgid "Numeric prefix ordering"
+msgstr "Orden por prefijo numérico"
+
+msgctxt "path-repair"
+msgid "Path repair"
+msgstr "Reparar rutas"
+
+msgctxt "path-repair"
+msgid "Repair collections"
+msgstr "Reparar colecciones"
+
+msgctxt "path-repair"
+msgid "Repair recents"
+msgstr "Reparar recientes"
+
+msgctxt "platform-jump"
+msgid "Jump between systems in collections"
+msgstr "Saltar entre sistemas en las colecciones"
+
+msgctxt "platform-jump"
+msgid "Jump between systems on the root"
+msgstr "Saltar entre sistemas en la raíz"
+
+msgctxt "platform-jump"
+msgid "Platform jump"
+msgstr "Salto de plataforma"
+
+msgctxt "platform-jump"
+msgid "SYSTEM"
+msgstr "SISTEMA"
+
+msgctxt "platform-jump"
+msgid "Wrap around"
+msgstr "Dar la vuelta"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] "hace %i día"
+msgstr[1] "hace %i días"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i month ago"
+msgid_plural "%i months ago"
+msgstr[0] "hace %i mes"
+msgstr[1] "hace %i meses"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] "%i sesión"
+msgstr[1] "%i sesiones"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i week ago"
+msgid_plural "%i weeks ago"
+msgstr[0] "hace %i semana"
+msgstr[1] "hace %i semanas"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i year ago"
+msgid_plural "%i years ago"
+msgstr[0] "hace %i año"
+msgstr[1] "hace %i años"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i/%i achievements"
+msgstr "%i/%i logros"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%id"
+msgstr "%i d"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%imo"
+msgstr "%i m"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%iw"
+msgstr "%i sem"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%ix"
+msgstr "%ix"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%iy"
+msgstr "%i a"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%lldh"
+msgstr "%lld h"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%s %i"
+msgstr "%s %i"
+
+#, c-format
+msgctxt "playtime-captions"
+msgid "%s %i, %i"
+msgstr "%s %i, %i"
+
+msgctxt "playtime-captions"
+msgid "<1m"
+msgstr "<1 min"
+
+msgctxt "playtime-captions"
+msgid "Achievements"
+msgstr "Logros"
+
+msgctxt "playtime-captions"
+msgid "Apr"
+msgstr "abr"
+
+msgctxt "playtime-captions"
+msgid "Aug"
+msgstr "ago"
+
+msgctxt "playtime-captions"
+msgid "Dec"
+msgstr "dic"
+
+msgctxt "playtime-captions"
+msgid "Feb"
+msgstr "feb"
+
+msgctxt "playtime-captions"
+msgid "Format"
+msgstr "Formato"
+
+msgctxt "playtime-captions"
+msgid "Jan"
+msgstr "ene"
+
+msgctxt "playtime-captions"
+msgid "Jul"
+msgstr "jul"
+
+msgctxt "playtime-captions"
+msgid "Jun"
+msgstr "jun"
+
+msgctxt "playtime-captions"
+msgid "Last played"
+msgstr "Última partida"
+
+msgctxt "playtime-captions"
+msgid "Mar"
+msgstr "mar"
+
+msgctxt "playtime-captions"
+msgid "May"
+msgstr "may"
+
+msgctxt "playtime-captions"
+msgid "Never played"
+msgstr "Sin jugar"
+
+msgctxt "playtime-captions"
+msgid "Nov"
+msgstr "nov"
+
+msgctxt "playtime-captions"
+msgid "Oct"
+msgstr "oct"
+
+msgctxt "playtime-captions"
+msgid "Play time"
+msgstr "Tiempo de juego"
+
+msgctxt "playtime-captions"
+msgid "Play time captions"
+msgstr "Rótulos de tiempo de juego"
+
+msgctxt "playtime-captions"
+msgid "Sep"
+msgstr "sept"
+
+msgctxt "playtime-captions"
+msgid "Sessions"
+msgstr "Sesiones"
+
+msgctxt "playtime-captions"
+msgid "compact"
+msgstr "compacto"
+
+msgctxt "playtime-captions"
+msgid "date"
+msgstr "fecha"
+
+msgctxt "playtime-captions"
+msgid "relative"
+msgstr "relativo"
+
+msgctxt "playtime-captions"
+msgid "today"
+msgstr "hoy"
+
+msgctxt "playtime-captions"
+msgid "yesterday"
+msgstr "ayer"
+
+#, c-format
+msgctxt "playtime-limit"
+msgid "%i more minutes today"
+msgstr "%i minutos más hoy"
+
+#, c-format
+msgctxt "playtime-limit"
+msgid "%lldh %02lldm left"
+msgstr "quedan %lld h %02lld min"
+
+#, c-format
+msgctxt "playtime-limit"
+msgid "%lldm left"
+msgstr "quedan %lld min"
+
+#, c-format
+msgctxt "playtime-limit"
+msgid "%s today"
+msgstr "%s hoy"
+
+msgctxt "playtime-limit"
+msgid "10"
+msgstr "10"
+
+msgctxt "playtime-limit"
+msgid "120"
+msgstr "120"
+
+msgctxt "playtime-limit"
+msgid "15"
+msgstr "15"
+
+msgctxt "playtime-limit"
+msgid "180"
+msgstr "180"
+
+msgctxt "playtime-limit"
+msgid "240"
+msgstr "240"
+
+msgctxt "playtime-limit"
+msgid "30"
+msgstr "30"
+
+msgctxt "playtime-limit"
+msgid "45"
+msgstr "45"
+
+msgctxt "playtime-limit"
+msgid "5"
+msgstr "5"
+
+msgctxt "playtime-limit"
+msgid "60"
+msgstr "60"
+
+msgctxt "playtime-limit"
+msgid "90"
+msgstr "90"
+
+msgctxt "playtime-limit"
+msgid "CODE"
+msgstr "CÓDIGO"
+
+msgctxt "playtime-limit"
+msgid "Code for extra time"
+msgstr "Código para tiempo extra"
+
+msgctxt "playtime-limit"
+msgid "Daily limit (minutes)"
+msgstr "Límite diario (minutos)"
+
+msgctxt "playtime-limit"
+msgid "Extra time (minutes)"
+msgstr "Tiempo extra (minutos)"
+
+msgctxt "playtime-limit"
+msgid "Play time limit"
+msgstr "Límite de tiempo de juego"
+
+msgctxt "playtime-limit"
+msgid "Time's up"
+msgstr "Se acabó el tiempo"
+
+msgctxt "playtime-limit"
+msgid "Time's up for today"
+msgstr "Se acabó el tiempo por hoy"
+
+#, c-format
+msgctxt "playtime-limit"
+msgid "Time's up for today. Enter the code for %i more minutes?"
+msgstr "Se acabó el tiempo por hoy. ¿Introducir el código para %i minutos más?"
+
+msgctxt "playtime-limit"
+msgid "Warn at (minutes left)"
+msgstr "Avisar cuando queden (minutos)"
+
+msgctxt "playtime-limit"
+msgid "Wrong code"
+msgstr "Código incorrecto"
+
+msgctxt "playtime-limit"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "power-plus"
+msgid "1"
+msgstr "1"
+
+msgctxt "power-plus"
+msgid "10"
+msgstr "10"
+
+msgctxt "power-plus"
+msgid "12"
+msgstr "12"
+
+msgctxt "power-plus"
+msgid "15"
+msgstr "15"
+
+msgctxt "power-plus"
+msgid "2"
+msgstr "2"
+
+msgctxt "power-plus"
+msgid "24"
+msgstr "24"
+
+msgctxt "power-plus"
+msgid "3"
+msgstr "3"
+
+msgctxt "power-plus"
+msgid "4"
+msgstr "4"
+
+msgctxt "power-plus"
+msgid "5"
+msgstr "5"
+
+msgctxt "power-plus"
+msgid "8"
+msgstr "8"
+
+#, c-format
+msgctxt "power-plus"
+msgid "Asleep for %ld min, powering off"
+msgstr "Suspendida %ld min, apagando"
+
+#, c-format
+msgctxt "power-plus"
+msgid "Battery at %d%%, charge soon"
+msgstr "Batería al %d%%, cárgala pronto"
+
+#, c-format
+msgctxt "power-plus"
+msgid "Battery at %d%%, powering off in %ds"
+msgstr "Batería al %d%%, apagando en %d s"
+
+msgctxt "power-plus"
+msgid "Hours asleep before powering off"
+msgstr "Horas en suspensión antes de apagar"
+
+msgctxt "power-plus"
+msgid "Low battery guard"
+msgstr "Protección de batería baja"
+
+msgctxt "power-plus"
+msgid "Low battery power off at (%)"
+msgstr "Apagar con batería baja al (%)"
+
+msgctxt "power-plus"
+msgid "Low battery warning at (%)"
+msgstr "Aviso de batería baja al (%)"
+
+msgctxt "power-plus"
+msgid "Power off after a long sleep"
+msgstr "Apagar tras una suspensión larga"
+
+msgctxt "power-plus"
+msgid "Power off cancelled"
+msgstr "Apagado cancelado"
+
+msgctxt "power-plus"
+msgid "Power plus"
+msgstr "Energía plus"
+
+#, c-format
+msgctxt "quick-menu-plus"
+msgid "%s off"
+msgstr "%s desactivado"
+
+#, c-format
+msgctxt "quick-menu-plus"
+msgid "%s on"
+msgstr "%s activado"
+
+msgctxt "quick-menu-plus"
+msgid "Adjustment notices"
+msgstr "Avisos de ajustes"
+
+msgctxt "quick-menu-plus"
+msgid "Battery %"
+msgstr "Batería %"
+
+msgctxt "quick-menu-plus"
+msgid "Clock"
+msgstr "Reloj"
+
+#, c-format
+msgctxt "quick-menu-plus"
+msgid "Couldn't change %s"
+msgstr "No se pudo cambiar %s"
+
+msgctxt "quick-menu-plus"
+msgid "Couldn't turn the launcher off"
+msgstr "No se pudo desactivar el launcher"
+
+msgctxt "quick-menu-plus"
+msgid "Haptics"
+msgstr "Vibración"
+
+msgctxt "quick-menu-plus"
+msgid "Hidden tiles (Pak Store, ...)"
+msgstr "Iconos ocultos (Pak Store, ...)"
+
+msgctxt "quick-menu-plus"
+msgid "Load notices"
+msgstr "Avisos de carga"
+
+msgctxt "quick-menu-plus"
+msgid "Quick menu plus"
+msgstr "Menú rápido plus"
+
+msgctxt "quick-menu-plus"
+msgid "REBOOT"
+msgstr "REINICIAR"
+
+msgctxt "quick-menu-plus"
+msgid "Reboot to stock"
+msgstr "Reiniciar a NextUI original"
+
+msgctxt "quick-menu-plus"
+msgid "Reboot to stock NextUI?\nTurn Launcher back on from Tools."
+msgstr "¿Reiniciar a NextUI original?\nVuelve a activar el launcher desde Herramientas."
+
+msgctxt "quick-menu-plus"
+msgid "Reboot to stock tile on the quick menu"
+msgstr "Icono de reiniciar a NextUI original en el menú rápido"
+
+msgctxt "quick-menu-plus"
+msgid "Save notices"
+msgstr "Avisos de guardado"
+
+msgctxt "quick-menu-plus"
+msgid "Screenshot notices"
+msgstr "Avisos de capturas"
+
+msgctxt "quick-menu-plus"
+msgid "Sleeping as usual"
+msgstr "Suspensión normal"
+
+msgctxt "quick-menu-plus"
+msgid "Stay awake"
+msgstr "No suspender"
+
+msgctxt "quick-menu-plus"
+msgid "Stay awake tile on the quick menu"
+msgstr "Icono de no suspender en el menú rápido"
+
+msgctxt "quick-menu-plus"
+msgid "Staying awake"
+msgstr "Sin suspender"
+
+msgctxt "quick-menu-plus"
+msgid "Tile labels (Recents=Played, ...)"
+msgstr "Nombres de iconos (Recents=Played, ...)"
+
+msgctxt "quick-menu-plus"
+msgid "Toggle tiles (save, load, clock, ...)"
+msgstr "Iconos de interruptores (guardar, cargar, reloj, ...)"
+
+msgctxt "random-game"
+msgid "No games to pick from"
+msgstr "No hay juegos entre los que elegir"
+
+msgctxt "random-game"
+msgid "Prefer unplayed games"
+msgstr "Preferir juegos sin jugar"
+
+msgctxt "random-game"
+msgid "RANDOM"
+msgstr "AL AZAR"
+
+msgctxt "random-game"
+msgid "Random"
+msgstr "Al azar"
+
+msgctxt "random-game"
+msgid "Random game"
+msgstr "Juego al azar"
+
+msgctxt "random-game"
+msgid "Random game on the root"
+msgstr "Juego al azar en la raíz"
+
+msgctxt "random-game"
+msgid "Random tile on the quick menu"
+msgstr "Icono de juego al azar en el menú rápido"
+
+#, c-format
+msgctxt "romm"
+msgid "%s of %s"
+msgstr "%s de %s"
+
+msgctxt "romm"
+msgid "(can't restore)"
+msgstr "(no se puede restaurar)"
+
+msgctxt "romm"
+msgid "10"
+msgstr "10"
+
+msgctxt "romm"
+msgid "20"
+msgstr "20"
+
+msgctxt "romm"
+msgid "5"
+msgstr "5"
+
+msgctxt "romm"
+msgid "50"
+msgstr "50"
+
+msgctxt "romm"
+msgid "B"
+msgstr "B"
+
+msgctxt "romm"
+msgid "Busy, try again"
+msgstr "Ocupado, inténtalo de nuevo"
+
+msgctxt "romm"
+msgid "CA certificates file"
+msgstr "Archivo de certificados de CA"
+
+msgctxt "romm"
+msgid "Certificate fingerprint (SHA-256)"
+msgstr "Huella del certificado (SHA-256)"
+
+#, c-format
+msgctxt "romm"
+msgid "Downloading %s"
+msgstr "Descargando %s"
+
+msgctxt "romm"
+msgid "FLASHBACK"
+msgstr "FLASHBACK"
+
+msgctxt "romm"
+msgid "Flashback button"
+msgstr "Botón de flashback"
+
+#, c-format
+msgctxt "romm"
+msgid "Flashback: %s"
+msgstr "Flashback: %s"
+
+msgctxt "romm"
+msgid "GB"
+msgstr "GB"
+
+msgctxt "romm"
+msgid "KB"
+msgstr "KB"
+
+msgctxt "romm"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "romm"
+msgid "Loading..."
+msgstr "Cargando..."
+
+msgctxt "romm"
+msgid "MB"
+msgstr "MB"
+
+msgctxt "romm"
+msgid "No network"
+msgstr "Sin red"
+
+msgctxt "romm"
+msgid "No saves or states on the server"
+msgstr "No hay partidas ni estados en el servidor"
+
+msgctxt "romm"
+msgid "Password or API token"
+msgstr "Contraseña o token de API"
+
+msgctxt "romm"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "romm"
+msgid "RESTORE"
+msgstr "RESTAURAR"
+
+#, c-format
+msgctxt "romm"
+msgid "Restore this save?\n%s\nThe one on the card is backed up first."
+msgstr "¿Restaurar esta partida?\n%s\nAntes se hace una copia de la que hay en la tarjeta."
+
+#, c-format
+msgctxt "romm"
+msgid "Restore this state?\n%s\nThe one on the card is backed up first."
+msgstr "¿Restaurar este estado?\n%s\nAntes se hace una copia del que hay en la tarjeta."
+
+msgctxt "romm"
+msgid "RomM"
+msgstr "RomM"
+
+#, c-format
+msgctxt "romm"
+msgid "RomM: %s"
+msgstr "RomM: %s"
+
+msgctxt "romm"
+msgid "RomM: a folder of that name is already on the card"
+msgstr "RomM: ya hay una carpeta con ese nombre en la tarjeta"
+
+msgctxt "romm"
+msgid "RomM: couldn't back up the current file"
+msgstr "RomM: no se pudo copiar el archivo actual"
+
+msgctxt "romm"
+msgid "RomM: couldn't restore it"
+msgstr "RomM: no se pudo restaurar"
+
+msgctxt "romm"
+msgid "RomM: not enough space on the card"
+msgstr "RomM: no hay espacio suficiente en la tarjeta"
+
+msgctxt "romm"
+msgid "RomM: restored"
+msgstr "RomM: restaurado"
+
+msgctxt "romm"
+msgid "RomM: restoring..."
+msgstr "RomM: restaurando..."
+
+msgctxt "romm"
+msgid "RomM: save uploaded"
+msgstr "RomM: partida subida"
+
+msgctxt "romm"
+msgid "RomM: that folder isn't on the card"
+msgstr "RomM: esa carpeta no está en la tarjeta"
+
+msgctxt "romm"
+msgid "RomM: that system's folder isn't on the card"
+msgstr "RomM: la carpeta de ese sistema no está en la tarjeta"
+
+msgctxt "romm"
+msgid "RomM: this state can't be restored on this device"
+msgstr "RomM: este estado no se puede restaurar en este dispositivo"
+
+msgctxt "romm"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "romm"
+msgid "Save"
+msgstr "Partida"
+
+msgctxt "romm"
+msgid "Saves kept on the server"
+msgstr "Partidas guardadas en el servidor"
+
+msgctxt "romm"
+msgid "Server"
+msgstr "Servidor"
+
+msgctxt "romm"
+msgid "Starting..."
+msgstr "Iniciando..."
+
+msgctxt "romm"
+msgid "State"
+msgstr "Estado"
+
+#, c-format
+msgctxt "romm"
+msgid "State %d"
+msgstr "Estado %d"
+
+#, c-format
+msgctxt "romm"
+msgid "Unpacking %s"
+msgstr "Descomprimiendo %s"
+
+msgctxt "romm"
+msgid "Upload saves after playing"
+msgstr "Subir partidas al terminar de jugar"
+
+msgctxt "romm"
+msgid "User"
+msgstr "Usuario"
+
+msgctxt "romm"
+msgid "Wi-Fi is off"
+msgstr "El Wi-Fi está apagado"
+
+msgctxt "romm"
+msgid "Wi-Fi isn't connected"
+msgstr "El Wi-Fi no está conectado"
+
+msgctxt "romm"
+msgid "Wi-Fi isn't ready yet"
+msgstr "El Wi-Fi aún no está listo"
+
+msgctxt "romm"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "romm"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "romm"
+msgid "unknown time"
+msgstr "hora desconocida"
+
+msgctxt "row-badges"
+msgid "Row badges"
+msgstr "Distintivos de filas"
+
+msgctxt "row-badges"
+msgid "Tier dots"
+msgstr "Puntos de nivel"
+
+msgctxt "row-badges"
+msgid "Unplayed dot"
+msgstr "Punto de sin jugar"
+
+msgctxt "save-state-manager"
+msgid "Auto"
+msgstr "Auto"
+
+msgctxt "save-state-manager"
+msgid "Couldn't delete that state"
+msgstr "No se pudo borrar ese estado"
+
+msgctxt "save-state-manager"
+msgid "DELETE"
+msgstr "BORRAR"
+
+msgctxt "save-state-manager"
+msgid "Default"
+msgstr "Predeterminado"
+
+#, c-format
+msgctxt "save-state-manager"
+msgid "Delete this save state?\n%s"
+msgstr "¿Borrar este estado guardado?\n%s"
+
+msgctxt "save-state-manager"
+msgid "Delete with Y"
+msgstr "Borrar con Y"
+
+msgctxt "save-state-manager"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "save-state-manager"
+msgid "No preview"
+msgstr "Sin vista previa"
+
+msgctxt "save-state-manager"
+msgid "No save states"
+msgstr "No hay estados guardados"
+
+msgctxt "save-state-manager"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "save-state-manager"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "save-state-manager"
+msgid "SAVE STATES"
+msgstr "ESTADOS GUARDADOS"
+
+msgctxt "save-state-manager"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "save-state-manager"
+msgid "Save state deleted"
+msgstr "Estado guardado borrado"
+
+msgctxt "save-state-manager"
+msgid "Save state manager"
+msgstr "Gestor de estados guardados"
+
+msgctxt "save-state-manager"
+msgid "Save states"
+msgstr "Estados guardados"
+
+msgctxt "save-state-manager"
+msgid "Save states button"
+msgstr "Botón de estados guardados"
+
+#, c-format
+msgctxt "save-state-manager"
+msgid "Slot %d"
+msgstr "Ranura %d"
+
+msgctxt "save-state-manager"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "save-state-manager"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "screensaver"
+msgid "10"
+msgstr "10"
+
+msgctxt "screensaver"
+msgid "120"
+msgstr "120"
+
+msgctxt "screensaver"
+msgid "12h"
+msgstr "12 h"
+
+msgctxt "screensaver"
+msgid "15"
+msgstr "15"
+
+msgctxt "screensaver"
+msgid "20"
+msgstr "20"
+
+msgctxt "screensaver"
+msgid "24h"
+msgstr "24 h"
+
+msgctxt "screensaver"
+msgid "30"
+msgstr "30"
+
+msgctxt "screensaver"
+msgid "300"
+msgstr "300"
+
+msgctxt "screensaver"
+msgid "45"
+msgstr "45"
+
+msgctxt "screensaver"
+msgid "5"
+msgstr "5"
+
+msgctxt "screensaver"
+msgid "60"
+msgstr "60"
+
+msgctxt "screensaver"
+msgid "600"
+msgstr "600"
+
+msgctxt "screensaver"
+msgid "AM"
+msgstr "a. m."
+
+msgctxt "screensaver"
+msgid "Change"
+msgstr "Cambiar"
+
+msgctxt "screensaver"
+msgid "Clock"
+msgstr "Reloj"
+
+msgctxt "screensaver"
+msgid "Game art"
+msgstr "Arte de los juegos"
+
+msgctxt "screensaver"
+msgid "Image folder"
+msgstr "Carpeta de imágenes"
+
+msgctxt "screensaver"
+msgid "Images"
+msgstr "Imágenes"
+
+msgctxt "screensaver"
+msgid "PM"
+msgstr "p. m."
+
+msgctxt "screensaver"
+msgid "Screensaver"
+msgstr "Salvapantallas"
+
+msgctxt "screensaver"
+msgid "Seconds per image"
+msgstr "Segundos por imagen"
+
+msgctxt "screensaver"
+msgid "Show after idle (seconds)"
+msgstr "Mostrar tras inactividad (segundos)"
+
+msgctxt "screensaver"
+msgid "box"
+msgstr "caja"
+
+msgctxt "screensaver"
+msgid "fade"
+msgstr "fundido"
+
+msgctxt "screensaver"
+msgid "folder"
+msgstr "carpeta"
+
+msgctxt "screensaver"
+msgid "games"
+msgstr "juegos"
+
+msgctxt "screensaver"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "screensaver"
+msgid "screenshot"
+msgstr "captura"
+
+msgctxt "screensaver"
+msgid "screenshots"
+msgstr "capturas"
+
+msgctxt "screensaver"
+msgid "slide"
+msgstr "deslizar"
+
+msgctxt "screenshot-viewer"
+msgid "Can't show this screenshot"
+msgstr "No se puede mostrar esta captura"
+
+msgctxt "screenshot-viewer"
+msgid "Couldn't delete that"
+msgstr "No se pudo borrar"
+
+msgctxt "screenshot-viewer"
+msgid "DELETE"
+msgstr "BORRAR"
+
+#, c-format
+msgctxt "screenshot-viewer"
+msgid "Delete this screenshot?\n%s"
+msgstr "¿Borrar esta captura?\n%s"
+
+msgctxt "screenshot-viewer"
+msgid "Delete with Y"
+msgstr "Borrar con Y"
+
+msgctxt "screenshot-viewer"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "screenshot-viewer"
+msgid "No screenshots"
+msgstr "No hay capturas"
+
+msgctxt "screenshot-viewer"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "screenshot-viewer"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "screenshot-viewer"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "screenshot-viewer"
+msgid "Screenshot deleted"
+msgstr "Captura borrada"
+
+msgctxt "screenshot-viewer"
+msgid "Screenshot viewer"
+msgstr "Visor de capturas"
+
+msgctxt "screenshot-viewer"
+msgid "Screenshots"
+msgstr "Capturas"
+
+msgctxt "screenshot-viewer"
+msgid "Screenshots button"
+msgstr "Botón de capturas"
+
+msgctxt "screenshot-viewer"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "screenshot-viewer"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "search"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "search"
+msgid "New search"
+msgstr "Nueva búsqueda"
+
+#, c-format
+msgctxt "search"
+msgid "No games match %s"
+msgstr "Ningún juego coincide con %s"
+
+msgctxt "search"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "search"
+msgid "Remember recent searches"
+msgstr "Recordar búsquedas recientes"
+
+msgctxt "search"
+msgid "SEARCH"
+msgstr "BUSCAR"
+
+msgctxt "search"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "search"
+msgid "Search"
+msgstr "Buscar"
+
+msgctxt "search"
+msgid "Search button"
+msgstr "Botón de búsqueda"
+
+msgctxt "search"
+msgid "Search on the root"
+msgstr "Búsqueda en la raíz"
+
+msgctxt "search"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "search"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "second-screen"
+msgid "480x320"
+msgstr "480x320"
+
+msgctxt "second-screen"
+msgid "480x640"
+msgstr "480x640"
+
+msgctxt "second-screen"
+msgid "640x480"
+msgstr "640x480"
+
+msgctxt "second-screen"
+msgid "800x480"
+msgstr "800x480"
+
+msgctxt "second-screen"
+msgid "Developer"
+msgstr "Desarrollador"
+
+msgctxt "second-screen"
+msgid "Empty folder"
+msgstr "Carpeta vacía"
+
+msgctxt "second-screen"
+msgid "Folder"
+msgstr "Carpeta"
+
+msgctxt "second-screen"
+msgid "Game"
+msgstr "Juego"
+
+msgctxt "second-screen"
+msgid "Genre"
+msgstr "Género"
+
+msgctxt "second-screen"
+msgid "Pak"
+msgstr "Pak"
+
+msgctxt "second-screen"
+msgid "Players"
+msgstr "Jugadores"
+
+msgctxt "second-screen"
+msgid "Publisher"
+msgstr "Editor"
+
+msgctxt "second-screen"
+msgid "Second screen (experimental, desktop only)"
+msgstr "Segunda pantalla (experimental, solo escritorio)"
+
+msgctxt "second-screen"
+msgid "Window size"
+msgstr "Tamaño de la ventana"
+
+msgctxt "second-screen"
+msgid "Year"
+msgstr "Año"
+
+msgctxt "simple-mode"
+msgid "Hide settings tiles"
+msgstr "Ocultar iconos de ajustes"
+
+msgctxt "simple-mode"
+msgid "LEAVE"
+msgstr "SALIR"
+
+msgctxt "simple-mode"
+msgid "Leave simple mode?"
+msgstr "¿Salir del modo simple?"
+
+msgctxt "simple-mode"
+msgid "PIN to leave simple mode"
+msgstr "PIN para salir del modo simple"
+
+msgctxt "simple-mode"
+msgid "Simple mode"
+msgstr "Modo simple"
+
+msgctxt "simple-mode"
+msgid "Simple mode off"
+msgstr "Modo simple desactivado"
+
+msgctxt "simple-mode"
+msgid "Simple mode on"
+msgstr "Modo simple activado"
+
+msgctxt "simple-mode"
+msgid "Tools are off in simple mode"
+msgstr "Las herramientas no están en el modo simple"
+
+msgctxt "simple-mode"
+msgid "Wrong PIN"
+msgstr "PIN incorrecto"
+
+msgctxt "smart-collections"
+msgid "1"
+msgstr "1"
+
+msgctxt "smart-collections"
+msgid "10"
+msgstr "10"
+
+msgctxt "smart-collections"
+msgid "2"
+msgstr "2"
+
+msgctxt "smart-collections"
+msgid "3"
+msgstr "3"
+
+msgctxt "smart-collections"
+msgid "5"
+msgstr "5"
+
+#, c-format
+msgctxt "smart-collections"
+msgid "Bring back %d dismissed collection?"
+msgid_plural "Bring back %d dismissed collections?"
+msgstr[0] "¿Recuperar %d colección descartada?"
+msgstr[1] "¿Recuperar %d colecciones descartadas?"
+
+msgctxt "smart-collections"
+msgid "Built-in franchises"
+msgstr "Sagas incluidas"
+
+msgctxt "smart-collections"
+msgid "DISMISS"
+msgstr "DESCARTAR"
+
+#, c-format
+msgctxt "smart-collections"
+msgid "Dismiss %s?"
+msgstr "¿Descartar %s?"
+
+#, c-format
+msgctxt "smart-collections"
+msgid "Dismissed %s"
+msgstr "%s descartada"
+
+msgctxt "smart-collections"
+msgid "Dismissed collections are back"
+msgstr "Las colecciones descartadas han vuelto"
+
+msgctxt "smart-collections"
+msgid "More franchises"
+msgstr "Más sagas"
+
+msgctxt "smart-collections"
+msgid "RESTORE"
+msgstr "RESTAURAR"
+
+msgctxt "smart-collections"
+msgid "Smallest collection"
+msgstr "Colección más pequeña"
+
+msgctxt "smart-collections"
+msgid "Smart Collections"
+msgstr "Colecciones inteligentes"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] "hace %i día"
+msgstr[1] "hace %i días"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i month ago"
+msgid_plural "%i months ago"
+msgstr[0] "hace %i mes"
+msgstr[1] "hace %i meses"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] "%i sesión"
+msgstr[1] "%i sesiones"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i week ago"
+msgid_plural "%i weeks ago"
+msgstr[0] "hace %i semana"
+msgstr[1] "hace %i semanas"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i year ago"
+msgid_plural "%i years ago"
+msgstr[0] "hace %i año"
+msgstr[1] "hace %i años"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i/%i achievements"
+msgstr "%i/%i logros"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%id"
+msgstr "%i d"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%imo"
+msgstr "%i m"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%iw"
+msgstr "%i sem"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%ix"
+msgstr "%ix"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%iy"
+msgstr "%i a"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%lldh"
+msgstr "%lld h"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%s %i"
+msgstr "%s %i"
+
+#, c-format
+msgctxt "switcher-plus"
+msgid "%s %i, %i"
+msgstr "%s %i, %i"
+
+msgctxt "switcher-plus"
+msgid "<1m"
+msgstr "<1 min"
+
+msgctxt "switcher-plus"
+msgid "Apr"
+msgstr "abr"
+
+msgctxt "switcher-plus"
+msgid "Aug"
+msgstr "ago"
+
+msgctxt "switcher-plus"
+msgid "Dec"
+msgstr "dic"
+
+msgctxt "switcher-plus"
+msgid "Feb"
+msgstr "feb"
+
+msgctxt "switcher-plus"
+msgid "Game switcher plus"
+msgstr "Selector de juegos plus"
+
+msgctxt "switcher-plus"
+msgid "Jan"
+msgstr "ene"
+
+msgctxt "switcher-plus"
+msgid "Jul"
+msgstr "jul"
+
+msgctxt "switcher-plus"
+msgid "Jun"
+msgstr "jun"
+
+msgctxt "switcher-plus"
+msgid "Mar"
+msgstr "mar"
+
+msgctxt "switcher-plus"
+msgid "May"
+msgstr "may"
+
+msgctxt "switcher-plus"
+msgid "Never played"
+msgstr "Sin jugar"
+
+msgctxt "switcher-plus"
+msgid "No Preview"
+msgstr "Sin vista previa"
+
+msgctxt "switcher-plus"
+msgid "Nov"
+msgstr "nov"
+
+msgctxt "switcher-plus"
+msgid "Oct"
+msgstr "oct"
+
+msgctxt "switcher-plus"
+msgid "Play time captions"
+msgstr "Rótulos de tiempo de juego"
+
+msgctxt "switcher-plus"
+msgid "Sep"
+msgstr "sept"
+
+msgctxt "switcher-plus"
+msgid "Style"
+msgstr "Estilo"
+
+msgctxt "switcher-plus"
+msgid "full"
+msgstr "completo"
+
+msgctxt "switcher-plus"
+msgid "list"
+msgstr "lista"
+
+msgctxt "switcher-plus"
+msgid "strip"
+msgstr "tira"
+
+msgctxt "switcher-plus"
+msgid "today"
+msgstr "hoy"
+
+msgctxt "switcher-plus"
+msgid "yesterday"
+msgstr "ayer"
+
+#, c-format
+msgctxt "system-info"
+msgid "%i of 3 bars"
+msgstr "%i de 3 barras"
+
+#, c-format
+msgctxt "system-info"
+msgid "%i%%, charging"
+msgstr "%i%%, cargando"
+
+#, c-format
+msgctxt "system-info"
+msgid "%lldd %lldh %lldm"
+msgstr "%lld d %lld h %lld min"
+
+#, c-format
+msgctxt "system-info"
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgctxt "system-info"
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgctxt "system-info"
+msgid "%s free of %s"
+msgstr "%s libres de %s"
+
+msgctxt "system-info"
+msgid "Battery"
+msgstr "Batería"
+
+#, c-format
+msgctxt "system-info"
+msgid "Battery over the last %i game, %s of play"
+msgid_plural "Battery over the last %i games, %s of play"
+msgstr[0] "Batería en la última partida (%i), %s de juego"
+msgstr[1] "Batería en las últimas %i partidas, %s de juego"
+
+msgctxt "system-info"
+msgid "GB"
+msgstr "GB"
+
+msgctxt "system-info"
+msgid "IP address"
+msgstr "Dirección IP"
+
+msgctxt "system-info"
+msgid "KB"
+msgstr "KB"
+
+msgctxt "system-info"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "system-info"
+msgid "MB"
+msgstr "MB"
+
+msgctxt "system-info"
+msgid "Memory"
+msgstr "Memoria"
+
+msgctxt "system-info"
+msgid "No battery history: battery-logger hasn't logged a game yet"
+msgstr "Sin historial de batería: battery-logger aún no ha registrado ninguna partida"
+
+msgctxt "system-info"
+msgid "PB"
+msgstr "PB"
+
+msgctxt "system-info"
+msgid "Platform"
+msgstr "Plataforma"
+
+msgctxt "system-info"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "system-info"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "system-info"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "system-info"
+msgid "Storage"
+msgstr "Almacenamiento"
+
+msgctxt "system-info"
+msgid "System info"
+msgstr "Información del sistema"
+
+msgctxt "system-info"
+msgid "System info button"
+msgstr "Botón de información del sistema"
+
+msgctxt "system-info"
+msgid "TB"
+msgstr "TB"
+
+msgctxt "system-info"
+msgid "Uptime"
+msgstr "Tiempo encendido"
+
+msgctxt "system-info"
+msgid "Version"
+msgstr "Versión"
+
+msgctxt "system-info"
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgctxt "system-info"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "system-info"
+msgid "checking"
+msgstr "comprobando"
+
+msgctxt "system-info"
+msgid "hidden network"
+msgstr "red oculta"
+
+msgctxt "system-info"
+msgid "no address yet"
+msgstr "aún sin dirección"
+
+msgctxt "system-info"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "system-info"
+msgid "not connected"
+msgstr "no conectado"
+
+msgctxt "system-info"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "system-info"
+msgid "unavailable"
+msgstr "no disponible"
+
+#, c-format
+msgctxt "tags"
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] "%i juego"
+msgstr[1] "%i juegos"
+
+msgctxt "tags"
+msgid "Couldn't save tags"
+msgstr "No se pudieron guardar las etiquetas"
+
+msgctxt "tags"
+msgid "Couldn't tag that"
+msgstr "No se pudo etiquetar"
+
+msgctxt "tags"
+msgid "DELETE"
+msgstr "BORRAR"
+
+#, c-format
+msgctxt "tags"
+msgid "Delete the tag %s?"
+msgstr "¿Borrar la etiqueta %s?"
+
+msgctxt "tags"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "tags"
+msgid "New tag"
+msgstr "Nueva etiqueta"
+
+msgctxt "tags"
+msgid "Not a tag name"
+msgstr "No es un nombre de etiqueta"
+
+msgctxt "tags"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "tags"
+msgid "TAGS"
+msgstr "ETIQUETAS"
+
+msgctxt "tags"
+msgid "Tag tiles on the quick menu"
+msgstr "Iconos de etiquetas en el menú rápido"
+
+msgctxt "tags"
+msgid "Tags"
+msgstr "Etiquetas"
+
+msgctxt "tags"
+msgid "Tags button"
+msgstr "Botón de etiquetas"
+
+msgctxt "tags"
+msgid "Tags folder on the root"
+msgstr "Carpeta de etiquetas en la raíz"
+
+msgctxt "tags"
+msgid "Too many tags"
+msgstr "Demasiadas etiquetas"
+
+msgctxt "tags"
+msgid "Untag its games to delete it"
+msgstr "Quita la etiqueta de sus juegos para borrarla"
+
+msgctxt "tags"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "tags"
+msgid "unused"
+msgstr "sin usar"
+
+msgctxt "theme-plus"
+msgid "10"
+msgstr "10"
+
+msgctxt "theme-plus"
+msgid "15"
+msgstr "15"
+
+msgctxt "theme-plus"
+msgid "2"
+msgstr "2"
+
+msgctxt "theme-plus"
+msgid "20"
+msgstr "20"
+
+msgctxt "theme-plus"
+msgid "3"
+msgstr "3"
+
+msgctxt "theme-plus"
+msgid "4.5"
+msgstr "4.5"
+
+msgctxt "theme-plus"
+msgid "5"
+msgstr "5"
+
+msgctxt "theme-plus"
+msgid "7"
+msgstr "7"
+
+msgctxt "theme-plus"
+msgid "8"
+msgstr "8"
+
+msgctxt "theme-plus"
+msgid "Background colour"
+msgstr "Color de fondo"
+
+msgctxt "theme-plus"
+msgid "Contrast"
+msgstr "Contraste"
+
+msgctxt "theme-plus"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "theme-plus"
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgctxt "theme-plus"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "theme-plus"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "theme-plus"
+msgid "Screen margins"
+msgstr "Márgenes de la pantalla"
+
+msgctxt "theme-plus"
+msgid "Stock"
+msgstr "Original"
+
+msgctxt "theme-plus"
+msgid "Text size"
+msgstr "Tamaño del texto"
+
+msgctxt "theme-plus"
+msgid "Theme"
+msgstr "Tema"
+
+msgctxt "theme-plus"
+msgid "Theme button"
+msgstr "Botón de tema"
+
+msgctxt "theme-plus"
+msgid "Theme plus"
+msgstr "Tema plus"
+
+msgctxt "theme-plus"
+msgid "UI size"
+msgstr "Tamaño de la interfaz"
+
+msgctxt "theme-plus"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "theme-plus"
+msgid "auto"
+msgstr "auto"
+
+msgctxt "theme-plus"
+msgid "compact"
+msgstr "compacto"
+
+msgctxt "theme-plus"
+msgid "large"
+msgstr "grande"
+
+msgctxt "theme-plus"
+msgid "larger"
+msgstr "más grande"
+
+msgctxt "theme-plus"
+msgid "largest"
+msgstr "el más grande"
+
+msgctxt "theme-plus"
+msgid "none"
+msgstr "ninguno"
+
+msgctxt "theme-plus"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "theme-plus"
+msgid "small"
+msgstr "pequeño"
+
+msgctxt "theme-plus"
+msgid "stock"
+msgstr "original"
+
+msgctxt "theme-plus"
+msgid "theme"
+msgstr "tema"
+
+msgctxt "title-disambiguation"
+msgid "Same system too"
+msgstr "También del mismo sistema"
+
+msgctxt "title-disambiguation"
+msgid "Title disambiguation"
+msgstr "Desambiguación de títulos"
+
+msgctxt "transitions"
+msgid "Ease"
+msgstr "Suavizado"
+
+msgctxt "transitions"
+msgid "Speed"
+msgstr "Velocidad"
+
+msgctxt "transitions"
+msgid "Style"
+msgstr "Estilo"
+
+msgctxt "transitions"
+msgid "Transition styles"
+msgstr "Estilos de transición"
+
+msgctxt "transitions"
+msgid "fade"
+msgstr "fundido"
+
+msgctxt "transitions"
+msgid "fast"
+msgstr "rápida"
+
+msgctxt "transitions"
+msgid "in"
+msgstr "entrada"
+
+msgctxt "transitions"
+msgid "in_out"
+msgstr "entrada y salida"
+
+msgctxt "transitions"
+msgid "linear"
+msgstr "lineal"
+
+msgctxt "transitions"
+msgid "normal"
+msgstr "normal"
+
+msgctxt "transitions"
+msgid "off"
+msgstr "desactivado"
+
+msgctxt "transitions"
+msgid "out"
+msgstr "salida"
+
+msgctxt "transitions"
+msgid "slide"
+msgstr "deslizar"
+
+msgctxt "transitions"
+msgid "slide_fade"
+msgstr "deslizar y fundir"
+
+msgctxt "transitions"
+msgid "slow"
+msgstr "lenta"
+
+msgctxt "transitions"
+msgid "stock"
+msgstr "original"
+
+msgctxt "video-previews"
+msgid "1"
+msgstr "1"
+
+msgctxt "video-previews"
+msgid "2"
+msgstr "2"
+
+msgctxt "video-previews"
+msgid "3"
+msgstr "3"
+
+msgctxt "video-previews"
+msgid "5"
+msgstr "5"
+
+msgctxt "video-previews"
+msgid "Play after (seconds)"
+msgstr "Reproducir tras (segundos)"
+
+msgctxt "video-previews"
+msgid "Sound"
+msgstr "Sonido"
+
+msgctxt "video-previews"
+msgid "Video previews"
+msgstr "Vistas previas en vídeo"

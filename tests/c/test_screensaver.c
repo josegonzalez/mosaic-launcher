@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/screensaver/screensaver.c"
 
 #define BIT MOSAIC_BUTTON_BIT
@@ -57,6 +58,16 @@ static void testSettings(void) {
 	char out[64];
 	SS_formatClock(9, 5, SS_CLOCK_24H, out, sizeof(out));
 	CHECK_STR(out, "09:05");
+	SS_formatClock(0, 0, SS_CLOCK_12H, out, sizeof(out));
+	CHECK_STR(out, "12:00 AM");
+	// in the words it's given, then English again
+	static const char* const words[] = { "AM", "a. m.", NULL };
+	fake_words = words;
+	SSWords set = { fakeTr, fakePlural };
+	SS_setWords(&set);
+	SS_formatClock(0, 0, SS_CLOCK_12H, out, sizeof(out));
+	CHECK_STR(out, "12:00 a. m.");
+	SS_setWords(NULL);
 	SS_formatClock(0, 0, SS_CLOCK_12H, out, sizeof(out));
 	CHECK_STR(out, "12:00 AM");
 	SS_formatClock(21, 7, SS_CLOCK_12H, out, sizeof(out));

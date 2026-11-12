@@ -4,6 +4,17 @@
 #include <stddef.h>
 #include "mosaic_plugin.h"
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until SS_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct SSWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} SSWords;
+void SS_setWords(const SSWords* words);
+
 // What the screensaver decides, apart from the host, the clock and the
 // screen: its settings, when it opens, the buttons it takes, which images
 // it cycles through and how one changes to the next. No SDL; it reads

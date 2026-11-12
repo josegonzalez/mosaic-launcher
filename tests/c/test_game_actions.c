@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/game-actions/game_actions.c"
 
 struct MosaicEntry {
@@ -336,6 +337,18 @@ static void testPlans(void) {
 		"game /Roms/Game Boy (GB)/Tetris 2.gb\n"
 		"save /Saves/GB/Tetris 2.gb.sav\n"
 		"slot /.userdata/shared/.minui/GB/Tetris 2.gb.txt\n");
+	GA_planSummary(&plan, summary, sizeof(summary));
+	CHECK_STR(summary, "1 save and its resume files");
+	// in the words it's given, then English again
+	static const char* const words[] = { "%s and %s", "%s y %s", "its resume files", "sus archivos de reanudar", NULL };
+	static const char* const plurals[] = { "%i save", "%i partida guardada", "%i partidas guardadas", NULL };
+	fake_words = words;
+	fake_plurals = plurals;
+	GAWords set = { fakeTr, fakePlural };
+	GA_setWords(&set);
+	GA_planSummary(&plan, summary, sizeof(summary));
+	CHECK_STR(summary, "1 partida guardada y sus archivos de reanudar");
+	GA_setWords(NULL);
 	GA_planSummary(&plan, summary, sizeof(summary));
 	CHECK_STR(summary, "1 save and its resume files");
 

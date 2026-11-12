@@ -36,6 +36,17 @@
 #define MUTE_PERCENT 40
 
 static const MosaicHost* host;
+
+// Fixed text, translated in this plugin's id's context.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 static PCOptions options;
 static int badges_known = 0;
 static int badge_reserve = 0; // room after the name for row-badges' dots, in units of the screen's scale
@@ -101,6 +112,8 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const PCWords words = { tr, trPlural };
+	PC_setWords(&words);
 	if (!MOSAIC_HOST_HAS(host, decorate_cell) || !MOSAIC_HOST_HAS(host, draw_text) || !MOSAIC_HOST_HAS(host, theme_color)) {
 		host->log(ID, "this launcher can't decorate rows");
 		return 1;

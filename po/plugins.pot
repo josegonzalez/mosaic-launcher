@@ -16,6 +16,58 @@ msgstr ""
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
 #: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%i days: %s"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%i days: no play history"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%lld session"
+msgid_plural "%lld sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%lldh"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%lldh %lldm"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%lldm"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+#, c-format
+msgctxt "activity-stats"
+msgid "%s a day"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
 msgctxt "activity-stats"
 msgid "30 days"
 msgstr ""
@@ -23,6 +75,11 @@ msgstr ""
 #: plugins/activity-stats/activity_model.c
 msgctxt "activity-stats"
 msgid "7 days"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "<1m"
 msgstr ""
 
 #: plugins/activity-stats/activity_stats.c
@@ -48,6 +105,11 @@ msgstr ""
 
 #: plugins/activity-stats/activity_model.c
 msgctxt "activity-stats"
+msgid "Fri"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
 msgid "Games"
 msgstr ""
 
@@ -59,6 +121,11 @@ msgstr ""
 #: plugins/activity-stats/activity_model.c
 msgctxt "activity-stats"
 msgid "Launches"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Mon"
 msgstr ""
 
 #: plugins/activity-stats/activity_stats.c
@@ -84,6 +151,36 @@ msgstr ""
 #: plugins/activity-stats/plugin.txt
 msgctxt "activity-stats"
 msgid "SELECT"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Sat"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Sun"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Thu"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Tue"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Unknown game"
+msgstr ""
+
+#: plugins/activity-stats/activity_model.c
+msgctxt "activity-stats"
+msgid "Wed"
 msgstr ""
 
 #: plugins/activity-stats/plugin.txt
@@ -403,6 +500,11 @@ msgstr ""
 
 #: plugins/charging-screen/charging_model.c
 msgctxt "charging-screen"
+msgid "AM"
+msgstr ""
+
+#: plugins/charging-screen/charging_model.c
+msgctxt "charging-screen"
 msgid "Charged"
 msgstr ""
 
@@ -419,6 +521,11 @@ msgstr ""
 #: plugins/charging-screen/plugin.txt
 msgctxt "charging-screen"
 msgid "Clock"
+msgstr ""
+
+#: plugins/charging-screen/charging_model.c
+msgctxt "charging-screen"
+msgid "PM"
 msgstr ""
 
 #: plugins/charging-screen/plugin.txt
@@ -954,6 +1061,36 @@ msgctxt "focus-mode"
 msgid "Focus on favorites"
 msgstr ""
 
+#: plugins/game-actions/actions_model.c
+#, c-format
+msgctxt "game-actions"
+msgid "%i disc file"
+msgid_plural "%i disc files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/game-actions/actions_model.c
+#, c-format
+msgctxt "game-actions"
+msgid "%i save"
+msgid_plural "%i saves"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/game-actions/actions_model.c
+#, c-format
+msgctxt "game-actions"
+msgid "%i state"
+msgid_plural "%i states"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/game-actions/actions_model.c
+#, c-format
+msgctxt "game-actions"
+msgid "%s and %s"
+msgstr ""
+
 #: plugins/game-actions/game_actions.c
 msgctxt "game-actions"
 msgid "ADD TO COLLECTION"
@@ -1100,6 +1237,55 @@ msgctxt "game-actions"
 msgid "Y"
 msgstr ""
 
+#: plugins/game-actions/actions_model.c
+msgctxt "game-actions"
+msgid "its art"
+msgstr ""
+
+#: plugins/game-actions/actions_model.c
+msgctxt "game-actions"
+msgid "its resume files"
+msgstr ""
+
+#: plugins/game-actions/actions_model.c
+msgctxt "game-actions"
+msgid "its settings"
+msgstr ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "%i day streak"
+msgid_plural "%i day streak"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "%i quest done"
+msgid_plural "%i quests done"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "%lldh"
+msgstr ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "%lldh %lldm"
+msgstr ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "%lldm"
+msgstr ""
+
 #: plugins/gamification/plugin.txt
 msgctxt "gamification"
 msgid "1"
@@ -1180,6 +1366,14 @@ msgctxt "gamification"
 msgid "90"
 msgstr ""
 
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Best %i day"
+msgid_plural "Best %i days"
+msgstr[0] ""
+msgstr[1] ""
+
 #: plugins/gamification/plugin.txt
 msgctxt "gamification"
 msgid "Daily games"
@@ -1195,14 +1389,76 @@ msgctxt "gamification"
 msgid "Days a week"
 msgstr ""
 
+#: plugins/gamification/gamification_model.c
+msgctxt "gamification"
+msgid "Done"
+msgstr ""
+
 #: plugins/gamification/plugin.txt
 msgctxt "gamification"
 msgid "Gamification"
 msgstr ""
 
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Go back to a game you haven't played in %i days"
+msgstr ""
+
 #: plugins/gamification/plugin.txt
 msgctxt "gamification"
 msgid "L2"
+msgstr ""
+
+#: plugins/gamification/gamification_model.c
+msgctxt "gamification"
+msgid "No streak"
+msgstr ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Play %i different games today"
+msgid_plural "Play %i different games today"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Play for %i hour this week"
+msgid_plural "Play for %i hours this week"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Play for %i hour today"
+msgid_plural "Play for %i hours today"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Play for %i minutes today"
+msgid_plural "Play for %i minutes today"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Play on %i days this week"
+msgid_plural "Play on %i days this week"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/gamification/gamification_model.c
+#, c-format
+msgctxt "gamification"
+msgid "Quest done: %s"
 msgstr ""
 
 #: plugins/gamification/gamification.c
@@ -1228,6 +1484,11 @@ msgstr ""
 #: plugins/gamification/plugin.txt
 msgctxt "gamification"
 msgid "SELECT"
+msgstr ""
+
+#: plugins/gamification/gamification_model.c
+msgctxt "gamification"
+msgid "Start a game you've never played"
 msgstr ""
 
 #: plugins/gamification/plugin.txt
@@ -1455,6 +1716,14 @@ msgctxt "hold-lock"
 msgid "select+start"
 msgstr ""
 
+#: plugins/home-dashboard/home_model.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] ""
+msgstr[1] ""
+
 #: plugins/home-dashboard/home_dashboard.c
 #, c-format
 msgctxt "home-dashboard"
@@ -1470,6 +1739,35 @@ msgid "%i session"
 msgid_plural "%i sessions"
 msgstr[0] ""
 msgstr[1] ""
+
+#: plugins/home-dashboard/home_model.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "%i/%i points"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "%lldh %lldm"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "%lldm"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+#, c-format
+msgctxt "home-dashboard"
+msgid "%s played"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+msgctxt "home-dashboard"
+msgid "<1m"
+msgstr ""
 
 #: plugins/home-dashboard/home_dashboard.c
 msgctxt "home-dashboard"
@@ -1605,6 +1903,16 @@ msgstr ""
 #: plugins/home-dashboard/plugin.txt
 msgctxt "home-dashboard"
 msgid "retroachievements"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+msgctxt "home-dashboard"
+msgid "today"
+msgstr ""
+
+#: plugins/home-dashboard/home_model.c
+msgctxt "home-dashboard"
+msgid "yesterday"
 msgstr ""
 
 #: plugins/launch-animation/plugin.txt
@@ -2218,6 +2526,11 @@ msgctxt "music"
 msgid "Lock screen"
 msgstr ""
 
+#: plugins/music/music.c
+msgctxt "music"
+msgid "Locked: SELECT then START to unlock"
+msgstr ""
+
 #: plugins/music/music.c plugins/music/plugin.txt
 msgctxt "music"
 msgid "Music"
@@ -2430,9 +2743,140 @@ msgctxt "platform-jump"
 msgid "Wrap around"
 msgstr ""
 
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i month ago"
+msgid_plural "%i months ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i week ago"
+msgid_plural "%i weeks ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i year ago"
+msgid_plural "%i years ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%i/%i achievements"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%id"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%imo"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%iw"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%ix"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%iy"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%lldh"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%lldh %lldm"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%lldm"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%s %i"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+#, c-format
+msgctxt "playtime-captions"
+msgid "%s %i, %i"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "<1m"
+msgstr ""
+
 #: plugins/playtime-captions/plugin.txt
 msgctxt "playtime-captions"
 msgid "Achievements"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Apr"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Aug"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Dec"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Feb"
 msgstr ""
 
 #: plugins/playtime-captions/plugin.txt
@@ -2440,14 +2884,49 @@ msgctxt "playtime-captions"
 msgid "Format"
 msgstr ""
 
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Jan"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Jul"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Jun"
+msgstr ""
+
 #: plugins/playtime-captions/plugin.txt
 msgctxt "playtime-captions"
 msgid "Last played"
 msgstr ""
 
-#: plugins/playtime-captions/plugin.txt
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Mar"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "May"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c plugins/playtime-captions/plugin.txt
 msgctxt "playtime-captions"
 msgid "Never played"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Nov"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Oct"
 msgstr ""
 
 #: plugins/playtime-captions/plugin.txt
@@ -2458,6 +2937,11 @@ msgstr ""
 #: plugins/playtime-captions/plugin.txt
 msgctxt "playtime-captions"
 msgid "Play time captions"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "Sep"
 msgstr ""
 
 #: plugins/playtime-captions/plugin.txt
@@ -2478,6 +2962,16 @@ msgstr ""
 #: plugins/playtime-captions/plugin.txt
 msgctxt "playtime-captions"
 msgid "relative"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "today"
+msgstr ""
+
+#: plugins/playtime-captions/captions_model.c
+msgctxt "playtime-captions"
+msgid "yesterday"
 msgstr ""
 
 #: plugins/playtime-limit/playtime_limit.c
@@ -2872,6 +3366,11 @@ msgctxt "romm"
 msgid "%s of %s"
 msgstr ""
 
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "(can't restore)"
+msgstr ""
+
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "10"
@@ -2890,6 +3389,16 @@ msgstr ""
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "50"
+msgstr ""
+
+#: plugins/romm/romm_model.c
+msgctxt "romm"
+msgid "B"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "Busy, try again"
 msgstr ""
 
 #: plugins/romm/plugin.txt
@@ -2924,6 +3433,16 @@ msgctxt "romm"
 msgid "Flashback: %s"
 msgstr ""
 
+#: plugins/romm/romm_model.c
+msgctxt "romm"
+msgid "GB"
+msgstr ""
+
+#: plugins/romm/romm_model.c
+msgctxt "romm"
+msgid "KB"
+msgstr ""
+
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "L2"
@@ -2932,6 +3451,16 @@ msgstr ""
 #: plugins/romm/romm.c
 msgctxt "romm"
 msgid "Loading..."
+msgstr ""
+
+#: plugins/romm/romm_model.c
+msgctxt "romm"
+msgid "MB"
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "No network"
 msgstr ""
 
 #: plugins/romm/romm.c
@@ -3032,6 +3561,11 @@ msgctxt "romm"
 msgid "SELECT"
 msgstr ""
 
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "Save"
+msgstr ""
+
 #: plugins/romm/plugin.txt
 msgctxt "romm"
 msgid "Saves kept on the server"
@@ -3045,6 +3579,17 @@ msgstr ""
 #: plugins/romm/romm.c
 msgctxt "romm"
 msgid "Starting..."
+msgstr ""
+
+#: plugins/romm/romm.c
+msgctxt "romm"
+msgid "State"
+msgstr ""
+
+#: plugins/romm/romm.c
+#, c-format
+msgctxt "romm"
+msgid "State %d"
 msgstr ""
 
 #: plugins/romm/romm.c
@@ -3088,6 +3633,11 @@ msgctxt "romm"
 msgid "none"
 msgstr ""
 
+#: plugins/romm/romm_model.c
+msgctxt "romm"
+msgid "unknown time"
+msgstr ""
+
 #: plugins/row-badges/plugin.txt
 msgctxt "row-badges"
 msgid "Row badges"
@@ -3103,6 +3653,11 @@ msgctxt "row-badges"
 msgid "Unplayed dot"
 msgstr ""
 
+#: plugins/save-state-manager/state_model.c
+msgctxt "save-state-manager"
+msgid "Auto"
+msgstr ""
+
 #: plugins/save-state-manager/save_state_manager.c
 msgctxt "save-state-manager"
 msgid "Couldn't delete that state"
@@ -3111,6 +3666,11 @@ msgstr ""
 #: plugins/save-state-manager/save_state_manager.c
 msgctxt "save-state-manager"
 msgid "DELETE"
+msgstr ""
+
+#: plugins/save-state-manager/state_model.c
+msgctxt "save-state-manager"
+msgid "Default"
 msgstr ""
 
 #: plugins/save-state-manager/save_state_manager.c
@@ -3177,6 +3737,12 @@ msgstr ""
 #: plugins/save-state-manager/plugin.txt
 msgctxt "save-state-manager"
 msgid "Save states button"
+msgstr ""
+
+#: plugins/save-state-manager/state_model.c
+#, c-format
+msgctxt "save-state-manager"
+msgid "Slot %d"
 msgstr ""
 
 #: plugins/save-state-manager/plugin.txt
@@ -3249,6 +3815,11 @@ msgctxt "screensaver"
 msgid "600"
 msgstr ""
 
+#: plugins/screensaver/screensaver_model.c
+msgctxt "screensaver"
+msgid "AM"
+msgstr ""
+
 #: plugins/screensaver/plugin.txt
 msgctxt "screensaver"
 msgid "Change"
@@ -3272,6 +3843,11 @@ msgstr ""
 #: plugins/screensaver/plugin.txt
 msgctxt "screensaver"
 msgid "Images"
+msgstr ""
+
+#: plugins/screensaver/screensaver_model.c
+msgctxt "screensaver"
+msgid "PM"
 msgstr ""
 
 #: plugins/screensaver/plugin.txt
@@ -3491,6 +4067,11 @@ msgctxt "second-screen"
 msgid "800x480"
 msgstr ""
 
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
+msgid "Developer"
+msgstr ""
+
 #: plugins/second-screen/second_screen.c
 msgctxt "second-screen"
 msgid "Empty folder"
@@ -3508,7 +4089,22 @@ msgstr ""
 
 #: plugins/second-screen/ss_model.c
 msgctxt "second-screen"
+msgid "Genre"
+msgstr ""
+
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
 msgid "Pak"
+msgstr ""
+
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
+msgid "Players"
+msgstr ""
+
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
+msgid "Publisher"
 msgstr ""
 
 #: plugins/second-screen/plugin.txt
@@ -3519,6 +4115,11 @@ msgstr ""
 #: plugins/second-screen/plugin.txt
 msgctxt "second-screen"
 msgid "Window size"
+msgstr ""
+
+#: plugins/second-screen/ss_model.c
+msgctxt "second-screen"
+msgid "Year"
 msgstr ""
 
 #: plugins/simple-mode/plugin.txt
@@ -3646,9 +4247,170 @@ msgctxt "smart-collections"
 msgid "Smart Collections"
 msgstr ""
 
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i month ago"
+msgid_plural "%i months ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i week ago"
+msgid_plural "%i weeks ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i year ago"
+msgid_plural "%i years ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%i/%i achievements"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%id"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%imo"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%iw"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%ix"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%iy"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%lldh"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%lldh %lldm"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%lldm"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%s %i"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+#, c-format
+msgctxt "switcher-plus"
+msgid "%s %i, %i"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "<1m"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Apr"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Aug"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Dec"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Feb"
+msgstr ""
+
 #: plugins/switcher-plus/plugin.txt
 msgctxt "switcher-plus"
 msgid "Game switcher plus"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Jan"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Jul"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Jun"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Mar"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "May"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Never played"
 msgstr ""
 
 #: plugins/switcher-plus/switcher_plus.c
@@ -3656,9 +4418,24 @@ msgctxt "switcher-plus"
 msgid "No Preview"
 msgstr ""
 
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Nov"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Oct"
+msgstr ""
+
 #: plugins/switcher-plus/plugin.txt
 msgctxt "switcher-plus"
 msgid "Play time captions"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "Sep"
 msgstr ""
 
 #: plugins/switcher-plus/plugin.txt
@@ -3681,9 +4458,68 @@ msgctxt "switcher-plus"
 msgid "strip"
 msgstr ""
 
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "today"
+msgstr ""
+
+#: plugins/switcher-plus/switcher_model.c
+msgctxt "switcher-plus"
+msgid "yesterday"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+#, c-format
+msgctxt "system-info"
+msgid "%i of 3 bars"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+#, c-format
+msgctxt "system-info"
+msgid "%i%%, charging"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+#, c-format
+msgctxt "system-info"
+msgid "%lldd %lldh %lldm"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+#, c-format
+msgctxt "system-info"
+msgid "%lldh %lldm"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+#, c-format
+msgctxt "system-info"
+msgid "%lldm"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+#, c-format
+msgctxt "system-info"
+msgid "%s free of %s"
+msgstr ""
+
 #: plugins/system-info/info_model.c
 msgctxt "system-info"
 msgid "Battery"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+#, c-format
+msgctxt "system-info"
+msgid "Battery over the last %i game, %s of play"
+msgid_plural "Battery over the last %i games, %s of play"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "GB"
 msgstr ""
 
 #: plugins/system-info/info_model.c
@@ -3691,9 +4527,19 @@ msgctxt "system-info"
 msgid "IP address"
 msgstr ""
 
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "KB"
+msgstr ""
+
 #: plugins/system-info/plugin.txt
 msgctxt "system-info"
 msgid "L2"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "MB"
 msgstr ""
 
 #: plugins/system-info/info_model.c
@@ -3704,6 +4550,11 @@ msgstr ""
 #: plugins/system-info/system_info.c
 msgctxt "system-info"
 msgid "No battery history: battery-logger hasn't logged a game yet"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "PB"
 msgstr ""
 
 #: plugins/system-info/info_model.c
@@ -3743,6 +4594,11 @@ msgstr ""
 
 #: plugins/system-info/info_model.c
 msgctxt "system-info"
+msgid "TB"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
 msgid "Uptime"
 msgstr ""
 
@@ -3761,9 +4617,39 @@ msgctxt "system-info"
 msgid "Y"
 msgstr ""
 
-#: plugins/system-info/plugin.txt
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "checking"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "hidden network"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "no address yet"
+msgstr ""
+
+#: plugins/system-info/info_model.c plugins/system-info/plugin.txt
 msgctxt "system-info"
 msgid "none"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "not connected"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "off"
+msgstr ""
+
+#: plugins/system-info/info_model.c
+msgctxt "system-info"
+msgid "unavailable"
 msgstr ""
 
 #: plugins/tags/tags.c

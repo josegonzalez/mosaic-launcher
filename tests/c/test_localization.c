@@ -754,8 +754,46 @@ static void testPlugin(void) {
 	quit();
 }
 
-// The bundled packs read, and every string they translate is the
-// launcher's (in po/launcher.pot) or the plugin's own.
+// A template read as a catalog, with every msgstr filled in so its
+// entries are kept.
+static PoCatalog* readTemplate(const char* path) {
+	int missing;
+	size_t len = 0;
+	char err[256];
+	char* pot = readFile(path, PACK_MAX, &len, &missing);
+	CHECK(pot != NULL);
+	if (!pot) return NULL;
+	char* filled = malloc(len * 2 + 1);
+	size_t at = 0;
+	for (const char* line = pot; *line; ) {
+		const char* end = strchr(line, '\n');
+		size_t n = end ? (size_t)(end - line + 1) : strlen(line);
+		if (!strncmp(line, "msgstr \"\"\n", 10)) {
+			memcpy(filled + at, "msgstr \"x\"\n", 11);
+			at += 11;
+		}
+		else if (!strncmp(line, "msgstr[", 7) && strstr(line, "] \"\"\n")) {
+			memcpy(filled + at, line, 11); // msgstr[N] "
+			memcpy(filled + at + 11, "x\"\n", 3);
+			at += 14;
+		}
+		else {
+			memcpy(filled + at, line, n);
+			at += n;
+		}
+		line += n;
+	}
+	free(pot);
+	PoCatalog* catalog = Po_parse(filled, at, err, sizeof(err));
+	free(filled);
+	CHECK(catalog != NULL);
+	if (!catalog) fprintf(stderr, "%s: %s\n", path, err);
+	return catalog;
+}
+
+// The bundled packs read, every string they translate is the launcher's
+// (in po/launcher.pot) or a bundled plugin's (in po/plugins.pot), and
+// Spanish has every bundled plugin's.
 static void testBundled(void) {
 	char err[256];
 	int missing;
@@ -772,55 +810,29 @@ static void testBundled(void) {
 	}
 	CHECK(!pack->english_rule && pack->nplurals == 2);
 
-	// the template, with every msgstr filled in so its entries are kept
-	char* pot = readFile(REPO_DIR "/po/launcher.pot", PACK_MAX, &len, &missing);
-	CHECK(pot != NULL);
-	if (!pot) {
-		Po_free(pack);
-		return;
-	}
-	char* filled = malloc(len * 2 + 1);
-	size_t at = 0;
-	for (const char* line = pot; *line; ) {
-		const char* end = strchr(line, '\n');
-		size_t n = end ? (size_t)(end - line + 1) : strlen(line);
-		if (!strncmp(line, "msgstr \"\"\n", 10)) {
-			memcpy(filled + at, "msgstr \"x\"\n", 11);
-			at += 11;
-		}
-		else {
-			memcpy(filled + at, line, n);
-			at += n;
-		}
-		line += n;
-	}
-	free(pot);
-	PoCatalog* launcher = Po_parse(filled, at, err, sizeof(err));
-	free(filled);
-	CHECK(launcher != NULL);
-	if (!launcher) fprintf(stderr, "launcher.pot: %s\n", err);
-
-	static const char* const own[] = {
-		"Write map.txt names", "WRITE", "Lines already in a map.txt are kept.", "No names lists for this language",
-		"No names to add to map.txt", "Add names to map.txt in %d folder?", "Added names to map.txt in %d folder",
-	};
-	for (int i = 0; launcher && i < pack->count; i++) {
+	PoCatalog* launcher = readTemplate(REPO_DIR "/po/launcher.pot");
+	PoCatalog* plugins = readTemplate(REPO_DIR "/po/plugins.pot");
+	for (int i = 0; launcher && plugins && i < pack->count; i++) {
 		const PoEntry* e = &pack->entries[i];
-		if (!e->context) {
-			if (!Po_find(launcher, NULL, e->id)) fprintf(stderr, "es.po: \"%s\" isn't in launcher.pot\n", e->id);
-			CHECK(Po_find(launcher, NULL, e->id) != NULL);
-			continue;
+		const PoCatalog* from = e->context ? plugins : launcher;
+		if (!Po_find(from, e->context, e->id)) {
+			fprintf(stderr, "es.po: \"%s\" in \"%s\" isn't in %s\n", e->id, e->context ? e->context : "",
+				e->context ? "plugins.pot" : "launcher.pot");
 		}
-		CHECK_STR(e->context, ID);
-		int known = 0;
-		for (size_t j = 0; j < sizeof(own) / sizeof(own[0]); j++) known |= !strcmp(own[j], e->id);
-		if (!known) fprintf(stderr, "es.po: \"%s\" isn't one of the plugin's strings\n", e->id);
-		CHECK(known);
+		CHECK(Po_find(from, e->context, e->id) != NULL);
 	}
-	for (size_t j = 0; j < sizeof(own) / sizeof(own[0]); j++) CHECK(Po_find(pack, ID, own[j]) != NULL);
+	for (int i = 0; plugins && i < plugins->count; i++) {
+		const PoEntry* e = &plugins->entries[i];
+		if (!Po_find(pack, e->context, e->id)) fprintf(stderr, "es.po: no Spanish for \"%s\" in \"%s\"\n", e->id, e->context);
+		CHECK(Po_find(pack, e->context, e->id) != NULL);
+	}
 	CHECK_STR(Po_findPlural(pack, ID, "Add names to map.txt in %d folder?", 1), "¿Añadir nombres a map.txt en %d carpeta?");
 	CHECK_STR(Po_findPlural(pack, ID, "Add names to map.txt in %d folder?", 0), "¿Añadir nombres a map.txt en %d carpetas?");
+	// a model's duration and plural count
+	CHECK_STR(Po_find(pack, "activity-stats", "%lldh %lldm"), "%lld h %lld min");
+	CHECK_STR(Po_findPlural(pack, "activity-stats", "%lld session", 2), "%lld sesiones");
 	Po_free(launcher);
+	Po_free(plugins);
 	Po_free(pack);
 }
 

@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/save-state-manager/save_state_manager.c"
 
 #define CARD TEST_SDCARD_PATH
@@ -137,6 +138,18 @@ static void testNames(void) {
 	CHECK_STR(out, "Default");
 	SM_slotLabel(9, out, sizeof(out));
 	CHECK_STR(out, "Auto");
+	// in the words it's given, then English again
+	static const char* const words[] = { "Slot %d", "Ranura %d", "Default", "Predeterminada", NULL };
+	fake_words = words;
+	SMWords set = { fakeTr, fakePlural };
+	SM_setWords(&set);
+	SM_slotLabel(0, out, sizeof(out));
+	CHECK_STR(out, "Ranura 1");
+	SM_slotLabel(8, out, sizeof(out));
+	CHECK_STR(out, "Predeterminada");
+	SM_setWords(NULL);
+	SM_slotLabel(0, out, sizeof(out));
+	CHECK_STR(out, "Slot 1");
 
 	CHECK(SM_slotOf("2") == 2);
 	CHECK(SM_slotOf(" 7\n") == 7);

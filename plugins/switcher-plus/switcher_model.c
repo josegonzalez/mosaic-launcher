@@ -3,6 +3,9 @@
 #include <time.h>
 #include "switcher_model.h"
 
+// English the caller's words translate, for make pot
+#define TR_MARK(text) (text)
+
 // stock's sizes, at scale 1
 #define PADDING 10
 #define PILL_SIZE 30
@@ -259,10 +262,27 @@ int SP_list(const MosaicRect* area, const MosaicRect* hole, int scale, SPList* o
 #define BUTTON_SIZE 20
 #define BUTTON_MARGIN 5
 #define SEPARATOR " \xC2\xB7 " // " · "
-#define CAPTION_MAX 160
+#define CAPTION_MAX 256
 
-static const char* months[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
-	"Dec" };
+static const char* months[12] = { TR_MARK("Jan"), TR_MARK("Feb"), TR_MARK("Mar"), TR_MARK("Apr"), TR_MARK("May"),
+	TR_MARK("Jun"), TR_MARK("Jul"), TR_MARK("Aug"), TR_MARK("Sep"), TR_MARK("Oct"), TR_MARK("Nov"), TR_MARK("Dec") };
+
+static SPWords words; // none set: English
+
+void SP_setWords(const SPWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text and a count's form in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (words.tr_plural) return words.tr_plural(singular, plural, n);
+	return n == 1 ? singular : plural;
+}
 
 static int isOn(const char* value) {
 	return value && strcmp(value, "on") == 0;
@@ -282,13 +302,13 @@ SPCaptions SP_captions(const char* time, const char* last, const char* sessions,
 
 static void duration(long long seconds, int format, char* out, size_t size) {
 	if (seconds < 60) {
-		snprintf(out, size, "<1m");
+		snprintf(out, size, "%s", tr("<1m"));
 		return;
 	}
 	long long hours = seconds / 3600, minutes = seconds / 60 % 60;
-	if (!hours) snprintf(out, size, "%lldm", minutes);
-	else if (format == SP_FORMAT_COMPACT || !minutes) snprintf(out, size, "%lldh", hours);
-	else snprintf(out, size, "%lldh %lldm", hours, minutes);
+	if (!hours) snprintf(out, size, tr("%lldm"), minutes);
+	else if (format == SP_FORMAT_COMPACT || !minutes) snprintf(out, size, tr("%lldh"), hours);
+	else snprintf(out, size, tr("%lldh %lldm"), hours, minutes);
 }
 
 // Days since 1970-01-01 of a date in the proleptic Gregorian calendar.
@@ -315,26 +335,41 @@ static int daysBetween(long long when, long long now) {
 	return days > 0 ? (int)days : 0;
 }
 
-// "1 week ago" or "2 weeks ago"
-static void ago(int n, const char* unit, char* out, size_t size) {
-	snprintf(out, size, "%i %s%s ago", n, unit, n == 1 ? "" : "s");
+// "1 week ago" or "2 weeks ago", in the unit days are counted in
+static void ago(int days, char* out, size_t size) {
+	const char* text;
+	int n;
+	if (days < 7) {
+		n = days;
+		text = trPlural("%i day ago", "%i days ago", (unsigned long)n);
+	} else if (days < 30) {
+		n = days / 7;
+		text = trPlural("%i week ago", "%i weeks ago", (unsigned long)n);
+	} else if (days < 365) {
+		n = days / 30;
+		text = trPlural("%i month ago", "%i months ago", (unsigned long)n);
+	} else {
+		n = days / 365;
+		text = trPlural("%i year ago", "%i years ago", (unsigned long)n);
+	}
+	snprintf(out, size, text, n);
 }
 
 static void lastPlayed(long long when, long long now, int format, char* out, size_t size) {
 	int days = daysBetween(when, now);
 	if (days == 0) {
-		snprintf(out, size, "today");
+		snprintf(out, size, "%s", tr("today"));
 		return;
 	}
 	if (format == SP_FORMAT_COMPACT) {
-		if (days < 7) snprintf(out, size, "%id", days);
-		else if (days < 30) snprintf(out, size, "%iw", days / 7);
-		else if (days < 365) snprintf(out, size, "%imo", days / 30);
-		else snprintf(out, size, "%iy", days / 365);
+		if (days < 7) snprintf(out, size, tr("%id"), days);
+		else if (days < 30) snprintf(out, size, tr("%iw"), days / 7);
+		else if (days < 365) snprintf(out, size, tr("%imo"), days / 30);
+		else snprintf(out, size, tr("%iy"), days / 365);
 		return;
 	}
 	if (days == 1) {
-		snprintf(out, size, "yesterday");
+		snprintf(out, size, "%s", tr("yesterday"));
 		return;
 	}
 	if (format == SP_FORMAT_DATE) {
@@ -343,24 +378,23 @@ static void lastPlayed(long long when, long long now, int format, char* out, siz
 			out[0] = '\0';
 			return;
 		}
-		if (then.tm_year == today.tm_year) snprintf(out, size, "%s %i", months[then.tm_mon], then.tm_mday);
-		else snprintf(out, size, "%s %i, %i", months[then.tm_mon], then.tm_mday, then.tm_year + 1900);
+		// a month's name and its day, then the year when it isn't this one's
+		const char* month = tr(months[then.tm_mon]);
+		if (then.tm_year == today.tm_year) snprintf(out, size, tr("%s %i"), month, then.tm_mday);
+		else snprintf(out, size, tr("%s %i, %i"), month, then.tm_mday, then.tm_year + 1900);
 		return;
 	}
-	if (days < 7) ago(days, "day", out, size);
-	else if (days < 30) ago(days / 7, "week", out, size);
-	else if (days < 365) ago(days / 30, "month", out, size);
-	else ago(days / 365, "year", out, size);
+	ago(days, out, size);
 }
 
 static void sessions(int count, int format, char* out, size_t size) {
-	if (format == SP_FORMAT_COMPACT) snprintf(out, size, "%ix", count);
-	else snprintf(out, size, "%i session%s", count, count == 1 ? "" : "s");
+	if (format == SP_FORMAT_COMPACT) snprintf(out, size, tr("%ix"), count);
+	else snprintf(out, size, trPlural("%i session", "%i sessions", (unsigned long)count), count);
 }
 
 static void achievements(int unlocked, int total, int format, char* out, size_t size) {
 	if (format == SP_FORMAT_COMPACT) snprintf(out, size, "%i/%i", unlocked, total);
-	else snprintf(out, size, "%i/%i achievements", unlocked, total);
+	else snprintf(out, size, tr("%i/%i achievements"), unlocked, total);
 }
 
 int SP_captionBuild(const SPPlay* play, long long now, int parts, int format, int never, int max_parts, char* out,
@@ -375,7 +409,7 @@ int SP_captionBuild(const SPPlay* play, long long now, int parts, int format, in
 	int written = 0;
 	size_t used = 0;
 	if (unseen && never && max_parts >= 1) {
-		int n = snprintf(out, size, "Never played");
+		int n = snprintf(out, size, "%s", tr("Never played"));
 		if (n < 0 || (size_t)n >= size) {
 			out[0] = '\0';
 			return 0;
@@ -386,7 +420,7 @@ int SP_captionBuild(const SPPlay* play, long long now, int parts, int format, in
 	static const int order[] = { SP_PART_TIME, SP_PART_LAST, SP_PART_SESSIONS, SP_PART_ACHIEVEMENTS };
 	for (int i = 0; i < 4 && written < max_parts; i++) {
 		if (!(parts & order[i])) continue;
-		char part[64];
+		char part[128];
 		if (order[i] == SP_PART_TIME) duration(play->time, format, part, sizeof(part));
 		else if (order[i] == SP_PART_ACHIEVEMENTS)
 			achievements(play->cheevos, play->cheevos_total, format, part, sizeof(part));

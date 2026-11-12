@@ -81,6 +81,7 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
+
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
 	char message[1400];
@@ -435,6 +436,8 @@ static void quit(void) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const SSWords words = { tr, NULL };
+	SS_setWords(&words);
 	if (!SS_hasSecondDisplay(host->platform)) {
 		say("%s has no second display, so the second screen doesn't start", host->platform ? host->platform : "this device");
 		return 1;

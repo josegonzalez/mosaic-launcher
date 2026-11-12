@@ -11,6 +11,17 @@
 #include <stdint.h>
 #include <time.h>
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until RM_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct RMWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} RMWords;
+void RM_setWords(const RMWords* words);
+
 #define RM_HOST_MAX 256
 #define RM_PATH_MAX 1024
 #define RM_NAME_MAX 256

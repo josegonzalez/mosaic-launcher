@@ -47,6 +47,11 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 static void say(const char* message) {
 	host->log(ID, message);
 }
@@ -408,6 +413,8 @@ static void openStats(void* data) {
 
 static int init(const MosaicHost* h) {
 	host = h;
+	static const ASWords words = { tr, trPlural };
+	AS_setWords(&words);
 	if (!MOSAIC_HOST_HAS(host, play_time_on) || !MOSAIC_HOST_HAS(host, draw_hints)) {
 		say("this launcher has no play history list or button hints");
 		return 1;

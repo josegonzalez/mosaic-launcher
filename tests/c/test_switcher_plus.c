@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include "check.h"
+#include "words.h"
 #include "../../plugins/switcher-plus/switcher_plus.c"
 #include "../../plugins/playtime-captions/captions_model.h"
 
@@ -343,6 +344,30 @@ static void testCaptionsCopy(void) {
 	CHECK_STR(out, "2h 15m \xC2\xB7 3 days ago");
 	CHECK(SP_captionFit(&tetris, now, &both, 60, bytes, NULL, out, sizeof(out)) == 48);
 	CHECK_STR(out, "2h \xC2\xB7 3d");
+
+	// both copies take the same words
+	static const char* const words[] = { "%lldh %lldm", "%lld h %lld min", "Nov", "nov", NULL };
+	static const char* const plurals[] = { "%i day ago", "hace %i d\xc3\xad" "a", "hace %i d\xc3\xad" "as",
+		"%i session", "%i sesi\xc3\xb3n", "%i sesiones", NULL };
+	fake_words = words;
+	fake_plurals = plurals;
+	SPWords sp_words = { fakeTr, fakePlural };
+	PCWords pc_words = { fakeTr, fakePlural };
+	SP_setWords(&sp_words);
+	PC_setWords(&pc_words);
+	PCStats tetris_pc = { 8100, now - 3 * 86400, 2, 0, 0 };
+	char theirs[256];
+	for (int format = 0; format < 3; format++) {
+		SP_captionBuild(&tetris, now, 7, format, 0, 3, out, sizeof(out));
+		PC_build(&tetris_pc, now, 7, format, 0, 3, theirs, sizeof(theirs));
+		CHECK_STR(out, theirs);
+	}
+	SP_captionBuild(&tetris, now, 7, SP_FORMAT_RELATIVE, 0, 3, out, sizeof(out));
+	CHECK_STR(out, "2 h 15 min \xC2\xB7 hace 3 d\xc3\xad" "as \xC2\xB7 2 sesiones");
+	SP_setWords(NULL);
+	PC_setWords(NULL);
+	SP_captionBuild(&tetris, now, 7, SP_FORMAT_RELATIVE, 0, 3, out, sizeof(out));
+	CHECK_STR(out, "2h 15m \xC2\xB7 3 days ago \xC2\xB7 2 sessions");
 	CHECK(SP_captionFit(&tetris, now, &both, 10, bytes, NULL, out, sizeof(out)) == 0);
 	CHECK_STR(out, "");
 	SPPlay unseen = { 0, 0, 0, 0, 0 };

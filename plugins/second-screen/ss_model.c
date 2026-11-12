@@ -4,6 +4,21 @@
 #include <string.h>
 #include "ss_model.h"
 
+// English the plugin translates where it draws it, for make pot
+#define TR_MARK(text) (text)
+
+static SSWords words; // none set: English
+
+void SS_setWords(const SSWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
 int SS_hasSecondDisplay(const char* platform) {
 	return platform && !strcmp(platform, "desktop");
 }
@@ -108,7 +123,8 @@ int SS_wrap(const char* text, int max_width, int max_lines, SSMeasure measure, v
 }
 
 static const char* const keys[SS_INFO_COUNT] = { "year", "genre", "publisher", "developer", "players" };
-static const char* const labels[SS_INFO_COUNT] = { "Year", "Genre", "Publisher", "Developer", "Players" };
+static const char* const labels[SS_INFO_COUNT] = { TR_MARK("Year"), TR_MARK("Genre"), TR_MARK("Publisher"),
+	TR_MARK("Developer"), TR_MARK("Players") };
 
 const char* SS_infoKey(int field) {
 	return field >= 0 && field < SS_INFO_COUNT ? keys[field] : NULL;
@@ -141,13 +157,10 @@ int SS_infoLines(SSInfoGet get, void* data, char lines[][SS_LINE_SIZE], int max)
 		char raw[SS_LINE_SIZE], value[SS_LINE_SIZE - 16];
 		if (get(keys[f], raw, sizeof(raw), data) != 1) continue;
 		if (!SS_clean(f, raw, value, sizeof(value))) continue;
-		snprintf(lines[count++], SS_LINE_SIZE, "%s: %s", labels[f], value);
+		snprintf(lines[count++], SS_LINE_SIZE, "%s: %s", tr(labels[f]), value);
 	}
 	return count;
 }
-
-// English the plugin translates where it draws it, for make pot
-#define TR_MARK(text) (text)
 
 const char* SS_kindLabel(int type) {
 	switch (type) {

@@ -5,6 +5,23 @@
 #include <string.h>
 #include "gamification_model.h"
 
+static GMWords words; // none set: English
+
+void GM_setWords(const GMWords* set) {
+	if (set) words = *set;
+	else memset(&words, 0, sizeof(words));
+}
+
+// Fixed text and a count's form in the caller's words, for make pot
+static const char* tr(const char* text) {
+	return words.tr ? words.tr(text) : text;
+}
+
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (words.tr_plural) return words.tr_plural(singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 // stock's sizes, in its units
 #define PADDING 10
 #define PILL_SIZE 30
@@ -340,31 +357,39 @@ int GM_settle(GMState* state, int today, const GMProgress* progress, int streak,
 void GM_duration(long long minutes, char* out, size_t size) {
 	if (minutes < 0) minutes = 0;
 	long long h = minutes / 60, m = minutes % 60;
-	if (h == 0) snprintf(out, size, "%lldm", m);
-	else if (m == 0) snprintf(out, size, "%lldh", h);
-	else snprintf(out, size, "%lldh %lldm", h, m);
+	if (h == 0) snprintf(out, size, tr("%lldm"), m);
+	else if (m == 0) snprintf(out, size, tr("%lldh"), h);
+	else snprintf(out, size, tr("%lldh %lldm"), h, m);
 }
 
+// Where English reads the same for one as for more ("Play 1 different
+// games today"), both forms are that English, so it doesn't change, and a
+// translation can still have its own forms.
 void GM_title(int quest, const GMTargets* targets, char* out, size_t size) {
+	int n;
 	switch (quest) {
 	case GM_Q_PLAY:
-		if (targets->daily_minutes % 60) snprintf(out, size, "Play for %i minutes today", targets->daily_minutes);
-		else snprintf(out, size, "Play for %i hour%s today", targets->daily_minutes / 60, targets->daily_minutes == 60 ? "" : "s");
+		n = targets->daily_minutes;
+		if (n % 60) snprintf(out, size, trPlural("Play for %i minutes today", "Play for %i minutes today", (unsigned long)n), n);
+		else snprintf(out, size, trPlural("Play for %i hour today", "Play for %i hours today", (unsigned long)(n / 60)), n / 60);
 		break;
 	case GM_Q_GAMES:
-		snprintf(out, size, "Play %i different games today", targets->daily_games);
+		n = targets->daily_games;
+		snprintf(out, size, trPlural("Play %i different games today", "Play %i different games today", (unsigned long)n), n);
 		break;
 	case GM_Q_FRESH:
-		snprintf(out, size, "Start a game you've never played");
+		snprintf(out, size, "%s", tr("Start a game you've never played"));
 		break;
 	case GM_Q_REVISIT:
-		snprintf(out, size, "Go back to a game you haven't played in %i days", GM_REVISIT_DAYS);
+		snprintf(out, size, tr("Go back to a game you haven't played in %i days"), GM_REVISIT_DAYS);
 		break;
 	case GM_Q_WEEK_DAYS:
-		snprintf(out, size, "Play on %i days this week", targets->week_days);
+		n = targets->week_days;
+		snprintf(out, size, trPlural("Play on %i days this week", "Play on %i days this week", (unsigned long)n), n);
 		break;
 	case GM_Q_WEEK_HOURS:
-		snprintf(out, size, "Play for %i hour%s this week", targets->week_hours, targets->week_hours == 1 ? "" : "s");
+		n = targets->week_hours;
+		snprintf(out, size, trPlural("Play for %i hour this week", "Play for %i hours this week", (unsigned long)n), n);
 		break;
 	default:
 		if (size) out[0] = '\0';
@@ -373,7 +398,7 @@ void GM_title(int quest, const GMTargets* targets, char* out, size_t size) {
 
 void GM_value(int quest, const GMProgress* progress, char* out, size_t size) {
 	if (progress->done) {
-		snprintf(out, size, "Done");
+		snprintf(out, size, "%s", tr("Done"));
 	} else if (quest == GM_Q_PLAY || quest == GM_Q_WEEK_HOURS) {
 		char value[32], target[32];
 		GM_duration(progress->value, value, sizeof(value));
@@ -385,24 +410,26 @@ void GM_value(int quest, const GMProgress* progress, char* out, size_t size) {
 }
 
 void GM_streakText(int streak, char* out, size_t size) {
-	if (streak <= 0) snprintf(out, size, "No streak");
-	else snprintf(out, size, "%i day streak", streak);
+	if (streak <= 0) snprintf(out, size, "%s", tr("No streak"));
+	else snprintf(out, size, trPlural("%i day streak", "%i day streak", (unsigned long)streak), streak);
 }
 
 void GM_summary(int best, int completed, char* out, size_t size) {
-	snprintf(out, size, "Best %i day%s \xc2\xb7 %i quest%s done", best, best == 1 ? "" : "s", completed,
-		completed == 1 ? "" : "s");
+	char days[128], quests[128];
+	snprintf(days, sizeof(days), trPlural("Best %i day", "Best %i days", (unsigned long)best), best);
+	snprintf(quests, sizeof(quests), trPlural("%i quest done", "%i quests done", (unsigned long)completed), completed);
+	snprintf(out, size, "%s \xc2\xb7 %s", days, quests);
 }
 
 void GM_toast(const int* newly, int count, const GMTargets* targets, int streak, int cheer, char* out, size_t size) {
 	if (!size) return;
 	out[0] = '\0';
 	if (count == 1) {
-		char title[128];
+		char title[256];
 		GM_title(newly[0], targets, title, sizeof(title));
-		snprintf(out, size, "Quest done: %s", title);
+		snprintf(out, size, tr("Quest done: %s"), title);
 	} else if (count > 1) {
-		snprintf(out, size, "%i quests done", count);
+		snprintf(out, size, trPlural("%i quest done", "%i quests done", (unsigned long)count), count);
 	} else if (cheer && streak > 0) {
 		GM_streakText(streak, out, size);
 	}

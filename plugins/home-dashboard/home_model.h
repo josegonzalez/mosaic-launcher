@@ -11,6 +11,17 @@
 #include <stddef.h>
 #include "mosaic_plugin.h"
 
+// Where the text the model builds gets its words: tr(text) for fixed
+// English and tr_plural(singular, plural, n) for a count's form, each
+// keeping the English's printf conversions (the plugin's helpers over
+// host->tr and host->tr_plural). Until HD_setWords is called, or after
+// it's called with NULL, the text is English.
+typedef struct HDWords {
+	const char* (*tr)(const char* text);
+	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
+} HDWords;
+void HD_setWords(const HDWords* words);
+
 // The home layouts the "mode" setting picks.
 enum HDMode {
 	HD_MODE_DASHBOARD,        // tabs: home (continue card and top shelf), pinned, stats
