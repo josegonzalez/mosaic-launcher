@@ -102,17 +102,27 @@ static void testCheck(void) {
 
 static void testKey(void) {
 	char a[64], b[64];
-	CHECK(Tr_key(NULL, "Open", NULL, 0, a, sizeof(a)) == 0);
-	CHECK(Tr_key("button", "Open", NULL, 0, b, sizeof(b)) == 0);
+	CHECK(Tr_key(NULL, NULL, "Open", NULL, 0, a, sizeof(a)) == 0);
+	CHECK(Tr_key(NULL, "button", "Open", NULL, 0, b, sizeof(b)) == 0);
 	CHECK(strcmp(a, b) != 0);
-	CHECK(Tr_key("", "Open", NULL, 0, b, sizeof(b)) == 0);
+	CHECK(Tr_key(NULL, "", "Open", NULL, 0, b, sizeof(b)) == 0);
 	CHECK(strcmp(a, b) != 0);
-	CHECK(Tr_key(NULL, "%d file", "%d files", 1, a, sizeof(a)) == 0);
-	CHECK(Tr_key(NULL, "%d file", "%d files", 2, b, sizeof(b)) == 0);
+	CHECK(Tr_key(NULL, NULL, "%d file", "%d files", 1, a, sizeof(a)) == 0);
+	CHECK(Tr_key(NULL, NULL, "%d file", "%d files", 2, b, sizeof(b)) == 0);
 	CHECK(strcmp(a, b) != 0);
+	// a plugin's strings are apart from the launcher's, other plugins' and
+	// a context named like the plugin
+	char c[64];
+	CHECK(Tr_key("hello", NULL, "Open", NULL, 0, a, sizeof(a)) == 0);
+	CHECK(Tr_key(NULL, "hello", "Open", NULL, 0, b, sizeof(b)) == 0);
+	CHECK(strcmp(a, b) != 0);
+	CHECK(Tr_key("other", NULL, "Open", NULL, 0, c, sizeof(c)) == 0);
+	CHECK(strcmp(a, c) != 0);
+	CHECK(Tr_key("hello", "button", "Open", NULL, 0, c, sizeof(c)) == 0);
+	CHECK(strcmp(a, c) != 0 && strcmp(b, c) != 0);
 	char small[4];
-	CHECK(Tr_key(NULL, "Open", NULL, 0, small, sizeof(small)) == -1);
-	CHECK(Tr_key(NULL, NULL, NULL, 0, a, sizeof(a)) == -1);
+	CHECK(Tr_key(NULL, NULL, "Open", NULL, 0, small, sizeof(small)) == -1);
+	CHECK(Tr_key(NULL, NULL, NULL, NULL, 0, a, sizeof(a)) == -1);
 
 	CHECK_STR(Tr_english("one", "many", 1), "one");
 	CHECK_STR(Tr_english("one", "many", 0), "many");
@@ -156,8 +166,19 @@ static int logs = 0;
 static const char* inner = NULL; // what TR gave the owner's own ask
 static char volatile_answer[32];
 
-static const char* translate(const char* context, const char* text) {
+static char seen[128]; // the last ask's plugin id and context, "-" for NULL
+
+static void see(const char* plugin_id, const char* context) {
+	snprintf(seen, sizeof(seen), "%s %s", plugin_id ? plugin_id : "-", context ? context : "-");
+}
+
+static const char* translate(const char* plugin_id, const char* context, const char* text) {
 	asked++;
+	see(plugin_id, context);
+	if (plugin_id) {
+		if (strcmp(plugin_id, "hello") || strcmp(text, "Open")) return NULL;
+		return context ? (!strcmp(context, "button") ? "Knopf" : NULL) : "Öffnen";
+	}
 	if (!strcmp(text, "Ask myself")) {
 		inner = TR("Open");
 		return "Mich";
@@ -180,10 +201,12 @@ static const char* translate(const char* context, const char* text) {
 }
 
 // Russian-style: one, few, many.
-static const char* translatePlural(const char* context, const char* singular, const char* plural, unsigned long n) {
-	(void)context;
+static const char* translatePlural(const char* plugin_id, const char* context, const char* singular, const char* plural,
+		unsigned long n) {
 	(void)plural;
 	plural_asked++;
+	see(plugin_id, context);
+	if (plugin_id && !strcmp(singular, "%d file")) return "%d plugin";
 	if (strcmp(singular, "%d file")) return NULL;
 	if (n % 10 == 1 && n % 100 != 11) return "%d fail";
 	if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return "%d faila";
@@ -207,6 +230,11 @@ static void testNoOwner(void) {
 	CHECK(TRN(one, many, 0) == many);
 	CHECK(TRN(one, many, 2) == many);
 	CHECK(TRCN("x", one, many, 1) == one);
+	CHECK(Tr_plugin("hello", NULL, open) == open);
+	CHECK(Tr_plugin("hello", "button", open) == open);
+	CHECK(Tr_plugin("hello", NULL, NULL) == NULL);
+	CHECK(Tr_pluginPlural("hello", NULL, one, many, 1) == one);
+	CHECK(Tr_pluginPlural("hello", "x", one, many, 2) == many);
 	CHECK(!Tr_active());
 	// an owner without translate is no owner
 	TrOwner none = { .translate = NULL, .id = "none" };
@@ -270,6 +298,36 @@ static void testOwner(void) {
 	CHECK(inner && !strcmp(inner, "Open"));
 }
 
+static void testPluginText(void) {
+	TrOwner owner = { .translate = translate, .translate_plural = translatePlural, .id = "fake", .log = logLine };
+	Tr_setOwner(&owner);
+	// the launcher's own text has no plugin id, in its context or none
+	CHECK_STR(TR("Open"), "Abrir");
+	CHECK_STR(seen, "- -");
+	CHECK_STR(TRC("button", "Open"), "Ouvrir");
+	CHECK_STR(seen, "- button");
+	// a plugin's has its id, with no context or its own
+	CHECK_STR(Tr_plugin("hello", NULL, "Open"), "Öffnen");
+	CHECK_STR(seen, "hello -");
+	CHECK_STR(Tr_plugin("hello", "button", "Open"), "Knopf");
+	CHECK_STR(seen, "hello button");
+	// a launcher context named like a plugin isn't that plugin's text
+	CHECK_STR(TRC("hello", "Open"), "Open");
+	CHECK_STR(seen, "- hello");
+	// another plugin's Open is its own, and each is cached apart
+	CHECK_STR(Tr_plugin("other", NULL, "Open"), "Open");
+	CHECK_STR(seen, "other -");
+	asked = 0;
+	CHECK_STR(Tr_plugin("hello", NULL, "Open"), "Öffnen");
+	CHECK_STR(Tr_plugin("hello", "button", "Open"), "Knopf");
+	CHECK_STR(TR("Open"), "Abrir");
+	CHECK(asked == 0);
+	// plurals too
+	CHECK_STR(Tr_pluginPlural("hello", "count", "%d file", "%d files", 2), "%d plugin");
+	CHECK_STR(seen, "hello count");
+	Tr_setOwner(NULL);
+}
+
 static void testNoPlural(void) {
 	// without translate_plural, translate is asked for English's form
 	TrOwner owner = { .translate = translate, .id = "fake", .log = logLine };
@@ -302,7 +360,8 @@ static void testFailure(void) {
 	CHECK_STR(TR("Open"), "Open");
 }
 
-static const char* echo(const char* context, const char* text) {
+static const char* echo(const char* plugin_id, const char* context, const char* text) {
+	(void)plugin_id;
 	(void)context;
 	return text;
 }
@@ -334,6 +393,7 @@ int main(void) {
 	testCache();
 	testNoOwner();
 	testOwner();
+	testPluginText();
 	testNoPlural();
 	testFailure();
 	testFull();

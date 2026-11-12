@@ -217,6 +217,17 @@ static void testParse(void) {
 	CHECK_STR(Po_find(c, "hello", "OPEN"), "Открыто");
 	CHECK_STR(Po_find(c, "", "OPEN"), "empty context");
 	CHECK(Po_find(c, "other", "OPEN") == NULL);
+	// as translate looks them up: the launcher's own in their context, a
+	// plugin's under its id, or in its own context when it gives one
+	CHECK(Po_context(NULL, NULL) == NULL);
+	CHECK_STR(Po_context(NULL, "systems"), "systems");
+	CHECK_STR(Po_context("hello", NULL), "hello");
+	CHECK_STR(Po_context("hello", "button"), "button");
+	CHECK_STR(Po_context("hello", ""), "");
+	CHECK_STR(Po_find(c, Po_context(NULL, NULL), "OPEN"), "ОТКРЫТЬ");
+	CHECK_STR(Po_find(c, Po_context("hello", NULL), "OPEN"), "Открыто");
+	CHECK_STR(Po_find(c, Po_context("other", ""), "OPEN"), "empty context");
+	CHECK(Po_find(c, Po_context("other", NULL), "OPEN") == NULL);
 	CHECK_STR(Po_find(c, NULL, "two lines"), "dos líneas");
 	CHECK(Po_find(c, NULL, "Fuzzy") == NULL);
 	CHECK(Po_find(c, NULL, "Fuzzy too") == NULL);
@@ -485,11 +496,11 @@ static int fakeQuickTile(const char* id, int row, const char* icon, const char* 
 }
 // the host's tr, answered by the plugin itself, as the launcher would once it owns the slot
 static const char* fakeTr(const char* id, const char* context, const char* text) {
-	const char* got = translate(context ? context : id, text);
+	const char* got = translate(id, context, text);
 	return got ? got : text;
 }
 static const char* fakeTrPlural(const char* id, const char* context, const char* singular, const char* plural, unsigned long n) {
-	const char* got = translatePlural(context ? context : id, singular, plural, n);
+	const char* got = translatePlural(id, context, singular, plural, n);
 	return got ? got : (n == 1 ? singular : plural);
 }
 
@@ -553,18 +564,18 @@ static void testPlugin(void) {
 	// off by default, and nothing registered
 	start(NULL, NULL);
 	CHECK(saidLine("language off, so nothing is translated"));
-	CHECK(translate(NULL, "OPEN") == NULL);
-	CHECK(translatePlural(NULL, "%d game", "%d games", 2) == NULL);
+	CHECK(translate(NULL, NULL, "OPEN") == NULL);
+	CHECK(translatePlural(NULL, NULL, "%d game", "%d games", 2) == NULL);
 	CHECK(registered == 0);
 
 	// the bundled pack
 	start("xx", NULL);
 	CHECK(saidLine("bundled pack " RES "/xx.po read, 4 translated"));
 	CHECK(saidLine("language xx"));
-	CHECK_STR(translate(NULL, "OPEN"), "XOPEN");
-	CHECK(translate("someone", "OPEN") == NULL);
-	CHECK(translate(NULL, "Missing") == NULL);
-	CHECK_STR(translatePlural("localization", "Add names to map.txt in %d folder?", "Add names to map.txt in %d folders?", 2), "X2 %d?");
+	CHECK_STR(translate(NULL, NULL, "OPEN"), "XOPEN");
+	CHECK(translate("someone", NULL, "OPEN") == NULL);
+	CHECK(translate(NULL, NULL, "Missing") == NULL);
+	CHECK_STR(translatePlural("localization", NULL, "Add names to map.txt in %d folder?", "Add names to map.txt in %d folders?", 2), "X2 %d?");
 	CHECK(registered == 1 && bound == -1 && tiles == 0);
 
 	// a user pack comes first, string by string, and adds its own
@@ -572,32 +583,32 @@ static void testPlugin(void) {
 	start("xx", NULL);
 	CHECK(saidLine("user pack " LANGS "/xx.po read, 2 translated"));
 	CHECK(saidLine("user pack " LANGS "/xx.po: there's no header, so plurals use English's rule"));
-	CHECK_STR(translate(NULL, "OPEN"), "USER OPEN");
-	CHECK_STR(translate(NULL, "NEW"), "USER NEW");
-	CHECK_STR(translate(NULL, "BACK"), "XBACK");
-	CHECK_STR(translatePlural("localization", "Add names to map.txt in %d folder?", "", 7), "Xn %d?");
+	CHECK_STR(translate(NULL, NULL, "OPEN"), "USER OPEN");
+	CHECK_STR(translate(NULL, NULL, "NEW"), "USER NEW");
+	CHECK_STR(translate(NULL, NULL, "BACK"), "XBACK");
+	CHECK_STR(translatePlural("localization", NULL, "Add names to map.txt in %d folder?", "", 7), "Xn %d?");
 
 	// a broken user pack is skipped whole, and the bundled one stays
 	writeFile(LANGS "/xx.po", "msgid \"OPEN\"\nmsgstr \"USER OPEN\"\n\nmsgid \"NEW\nmsgstr \"x\"\n");
 	start("xx", NULL);
 	CHECK(saidLine("user pack " LANGS "/xx.po is refused, line 4: a string with no closing quote"));
-	CHECK_STR(translate(NULL, "OPEN"), "XOPEN");
-	CHECK(translate(NULL, "NEW") == NULL);
+	CHECK_STR(translate(NULL, NULL, "OPEN"), "XOPEN");
+	CHECK(translate(NULL, NULL, "NEW") == NULL);
 	unlink(LANGS "/xx.po");
 
 	// a region falls back to its language, and other takes the code setting
 	start("pt_BR", NULL);
-	CHECK_STR(translate(NULL, "OPEN"), "ABRIR pt");
+	CHECK_STR(translate(NULL, NULL, "OPEN"), "ABRIR pt");
 	start("other", "pt-PT");
-	CHECK_STR(translate(NULL, "OPEN"), "ABRIR pt");
+	CHECK_STR(translate(NULL, NULL, "OPEN"), "ABRIR pt");
 	start("other", NULL);
 	CHECK(saidLine("language off"));
 	start("other", "../../etc/passwd");
 	CHECK(saidLine("isn't a language code"));
-	CHECK(translate(NULL, "OPEN") == NULL);
+	CHECK(translate(NULL, NULL, "OPEN") == NULL);
 	start("zz", NULL);
 	CHECK(saidLine("no pack for zz in " LANGS " or " RES ", so nothing is translated"));
-	CHECK(translate(NULL, "OPEN") == NULL);
+	CHECK(translate(NULL, NULL, "OPEN") == NULL);
 	CHECK(registered == 1); // the map.txt writer still works with names lists alone
 
 	// a pack that's a folder

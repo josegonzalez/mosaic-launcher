@@ -127,6 +127,16 @@ int Manifest_parse(const char* text, PluginManifest* out) {
 	return 0;
 }
 
+int Manifest_res(const PluginManifest* m, char* out, size_t size) {
+	if (!out || size == 0) return -1;
+	int len = snprintf(out, size, "%s/res", m->dir);
+	if (len < 0 || (size_t)len >= size) {
+		out[0] = '\0';
+		return -1;
+	}
+	return 0;
+}
+
 int Manifest_isProtected(const PluginManifest* m) {
 	for (int i = 0; i < m->setting_count; i++) {
 		if (m->settings[i].flags & SETTING_PROTECTED) return 1;

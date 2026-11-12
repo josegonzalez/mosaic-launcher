@@ -49,10 +49,11 @@ const char* Tr_reason(int check);
 // picks.
 const char* Tr_english(const char* singular, const char* plural, unsigned long n);
 
-// The cache key for a string (plural NULL) or a plural's forms and n, in
-// context (NULL for the launcher's own), into out. Returns 0, or -1 when it
-// doesn't fit.
-int Tr_key(const char* context, const char* text, const char* plural, unsigned long n, char* out, size_t size);
+// The cache key for a string (plural NULL) or a plural's forms and n, of
+// plugin_id (NULL for the launcher's own) in context (NULL for none), into
+// out. Returns 0, or -1 when it doesn't fit.
+int Tr_key(const char* plugin_id, const char* context, const char* text, const char* plural, unsigned long n, char* out,
+	size_t size);
 
 typedef struct TrCacheEntry {
 	char* key;

@@ -24,7 +24,7 @@ Rules for agents working on mosaic-launcher.
   - its desktop cases go in `tests/plugins/cases/<number>-<name>.sh`, after the last case number and before `990-crash.sh`, with a `# shard: <1-3>` line picking the CI shard with the least time (each case prints its time in the CI log).
 - SDK changes:
   - fields are only ever added at the end of `MosaicHost` and `MosaicPlugin`;
-  - `MOSAIC_API_VERSION` stays 1;
+  - `MOSAIC_API_VERSION` stays 2 (it went to 2 in #280, when the strings slot's `translate` hooks took the plugin id); it goes up only when a field's arguments change, and the launcher keeps loading plugins built for API 1 except as the strings slot's owner;
   - new host fields are documented under "Features added since the first API" in PLUGINS.md;
   - `template/sdk/mosaic_plugin.h` must stay an exact copy of `sdk/mosaic_plugin.h` (`make lint` checks it).
 

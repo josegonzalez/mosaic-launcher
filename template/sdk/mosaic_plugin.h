@@ -18,6 +18,11 @@
  * Both structs begin with their own size, so a launcher and a plugin built
  * against different versions of this header can tell which fields the
  * other has. Fields are only ever added at the end.
+ *
+ * MOSAIC_API_VERSION goes up only when a field's arguments change, as the
+ * strings slot's translate and translate_plural did in API 2, when they
+ * took the plugin id. The launcher still loads plugins built for API 1,
+ * except a strings slot owner, which must be built for API 2.
  */
 
 #ifndef MOSAIC_PLUGIN_H
@@ -29,7 +34,7 @@
 extern "C" {
 #endif
 
-#define MOSAIC_API_VERSION 1
+#define MOSAIC_API_VERSION 2
 
 ///////////////////////////////////////
 // Things the launcher owns. Plugins only hold pointers to them.
@@ -326,6 +331,15 @@ typedef struct MosaicRecent {
 	int can_resume;    // 1 when it has a save state to resume: the last one minarch saved
 	char preview[512]; // that state's preview image, for art_load, or "" when there's none
 } MosaicRecent;
+
+// A loaded plugin, for host->plugin_info. The plugin sets size to
+// sizeof(MosaicPluginInfo) before asking, and the launcher fills in only
+// the fields that fit in it, so fields are only added at the end.
+typedef struct MosaicPluginInfo {
+	size_t size;   // sizeof(MosaicPluginInfo) in the plugin
+	char id[64];   // its id, as in its plugin.txt
+	char res[600]; // its resource folder, <its folder>/res, which may not be there
+} MosaicPluginInfo;
 
 // A game in the play history, for host->play_game_info. The plugin sets
 // size to sizeof(MosaicPlayGame) before asking, and the launcher fills in
@@ -1154,10 +1168,11 @@ typedef struct MosaicHost {
 	// The strings slot's translations, for a plugin's own text (see
 	// translate in MosaicPlugin). tr returns text translated by the slot's
 	// owner, and tr_plural the form of singular and plural for the count n
-	// (English rules without an owner: n == 1 picks singular). context
-	// tells apart the same English text with different meanings; NULL
-	// means plugin_id, so each plugin's strings are kept apart from the
-	// launcher's and other plugins'. With no owner, an unknown text, a
+	// (English rules without an owner: n == 1 picks singular). The owner
+	// gets plugin_id, so each plugin's strings are kept apart from the
+	// launcher's and other plugins', and context, the plugin's own, to tell
+	// apart the same English text with different meanings, or NULL for
+	// none. With no owner, an unknown text, a
 	// translation the host refuses, from init, and from inside the owner's
 	// own translate, they return text (or singular or plural) itself.
 	// Otherwise the result is the host's copy, kept until the launcher
@@ -1173,6 +1188,21 @@ typedef struct MosaicHost {
 	// other value. They change only when the lists reload. Check for it
 	// with MOSAIC_HOST_HAS(host, ui_size).
 	int (*ui_size)(int which);
+
+	// The plugins loaded this run, for the strings slot's owner to find
+	// each one's own files: plugins_count returns how many, and
+	// plugin_info fills out (see MosaicPluginInfo) for the one at index,
+	// in load order, and returns 0, or -1 for an index past the end or a
+	// NULL out. They list every plugin that's on and loaded, bundled ones
+	// and ones installed as their own pak, the asking plugin too, and none
+	// that's off, skipped or declined to start. In the Launcher pak's
+	// settings, which load only the strings and theme slots' owners, they
+	// list every plugin its Plugins page shows instead, loaded or not.
+	// From init, before every plugin has loaded, plugins_count returns 0
+	// and plugin_info -1. Check for them with
+	// MOSAIC_HOST_HAS(host, plugin_info).
+	int (*plugins_count)(void);
+	int (*plugin_info)(int index, MosaicPluginInfo* out);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1483,9 +1513,12 @@ typedef struct MosaicPlugin {
 
 	// The strings slot. A plugin with slots=strings in its plugin.txt
 	// translates the launcher's text, and plugins' through host->tr.
-	// translate gets the English text and its context: NULL for the
-	// launcher's own strings, or the asking plugin's id (or the context it
-	// passed to host->tr). translate_plural gets both English forms and
+	// translate gets the id of the plugin whose text it is, or NULL for
+	// the launcher's own strings, the context, the launcher's or the one
+	// the plugin passed to host->tr (NULL for none), and the English text.
+	// host->plugin_info says where each plugin's files are. It must be
+	// built for API 2: one built for API 1, whose translate took no
+	// plugin id, isn't loaded. translate_plural gets both English forms and
 	// the count, and returns the form the language's plural rules pick for
 	// n. Return NULL for text you have no translation of, which then shows
 	// in English. The host copies what's returned, so it only has to last
@@ -1498,8 +1531,8 @@ typedef struct MosaicPlugin {
 	// the launcher logs it and shows English for everything until it
 	// restarts. Without translate_plural, translate is asked for the form
 	// English rules pick. Check for them with MOSAIC_HOST_HAS(host, tr).
-	const char* (*translate)(const char* context, const char* text);
-	const char* (*translate_plural)(const char* context, const char* singular, const char* plural, unsigned long n);
+	const char* (*translate)(const char* plugin_id, const char* context, const char* text);
+	const char* (*translate_plural)(const char* plugin_id, const char* context, const char* singular, const char* plural, unsigned long n);
 
 	// The theme slot. A plugin with slots=theme in its plugin.txt supplies
 	// the launcher's colours, font and fallback font, text size, UI sizes

@@ -190,12 +190,15 @@ const char* Tr_english(const char* singular, const char* plural, unsigned long n
 	return n == 1 ? singular : plural;
 }
 
-int Tr_key(const char* context, const char* text, const char* plural, unsigned long n, char* out, size_t size) {
+int Tr_key(const char* plugin_id, const char* context, const char* text, const char* plural, unsigned long n, char* out,
+		size_t size) {
 	if (!text || !out || size == 0) return -1;
 	int len;
-	// \x01 starts the launcher's own, which have no context
-	if (plural) len = snprintf(out, size, "%s\x04%s\x1f%s\x1f%lu", context ? context : "\x01", text, plural, n);
-	else len = snprintf(out, size, "%s\x04%s", context ? context : "\x01", text);
+	// \x01 stands for no plugin (the launcher's own) and for no context
+	const char* who = plugin_id ? plugin_id : "\x01";
+	const char* what = context ? context : "\x01";
+	if (plural) len = snprintf(out, size, "%s\x02%s\x04%s\x1f%s\x1f%lu", who, what, text, plural, n);
+	else len = snprintf(out, size, "%s\x02%s\x04%s", who, what, text);
 	return len < 0 || (size_t)len >= size ? -1 : 0;
 }
 

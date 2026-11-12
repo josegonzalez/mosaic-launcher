@@ -14,14 +14,14 @@ typedef struct Action {
 	int (*available)(void* data); // may it run now, and should its hint show; NULL means always
 	void (*run)(void* data);
 	void* data;              // passed to both, eg. a plugin's own state
-	const char* context;     // the label's TRC context: NULL for the launcher's own, the plugin's id for a plugin's
+	const char* plugin_id;   // whose label it is: NULL for the launcher's own, the plugin's id for a plugin's
 } Action;
 
 // True when the action exists and may run now.
 int Action_available(const Action* action);
 void Action_run(const Action* action);
 
-// The label to draw, translated in the action's context.
+// The label to draw, translated as its owner's text.
 char* Action_label(const Action* action);
 
 enum ActionTrigger {

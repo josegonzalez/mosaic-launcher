@@ -4,9 +4,10 @@
 # the Launcher pak's settings load only the strings and theme slots'
 # owners: with sayer (strings) and themer (theme) on, the Plugins page's
 # title and a group header are sayer's French, sayer's name, setting label
-# and options are its own, in its id's context, a typed value stays as
+# and options are its own, asked under its id, a typed value stays as
 # typed, and themer's background colour and sizes are drawn, with the rows
-# scrolling to fit; hello, on but owning neither, isn't loaded. An option
+# scrolling to fit; hello, on but owning neither, isn't loaded, though
+# host->plugin_info lists it with the other two, as the page shows it. An option
 # picked from its translated name is saved as plugin.txt has it. With
 # neither owner on the page is stock's English. A crash in the strings
 # owner leaves it out of the next open, which shows English and can turn
@@ -22,7 +23,7 @@ fi
 # its own folder, so plugins other cases left in $WORK/plugins don't load
 SO_PLUGINS="$WORK/settings-owners"
 rm -rf "$SO_PLUGINS"
-build_plugin sayer 'id=sayer\nname=Sayer\napi=1\nslots=strings\nsetting.greet=choice|Greeting|Open|Hello,Open,Missing\nsetting.note=text|Note|Hello\n'
+build_plugin sayer 'id=sayer\nname=Sayer\napi=2\nslots=strings\nsetting.greet=choice|Greeting|Open|Hello,Open,Missing\nsetting.note=text|Note|Hello\n'
 build_plugin themer 'id=themer\nname=Themer\napi=1\nslots=theme\n'
 build_plugin hello 'id=hello\nname=Hello\napi=1\n'
 mkdir -p "$SO_PLUGINS"
@@ -77,6 +78,10 @@ grep -qF "plugins: themer supplies the theme: pill 36" "$log" || fail "themer's 
 grep -qF "plugins: not loading hello: the settings load only the strings and theme slots' owners" "$log" \
 	|| fail "hello's not loading wasn't logged"
 grep -qF "plugins: loaded hello" "$log" && fail "hello was loaded in the settings"
+# the listing has every plugin the Plugins page shows, loaded or not
+for so_id in sayer themer hello; do
+	grep -qF "plugin sayer: listed $so_id at $SO_PLUGINS/$so_id.plugin/res" "$log" || fail "the settings' listing left out $so_id"
+done
 drew "Extensions"
 drew "Langue"
 drew "Diseur"
@@ -100,7 +105,7 @@ drew "Missing"
 drew "Hello"
 grep -qxF "Greeting" "$texts" && fail "sayer's label was drawn in English"
 grep -qxF "greet=Hello" "$STATE/sayer.cfg" 2>/dev/null || fail "the option picked wasn't saved as Hello: $(cat "$STATE/sayer.cfg" 2>/dev/null)"
-grep -qF "plugin sayer: asked sayer Greeting" "$log" || fail "sayer's label wasn't asked in its context"
+grep -qF "plugin sayer: asked sayer - Greeting" "$log" || fail "sayer's label wasn't asked under its id"
 
 # neither owner: stock's English, colours and rows
 printf 'sayer=off\nthemer=off\nhello=on\n' >"$STATE/plugins.txt"

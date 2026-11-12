@@ -158,14 +158,18 @@ static PoCatalog* loadPack(const char* dir, const char* where) {
 	return NULL;
 }
 
-static const char* translate(const char* context, const char* text) {
+// Plugins' strings are in the pack under their ids, or their own contexts.
+static const char* translate(const char* plugin_id, const char* context, const char* text) {
+	context = Po_context(plugin_id, context);
 	const char* got = user_pack ? Po_find(user_pack, context, text) : NULL;
 	if (!got && bundled_pack) got = Po_find(bundled_pack, context, text);
 	return got;
 }
 
-static const char* translatePlural(const char* context, const char* singular, const char* plural, unsigned long n) {
+static const char* translatePlural(const char* plugin_id, const char* context, const char* singular, const char* plural,
+		unsigned long n) {
 	(void)plural;
+	context = Po_context(plugin_id, context);
 	const char* got = user_pack ? Po_findPlural(user_pack, context, singular, n) : NULL;
 	if (!got && bundled_pack) got = Po_findPlural(bundled_pack, context, singular, n);
 	return got;

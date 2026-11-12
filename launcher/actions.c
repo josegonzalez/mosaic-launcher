@@ -4,7 +4,7 @@ static const Action* registry[ACTIONS_MAX];
 static int registered = 0;
 
 char* Action_label(const Action* action) {
-	return action ? TRC(action->context, action->label) : NULL;
+	return action ? Tr_plugin(action->plugin_id, NULL, action->label) : NULL;
 }
 
 void Actions_register(const Action* action) {

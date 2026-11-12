@@ -20,7 +20,7 @@
 //
 // Only the strings and theme slots' owners load here (Plugins_initSettings),
 // so the pages' text goes through TR() and a plugin's name, labels and
-// options through TRC() in its id's context, the same as host->tr. Values
+// options through Tr_plugin() as its own text, the same as host->tr. Values
 // the user typed show as typed.
 
 enum MenuKind { MENU_MAIN, MENU_PLUGINS, MENU_PLUGIN, MENU_CHOICE };
@@ -285,9 +285,10 @@ static Row* addRow(int kind, int arg, const char* label, const char* value) {
 }
 
 // A plugin's own text from its plugin.txt (its name, a setting's label or a
-// choice's option), in its id's context, as host->tr gives plugins theirs.
+// choice's option), under its id with no context, as host->tr gives
+// plugins theirs.
 static const char* pluginText(const PluginManifest* m, const char* text) {
-	return TRC(m->id, text);
+	return Tr_plugin(m->id, NULL, text);
 }
 
 // A choice's value as shown: one of its options is the plugin's text, and

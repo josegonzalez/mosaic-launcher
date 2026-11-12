@@ -46,7 +46,8 @@ static long ms(void) {
 	return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
 }
 
-static const char* translate(const char* context, const char* text) {
+static const char* translate(const char* plugin_id, const char* context, const char* text) {
+	(void)plugin_id;
 	(void)context;
 	(void)text;
 	return NULL;

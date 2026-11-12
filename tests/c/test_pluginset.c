@@ -55,6 +55,19 @@ int main(void) {
 	CHECK(Manifest_parse("id=solo\n", &m) == 0);
 	CHECK_STR(m.name, "solo"); // name defaults to id
 
+	// the resource folder plugin_info gives, for a bundled plugin and one
+	// installed as its own pak
+	char res[64];
+	snprintf(m.dir, sizeof(m.dir), "/pak/plugins/solo.plugin");
+	CHECK(Manifest_res(&m, res, sizeof(res)) == 0);
+	CHECK_STR(res, "/pak/plugins/solo.plugin/res");
+	snprintf(m.dir, sizeof(m.dir), "/sd/Tools/tg5040/Solo.pak");
+	CHECK(Manifest_res(&m, res, sizeof(res)) == 0);
+	CHECK_STR(res, "/sd/Tools/tg5040/Solo.pak/res");
+	char small[8];
+	CHECK(Manifest_res(&m, small, sizeof(small)) == -1);
+	CHECK_STR(small, "");
+
 	// defaults: bundled off, separately installed on
 	reset();
 	add("id=bundled", 1);

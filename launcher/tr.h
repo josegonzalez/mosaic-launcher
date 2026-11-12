@@ -23,10 +23,18 @@ char* TRN(const char* singular, const char* plural, unsigned long n);
 char* TRCN(const char* context, const char* singular, const char* plural, unsigned long n);
 #define TR_MARK(text) (text)
 
-// The strings slot's owner, as the plugin loader hands it over.
+// A plugin's own text, as host->tr and host->tr_plural give it: plugin_id
+// names the plugin, and context is the plugin's own (NULL for none).
+char* Tr_plugin(const char* plugin_id, const char* context, const char* text);
+char* Tr_pluginPlural(const char* plugin_id, const char* context, const char* singular, const char* plural,
+	unsigned long n);
+
+// The strings slot's owner, as the plugin loader hands it over. plugin_id
+// is NULL for the launcher's own strings.
 typedef struct TrOwner {
-	const char* (*translate)(const char* context, const char* text);
-	const char* (*translate_plural)(const char* context, const char* singular, const char* plural, unsigned long n);
+	const char* (*translate)(const char* plugin_id, const char* context, const char* text);
+	const char* (*translate_plural)(const char* plugin_id, const char* context, const char* singular, const char* plural,
+		unsigned long n);
 	const char* id;                   // for logs
 	void (*log)(const char* message); // a line for the log, without its newline
 } TrOwner;

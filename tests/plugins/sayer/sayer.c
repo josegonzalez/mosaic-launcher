@@ -1,5 +1,7 @@
 // Owns the strings slot: translates a few of the launcher's strings and its
-// own into French, logging each ask, and on its first tick logs what
+// own into French, logging each ask with the plugin id and context it got
+// ("asked <id or -> <context or -> <text>") and, on the first, the plugins
+// host->plugin_info lists, and on its first tick logs what
 // host->tr and host->tr_plural give it back. Its action, on Y, has a label
 // of its own, which the game list's hint shows translated. A few of the
 // Launcher pak's settings strings, and its own name, setting label and
@@ -12,17 +14,25 @@
 //   mode=root   logs the root list's names and paths and the Game Boy
 //               row's art, then runs quick-menu-plus.awake (a toast) and
 //               theme-plus.pick (a choose), and logs "root done"
+//
+// Built with -DSAYER_API=1 it says it's for API 1, whose translate took no
+// plugin id, so the launcher refuses it as the strings slot's owner.
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mosaic_plugin.h"
 
+#ifndef SAYER_API
+#define SAYER_API MOSAIC_API_VERSION
+#endif
+
 static const MosaicHost* host;
 static int bad = 0;
 static int crash = 0;
 static int root = 0;
 static int ticked = 0;
+static int listed = 0;
 
 static void say(const char* format, const char* a, const char* b) {
 	char message[512];
@@ -30,13 +40,29 @@ static void say(const char* format, const char* a, const char* b) {
 	host->log("sayer", message);
 }
 
-static const char* translate(const char* context, const char* text) {
-	say("asked %s %s", context ? context : "-", text);
+// The plugins the launcher lists, once, from the first ask.
+static void list(void) {
+	if (listed++) return;
+	char count[16];
+	snprintf(count, sizeof(count), "%i", host->plugins_count());
+	say("listed %s plugins%s", count, "");
+	for (int i = 0;; i++) {
+		MosaicPluginInfo info = { .size = sizeof(info) };
+		if (host->plugin_info(i, &info) != 0) break;
+		say("listed %s at %s", info.id, info.res);
+	}
+}
+
+static const char* translate(const char* plugin_id, const char* context, const char* text) {
+	char who[160];
+	snprintf(who, sizeof(who), "%s %s", plugin_id ? plugin_id : "-", context ? context : "-");
+	say("asked %s %s", who, text);
 	if (crash) {
 		say("crashing%s%s", "", "");
 		abort();
 	}
-	if (!context) {
+	list();
+	if (!plugin_id && !context) {
 		if (!strcmp(text, "OPEN")) return bad ? "OUV\xff" : "OUVRIR";
 		if (!strcmp(text, "BACK")) return "RETOUR";
 		if (!strcmp(text, "SLEEP")) return "VEILLE";
@@ -48,7 +74,15 @@ static const char* translate(const char* context, const char* text) {
 		if (!strcmp(text, "Recently Played")) return "Joués récemment";
 		return NULL;
 	}
-	if (!strcmp(context, "sayer")) {
+	if (!plugin_id) {
+		if (!strcmp(context, "systems") && !strcmp(text, "Game Boy")) return "Vieille Game Boy"; // sorts after Pocket Colour, but stays before it
+		return NULL;
+	}
+	if (context) {
+		if (!strcmp(plugin_id, "sayer") && !strcmp(context, "sayer.button") && !strcmp(text, "Open")) return "Ouvrir";
+		return NULL;
+	}
+	if (!strcmp(plugin_id, "sayer")) {
 		if (!strcmp(text, "Sayer")) return "Diseur";
 		if (!strcmp(text, "Greeting")) return "Salutation";
 		if (!strcmp(text, "Hello")) return "Bonjour";
@@ -57,10 +91,8 @@ static const char* translate(const char* context, const char* text) {
 		if (!strcmp(text, "%d games")) return "%s jeux"; // refused: not the same conversions
 		return NULL;
 	}
-	if (!strcmp(context, "sayer.button") && !strcmp(text, "Open")) return "Ouvrir";
-	if (!strcmp(context, "systems") && !strcmp(text, "Game Boy")) return "Vieille Game Boy"; // sorts after Pocket Colour, but stays before it
-	if (!strcmp(context, "quick-menu-plus") && !strcmp(text, "Staying awake")) return "Reste éveillé";
-	if (!strcmp(context, "theme-plus")) {
+	if (!strcmp(plugin_id, "quick-menu-plus") && !strcmp(text, "Staying awake")) return "Reste éveillé";
+	if (!strcmp(plugin_id, "theme-plus")) {
 		if (!strcmp(text, "Theme")) return "Thème";
 		if (!strcmp(text, "Stock")) return "D'origine";
 	}
@@ -68,12 +100,13 @@ static const char* translate(const char* context, const char* text) {
 }
 
 // French: 0 and 1 are singular.
-static const char* translatePlural(const char* context, const char* singular, const char* plural, unsigned long n) {
+static const char* translatePlural(const char* plugin_id, const char* context, const char* singular, const char* plural,
+		unsigned long n) {
 	char count[32];
 	snprintf(count, sizeof(count), "%lu", n);
 	say("asked plural %s %s", singular, count);
 	(void)plural;
-	if (!context || strcmp(context, "sayer") || strcmp(singular, "%d game")) return NULL;
+	if (!plugin_id || strcmp(plugin_id, "sayer") || context || strcmp(singular, "%d game")) return NULL;
 	return n <= 1 ? "%d jeu" : "%d jeux";
 }
 
@@ -153,6 +186,7 @@ static void tick(unsigned long now) {
 		host->tr_plural("sayer", NULL, "%d game", "%d games", 2));
 	say("plural other 0 = %s%s", host->tr_plural("sayer", NULL, "%d dir", "%d dirs", 0), "");
 	say("launcher OPEN = %s%s", host->tr("sayer", "", "OPEN"), "");
+	say("no id OPEN = %s%s", host->tr(NULL, NULL, "OPEN"), "");
 	say("done%s%s", "", "");
 }
 
@@ -165,8 +199,10 @@ static int init(const MosaicHost* h) {
 	bad = !strcmp(host->cfg_get("sayer", "mode", ""), "bad");
 	crash = !strcmp(host->cfg_get("sayer", "mode", ""), "crash");
 	root = !strcmp(host->cfg_get("sayer", "mode", ""), "root");
-	// from init, before the slot is settled: English
+	// from init, before the slot is settled: English, and no plugins listed
 	say("init tr Hello = %s%s", host->tr("sayer", NULL, "Hello"), "");
+	MosaicPluginInfo info = { .size = sizeof(info) };
+	say("init plugins %s, first %s", host->plugins_count() == 0 ? "0" : "some", host->plugin_info(0, &info) == -1 ? "-1" : "0");
 	host->register_action("sayer.shout", "SHOUT", NULL, shout, NULL);
 	host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "sayer.shout");
 	return 0;
@@ -174,7 +210,7 @@ static int init(const MosaicHost* h) {
 
 static const MosaicPlugin plugin = {
 	.size = sizeof(MosaicPlugin),
-	.api_version = MOSAIC_API_VERSION,
+	.api_version = SAYER_API,
 	.id = "sayer",
 	.init = init,
 	.tick = tick,

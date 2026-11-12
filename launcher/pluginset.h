@@ -67,6 +67,11 @@ int Manifest_option(const char* options, int index, char* out, size_t size);
 // again. Values, such as defaults, are left out.
 void Manifest_strings(const PluginManifest* m, void (*fn)(const char* text, void* data), void* data);
 
+// Writes the plugin's resource folder, <its directory>/res, to out (size
+// bytes), as host->plugin_info gives it. Returns 0, or -1 when it doesn't
+// fit.
+int Manifest_res(const PluginManifest* m, char* out, size_t size);
+
 // Decides, given the user's choices from plugins.txt:
 //
 //   <id>=on|off       turn a plugin on or off; listed ids load first, in order

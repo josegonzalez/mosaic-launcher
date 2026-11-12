@@ -15,7 +15,7 @@ if [ "$(uname -s)" = Darwin ]; then
 else
 	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" -ldl || fail "building presser"
 fi
-build_plugin sayer 'id=sayer\nname=Sayer\napi=1\nslots=strings\n'
+build_plugin sayer 'id=sayer\nname=Sayer\napi=2\nslots=strings\n'
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" quick-menu-plus theme-plus >/dev/null \
 	|| fail "building quick-menu-plus and theme-plus"
 RN_GB="$CARD/Roms/Game Boy (GB)"
@@ -58,11 +58,15 @@ sed -n 's/.*plugin sayer: root row \(.*\) at .*/\1/p' "$log" | grep -xE "Joués 
 	| tr '\n' ',' >"$WORK/root-names-order.txt"
 [ "$(cat "$WORK/root-names-order.txt")" = "Joués récemment,Vieille Game Boy,Pocket Colour," ] \
 	|| fail "the root's order changed: $(cat "$WORK/root-names-order.txt")"
-grep -qF "plugin sayer: asked systems Game Boy Color" "$log" && fail "a map.txt name was translated"
+expect "asked - systems Game Boy"
+grep -qF "plugin sayer: asked - systems Game Boy Color" "$log" && fail "a map.txt name was translated"
+expect "listed quick-menu-plus at $WORK/plugins/quick-menu-plus.plugin/res"
+expect "listed theme-plus at $WORK/plugins/theme-plus.plugin/res"
 drew "Joués récemment"
 drew "Vieille Game Boy"
 expect "ran quick-menu-plus.awake 0"
 drew "Reste éveillé"
+expect "asked quick-menu-plus - Staying awake"
 expect "ran theme-plus.pick 0"
 drew "Thème"
 drew "D'origine"

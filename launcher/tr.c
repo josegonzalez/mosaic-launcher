@@ -30,20 +30,21 @@ int Tr_active(void) {
 	return owned && !failed;
 }
 
-// The translation of text (plural NULL) or of a plural's forms for n, or
-// english.
-static char* lookup(const char* context, const char* text, const char* plural, unsigned long n, const char* english) {
+// The translation of plugin_id's (NULL for the launcher's) text in
+// context (plural NULL) or of a plural's forms for n, or english.
+static char* lookup(const char* plugin_id, const char* context, const char* text, const char* plural, unsigned long n,
+		const char* english) {
 	if (!Tr_active() || asking) return (char*)english;
 	char key[2048];
-	if (Tr_key(context, text, plural, n, key, sizeof(key)) < 0) return (char*)english;
+	if (Tr_key(plugin_id, context, text, plural, n, key, sizeof(key)) < 0) return (char*)english;
 	const TrCacheEntry* hit = TrCache_find(&cache, key);
 	if (hit) return hit->value ? hit->value : (char*)english;
 
 	asking = 1;
 	const char* got;
-	if (!plural) got = owner.translate(context, text);
-	else if (owner.translate_plural) got = owner.translate_plural(context, text, plural, n);
-	else got = owner.translate(context, english);
+	if (!plural) got = owner.translate(plugin_id, context, text);
+	else if (owner.translate_plural) got = owner.translate_plural(plugin_id, context, text, plural, n);
+	else got = owner.translate(plugin_id, context, english);
 	asking = 0;
 
 	int check = Tr_check(text, plural, got);
@@ -67,8 +68,7 @@ char* TR(const char* text) {
 }
 
 char* TRC(const char* context, const char* text) {
-	if (!text) return NULL;
-	return lookup(context, text, NULL, 0, text);
+	return Tr_plugin(NULL, context, text);
 }
 
 char* TRN(const char* singular, const char* plural, unsigned long n) {
@@ -76,7 +76,17 @@ char* TRN(const char* singular, const char* plural, unsigned long n) {
 }
 
 char* TRCN(const char* context, const char* singular, const char* plural, unsigned long n) {
+	return Tr_pluginPlural(NULL, context, singular, plural, n);
+}
+
+char* Tr_plugin(const char* plugin_id, const char* context, const char* text) {
+	if (!text) return NULL;
+	return lookup(plugin_id, context, text, NULL, 0, text);
+}
+
+char* Tr_pluginPlural(const char* plugin_id, const char* context, const char* singular, const char* plural,
+		unsigned long n) {
 	const char* english = Tr_english(singular, plural, n);
 	if (!singular || !plural) return (char*)english;
-	return lookup(context, singular, plural, n, english);
+	return lookup(plugin_id, context, singular, plural, n, english);
 }

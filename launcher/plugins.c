@@ -35,6 +35,7 @@
 typedef struct LoadedPlugin {
 	void* handle;
 	const MosaicPlugin* plugin;
+	const PluginManifest* manifest; // its plugin.txt, for plugin_info
 	char id[64];
 	Hash* cfg; // loaded on first cfg_get or cfg_set
 	int owns_root; // claims the root slot, so its root_replace is asked
@@ -90,6 +91,11 @@ static void saveBindings(int* counts);
 static void dropBindings(const int* counts);
 static PluginManifest manifests[PLUGIN_MAX];
 static int manifest_count = 0;
+static int listed = 0; // every plugin has loaded, so plugin_info lists them
+
+// The Launcher pak's settings, with only the strings and theme slots'
+// owners loaded (Plugins_initSettings).
+static int settings_only = 0;
 
 ///////////////////////////////////////
 // files
@@ -351,20 +357,40 @@ static int hostRegisterAction(const char* id, const char* label,
 	action->available = available;
 	action->run = run;
 	action->data = data;
-	// its label is the plugin's own text, translated in its id's context
-	action->context = initializing >= 0 ? strdup(loaded[initializing].id) : NULL;
+	// its label is the plugin's own text, translated as its id's
+	action->plugin_id = initializing >= 0 ? strdup(loaded[initializing].id) : NULL;
 	Actions_register(action);
 	return 0;
 }
 
-// A plugin's own strings are in its id's context unless it names one.
+// A plugin's own strings, under its id, in its own context or none. A NULL
+// id would be the launcher's own, so it gets English.
 static const char* hostTr(const char* plugin_id, const char* context, const char* text) {
-	if (!text || initializing >= 0) return text;
-	return TRC(context ? context : plugin_id, text);
+	if (!text || !plugin_id || initializing >= 0) return text;
+	return Tr_plugin(plugin_id, context, text);
 }
 static const char* hostTrPlural(const char* plugin_id, const char* context, const char* singular, const char* plural, unsigned long n) {
-	if (!singular || !plural || initializing >= 0) return n == 1 ? singular : plural;
-	return TRCN(context ? context : plugin_id, singular, plural, n);
+	if (!singular || !plural || !plugin_id || initializing >= 0) return n == 1 ? singular : plural;
+	return Tr_pluginPlural(plugin_id, context, singular, plural, n);
+}
+
+// The plugins loaded this run, or in the settings every plugin the Plugins
+// page shows (every one discovered), once they've all loaded.
+static int hostPluginsCount(void) {
+	if (!listed) return 0;
+	return settings_only ? manifest_count : loaded_count;
+}
+static int hostPluginInfo(int index, MosaicPluginInfo* out) {
+	if (!out || out->size < sizeof(out->size) || index < 0 || index >= hostPluginsCount()) return -1;
+	const PluginManifest* m = settings_only ? &manifests[index] : loaded[index].manifest;
+	MosaicPluginInfo full;
+	memset(&full, 0, sizeof(full));
+	full.size = out->size;
+	snprintf(full.id, sizeof(full.id), "%s", m->id);
+	Manifest_res(m, full.res, sizeof(full.res));
+	// only the fields the plugin knows about
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return 0;
 }
 
 static int hostBindButton(int screen, int button, int trigger, const char* action_id) {
@@ -1093,14 +1119,27 @@ static const MosaicHost host = {
 	.tr = hostTr,
 	.tr_plural = hostTrPlural,
 	.ui_size = Theme_uiSize,
+	.plugins_count = hostPluginsCount,
+	.plugin_info = hostPluginInfo,
 };
 
 ///////////////////////////////////////
 // loading
 
+// The oldest API the launcher still loads plugins for, and the oldest a
+// strings slot owner can be built for: API 2's translate and
+// translate_plural take the plugin id, which API 1's didn't.
+#define API_OLDEST 1
+#define API_STRINGS 2
+
+static int apiKnown(int api) {
+	return api >= API_OLDEST && api <= MOSAIC_API_VERSION;
+}
+
 static void load(const PluginManifest* m) {
-	if (m->api != MOSAIC_API_VERSION) {
-		LOG_warn("plugins: %s targets API %i, this launcher has %i, skipping\n", m->id, m->api, MOSAIC_API_VERSION);
+	if (!apiKnown(m->api)) {
+		LOG_warn("plugins: %s targets API %i, this launcher takes API %i to %i, skipping\n", m->id, m->api, API_OLDEST,
+			MOSAIC_API_VERSION);
 		return;
 	}
 
@@ -1118,9 +1157,16 @@ static void load(const PluginManifest* m) {
 	}
 	MosaicPluginGet get = (MosaicPluginGet)dlsym(handle, MOSAIC_PLUGIN_ENTRY);
 	const MosaicPlugin* plugin = get ? get(&host) : NULL;
-	if (!plugin || plugin->size < offsetof(MosaicPlugin, init) || plugin->api_version != MOSAIC_API_VERSION
+	if (!plugin || plugin->size < offsetof(MosaicPlugin, init) || !apiKnown(plugin->api_version)
 			|| !plugin->id || strcmp(plugin->id, m->id) != 0) {
-		LOG_warn("plugins: %s doesn't describe itself as plugin %s for API %i, skipping\n", so, m->id, MOSAIC_API_VERSION);
+		LOG_warn("plugins: %s doesn't describe itself as plugin %s for API %i to %i, skipping\n", so, m->id, API_OLDEST,
+			MOSAIC_API_VERSION);
+		dlclose(handle);
+		return;
+	}
+	if (csvHas(m->slots, STRINGS_SLOT) && plugin->api_version < API_STRINGS) {
+		LOG_warn("plugins: %s is built for API %i, but the " STRINGS_SLOT " slot's owner needs API %i, skipping\n", m->id,
+			plugin->api_version, API_STRINGS);
 		dlclose(handle);
 		return;
 	}
@@ -1129,6 +1175,7 @@ static void load(const PluginManifest* m) {
 	memset(p, 0, sizeof(*p));
 	p->handle = handle;
 	p->plugin = plugin;
+	p->manifest = m;
 	snprintf(p->id, sizeof(p->id), "%s", m->id);
 	p->owns_root = csvHas(m->slots, ROOT_SLOT);
 	if (!p->owns_root && Plugin_has(plugin, root_replace) && plugin->root_replace) {
@@ -1202,7 +1249,7 @@ static void load(const PluginManifest* m) {
 			Action* action = (Action*)now[i];
 			free((char*)action->id);
 			free((char*)action->label);
-			free((char*)action->context);
+			free((char*)action->plugin_id);
 			free(action);
 		}
 		Actions_restore(actions, action_count);
@@ -1408,10 +1455,6 @@ static void claimSwitcher(void) {
 	else LOG_warn("plugins: %s owns the " SWITCHER_SLOT " slot but registered no MOSAIC_SCREEN_GAME_SWITCHER screen other than its home screen, using the built-in switcher\n", loaded[owner].id);
 }
 
-// The Launcher pak's settings, with only the strings and theme slots'
-// owners loaded (Plugins_initSettings).
-static int settings_only = 0;
-
 // Any exit but a crash: the settings closed, or powered off from there.
 static void settingsExit(void) {
 	if (settings_only) unlink(SETTINGS_MARKER);
@@ -1495,6 +1538,7 @@ static void start(void) {
 		else LOG_info("plugins: not loading %s: %s\n", decisions[i].manifest->id, decisions[i].reason);
 	}
 	if (loaded_count == 0) unlink(marker);
+	listed = 1;
 	logOverridden();
 	claimLayout();
 	claimTransitions();
@@ -1550,6 +1594,7 @@ void Plugins_quit(void) {
 		dlclose(p->handle);
 	}
 	loaded_count = 0;
+	listed = 0;
 	PlayHistory_quit();
 	RAProgress_quit();
 	// a refresh or connect still running is stopped and reaped first

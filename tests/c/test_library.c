@@ -1048,8 +1048,9 @@ static void test_select_keeps_the_row_in_view(void) {
 
 // A strings slot owner for the root's names, counting what it's asked.
 static int tr_asks = 0;
-static const char* rootTranslate(const char* context, const char* text) {
+static const char* rootTranslate(const char* plugin_id, const char* context, const char* text) {
 	tr_asks++;
+	if (plugin_id) return NULL; // the root's names are the launcher's own
 	if (!context) {
 		if (!strcmp(text, "Recently Played")) return "Joués récemment";
 		if (!strcmp(text, "Tools")) return "Outils";
