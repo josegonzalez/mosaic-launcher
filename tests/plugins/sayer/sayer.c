@@ -14,18 +14,11 @@
 //   mode=root   logs the root list's names and paths and the Game Boy
 //               row's art, then runs quick-menu-plus.awake (a toast) and
 //               theme-plus.pick (a choose), and logs "root done"
-//
-// Built with -DSAYER_API=1 it says it's for API 1, whose translate took no
-// plugin id, so the launcher refuses it as the strings slot's owner.
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mosaic_plugin.h"
-
-#ifndef SAYER_API
-#define SAYER_API MOSAIC_API_VERSION
-#endif
 
 static const MosaicHost* host;
 static int bad = 0;
@@ -210,7 +203,7 @@ static int init(const MosaicHost* h) {
 
 static const MosaicPlugin plugin = {
 	.size = sizeof(MosaicPlugin),
-	.api_version = SAYER_API,
+	.api_version = MOSAIC_API_VERSION,
 	.id = "sayer",
 	.init = init,
 	.tick = tick,

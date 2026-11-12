@@ -1126,20 +1126,9 @@ static const MosaicHost host = {
 ///////////////////////////////////////
 // loading
 
-// The oldest API the launcher still loads plugins for, and the oldest a
-// strings slot owner can be built for: API 2's translate and
-// translate_plural take the plugin id, which API 1's didn't.
-#define API_OLDEST 1
-#define API_STRINGS 2
-
-static int apiKnown(int api) {
-	return api >= API_OLDEST && api <= MOSAIC_API_VERSION;
-}
-
 static void load(const PluginManifest* m) {
-	if (!apiKnown(m->api)) {
-		LOG_warn("plugins: %s targets API %i, this launcher takes API %i to %i, skipping\n", m->id, m->api, API_OLDEST,
-			MOSAIC_API_VERSION);
+	if (m->api != MOSAIC_API_VERSION) {
+		LOG_warn("plugins: %s targets API %i, this launcher has %i, skipping\n", m->id, m->api, MOSAIC_API_VERSION);
 		return;
 	}
 
@@ -1157,16 +1146,9 @@ static void load(const PluginManifest* m) {
 	}
 	MosaicPluginGet get = (MosaicPluginGet)dlsym(handle, MOSAIC_PLUGIN_ENTRY);
 	const MosaicPlugin* plugin = get ? get(&host) : NULL;
-	if (!plugin || plugin->size < offsetof(MosaicPlugin, init) || !apiKnown(plugin->api_version)
+	if (!plugin || plugin->size < offsetof(MosaicPlugin, init) || plugin->api_version != MOSAIC_API_VERSION
 			|| !plugin->id || strcmp(plugin->id, m->id) != 0) {
-		LOG_warn("plugins: %s doesn't describe itself as plugin %s for API %i to %i, skipping\n", so, m->id, API_OLDEST,
-			MOSAIC_API_VERSION);
-		dlclose(handle);
-		return;
-	}
-	if (csvHas(m->slots, STRINGS_SLOT) && plugin->api_version < API_STRINGS) {
-		LOG_warn("plugins: %s is built for API %i, but the " STRINGS_SLOT " slot's owner needs API %i, skipping\n", m->id,
-			plugin->api_version, API_STRINGS);
+		LOG_warn("plugins: %s doesn't describe itself as plugin %s for API %i, skipping\n", so, m->id, MOSAIC_API_VERSION);
 		dlclose(handle);
 		return;
 	}

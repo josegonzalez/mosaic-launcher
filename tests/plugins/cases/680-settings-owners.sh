@@ -23,7 +23,7 @@ fi
 # its own folder, so plugins other cases left in $WORK/plugins don't load
 SO_PLUGINS="$WORK/settings-owners"
 rm -rf "$SO_PLUGINS"
-build_plugin sayer 'id=sayer\nname=Sayer\napi=2\nslots=strings\nsetting.greet=choice|Greeting|Open|Hello,Open,Missing\nsetting.note=text|Note|Hello\n'
+build_plugin sayer 'id=sayer\nname=Sayer\napi=1\nslots=strings\nsetting.greet=choice|Greeting|Open|Hello,Open,Missing\nsetting.note=text|Note|Hello\n'
 build_plugin themer 'id=themer\nname=Themer\napi=1\nslots=theme\n'
 build_plugin hello 'id=hello\nname=Hello\napi=1\n'
 mkdir -p "$SO_PLUGINS"

@@ -8,7 +8,7 @@
 # and truncates between characters, the theme's wins when both are set, a
 # refused one is logged and the other or none used, a reload drops one the
 # owner no longer gives, and without slots=strings the hook isn't asked.
-build_plugin glypher 'id=glypher\nname=Glypher\napi=2\nslots=strings,theme\n'
+build_plugin glypher 'id=glypher\nname=Glypher\napi=1\nslots=strings,theme\n'
 printf 'glypher=on\n' >"$STATE/plugins.txt"
 plugin=glypher
 GL_DIR="$CARD/Fonts"

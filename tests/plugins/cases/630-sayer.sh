@@ -10,8 +10,7 @@
 # host->plugin_info lists the plugins loaded, one installed as its own
 # pak too, but not one turned off or one that declined to start, and none
 # from init. presser writes down the text drawn. An answer that isn't
-# UTF-8 turns the slot off, without slots=strings it's never asked, and
-# built for API 1 it isn't loaded.
+# UTF-8 turns the slot off, and without slots=strings it's never asked.
 PRESSER="$WORK/presser.so"
 if [ "$(uname -s)" = Darwin ]; then
 	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -undefined dynamic_lookup "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" \
@@ -19,7 +18,7 @@ if [ "$(uname -s)" = Darwin ]; then
 else
 	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" -ldl || fail "building presser"
 fi
-build_plugin sayer 'id=sayer\nname=Sayer\napi=2\nslots=strings\n'
+build_plugin sayer 'id=sayer\nname=Sayer\napi=1\nslots=strings\n'
 SY_STATUS="$STATE/status.d"
 mkdir -p "$SY_STATUS"
 printf 'state=done\nlabel=Sync\n' >"$SY_STATUS/sayer.status"
@@ -103,23 +102,6 @@ sayer_run sayer-unslotted
 grep -qF "plugins: sayer translates but has no slots=strings, so it won't be asked" "$log" || fail "the missing strings slot wasn't reported"
 grep -qF "plugin sayer: asked" "$log" && fail "sayer was asked without the slot"
 expect "tr Hello = Hello"
-drew "OPEN"
-
-# built for API 1, whose translate took no plugin id, the strings slot's
-# owner isn't loaded, and the launcher shows English
-"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -DSAYER_API=1 -I"$ROOT/sdk" "$ROOT/tests/plugins/sayer/sayer.c" \
-	-o "$WORK/plugins/sayer.plugin/lib/$ARCH/plugin.so" || fail "building sayer for API 1"
-printf 'id=sayer\nname=Sayer\napi=1\nslots=strings\n' >"$WORK/plugins/sayer.plugin/plugin.txt"
-log="$WORK/sayer-old.log"
-rm -f "$texts"
-PRESSER_KEYS=wait PRESSER_LOG="$texts" SMOKE_PRELOAD="$PRESSER"
-export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
-run_launcher "$log" "plugins: sayer is built for API 1" "presser: done" || fail "the launcher exited early with sayer for API 1"
-unset PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
-grep -qF "plugins: sayer is built for API 1, but the strings slot's owner needs API 2, skipping" "$log" \
-	|| fail "the old strings owner wasn't refused"
-grep -qF "plugins: loaded sayer" "$log" && fail "a strings owner for API 1 loaded"
-grep -qF "plugin sayer:" "$log" && fail "a strings owner for API 1 ran"
 drew "OPEN"
 
 rm -rf "$WORK/plugins/sayer.plugin" "$SY_STATUS/sayer.status" "$STATE/plugins.txt" "$texts"

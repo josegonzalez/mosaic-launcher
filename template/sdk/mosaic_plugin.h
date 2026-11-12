@@ -18,11 +18,6 @@
  * Both structs begin with their own size, so a launcher and a plugin built
  * against different versions of this header can tell which fields the
  * other has. Fields are only ever added at the end.
- *
- * MOSAIC_API_VERSION goes up only when a field's arguments change, as the
- * strings slot's translate and translate_plural did in API 2, when they
- * took the plugin id. The launcher still loads plugins built for API 1,
- * except a strings slot owner, which must be built for API 2.
  */
 
 #ifndef MOSAIC_PLUGIN_H
@@ -34,7 +29,7 @@
 extern "C" {
 #endif
 
-#define MOSAIC_API_VERSION 2
+#define MOSAIC_API_VERSION 1
 
 ///////////////////////////////////////
 // Things the launcher owns. Plugins only hold pointers to them.
@@ -1516,9 +1511,8 @@ typedef struct MosaicPlugin {
 	// translate gets the id of the plugin whose text it is, or NULL for
 	// the launcher's own strings, the context, the launcher's or the one
 	// the plugin passed to host->tr (NULL for none), and the English text.
-	// host->plugin_info says where each plugin's files are. It must be
-	// built for API 2: one built for API 1, whose translate took no
-	// plugin id, isn't loaded. translate_plural gets both English forms and
+	// host->plugin_info says where each plugin's files are.
+	// translate_plural gets both English forms and
 	// the count, and returns the form the language's plural rules pick for
 	// n. Return NULL for text you have no translation of, which then shows
 	// in English. The host copies what's returned, so it only has to last

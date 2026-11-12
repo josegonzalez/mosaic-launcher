@@ -1,6 +1,6 @@
 id=localization
 name=Localization
-api=2
+api=1
 slots=strings
 # the language pack to use, by its code; other takes the code below, and off translates nothing
 setting.language=choice|Language|off|off,other,ca,cs,da,de,el,es,fi,fr,hu,it,ja,ko,nl,no,pl,pt,pt_BR,ru,sv,tr,uk,zh_CN,zh_TW

@@ -15,7 +15,7 @@ if [ "$(uname -s)" = Darwin ]; then
 else
 	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" -ldl || fail "building presser"
 fi
-build_plugin sayer 'id=sayer\nname=Sayer\napi=2\nslots=strings\n'
+build_plugin sayer 'id=sayer\nname=Sayer\napi=1\nslots=strings\n'
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" quick-menu-plus theme-plus >/dev/null \
 	|| fail "building quick-menu-plus and theme-plus"
 RN_GB="$CARD/Roms/Game Boy (GB)"
