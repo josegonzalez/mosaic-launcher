@@ -1,0 +1,67 @@
+# The clear-recents plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: clear-recents\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: clear_recents.c
+msgid "CLEAR"
+msgstr ""
+
+#: clear_recents.c
+msgid "CLEAR ALL"
+msgstr ""
+
+#: clear_recents.c
+msgid "Clear all recently played games?"
+msgstr ""
+
+#: clear_recents.c plugin.txt
+msgid "Clear recents"
+msgstr ""
+
+#: plugin.txt
+msgid "Clear recents tile on the quick menu"
+msgstr ""
+
+#: clear_recents.c
+msgid "Couldn't remove that"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: clear_recents.c
+msgid "REMOVE"
+msgstr ""
+
+#: plugin.txt
+msgid "Recently Played button"
+msgstr ""
+
+#: clear_recents.c
+msgid "Recents cleared"
+msgstr ""
+
+#: clear_recents.c
+msgid "Removed from recents"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""

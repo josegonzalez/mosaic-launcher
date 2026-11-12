@@ -1,0 +1,110 @@
+# The quick-menu-plus plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: quick-menu-plus\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: quick_menu_plus.c
+#, c-format
+msgid "%s off"
+msgstr ""
+
+#: quick_menu_plus.c
+#, c-format
+msgid "%s on"
+msgstr ""
+
+#: quick_model.c
+msgid "Adjustment notices"
+msgstr ""
+
+#: quick_model.c
+msgid "Battery %"
+msgstr ""
+
+#: quick_model.c
+msgid "Clock"
+msgstr ""
+
+#: quick_menu_plus.c
+#, c-format
+msgid "Couldn't change %s"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Couldn't turn the launcher off"
+msgstr ""
+
+#: quick_model.c
+msgid "Haptics"
+msgstr ""
+
+#: plugin.txt
+msgid "Hidden tiles (Pak Store, ...)"
+msgstr ""
+
+#: quick_model.c
+msgid "Load notices"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu plus"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "REBOOT"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Reboot to stock"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Reboot to stock NextUI?\nTurn Launcher back on from Tools."
+msgstr ""
+
+#: plugin.txt
+msgid "Reboot to stock tile on the quick menu"
+msgstr ""
+
+#: quick_model.c
+msgid "Save notices"
+msgstr ""
+
+#: quick_model.c
+msgid "Screenshot notices"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Sleeping as usual"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Stay awake"
+msgstr ""
+
+#: plugin.txt
+msgid "Stay awake tile on the quick menu"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Staying awake"
+msgstr ""
+
+#: plugin.txt
+msgid "Tile labels (Recents=Played, ...)"
+msgstr ""
+
+#: plugin.txt
+msgid "Toggle tiles (save, load, clock, ...)"
+msgstr ""

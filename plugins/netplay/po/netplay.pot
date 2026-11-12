@@ -1,0 +1,55 @@
+# The netplay plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: netplay\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: netplay.c
+msgid "Host a game"
+msgstr ""
+
+#: netplay.c
+msgid "Host address"
+msgstr ""
+
+#: netplay.c
+msgid "Join a game"
+msgstr ""
+
+#: netplay.c
+msgid "NETPLAY"
+msgstr ""
+
+#: netplay.c
+msgid "Netplay"
+msgstr ""
+
+#: plugin.txt
+msgid "Netplay (needs NextUI netplay)"
+msgstr ""
+
+#: netplay.c
+msgid "Netplay couldn't start this game"
+msgstr ""
+
+#: netplay.c
+msgid "No emulator for netplay"
+msgstr ""
+
+#: plugin.txt
+msgid "Port"
+msgstr ""
+
+#: netplay.c
+msgid "Type a host name or IP address, with :port for another port"
+msgstr ""

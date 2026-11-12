@@ -1,0 +1,25 @@
+# Spanish for the platform-jump plugin, from po/platform-jump.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Jump between systems in collections"
+msgstr "Saltar entre sistemas en las colecciones"
+
+msgid "Jump between systems on the root"
+msgstr "Saltar entre sistemas en la raíz"
+
+msgid "Platform jump"
+msgstr "Salto de plataforma"
+
+msgid "SYSTEM"
+msgstr "SISTEMA"
+
+msgid "Wrap around"
+msgstr "Dar la vuelta"

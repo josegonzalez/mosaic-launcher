@@ -1,0 +1,178 @@
+# The home-dashboard plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: home-dashboard\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: home_model.c
+#, c-format
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: home_dashboard.c
+#, c-format
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] ""
+msgstr[1] ""
+
+#: home_dashboard.c
+#, c-format
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: home_model.c
+#, c-format
+msgid "%i/%i points"
+msgstr ""
+
+#: home_model.c
+#, c-format
+msgid "%lldh %lldm"
+msgstr ""
+
+#: home_model.c
+#, c-format
+msgid "%lldm"
+msgstr ""
+
+#: home_model.c
+#, c-format
+msgid "%s played"
+msgstr ""
+
+#: home_model.c
+msgid "<1m"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Achievements"
+msgstr ""
+
+#: home_dashboard.c
+msgid "CONTINUE"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Checking achievements"
+msgstr ""
+
+#: home_dashboard.c
+#, c-format
+msgid "Couldn't open %s"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Games"
+msgstr ""
+
+#: home_model.c
+msgid "Home"
+msgstr ""
+
+#: plugin.txt
+msgid "Home dashboard"
+msgstr ""
+
+#: plugin.txt
+msgid "Home mode"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Its emulator isn't installed"
+msgstr ""
+
+#: home_dashboard.c
+msgid "MOST PLAYED"
+msgstr ""
+
+#: home_dashboard.c
+msgid "No Pico-8 carts"
+msgstr ""
+
+#: home_dashboard.c
+msgid "No achievements on the card yet"
+msgstr ""
+
+#: home_dashboard.c
+msgid "No favorites yet"
+msgstr ""
+
+#: home_dashboard.c
+msgid "No play history yet"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Nothing played yet"
+msgstr ""
+
+#: plugin.txt
+msgid "Pico-8 folder tags"
+msgstr ""
+
+#: home_model.c
+msgid "Pinned"
+msgstr ""
+
+#: plugin.txt
+msgid "Pinned tab"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Played today"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Recently played"
+msgstr ""
+
+#: home_model.c
+msgid "Stats"
+msgstr ""
+
+#: plugin.txt
+msgid "Stats tab"
+msgstr ""
+
+#: plugin.txt
+msgid "Top shelf"
+msgstr ""
+
+#: plugin.txt
+msgid "dashboard"
+msgstr ""
+
+#: plugin.txt
+msgid "minui"
+msgstr ""
+
+#: plugin.txt
+msgid "pico8"
+msgstr ""
+
+#: plugin.txt
+msgid "retroachievements"
+msgstr ""
+
+#: home_model.c
+msgid "today"
+msgstr ""
+
+#: home_model.c
+msgid "yesterday"
+msgstr ""

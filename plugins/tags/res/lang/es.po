@@ -1,0 +1,68 @@
+# Spanish for the tags plugin, from po/tags.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] "%i juego"
+msgstr[1] "%i juegos"
+
+msgid "Couldn't save tags"
+msgstr "No se pudieron guardar las etiquetas"
+
+msgid "Couldn't tag that"
+msgstr "No se pudo etiquetar"
+
+msgid "DELETE"
+msgstr "BORRAR"
+
+#, c-format
+msgid "Delete the tag %s?"
+msgstr "¿Borrar la etiqueta %s?"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "New tag"
+msgstr "Nueva etiqueta"
+
+msgid "Not a tag name"
+msgstr "No es un nombre de etiqueta"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "TAGS"
+msgstr "ETIQUETAS"
+
+msgid "Tag tiles on the quick menu"
+msgstr "Iconos de etiquetas en el menú rápido"
+
+msgid "Tags"
+msgstr "Etiquetas"
+
+msgid "Tags button"
+msgstr "Botón de etiquetas"
+
+msgid "Tags folder on the root"
+msgstr "Carpeta de etiquetas en la raíz"
+
+msgid "Too many tags"
+msgstr "Demasiadas etiquetas"
+
+msgid "Untag its games to delete it"
+msgstr "Quita la etiqueta de sus juegos para borrarla"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "unused"
+msgstr "sin usar"

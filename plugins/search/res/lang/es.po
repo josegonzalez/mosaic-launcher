@@ -1,0 +1,47 @@
+# Spanish for the search plugin, from po/search.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "New search"
+msgstr "Nueva búsqueda"
+
+#, c-format
+msgid "No games match %s"
+msgstr "Ningún juego coincide con %s"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "Remember recent searches"
+msgstr "Recordar búsquedas recientes"
+
+msgid "SEARCH"
+msgstr "BUSCAR"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Search"
+msgstr "Buscar"
+
+msgid "Search button"
+msgstr "Botón de búsqueda"
+
+msgid "Search on the root"
+msgstr "Búsqueda en la raíz"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "none"
+msgstr "ninguno"

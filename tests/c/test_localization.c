@@ -217,17 +217,6 @@ static void testParse(void) {
 	CHECK_STR(Po_find(c, "hello", "OPEN"), "Открыто");
 	CHECK_STR(Po_find(c, "", "OPEN"), "empty context");
 	CHECK(Po_find(c, "other", "OPEN") == NULL);
-	// as translate looks them up: the launcher's own in their context, a
-	// plugin's under its id, or in its own context when it gives one
-	CHECK(Po_context(NULL, NULL) == NULL);
-	CHECK_STR(Po_context(NULL, "systems"), "systems");
-	CHECK_STR(Po_context("hello", NULL), "hello");
-	CHECK_STR(Po_context("hello", "button"), "button");
-	CHECK_STR(Po_context("hello", ""), "");
-	CHECK_STR(Po_find(c, Po_context(NULL, NULL), "OPEN"), "ОТКРЫТЬ");
-	CHECK_STR(Po_find(c, Po_context("hello", NULL), "OPEN"), "Открыто");
-	CHECK_STR(Po_find(c, Po_context("other", ""), "OPEN"), "empty context");
-	CHECK(Po_find(c, Po_context("other", NULL), "OPEN") == NULL);
 	CHECK_STR(Po_find(c, NULL, "two lines"), "dos líneas");
 	CHECK(Po_find(c, NULL, "Fuzzy") == NULL);
 	CHECK(Po_find(c, NULL, "Fuzzy too") == NULL);
@@ -504,6 +493,24 @@ static const char* fakeTrPlural(const char* id, const char* context, const char*
 	return got ? got : (n == 1 ? singular : plural);
 }
 
+// the plugins the host lists: none in init, as the launcher lists none
+// until every plugin has loaded
+static MosaicPluginInfo listed[8];
+static int listed_count = 0;
+static int fakePluginsCount(void) { return listed_count; }
+static int fakePluginInfo(int index, MosaicPluginInfo* out) {
+	if (!out || index < 0 || index >= listed_count) return -1;
+	*out = listed[index];
+	return 0;
+}
+static void list(const char* id, const char* res) {
+	MosaicPluginInfo* p = &listed[listed_count++];
+	memset(p, 0, sizeof(*p));
+	p->size = sizeof(*p);
+	snprintf(p->id, sizeof(p->id), "%s", id);
+	snprintf(p->res, sizeof(p->res), "%s", res);
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -518,6 +525,8 @@ static MosaicHost fake = {
 	.quick_tile = fakeQuickTile,
 	.tr = fakeTr,
 	.tr_plural = fakeTrPlural,
+	.plugins_count = fakePluginsCount,
+	.plugin_info = fakePluginInfo,
 };
 
 static void writeFile(const char* path, const char* text) {
@@ -541,7 +550,9 @@ static void start(const char* language, const char* code_setting) {
 	bound = -1;
 	snprintf(cfg_language, sizeof(cfg_language), "%s", language ? language : "");
 	snprintf(cfg_code, sizeof(cfg_code), "%s", code_setting ? code_setting : "");
+	listed_count = 0;
 	CHECK(init(&fake) == 0);
+	list(ID, RES);
 }
 
 static int saidLine(const char* text) {
@@ -553,25 +564,37 @@ static void testPlugin(void) {
 	mkdir(TEST_DIR, 0755);
 	mkdir(CARD, 0755);
 	mkdir(RES, 0755);
+	mkdir(RES "/lang", 0755);
+	mkdir(RES "/lang/launcher", 0755);
 	mkdir(LANGS, 0755);
-	writeFile(RES "/xx.po", HEADER("nplurals=3; plural=n==1 ? 0 : n==2 ? 1 : 2;")
-		"msgid \"OPEN\"\nmsgstr \"XOPEN\"\n\nmsgid \"BACK\"\nmsgstr \"XBACK\"\n\n"
-		"msgctxt \"localization\"\nmsgid \"WRITE\"\nmsgstr \"XWRITE\"\n\n"
-		"msgctxt \"localization\"\nmsgid \"Add names to map.txt in %d folder?\"\nmsgid_plural \"Add names to map.txt in %d folders?\"\n"
+	// the launcher's strings, and this plugin's own
+	writeFile(RES "/lang/launcher/xx.po", HEADER("nplurals=3; plural=n==1 ? 0 : n==2 ? 1 : 2;")
+		"msgid \"OPEN\"\nmsgstr \"XOPEN\"\n\nmsgid \"BACK\"\nmsgstr \"XBACK\"\n");
+	writeFile(RES "/lang/xx.po", HEADER("nplurals=3; plural=n==1 ? 0 : n==2 ? 1 : 2;")
+		"msgid \"WRITE\"\nmsgstr \"XWRITE\"\n\n"
+		"msgid \"Add names to map.txt in %d folder?\"\nmsgid_plural \"Add names to map.txt in %d folders?\"\n"
 		"msgstr[0] \"X1 %d?\"\nmsgstr[1] \"X2 %d?\"\nmsgstr[2] \"Xn %d?\"\n");
-	writeFile(RES "/pt.po", "msgid \"OPEN\"\nmsgstr \"ABRIR pt\"\n");
+	writeFile(RES "/lang/launcher/pt.po", "msgid \"OPEN\"\nmsgstr \"ABRIR pt\"\n");
 
 	// off by default, and nothing registered
 	start(NULL, NULL);
 	CHECK(saidLine("language off, so nothing is translated"));
 	CHECK(translate(NULL, NULL, "OPEN") == NULL);
+	CHECK(translate(ID, NULL, "WRITE") == NULL);
 	CHECK(translatePlural(NULL, NULL, "%d game", "%d games", 2) == NULL);
 	CHECK(registered == 0);
 
-	// the bundled pack
+	// the bundled packs: the launcher's read in init, this plugin's own on
+	// its first string, once
 	start("xx", NULL);
-	CHECK(saidLine("bundled pack " RES "/xx.po read, 4 translated"));
+	CHECK(saidLine("bundled pack " RES "/lang/launcher/xx.po read, 2 translated"));
 	CHECK(saidLine("language xx"));
+	CHECK(!saidLine(RES "/lang/xx.po"));
+	CHECK_STR(translate(ID, NULL, "WRITE"), "XWRITE");
+	CHECK(saidLine("bundled pack " RES "/lang/xx.po read, 2 translated"));
+	CHECK(translate(ID, NULL, "OPEN") == NULL); // the launcher's isn't this plugin's
+	CHECK(translate(NULL, NULL, "WRITE") == NULL);
+	CHECK(strstr(strstr(logged, RES "/lang/xx.po read") + 1, RES "/lang/xx.po read") == NULL);
 	CHECK_STR(translate(NULL, NULL, "OPEN"), "XOPEN");
 	CHECK(translate("someone", NULL, "OPEN") == NULL);
 	CHECK(translate(NULL, NULL, "Missing") == NULL);
@@ -596,6 +619,54 @@ static void testPlugin(void) {
 	CHECK(translate(NULL, NULL, "NEW") == NULL);
 	unlink(LANGS "/xx.po");
 
+	// each plugin's strings are in its own packs, without msgctxt for its
+	// id: alpha's bundled one and the user's for it, which comes first;
+	// beta's is refused, which leaves only beta in English; gamma has none
+	mkdir(TEST_DIR "/alpha", 0755);
+	mkdir(TEST_DIR "/alpha/res", 0755);
+	mkdir(TEST_DIR "/alpha/res/lang", 0755);
+	mkdir(TEST_DIR "/beta", 0755);
+	mkdir(TEST_DIR "/beta/res", 0755);
+	mkdir(TEST_DIR "/beta/res/lang", 0755);
+	mkdir(LANGS "/alpha", 0755);
+	writeFile(TEST_DIR "/alpha/res/lang/xx.po", "msgid \"OPEN\"\nmsgstr \"A OPEN\"\n\nmsgid \"Hello\"\nmsgstr \"A Hello\"\n\n"
+		"msgctxt \"button\"\nmsgid \"Open\"\nmsgstr \"A button Open\"\n");
+	writeFile(TEST_DIR "/alpha/res/lang/pt.po", "msgid \"OPEN\"\nmsgstr \"A OPEN pt\"\n");
+	writeFile(LANGS "/alpha/xx.po", "msgid \"Hello\"\nmsgstr \"USER A Hello\"\n");
+	writeFile(TEST_DIR "/beta/res/lang/xx.po", "msgid \"OPEN\"\nmsgstr \"B OPEN\n");
+	// the launcher's user pack no longer holds plugins' strings by their ids
+	writeFile(LANGS "/xx.po", "msgctxt \"gamma\"\nmsgid \"OPEN\"\nmsgstr \"OLD G OPEN\"\n");
+	// an id that can't name a folder gets no user pack
+	mkdir(CARD "/evil", 0755);
+	writeFile(CARD "/evil/xx.po", "msgid \"OPEN\"\nmsgstr \"EVIL\"\n");
+	start("xx", NULL);
+	CHECK(translate("alpha", NULL, "OPEN") == NULL); // not a plugin the host lists
+	// the listing is read on the first ask after init, as the host lists none in init
+	start("xx", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	list("beta", TEST_DIR "/beta/res");
+	list("gamma", TEST_DIR "/gamma/res");
+	list("../evil", TEST_DIR "/evil/res");
+	CHECK_STR(translate("alpha", NULL, "OPEN"), "A OPEN");
+	CHECK_STR(translate("alpha", NULL, "Hello"), "USER A Hello");
+	CHECK_STR(translate("alpha", "button", "Open"), "A button Open");
+	CHECK(translate("alpha", NULL, "Open") == NULL);
+	CHECK(translate("alpha", NULL, "BACK") == NULL);
+	CHECK(saidLine("user pack " LANGS "/alpha/xx.po read, 1 translated"));
+	CHECK(saidLine("bundled pack " TEST_DIR "/alpha/res/lang/xx.po read, 3 translated"));
+	CHECK(translate("beta", NULL, "OPEN") == NULL);
+	CHECK(saidLine("bundled pack " TEST_DIR "/beta/res/lang/xx.po is refused, line 2: a string with no closing quote"));
+	CHECK(translate("gamma", NULL, "OPEN") == NULL);
+	CHECK(translate("../evil", NULL, "OPEN") == NULL);
+	CHECK_STR(translate("alpha", NULL, "OPEN"), "A OPEN");
+	CHECK_STR(translate(NULL, NULL, "OPEN"), "XOPEN");
+	CHECK_STR(translate(ID, NULL, "WRITE"), "XWRITE");
+	// and a region falls back per plugin
+	start("pt_BR", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	CHECK_STR(translate("alpha", NULL, "OPEN"), "A OPEN pt");
+	unlink(LANGS "/xx.po");
+
 	// a region falls back to its language, and other takes the code setting
 	start("pt_BR", NULL);
 	CHECK_STR(translate(NULL, NULL, "OPEN"), "ABRIR pt");
@@ -607,7 +678,7 @@ static void testPlugin(void) {
 	CHECK(saidLine("isn't a language code"));
 	CHECK(translate(NULL, NULL, "OPEN") == NULL);
 	start("zz", NULL);
-	CHECK(saidLine("no pack for zz in " LANGS " or " RES ", so nothing is translated"));
+	CHECK(saidLine("no pack for zz in " LANGS " or " RES "/lang/launcher, so the launcher's strings stay English"));
 	CHECK(translate(NULL, NULL, "OPEN") == NULL);
 	CHECK(registered == 1); // the map.txt writer still works with names lists alone
 
@@ -802,48 +873,99 @@ static PoCatalog* readTemplate(const char* path) {
 	return catalog;
 }
 
-// The bundled packs read, every string they translate is the launcher's
-// (in po/launcher.pot) or a bundled plugin's (in po/plugins.pot), and
-// Spanish has every bundled plugin's.
-static void testBundled(void) {
+// A bundled pack, read, or NULL; msgfmt checks its printf formats too,
+// when it's installed.
+static PoCatalog* readPack(const char* path) {
 	char err[256];
 	int missing;
 	size_t len = 0;
-	char* es = readFile(REPO_DIR "/plugins/localization/res/es.po", PACK_MAX, &len, &missing);
-	CHECK(es != NULL);
-	if (!es) return;
-	PoCatalog* pack = Po_parse(es, len, err, sizeof(err));
-	free(es);
+	char* text = readFile(path, PACK_MAX, &len, &missing);
+	CHECK(text != NULL);
+	if (!text) {
+		fprintf(stderr, "%s: missing\n", path);
+		return NULL;
+	}
+	PoCatalog* pack = Po_parse(text, len, err, sizeof(err));
+	free(text);
 	CHECK(pack != NULL);
 	if (!pack) {
-		fprintf(stderr, "es.po: %s\n", err);
-		return;
+		fprintf(stderr, "%s: %s\n", path, err);
+		return NULL;
 	}
 	CHECK(!pack->english_rule && pack->nplurals == 2);
-
-	PoCatalog* launcher = readTemplate(REPO_DIR "/po/launcher.pot");
-	PoCatalog* plugins = readTemplate(REPO_DIR "/po/plugins.pot");
-	for (int i = 0; launcher && plugins && i < pack->count; i++) {
-		const PoEntry* e = &pack->entries[i];
-		const PoCatalog* from = e->context ? plugins : launcher;
-		if (!Po_find(from, e->context, e->id)) {
-			fprintf(stderr, "es.po: \"%s\" in \"%s\" isn't in %s\n", e->id, e->context ? e->context : "",
-				e->context ? "plugins.pot" : "launcher.pot");
-		}
-		CHECK(Po_find(from, e->context, e->id) != NULL);
+	if (system("command -v msgfmt >/dev/null") == 0) {
+		char command[1200];
+		snprintf(command, sizeof(command), "msgfmt --check-format -o /dev/null '%s'", path);
+		CHECK(system(command) == 0);
 	}
-	for (int i = 0; plugins && i < plugins->count; i++) {
-		const PoEntry* e = &plugins->entries[i];
-		if (!Po_find(pack, e->context, e->id)) fprintf(stderr, "es.po: no Spanish for \"%s\" in \"%s\"\n", e->id, e->context);
+	return pack;
+}
+
+// Every string pack translates is in template, and with all, it has
+// every string template lists.
+static void checkPack(const char* path, const PoCatalog* pack, const char* pot_path, const PoCatalog* pot, int all) {
+	for (int i = 0; pack && pot && i < pack->count; i++) {
+		const PoEntry* e = &pack->entries[i];
+		if (!Po_find(pot, e->context, e->id)) {
+			fprintf(stderr, "%s: \"%s\" in \"%s\" isn't in %s\n", path, e->id, e->context ? e->context : "", pot_path);
+		}
+		CHECK(Po_find(pot, e->context, e->id) != NULL);
+	}
+	for (int i = 0; all && pack && pot && i < pot->count; i++) {
+		const PoEntry* e = &pot->entries[i];
+		if (!Po_find(pack, e->context, e->id)) fprintf(stderr, "%s: no Spanish for \"%s\"\n", path, e->id);
 		CHECK(Po_find(pack, e->context, e->id) != NULL);
 	}
-	CHECK_STR(Po_findPlural(pack, ID, "Add names to map.txt in %d folder?", 1), "¿Añadir nombres a map.txt en %d carpeta?");
-	CHECK_STR(Po_findPlural(pack, ID, "Add names to map.txt in %d folder?", 0), "¿Añadir nombres a map.txt en %d carpetas?");
-	// a model's duration and plural count
-	CHECK_STR(Po_find(pack, "activity-stats", "%lldh %lldm"), "%lld h %lld min");
-	CHECK_STR(Po_findPlural(pack, "activity-stats", "%lld session", 2), "%lld sesiones");
+}
+
+// A plugin's Spanish pack, res/lang/es.po in its folder, against its
+// template, po/<id>.pot, both ways.
+static void checkPlugin(const char* dir, const char* id) {
+	char pack_path[700], pot_path[700];
+	snprintf(pack_path, sizeof(pack_path), "%s/res/lang/es.po", dir);
+	snprintf(pot_path, sizeof(pot_path), "%s/po/%s.pot", dir, id);
+	PoCatalog* pack = readPack(pack_path);
+	PoCatalog* pot = readTemplate(pot_path);
+	checkPack(pack_path, pack, pot_path, pot, 1);
+	Po_free(pot);
+	Po_free(pack);
+}
+
+// The bundled packs read, every string the launcher's translates is in
+// po/launcher.pot, and every plugin's Spanish, and the template's, has
+// exactly the strings in its own template.
+static void testBundled(void) {
+	PoCatalog* pack = readPack(REPO_DIR "/plugins/localization/res/" LAUNCHER_DIR "/es.po");
+	PoCatalog* launcher = readTemplate(REPO_DIR "/po/launcher.pot");
+	checkPack("launcher es.po", pack, "po/launcher.pot", launcher, 0);
 	Po_free(launcher);
-	Po_free(plugins);
+	Po_free(pack);
+
+	int plugins = 0;
+	DIR* d = opendir(REPO_DIR "/plugins");
+	CHECK(d != NULL);
+	struct dirent* de;
+	while (d && (de = readdir(d))) {
+		char dir[600], txt[700];
+		struct stat st;
+		snprintf(dir, sizeof(dir), REPO_DIR "/plugins/%s", de->d_name);
+		snprintf(txt, sizeof(txt), "%s/plugin.txt", dir);
+		if (de->d_name[0] == '.' || stat(txt, &st) != 0) continue;
+		checkPlugin(dir, de->d_name); // bundled plugins' folders are named by their ids
+		plugins++;
+	}
+	if (d) closedir(d);
+	CHECK(plugins > 50);
+	checkPlugin(REPO_DIR "/template", "example");
+
+	// the plural rule, a model's duration and plural count
+	pack = readPack(REPO_DIR "/plugins/localization/res/lang/es.po");
+	CHECK_STR(Po_findPlural(pack, NULL, "Add names to map.txt in %d folder?", 1), "¿Añadir nombres a map.txt en %d carpeta?");
+	CHECK_STR(Po_findPlural(pack, NULL, "Add names to map.txt in %d folder?", 0), "¿Añadir nombres a map.txt en %d carpetas?");
+	Po_free(pack);
+	pack = readPack(REPO_DIR "/plugins/activity-stats/res/lang/es.po");
+	CHECK_STR(Po_find(pack, NULL, "%lldh %lldm"), "%lld h %lld min");
+	CHECK_STR(Po_findPlural(pack, NULL, "%lld session", 2), "%lld sesiones");
 	Po_free(pack);
 }
 

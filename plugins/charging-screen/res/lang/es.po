@@ -1,0 +1,52 @@
+# Spanish for the charging-screen plugin, from po/charging-screen.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "120"
+msgstr "120"
+
+msgid "12h"
+msgstr "12 h"
+
+msgid "24h"
+msgstr "24 h"
+
+msgid "30"
+msgstr "30"
+
+msgid "300"
+msgstr "300"
+
+msgid "60"
+msgstr "60"
+
+msgid "AM"
+msgstr "a. m."
+
+msgid "Charged"
+msgstr "Cargada"
+
+msgid "Charging"
+msgstr "Cargando"
+
+msgid "Charging screen (unsupported on desktop)"
+msgstr "Pantalla de carga (no disponible en escritorio)"
+
+msgid "Clock"
+msgstr "Reloj"
+
+msgid "PM"
+msgstr "p. m."
+
+msgid "Show after idle on a charger (seconds)"
+msgstr "Mostrar tras inactividad cargando (segundos)"
+
+msgid "off"
+msgstr "desactivado"

@@ -1,0 +1,81 @@
+# The smart-collections plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: smart-collections\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: plugin.txt
+msgid "1"
+msgstr ""
+
+#: plugin.txt
+msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "2"
+msgstr ""
+
+#: plugin.txt
+msgid "3"
+msgstr ""
+
+#: plugin.txt
+msgid "5"
+msgstr ""
+
+#: smart_collections.c
+#, c-format
+msgid "Bring back %d dismissed collection?"
+msgid_plural "Bring back %d dismissed collections?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugin.txt
+msgid "Built-in franchises"
+msgstr ""
+
+#: smart_collections.c
+msgid "DISMISS"
+msgstr ""
+
+#: smart_collections.c
+#, c-format
+msgid "Dismiss %s?"
+msgstr ""
+
+#: smart_collections.c
+#, c-format
+msgid "Dismissed %s"
+msgstr ""
+
+#: smart_collections.c
+msgid "Dismissed collections are back"
+msgstr ""
+
+#: plugin.txt
+msgid "More franchises"
+msgstr ""
+
+#: smart_collections.c
+msgid "RESTORE"
+msgstr ""
+
+#: plugin.txt
+msgid "Smallest collection"
+msgstr ""
+
+#: plugin.txt smart_collections.c
+msgid "Smart Collections"
+msgstr ""

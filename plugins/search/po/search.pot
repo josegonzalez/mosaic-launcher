@@ -1,0 +1,64 @@
+# The search plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: search\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: search.c
+msgid "New search"
+msgstr ""
+
+#: search.c
+#, c-format
+msgid "No games match %s"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "Remember recent searches"
+msgstr ""
+
+#: search.c
+msgid "SEARCH"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: plugin.txt search.c
+msgid "Search"
+msgstr ""
+
+#: plugin.txt
+msgid "Search button"
+msgstr ""
+
+#: plugin.txt
+msgid "Search on the root"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""

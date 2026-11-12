@@ -1,0 +1,75 @@
+# The art-backdrop plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: art-backdrop\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "0"
+msgstr ""
+
+#: plugin.txt
+msgid "25"
+msgstr ""
+
+#: plugin.txt
+msgid "50"
+msgstr ""
+
+#: plugin.txt
+msgid "75"
+msgstr ""
+
+#: plugin.txt
+msgid "Art backdrop"
+msgstr ""
+
+#: plugin.txt
+msgid "Dim"
+msgstr ""
+
+#: plugin.txt
+msgid "Fall back to the box"
+msgstr ""
+
+#: plugin.txt
+msgid "Fall back to the screenshot"
+msgstr ""
+
+#: plugin.txt
+msgid "Fall back to the thumbnail"
+msgstr ""
+
+#: plugin.txt
+msgid "Height"
+msgstr ""
+
+#: plugin.txt
+msgid "Style"
+msgstr ""
+
+#: plugin.txt
+msgid "full"
+msgstr ""
+
+#: plugin.txt
+msgid "gradient"
+msgstr ""
+
+#: plugin.txt
+msgid "half"
+msgstr ""
+
+#: plugin.txt
+msgid "third"
+msgstr ""

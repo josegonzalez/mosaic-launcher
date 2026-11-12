@@ -1,0 +1,45 @@
+# Spanish for the favorites plugin, from po/favorites.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%s is full"
+msgstr "%s está llena"
+
+#, c-format
+msgid "Added to %s"
+msgstr "Añadido a %s"
+
+msgid "Collection"
+msgstr "Colección"
+
+#, c-format
+msgid "Couldn't save %s"
+msgstr "No se pudo guardar %s"
+
+msgid "FAVORITE"
+msgstr "FAVORITO"
+
+msgid "Favorites"
+msgstr "Favoritos"
+
+msgid "Pin to top"
+msgstr "Fijar arriba"
+
+msgid "REMOVE"
+msgstr "QUITAR"
+
+#, c-format
+msgid "Remove %.120s from %.60s?"
+msgstr "¿Quitar %.120s de %.60s?"
+
+#, c-format
+msgid "Removed from %s"
+msgstr "Quitado de %s"

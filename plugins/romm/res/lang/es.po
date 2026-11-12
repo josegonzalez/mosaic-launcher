@@ -1,0 +1,180 @@
+# Spanish for the romm plugin, from po/romm.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%s of %s"
+msgstr "%s de %s"
+
+msgid "(can't restore)"
+msgstr "(no se puede restaurar)"
+
+msgid "10"
+msgstr "10"
+
+msgid "20"
+msgstr "20"
+
+msgid "5"
+msgstr "5"
+
+msgid "50"
+msgstr "50"
+
+msgid "B"
+msgstr "B"
+
+msgid "Busy, try again"
+msgstr "Ocupado, inténtalo de nuevo"
+
+msgid "CA certificates file"
+msgstr "Archivo de certificados de CA"
+
+msgid "Certificate fingerprint (SHA-256)"
+msgstr "Huella del certificado (SHA-256)"
+
+#, c-format
+msgid "Downloading %s"
+msgstr "Descargando %s"
+
+msgid "FLASHBACK"
+msgstr "FLASHBACK"
+
+msgid "Flashback button"
+msgstr "Botón de flashback"
+
+#, c-format
+msgid "Flashback: %s"
+msgstr "Flashback: %s"
+
+msgid "GB"
+msgstr "GB"
+
+msgid "KB"
+msgstr "KB"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "Loading..."
+msgstr "Cargando..."
+
+msgid "MB"
+msgstr "MB"
+
+msgid "No network"
+msgstr "Sin red"
+
+msgid "No saves or states on the server"
+msgstr "No hay partidas ni estados en el servidor"
+
+msgid "Password or API token"
+msgstr "Contraseña o token de API"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "RESTORE"
+msgstr "RESTAURAR"
+
+#, c-format
+msgid "Restore this save?\n%s\nThe one on the card is backed up first."
+msgstr "¿Restaurar esta partida?\n%s\nAntes se hace una copia de la que hay en la tarjeta."
+
+#, c-format
+msgid "Restore this state?\n%s\nThe one on the card is backed up first."
+msgstr "¿Restaurar este estado?\n%s\nAntes se hace una copia del que hay en la tarjeta."
+
+msgid "RomM"
+msgstr "RomM"
+
+#, c-format
+msgid "RomM: %s"
+msgstr "RomM: %s"
+
+msgid "RomM: a folder of that name is already on the card"
+msgstr "RomM: ya hay una carpeta con ese nombre en la tarjeta"
+
+msgid "RomM: couldn't back up the current file"
+msgstr "RomM: no se pudo copiar el archivo actual"
+
+msgid "RomM: couldn't restore it"
+msgstr "RomM: no se pudo restaurar"
+
+msgid "RomM: not enough space on the card"
+msgstr "RomM: no hay espacio suficiente en la tarjeta"
+
+msgid "RomM: restored"
+msgstr "RomM: restaurado"
+
+msgid "RomM: restoring..."
+msgstr "RomM: restaurando..."
+
+msgid "RomM: save uploaded"
+msgstr "RomM: partida subida"
+
+msgid "RomM: that folder isn't on the card"
+msgstr "RomM: esa carpeta no está en la tarjeta"
+
+msgid "RomM: that system's folder isn't on the card"
+msgstr "RomM: la carpeta de ese sistema no está en la tarjeta"
+
+msgid "RomM: this state can't be restored on this device"
+msgstr "RomM: este estado no se puede restaurar en este dispositivo"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Save"
+msgstr "Partida"
+
+msgid "Saves kept on the server"
+msgstr "Partidas guardadas en el servidor"
+
+msgid "Server"
+msgstr "Servidor"
+
+msgid "Starting..."
+msgstr "Iniciando..."
+
+msgid "State"
+msgstr "Estado"
+
+#, c-format
+msgid "State %d"
+msgstr "Estado %d"
+
+#, c-format
+msgid "Unpacking %s"
+msgstr "Descomprimiendo %s"
+
+msgid "Upload saves after playing"
+msgstr "Subir partidas al terminar de jugar"
+
+msgid "User"
+msgstr "Usuario"
+
+msgid "Wi-Fi is off"
+msgstr "El Wi-Fi está apagado"
+
+msgid "Wi-Fi isn't connected"
+msgstr "El Wi-Fi no está conectado"
+
+msgid "Wi-Fi isn't ready yet"
+msgstr "El Wi-Fi aún no está listo"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "none"
+msgstr "ninguno"
+
+msgid "unknown time"
+msgstr "hora desconocida"

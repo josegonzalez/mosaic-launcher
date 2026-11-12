@@ -1,0 +1,51 @@
+# Spanish for the emulator-override plugin, from po/emulator-override.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Couldn't list the emulators"
+msgstr "No se pudieron listar los emuladores"
+
+msgid "Couldn't save the emulator"
+msgstr "No se pudo guardar el emulador"
+
+#, c-format
+msgid "Default (%s)"
+msgstr "Predeterminado (%s)"
+
+msgid "EMULATOR"
+msgstr "EMULADOR"
+
+msgid "Emulator"
+msgstr "Emulador"
+
+msgid "Emulator button"
+msgstr "Botón de emulador"
+
+msgid "Emulator override"
+msgstr "Cambiar emulador"
+
+#, c-format
+msgid "Emulator set to %s"
+msgstr "Emulador: %s"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "List every emulator pak"
+msgstr "Listar todos los paks de emulador"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "Using the default emulator"
+msgstr "Usando el emulador predeterminado"
+
+msgid "Y"
+msgstr "Y"

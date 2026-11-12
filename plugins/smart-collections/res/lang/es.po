@@ -1,0 +1,60 @@
+# Spanish for the smart-collections plugin, from po/smart-collections.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "1"
+msgstr "1"
+
+msgid "10"
+msgstr "10"
+
+msgid "2"
+msgstr "2"
+
+msgid "3"
+msgstr "3"
+
+msgid "5"
+msgstr "5"
+
+#, c-format
+msgid "Bring back %d dismissed collection?"
+msgid_plural "Bring back %d dismissed collections?"
+msgstr[0] "¿Recuperar %d colección descartada?"
+msgstr[1] "¿Recuperar %d colecciones descartadas?"
+
+msgid "Built-in franchises"
+msgstr "Sagas incluidas"
+
+msgid "DISMISS"
+msgstr "DESCARTAR"
+
+#, c-format
+msgid "Dismiss %s?"
+msgstr "¿Descartar %s?"
+
+#, c-format
+msgid "Dismissed %s"
+msgstr "%s descartada"
+
+msgid "Dismissed collections are back"
+msgstr "Las colecciones descartadas han vuelto"
+
+msgid "More franchises"
+msgstr "Más sagas"
+
+msgid "RESTORE"
+msgstr "RESTAURAR"
+
+msgid "Smallest collection"
+msgstr "Colección más pequeña"
+
+msgid "Smart Collections"
+msgstr "Colecciones inteligentes"

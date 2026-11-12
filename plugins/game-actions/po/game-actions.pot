@@ -1,0 +1,172 @@
+# The game-actions plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: game-actions\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: actions_model.c
+#, c-format
+msgid "%i disc file"
+msgid_plural "%i disc files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: actions_model.c
+#, c-format
+msgid "%i save"
+msgid_plural "%i saves"
+msgstr[0] ""
+msgstr[1] ""
+
+#: actions_model.c
+#, c-format
+msgid "%i state"
+msgid_plural "%i states"
+msgstr[0] ""
+msgstr[1] ""
+
+#: actions_model.c
+#, c-format
+msgid "%s and %s"
+msgstr ""
+
+#: game_actions.c
+msgid "ADD TO COLLECTION"
+msgstr ""
+
+#: game_actions.c plugin.txt
+msgid "Add to collection"
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Added to %s"
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Already in %s"
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Also deletes %s.\n"
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Also deletes its folder%s%s.\n"
+msgstr ""
+
+#: game_actions.c
+msgid "Can't delete that"
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Couldn't add to %s"
+msgstr ""
+
+#: game_actions.c
+msgid "Couldn't delete everything"
+msgstr ""
+
+#: game_actions.c
+msgid "Couldn't list collections"
+msgstr ""
+
+#: game_actions.c
+msgid "Couldn't rename that"
+msgstr ""
+
+#: game_actions.c
+msgid "Couldn't save the name"
+msgstr ""
+
+#: game_actions.c
+msgid "DELETE"
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Delete %.40s%s?\n%sThis can't be undone."
+msgstr ""
+
+#: plugin.txt
+msgid "Delete game"
+msgstr ""
+
+#: plugin.txt
+msgid "Delete saves and states with a game"
+msgstr ""
+
+#: game_actions.c
+msgid "Deleted"
+msgstr ""
+
+#: plugin.txt
+msgid "Game actions"
+msgstr ""
+
+#: plugin.txt
+msgid "Game actions button"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: game_actions.c
+msgid "Name restored"
+msgstr ""
+
+#: game_actions.c
+msgid "New collection"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: game_actions.c
+msgid "RENAME"
+msgstr ""
+
+#: game_actions.c plugin.txt
+msgid "Rename"
+msgstr ""
+
+#: game_actions.c
+msgid "Renamed"
+msgstr ""
+
+#: game_actions.c
+msgid "That name can't be a collection"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: actions_model.c
+msgid "its art"
+msgstr ""
+
+#: actions_model.c
+msgid "its resume files"
+msgstr ""
+
+#: actions_model.c
+msgid "its settings"
+msgstr ""

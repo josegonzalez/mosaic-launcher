@@ -1,0 +1,55 @@
+# The launch-animation plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: launch-animation\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "200"
+msgstr ""
+
+#: plugin.txt
+msgid "350"
+msgstr ""
+
+#: plugin.txt
+msgid "500"
+msgstr ""
+
+#: plugin.txt
+msgid "Duration"
+msgstr ""
+
+#: plugin.txt
+msgid "Ease"
+msgstr ""
+
+#: plugin.txt
+msgid "Launch animation"
+msgstr ""
+
+#: plugin.txt
+msgid "in"
+msgstr ""
+
+#: plugin.txt
+msgid "in-out"
+msgstr ""
+
+#: plugin.txt
+msgid "linear"
+msgstr ""
+
+#: plugin.txt
+msgid "out"
+msgstr ""

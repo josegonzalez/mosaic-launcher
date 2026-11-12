@@ -1,0 +1,59 @@
+# The battery-logger plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: battery-logger\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "0"
+msgstr ""
+
+#: plugin.txt
+msgid "1"
+msgstr ""
+
+#: plugin.txt
+msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "1024"
+msgstr ""
+
+#: plugin.txt
+msgid "256"
+msgstr ""
+
+#: plugin.txt
+msgid "5"
+msgstr ""
+
+#: plugin.txt
+msgid "64"
+msgstr ""
+
+#: plugin.txt
+msgid "Battery logger (unsupported on desktop)"
+msgstr ""
+
+#: plugin.txt
+msgid "Largest log size (KB)"
+msgstr ""
+
+#: plugin.txt
+msgid "Log sessions that charged"
+msgstr ""
+
+#: plugin.txt
+msgid "Shortest session to log (minutes)"
+msgstr ""

@@ -1,0 +1,239 @@
+# The romm plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: romm\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: romm.c
+#, c-format
+msgid "%s of %s"
+msgstr ""
+
+#: romm.c
+msgid "(can't restore)"
+msgstr ""
+
+#: plugin.txt
+msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "20"
+msgstr ""
+
+#: plugin.txt
+msgid "5"
+msgstr ""
+
+#: plugin.txt
+msgid "50"
+msgstr ""
+
+#: romm_model.c
+msgid "B"
+msgstr ""
+
+#: romm.c
+msgid "Busy, try again"
+msgstr ""
+
+#: plugin.txt
+msgid "CA certificates file"
+msgstr ""
+
+#: plugin.txt
+msgid "Certificate fingerprint (SHA-256)"
+msgstr ""
+
+#: romm.c
+#, c-format
+msgid "Downloading %s"
+msgstr ""
+
+#: romm.c
+msgid "FLASHBACK"
+msgstr ""
+
+#: plugin.txt
+msgid "Flashback button"
+msgstr ""
+
+#: romm.c
+#, c-format
+msgid "Flashback: %s"
+msgstr ""
+
+#: romm_model.c
+msgid "GB"
+msgstr ""
+
+#: romm_model.c
+msgid "KB"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: romm.c
+msgid "Loading..."
+msgstr ""
+
+#: romm_model.c
+msgid "MB"
+msgstr ""
+
+#: romm.c
+msgid "No network"
+msgstr ""
+
+#: romm.c
+msgid "No saves or states on the server"
+msgstr ""
+
+#: plugin.txt
+msgid "Password or API token"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: romm.c
+msgid "RESTORE"
+msgstr ""
+
+#: romm.c
+#, c-format
+msgid "Restore this save?\n%s\nThe one on the card is backed up first."
+msgstr ""
+
+#: romm.c
+#, c-format
+msgid "Restore this state?\n%s\nThe one on the card is backed up first."
+msgstr ""
+
+#: plugin.txt
+msgid "RomM"
+msgstr ""
+
+#: romm.c
+#, c-format
+msgid "RomM: %s"
+msgstr ""
+
+#: romm.c
+msgid "RomM: a folder of that name is already on the card"
+msgstr ""
+
+#: romm.c
+msgid "RomM: couldn't back up the current file"
+msgstr ""
+
+#: romm.c
+msgid "RomM: couldn't restore it"
+msgstr ""
+
+#: romm.c
+msgid "RomM: not enough space on the card"
+msgstr ""
+
+#: romm.c
+msgid "RomM: restored"
+msgstr ""
+
+#: romm.c
+msgid "RomM: restoring..."
+msgstr ""
+
+#: romm.c
+msgid "RomM: save uploaded"
+msgstr ""
+
+#: romm.c
+msgid "RomM: that folder isn't on the card"
+msgstr ""
+
+#: romm.c
+msgid "RomM: that system's folder isn't on the card"
+msgstr ""
+
+#: romm.c
+msgid "RomM: this state can't be restored on this device"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: romm.c
+msgid "Save"
+msgstr ""
+
+#: plugin.txt
+msgid "Saves kept on the server"
+msgstr ""
+
+#: plugin.txt
+msgid "Server"
+msgstr ""
+
+#: romm.c
+msgid "Starting..."
+msgstr ""
+
+#: romm.c
+msgid "State"
+msgstr ""
+
+#: romm.c
+#, c-format
+msgid "State %d"
+msgstr ""
+
+#: romm.c
+#, c-format
+msgid "Unpacking %s"
+msgstr ""
+
+#: plugin.txt
+msgid "Upload saves after playing"
+msgstr ""
+
+#: plugin.txt
+msgid "User"
+msgstr ""
+
+#: romm.c
+msgid "Wi-Fi is off"
+msgstr ""
+
+#: romm.c
+msgid "Wi-Fi isn't connected"
+msgstr ""
+
+#: romm.c
+msgid "Wi-Fi isn't ready yet"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""
+
+#: romm_model.c
+msgid "unknown time"
+msgstr ""

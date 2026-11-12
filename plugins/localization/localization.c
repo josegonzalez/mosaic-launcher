@@ -4,11 +4,15 @@
 // The "language" setting picks a pack by its code, eg. "es" or "pt_BR"
 // ("other" takes the code from the "code" setting); "off", the default,
 // translates nothing. A code with a region falls back to its language's
-// pack, "pt" for "pt_BR". Packs are looked for in the "folder" setting's
-// folder on the card (Languages by default) and in the plugin's own res/;
-// a pack in the folder comes first, string by string, so it can change or
-// add to the bundled one. A pack that doesn't parse is skipped whole, and
-// the launcher log says which line is wrong.
+// pack, "pt" for "pt_BR". The launcher's strings are in <code>.po in the
+// "folder" setting's folder on the card (Languages by default) and in this
+// plugin's res/lang/launcher/; each plugin's are in its own
+// res/lang/<code>.po and in <folder>/<plugin id>/<code>.po, without a
+// msgctxt for its id. A pack in the folder comes first, string by string,
+// so it can change or add to the bundled one. A pack that doesn't parse is
+// skipped whole, so only its own strings show in English, and the launcher
+// log says which line is wrong. A plugin's packs are read the first time
+// one of its strings is asked for, as plugin_info lists nothing in init.
 //
 // The localization.map action writes display names into each system
 // folder's map.txt from names lists in <folder>/<code>/<TAG>.txt, matching
@@ -44,6 +48,8 @@
 #define NAMES_MAX (8 * 1024 * 1024)
 #define MAP_MAX (4 * 1024 * 1024)
 #define FOLDER_FILES_MAX 20000
+#define LAUNCHER_DIR "lang/launcher" // the launcher's packs, in res/
+#define PLUGIN_DIR "lang"            // a plugin's packs, in its res/
 
 // snprintf into the array buf, 1 when it fit: a path cut short is never used
 #define FITS(buf, ...) (snprintf((buf), sizeof(buf), __VA_ARGS__) < (int)sizeof(buf))
@@ -51,9 +57,20 @@
 static const MosaicHost* host;
 static char code[CODE_MAX]; // the language in use, or "" for off
 static char folder[512];    // the user's packs, a full path
-static char res_dir[600];   // the bundled packs
-static PoCatalog* user_pack;
-static PoCatalog* bundled_pack;
+static char res_dir[600];   // this plugin's res/
+static PoCatalog* user_pack;    // the launcher's strings, the user's
+static PoCatalog* bundled_pack; // and the bundled ones
+
+// A plugin's packs, read the first time its strings are asked for.
+typedef struct PluginPacks {
+	char id[64];
+	char res[600];
+	int read;
+	PoCatalog* user;
+	PoCatalog* bundled;
+} PluginPacks;
+static PluginPacks* plugin_packs;
+static int plugin_count = -1; // -1 until plugin_info lists them
 static int tile_on = 0;
 static char font[700]; // the fallback font, or "" for none
 
@@ -158,20 +175,94 @@ static PoCatalog* loadPack(const char* dir, const char* where) {
 	return NULL;
 }
 
-// Plugins' strings are in the pack under their ids, or their own contexts.
+// 1 when id can name a folder: letters, digits, '.', '_' and '-', not
+// starting with '.'.
+static int validId(const char* id) {
+	if (!id[0] || id[0] == '.') return 0;
+	for (const char* p = id; *p; p++) {
+		char x = *p;
+		if (!((x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z') || (x >= '0' && x <= '9') || x == '_' || x == '-' || x == '.')) return 0;
+	}
+	return 1;
+}
+
+static void freePlugins(void) {
+	for (int i = 0; i < plugin_count; i++) {
+		Po_free(plugin_packs[i].user);
+		Po_free(plugin_packs[i].bundled);
+	}
+	free(plugin_packs);
+	plugin_packs = NULL;
+	plugin_count = -1;
+}
+
+// The plugins plugin_info lists, once it lists them: it lists none until
+// every plugin has loaded, this one too.
+static void listPlugins(void) {
+	if (plugin_count >= 0 || !MOSAIC_HOST_HAS(host, plugin_info)) return;
+	int count = host->plugins_count();
+	if (count <= 0) return;
+	plugin_packs = calloc((size_t)count, sizeof(PluginPacks));
+	if (!plugin_packs) return;
+	plugin_count = 0;
+	for (int i = 0; i < count; i++) {
+		MosaicPluginInfo info = { .size = sizeof(info) };
+		if (host->plugin_info(i, &info) != 0) break;
+		PluginPacks* p = &plugin_packs[plugin_count++];
+		snprintf(p->id, sizeof(p->id), "%s", info.id);
+		snprintf(p->res, sizeof(p->res), "%s", info.res);
+	}
+}
+
+// The packs for plugin_id's strings, read on its first ask, or NULL for a
+// plugin that isn't listed.
+static PluginPacks* pluginPacks(const char* plugin_id) {
+	listPlugins();
+	for (int i = 0; i < plugin_count; i++) {
+		PluginPacks* p = &plugin_packs[i];
+		if (strcmp(p->id, plugin_id) != 0) continue;
+		if (!p->read) {
+			p->read = 1;
+			char dir[700];
+			if (validId(p->id) && FITS(dir, "%s/%s", folder, p->id)) p->user = loadPack(dir, "user");
+			if (p->res[0] && FITS(dir, "%s/" PLUGIN_DIR, p->res)) p->bundled = loadPack(dir, "bundled");
+		}
+		return p;
+	}
+	return NULL;
+}
+
+// The launcher's strings are in its packs, in their contexts, and each
+// plugin's in its own packs, in its own contexts.
+static void packsFor(const char* plugin_id, PoCatalog** user, PoCatalog** bundled) {
+	*user = *bundled = NULL;
+	if (!code[0]) return;
+	if (!plugin_id) {
+		*user = user_pack;
+		*bundled = bundled_pack;
+		return;
+	}
+	PluginPacks* p = pluginPacks(plugin_id);
+	if (!p) return;
+	*user = p->user;
+	*bundled = p->bundled;
+}
+
 static const char* translate(const char* plugin_id, const char* context, const char* text) {
-	context = Po_context(plugin_id, context);
-	const char* got = user_pack ? Po_find(user_pack, context, text) : NULL;
-	if (!got && bundled_pack) got = Po_find(bundled_pack, context, text);
+	PoCatalog *user, *bundled;
+	packsFor(plugin_id, &user, &bundled);
+	const char* got = user ? Po_find(user, context, text) : NULL;
+	if (!got && bundled) got = Po_find(bundled, context, text);
 	return got;
 }
 
 static const char* translatePlural(const char* plugin_id, const char* context, const char* singular, const char* plural,
 		unsigned long n) {
 	(void)plural;
-	context = Po_context(plugin_id, context);
-	const char* got = user_pack ? Po_findPlural(user_pack, context, singular, n) : NULL;
-	if (!got && bundled_pack) got = Po_findPlural(bundled_pack, context, singular, n);
+	PoCatalog *user, *bundled;
+	packsFor(plugin_id, &user, &bundled);
+	const char* got = user ? Po_findPlural(user, context, singular, n) : NULL;
+	if (!got && bundled) got = Po_findPlural(bundled, context, singular, n);
 	return got;
 }
 
@@ -460,6 +551,8 @@ static int init(const MosaicHost* h) {
 	host = h;
 	code[0] = '\0';
 	user_pack = bundled_pack = NULL;
+	plugin_packs = NULL;
+	plugin_count = -1;
 	write_count = 0;
 	writes = NULL;
 	findRes();
@@ -485,9 +578,11 @@ static int init(const MosaicHost* h) {
 	snprintf(code, sizeof(code), "%s", language);
 	findFont();
 	user_pack = loadPack(folder, "user");
-	bundled_pack = loadPack(res_dir, "bundled");
-	if (!user_pack && !bundled_pack) say("no pack for %s in %s or %s, so nothing is translated", code, folder, res_dir);
-	else say("language %s", code);
+	char launcher_dir[700];
+	if (FITS(launcher_dir, "%s/" LAUNCHER_DIR, res_dir)) bundled_pack = loadPack(launcher_dir, "bundled");
+	else launcher_dir[0] = '\0';
+	if (!user_pack && !bundled_pack) say("no pack for %s in %s or %s, so the launcher's strings stay English", code, folder, launcher_dir);
+	say("language %s", code);
 
 	if (host->register_action(MAP_ACTION, "Write map.txt names", mapAvailable, runMap, NULL) != 0) {
 		say("couldn't register " MAP_ACTION);
@@ -520,6 +615,7 @@ static void quit(void) {
 	Po_free(user_pack);
 	Po_free(bundled_pack);
 	user_pack = bundled_pack = NULL;
+	freePlugins();
 	freeWrites();
 }
 

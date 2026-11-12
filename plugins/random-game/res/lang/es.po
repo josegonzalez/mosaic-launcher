@@ -1,0 +1,31 @@
+# Spanish for the random-game plugin, from po/random-game.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "No games to pick from"
+msgstr "No hay juegos entre los que elegir"
+
+msgid "Prefer unplayed games"
+msgstr "Preferir juegos sin jugar"
+
+msgid "RANDOM"
+msgstr "AL AZAR"
+
+msgid "Random"
+msgstr "Al azar"
+
+msgid "Random game"
+msgstr "Juego al azar"
+
+msgid "Random game on the root"
+msgstr "Juego al azar en la raíz"
+
+msgid "Random tile on the quick menu"
+msgstr "Icono de juego al azar en el menú rápido"

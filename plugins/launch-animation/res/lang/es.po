@@ -1,0 +1,40 @@
+# Spanish for the launch-animation plugin, from po/launch-animation.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "200"
+msgstr "200"
+
+msgid "350"
+msgstr "350"
+
+msgid "500"
+msgstr "500"
+
+msgid "Duration"
+msgstr "Duración"
+
+msgid "Ease"
+msgstr "Suavizado"
+
+msgid "Launch animation"
+msgstr "Animación de inicio"
+
+msgid "in"
+msgstr "entrada"
+
+msgid "in-out"
+msgstr "entrada y salida"
+
+msgid "linear"
+msgstr "lineal"
+
+msgid "out"
+msgstr "salida"

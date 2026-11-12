@@ -54,7 +54,7 @@ drew "OPEN"
 # the bundled Spanish
 printf 'language=es\nfolder=LocalizationTest\n' >"$LC_CFG"
 localization_run localization-es
-expect "bundled pack $LC_RES/es.po read, "
+expect "bundled pack $LC_RES/lang/launcher/es.po read, "
 expect "language es"
 drew "ABRIR"
 grep -qxF "OPEN" "$texts" && fail "the game list drew OPEN with Spanish on"
@@ -102,6 +102,7 @@ localization_run localization-map "plugin screener: done"
 expect "Localization Test (LCT): a new map.txt, 1 to add"
 expect "wrote $LC_ROMS/map.txt, 1 added"
 expect "toast: Nombres añadidos a map.txt en 1 carpeta"
+expect "bundled pack $LC_RES/lang/es.po read, "
 [ "$(cat "$LC_ROMS/map.txt" 2>/dev/null)" = "$(printf 'Tetris (World).gb\tTetris (prueba)')" ] \
 	|| fail "localization wrote the wrong map.txt: $(cat "$LC_ROMS/map.txt" 2>/dev/null)"
 

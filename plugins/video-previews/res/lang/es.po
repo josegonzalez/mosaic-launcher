@@ -1,0 +1,31 @@
+# Spanish for the video-previews plugin, from po/video-previews.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "1"
+msgstr "1"
+
+msgid "2"
+msgstr "2"
+
+msgid "3"
+msgstr "3"
+
+msgid "5"
+msgstr "5"
+
+msgid "Play after (seconds)"
+msgstr "Reproducir tras (segundos)"
+
+msgid "Sound"
+msgstr "Sonido"
+
+msgid "Video previews"
+msgstr "Vistas previas en vídeo"

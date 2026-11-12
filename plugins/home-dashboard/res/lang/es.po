@@ -1,0 +1,135 @@
+# Spanish for the home-dashboard plugin, from po/home-dashboard.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] "hace %i día"
+msgstr[1] "hace %i días"
+
+#, c-format
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] "%i juego"
+msgstr[1] "%i juegos"
+
+#, c-format
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] "%i sesión"
+msgstr[1] "%i sesiones"
+
+#, c-format
+msgid "%i/%i points"
+msgstr "%i/%i puntos"
+
+#, c-format
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgid "%s played"
+msgstr "%s jugado"
+
+msgid "<1m"
+msgstr "<1 min"
+
+msgid "Achievements"
+msgstr "Logros"
+
+msgid "CONTINUE"
+msgstr "CONTINUAR"
+
+msgid "Checking achievements"
+msgstr "Comprobando logros"
+
+#, c-format
+msgid "Couldn't open %s"
+msgstr "No se pudo abrir %s"
+
+msgid "Games"
+msgstr "Juegos"
+
+msgid "Home"
+msgstr "Inicio"
+
+msgid "Home dashboard"
+msgstr "Panel de inicio"
+
+msgid "Home mode"
+msgstr "Modo de inicio"
+
+msgid "Its emulator isn't installed"
+msgstr "Su emulador no está instalado"
+
+msgid "MOST PLAYED"
+msgstr "MÁS JUGADOS"
+
+msgid "No Pico-8 carts"
+msgstr "No hay cartuchos de Pico-8"
+
+msgid "No achievements on the card yet"
+msgstr "Aún no hay logros en la tarjeta"
+
+msgid "No favorites yet"
+msgstr "Aún no hay favoritos"
+
+msgid "No play history yet"
+msgstr "Aún no hay historial de juego"
+
+msgid "Nothing played yet"
+msgstr "Aún no se ha jugado nada"
+
+msgid "Pico-8 folder tags"
+msgstr "Etiquetas de carpetas de Pico-8"
+
+msgid "Pinned"
+msgstr "Fijados"
+
+msgid "Pinned tab"
+msgstr "Pestaña de fijados"
+
+msgid "Played today"
+msgstr "Jugado hoy"
+
+msgid "Recently played"
+msgstr "Jugados recientemente"
+
+msgid "Stats"
+msgstr "Estadísticas"
+
+msgid "Stats tab"
+msgstr "Pestaña de estadísticas"
+
+msgid "Top shelf"
+msgstr "Estante superior"
+
+msgid "dashboard"
+msgstr "panel"
+
+msgid "minui"
+msgstr "minui"
+
+msgid "pico8"
+msgstr "pico8"
+
+msgid "retroachievements"
+msgstr "retroachievements"
+
+msgid "today"
+msgstr "hoy"
+
+msgid "yesterday"
+msgstr "ayer"

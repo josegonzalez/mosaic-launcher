@@ -1,0 +1,135 @@
+# The screensaver plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: screensaver\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "120"
+msgstr ""
+
+#: plugin.txt
+msgid "12h"
+msgstr ""
+
+#: plugin.txt
+msgid "15"
+msgstr ""
+
+#: plugin.txt
+msgid "20"
+msgstr ""
+
+#: plugin.txt
+msgid "24h"
+msgstr ""
+
+#: plugin.txt
+msgid "30"
+msgstr ""
+
+#: plugin.txt
+msgid "300"
+msgstr ""
+
+#: plugin.txt
+msgid "45"
+msgstr ""
+
+#: plugin.txt
+msgid "5"
+msgstr ""
+
+#: plugin.txt
+msgid "60"
+msgstr ""
+
+#: plugin.txt
+msgid "600"
+msgstr ""
+
+#: screensaver_model.c
+msgid "AM"
+msgstr ""
+
+#: plugin.txt
+msgid "Change"
+msgstr ""
+
+#: plugin.txt
+msgid "Clock"
+msgstr ""
+
+#: plugin.txt
+msgid "Game art"
+msgstr ""
+
+#: plugin.txt
+msgid "Image folder"
+msgstr ""
+
+#: plugin.txt
+msgid "Images"
+msgstr ""
+
+#: screensaver_model.c
+msgid "PM"
+msgstr ""
+
+#: plugin.txt
+msgid "Screensaver"
+msgstr ""
+
+#: plugin.txt
+msgid "Seconds per image"
+msgstr ""
+
+#: plugin.txt
+msgid "Show after idle (seconds)"
+msgstr ""
+
+#: plugin.txt
+msgid "box"
+msgstr ""
+
+#: plugin.txt
+msgid "fade"
+msgstr ""
+
+#: plugin.txt
+msgid "folder"
+msgstr ""
+
+#: plugin.txt
+msgid "games"
+msgstr ""
+
+#: plugin.txt
+msgid "off"
+msgstr ""
+
+#: plugin.txt
+msgid "screenshot"
+msgstr ""
+
+#: plugin.txt
+msgid "screenshots"
+msgstr ""
+
+#: plugin.txt
+msgid "slide"
+msgstr ""

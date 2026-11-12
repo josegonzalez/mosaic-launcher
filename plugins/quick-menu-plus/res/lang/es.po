@@ -1,0 +1,82 @@
+# Spanish for the quick-menu-plus plugin, from po/quick-menu-plus.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%s off"
+msgstr "%s desactivado"
+
+#, c-format
+msgid "%s on"
+msgstr "%s activado"
+
+msgid "Adjustment notices"
+msgstr "Avisos de ajustes"
+
+msgid "Battery %"
+msgstr "Batería %"
+
+msgid "Clock"
+msgstr "Reloj"
+
+#, c-format
+msgid "Couldn't change %s"
+msgstr "No se pudo cambiar %s"
+
+msgid "Couldn't turn the launcher off"
+msgstr "No se pudo desactivar el launcher"
+
+msgid "Haptics"
+msgstr "Vibración"
+
+msgid "Hidden tiles (Pak Store, ...)"
+msgstr "Iconos ocultos (Pak Store, ...)"
+
+msgid "Load notices"
+msgstr "Avisos de carga"
+
+msgid "Quick menu plus"
+msgstr "Menú rápido plus"
+
+msgid "REBOOT"
+msgstr "REINICIAR"
+
+msgid "Reboot to stock"
+msgstr "Reiniciar a NextUI original"
+
+msgid "Reboot to stock NextUI?\nTurn Launcher back on from Tools."
+msgstr "¿Reiniciar a NextUI original?\nVuelve a activar el launcher desde Herramientas."
+
+msgid "Reboot to stock tile on the quick menu"
+msgstr "Icono de reiniciar a NextUI original en el menú rápido"
+
+msgid "Save notices"
+msgstr "Avisos de guardado"
+
+msgid "Screenshot notices"
+msgstr "Avisos de capturas"
+
+msgid "Sleeping as usual"
+msgstr "Suspensión normal"
+
+msgid "Stay awake"
+msgstr "No suspender"
+
+msgid "Stay awake tile on the quick menu"
+msgstr "Icono de no suspender en el menú rápido"
+
+msgid "Staying awake"
+msgstr "Sin suspender"
+
+msgid "Tile labels (Recents=Played, ...)"
+msgstr "Nombres de iconos (Recents=Played, ...)"
+
+msgid "Toggle tiles (save, load, clock, ...)"
+msgstr "Iconos de interruptores (guardar, cargar, reloj, ...)"

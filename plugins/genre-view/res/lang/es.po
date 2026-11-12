@@ -1,0 +1,46 @@
+# Spanish for the genre-view plugin, from po/genre-view.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "1"
+msgstr "1"
+
+msgid "2"
+msgstr "2"
+
+msgid "3"
+msgstr "3"
+
+msgid "4"
+msgstr "4"
+
+msgid "Consoles a genre needs"
+msgstr "Consolas que necesita un género"
+
+msgid "Folders that aren't genres"
+msgstr "Carpetas que no son géneros"
+
+msgid "Genre view"
+msgstr "Vista por géneros"
+
+msgid "Genres"
+msgstr "Géneros"
+
+msgid "Show the system"
+msgstr "Mostrar el sistema"
+
+msgid "always"
+msgstr "siempre"
+
+msgid "off"
+msgstr "desactivado"
+
+msgid "shared"
+msgstr "compartido"

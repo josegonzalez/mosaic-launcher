@@ -1,13 +1,12 @@
-// Writes the gettext template of the plugin.txt files named on the command
-// line to stdout: each plugin's name, setting labels and choice options,
-// read by the launcher's own parser (Manifest_strings), and the strings
-// xgettext found in its code (-c <file> after its plugin.txt), all under
-// msgctxt set to the plugin's id, as the Launcher pak's Plugins page and
-// host->tr translate them. Entries are sorted by context, then text
-// (bytewise), with file-only locations, so the template changes only when
-// a string does. Built and run by scripts/pot.sh.
+// Writes the gettext template of one plugin to stdout: its plugin.txt's
+// name, setting labels and choice options, read by the launcher's own
+// parser (Manifest_strings), and the strings xgettext found in its code
+// (-c <file>), with no msgctxt, as the Launcher pak's Plugins page and
+// host->tr ask for them with the plugin's id and no context. Entries are
+// sorted by text (bytewise), with file-only locations, so the template
+// changes only when a string does. Built and run by scripts/pot.sh.
 //
-//   plugin-pot plugins/a/plugin.txt -c build/pot/code/a.pot plugins/b/plugin.txt > po/plugins.pot
+//   plugin-pot plugin.txt -c ../../build/pot/code/a.pot > po/a.pot
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +17,6 @@
 #define FILES_MAX 32 // locations on one of xgettext's entries
 
 typedef struct Entry {
-	char context[64];
 	char text[512];
 	char plural[512]; // "" for none
 	char file[512];
@@ -28,7 +26,6 @@ typedef struct Entry {
 static Entry entries[ENTRIES_MAX];
 static int entry_count = 0;
 static const char* reading; // the file whose strings are being added
-static const PluginManifest* manifest;
 
 static void addEntry(const char* text, const char* plural, const char* file, int c_format) {
 	if (!text[0]) return;
@@ -37,7 +34,6 @@ static void addEntry(const char* text, const char* plural, const char* file, int
 		exit(1);
 	}
 	Entry* e = &entries[entry_count++];
-	snprintf(e->context, sizeof(e->context), "%s", manifest->id);
 	snprintf(e->text, sizeof(e->text), "%s", text);
 	snprintf(e->plural, sizeof(e->plural), "%s", plural ? plural : "");
 	snprintf(e->file, sizeof(e->file), "%s", file);
@@ -52,8 +48,7 @@ static void add(const char* text, void* data) {
 static int compare(const void* a, const void* b) {
 	const Entry* x = a;
 	const Entry* y = b;
-	int c = strcmp(x->context, y->context);
-	if (!c) c = strcmp(x->text, y->text);
+	int c = strcmp(x->text, y->text);
 	if (!c) c = strcmp(x->file, y->file);
 	return c;
 }
@@ -158,42 +153,35 @@ static void quoted(const char* s) {
 
 int main(int argc, char* argv[]) {
 	static PluginManifest m;
-	for (int i = 1; i < argc; i++) {
-		if (!strcmp(argv[i], "-c")) {
-			if (!manifest || i + 1 >= argc) {
-				fprintf(stderr, "plugin-pot: -c needs a plugin.txt before it and a file after it\n");
-				return 1;
-			}
-			if (readCode(argv[++i]) != 0) return 1;
-			continue;
-		}
-		char* text = readFile(argv[i]);
-		if (!text) {
-			fprintf(stderr, "plugin-pot: can't read %s\n", argv[i]);
-			return 1;
-		}
-		memset(&m, 0, sizeof(m));
-		if (Manifest_parse(text, &m) != 0) {
-			fprintf(stderr, "plugin-pot: %s has no id\n", argv[i]);
-			return 1;
-		}
-		free(text);
-		reading = argv[i];
-		manifest = &m;
-		Manifest_strings(&m, add, NULL);
+	if (argc != 2 && !(argc == 4 && !strcmp(argv[2], "-c"))) {
+		fprintf(stderr, "usage: plugin-pot <plugin.txt> [-c <xgettext's template of its code>]\n");
+		return 1;
 	}
+	char* text = readFile(argv[1]);
+	if (!text) {
+		fprintf(stderr, "plugin-pot: can't read %s\n", argv[1]);
+		return 1;
+	}
+	if (Manifest_parse(text, &m) != 0) {
+		fprintf(stderr, "plugin-pot: %s has no id\n", argv[1]);
+		return 1;
+	}
+	free(text);
+	reading = argv[1];
+	Manifest_strings(&m, add, NULL);
+	if (argc == 4 && readCode(argv[3]) != 0) return 1;
 	qsort(entries, entry_count, sizeof(entries[0]), compare);
 	int plurals = 0;
 	for (int i = 0; i < entry_count; i++) plurals |= entries[i].plural[0] != '\0';
 
-	fputs("# The bundled plugins' names, setting labels and choice options, from\n"
-		"# their plugin.txt files, and the fixed text their code hands the\n"
-		"# launcher, under msgctxt set to the plugin's id. Written by make pot.\n"
-		"#, fuzzy\n"
+	printf("# The %s plugin's name, setting labels and choice options, from its\n"
+		"# plugin.txt, and the fixed text its code hands the launcher. Written\n"
+		"# by make pot.\n", m.id);
+	fputs("#, fuzzy\n"
 		"msgid \"\"\n"
-		"msgstr \"\"\n"
-		"\"Project-Id-Version: mosaic-launcher\\n\"\n"
-		"\"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\\n\"\n"
+		"msgstr \"\"\n", stdout);
+	printf("\"Project-Id-Version: %s\\n\"\n", m.id);
+	fputs("\"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\\n\"\n"
 		"\"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\\n\"\n"
 		"\"Last-Translator: FULL NAME <EMAIL@ADDRESS>\\n\"\n"
 		"\"Language-Team: LANGUAGE <LL@li.org>\\n\"\n"
@@ -203,11 +191,11 @@ int main(int argc, char* argv[]) {
 		"\"Content-Transfer-Encoding: 8bit\\n\"\n", stdout);
 	if (plurals) fputs("\"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\\n\"\n", stdout);
 	for (int i = 0; i < entry_count; ) {
-		// one entry for each context and text, naming every file it's in
+		// one entry for each text, naming every file it's in
 		int j = i;
 		int c_format = 0;
 		const char* plural = "";
-		while (j < entry_count && !strcmp(entries[j].context, entries[i].context) && !strcmp(entries[j].text, entries[i].text)) {
+		while (j < entry_count && !strcmp(entries[j].text, entries[i].text)) {
 			c_format |= entries[j].c_format;
 			if (entries[j].plural[0]) plural = entries[j].plural;
 			j++;
@@ -218,8 +206,6 @@ int main(int argc, char* argv[]) {
 			printf(" %s", entries[k].file);
 		}
 		if (c_format) printf("\n#, c-format");
-		printf("\nmsgctxt ");
-		quoted(entries[i].context);
 		printf("\nmsgid ");
 		quoted(entries[i].text);
 		if (plural[0]) {

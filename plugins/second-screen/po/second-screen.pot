@@ -1,0 +1,75 @@
+# The second-screen plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: second-screen\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "480x320"
+msgstr ""
+
+#: plugin.txt
+msgid "480x640"
+msgstr ""
+
+#: plugin.txt
+msgid "640x480"
+msgstr ""
+
+#: plugin.txt
+msgid "800x480"
+msgstr ""
+
+#: ss_model.c
+msgid "Developer"
+msgstr ""
+
+#: second_screen.c
+msgid "Empty folder"
+msgstr ""
+
+#: ss_model.c
+msgid "Folder"
+msgstr ""
+
+#: ss_model.c
+msgid "Game"
+msgstr ""
+
+#: ss_model.c
+msgid "Genre"
+msgstr ""
+
+#: ss_model.c
+msgid "Pak"
+msgstr ""
+
+#: ss_model.c
+msgid "Players"
+msgstr ""
+
+#: ss_model.c
+msgid "Publisher"
+msgstr ""
+
+#: plugin.txt
+msgid "Second screen (experimental, desktop only)"
+msgstr ""
+
+#: plugin.txt
+msgid "Window size"
+msgstr ""
+
+#: ss_model.c
+msgid "Year"
+msgstr ""

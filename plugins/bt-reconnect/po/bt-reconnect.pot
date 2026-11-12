@@ -1,0 +1,31 @@
+# The bt-reconnect plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: bt-reconnect\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "Bluetooth reconnect (unsupported on desktop)"
+msgstr ""
+
+#: plugin.txt
+msgid "Device to reconnect"
+msgstr ""
+
+#: plugin.txt
+msgid "Reconnect after sleep"
+msgstr ""
+
+#: plugin.txt
+msgid "Reconnect at start"
+msgstr ""

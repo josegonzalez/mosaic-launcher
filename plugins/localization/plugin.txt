@@ -6,7 +6,7 @@ slots=strings
 setting.language=choice|Language|off|off,other,ca,cs,da,de,el,es,fi,fr,hu,it,ja,ko,nl,no,pl,pt,pt_BR,ru,sv,tr,uk,zh_CN,zh_TW
 # a language code for other, eg. eu or pt_PT
 setting.code=text|Other language code|
-# the folder on the card with your own packs (<code>.po) and names lists (<code>/<TAG>.txt)
+# the folder on the card with your own packs (<code>.po for the launcher, <plugin id>/<code>.po for a plugin) and names lists (<code>/<TAG>.txt)
 setting.folder=text|Language pack folder|Languages
 # a font for the characters the UI font has no glyphs for, such as CJK, relative to the card or a full path; empty uses <folder>/<code>.ttf or .otf when there's one
 setting.font=text|Fallback font|

@@ -1,0 +1,39 @@
+# The focus-mode plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: focus-mode\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: focus_mode.c
+msgid "All systems"
+msgstr ""
+
+#: focus_mode.c
+msgid "Focus"
+msgstr ""
+
+#: plugin.txt
+msgid "Focus mode"
+msgstr ""
+
+#: focus_mode.c
+msgid "Focus mode off"
+msgstr ""
+
+#: focus_mode.c
+msgid "Focus mode on"
+msgstr ""
+
+#: plugin.txt
+msgid "Focus on favorites"
+msgstr ""

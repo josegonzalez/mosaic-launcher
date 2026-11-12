@@ -1,0 +1,51 @@
+# The art-boxart plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: art-boxart\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid ".res folders"
+msgstr ""
+
+#: plugin.txt
+msgid "Box art"
+msgstr ""
+
+#: plugin.txt
+msgid "Box, wheel and screenshot in .media"
+msgstr ""
+
+#: plugin.txt
+msgid "Folder covers"
+msgstr ""
+
+#: plugin.txt
+msgid "Hide art folders"
+msgstr ""
+
+#: plugin.txt
+msgid "Hide covered folder names"
+msgstr ""
+
+#: plugin.txt
+msgid "Images folders"
+msgstr ""
+
+#: plugin.txt
+msgid "Imgs folders"
+msgstr ""
+
+#: plugin.txt
+msgid "Use as the thumbnail"
+msgstr ""

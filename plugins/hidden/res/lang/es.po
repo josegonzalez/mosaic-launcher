@@ -1,0 +1,46 @@
+# Spanish for the hidden plugin, from po/hidden.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Couldn't hide that"
+msgstr "No se pudo ocultar"
+
+msgid "Couldn't save hidden games"
+msgstr "No se pudieron guardar los juegos ocultos"
+
+msgid "HIDE"
+msgstr "OCULTAR"
+
+msgid "Hidden"
+msgstr "Ocultos"
+
+msgid "Hidden games"
+msgstr "Juegos ocultos"
+
+msgid "Hide button"
+msgstr "Botón de ocultar"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "UNHIDE"
+msgstr "MOSTRAR"
+
+msgid "Unhidden"
+msgstr "Mostrado"
+
+msgid "Y"
+msgstr "Y"

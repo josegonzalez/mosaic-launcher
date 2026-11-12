@@ -1,0 +1,233 @@
+# The gamification plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: gamification\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: gamification_model.c
+#, c-format
+msgid "%i day streak"
+msgid_plural "%i day streak"
+msgstr[0] ""
+msgstr[1] ""
+
+#: gamification_model.c
+#, c-format
+msgid "%i quest done"
+msgid_plural "%i quests done"
+msgstr[0] ""
+msgstr[1] ""
+
+#: gamification_model.c
+#, c-format
+msgid "%lldh"
+msgstr ""
+
+#: gamification_model.c
+#, c-format
+msgid "%lldh %lldm"
+msgstr ""
+
+#: gamification_model.c
+#, c-format
+msgid "%lldm"
+msgstr ""
+
+#: plugin.txt
+msgid "1"
+msgstr ""
+
+#: plugin.txt
+msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "120"
+msgstr ""
+
+#: plugin.txt
+msgid "14"
+msgstr ""
+
+#: plugin.txt
+msgid "15"
+msgstr ""
+
+#: plugin.txt
+msgid "2"
+msgstr ""
+
+#: plugin.txt
+msgid "20"
+msgstr ""
+
+#: plugin.txt
+msgid "3"
+msgstr ""
+
+#: plugin.txt
+msgid "30"
+msgstr ""
+
+#: plugin.txt
+msgid "4"
+msgstr ""
+
+#: plugin.txt
+msgid "45"
+msgstr ""
+
+#: plugin.txt
+msgid "5"
+msgstr ""
+
+#: plugin.txt
+msgid "6"
+msgstr ""
+
+#: plugin.txt
+msgid "60"
+msgstr ""
+
+#: plugin.txt
+msgid "7"
+msgstr ""
+
+#: plugin.txt
+msgid "90"
+msgstr ""
+
+#: gamification_model.c
+#, c-format
+msgid "Best %i day"
+msgid_plural "Best %i days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugin.txt
+msgid "Daily games"
+msgstr ""
+
+#: plugin.txt
+msgid "Daily play (minutes)"
+msgstr ""
+
+#: plugin.txt
+msgid "Days a week"
+msgstr ""
+
+#: gamification_model.c
+msgid "Done"
+msgstr ""
+
+#: plugin.txt
+msgid "Gamification"
+msgstr ""
+
+#: gamification_model.c
+#, c-format
+msgid "Go back to a game you haven't played in %i days"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: gamification_model.c
+msgid "No streak"
+msgstr ""
+
+#: gamification_model.c
+#, c-format
+msgid "Play %i different games today"
+msgid_plural "Play %i different games today"
+msgstr[0] ""
+msgstr[1] ""
+
+#: gamification_model.c
+#, c-format
+msgid "Play for %i hour this week"
+msgid_plural "Play for %i hours this week"
+msgstr[0] ""
+msgstr[1] ""
+
+#: gamification_model.c
+#, c-format
+msgid "Play for %i hour today"
+msgid_plural "Play for %i hours today"
+msgstr[0] ""
+msgstr[1] ""
+
+#: gamification_model.c
+#, c-format
+msgid "Play for %i minutes today"
+msgid_plural "Play for %i minutes today"
+msgstr[0] ""
+msgstr[1] ""
+
+#: gamification_model.c
+#, c-format
+msgid "Play on %i days this week"
+msgid_plural "Play on %i days this week"
+msgstr[0] ""
+msgstr[1] ""
+
+#: gamification_model.c
+#, c-format
+msgid "Quest done: %s"
+msgstr ""
+
+#: gamification.c
+msgid "Quests"
+msgstr ""
+
+#: plugin.txt
+msgid "Quests button"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu tile"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: gamification_model.c
+msgid "Start a game you've never played"
+msgstr ""
+
+#: plugin.txt
+msgid "Streak day (minutes)"
+msgstr ""
+
+#: plugin.txt
+msgid "Toasts"
+msgstr ""
+
+#: plugin.txt
+msgid "Weekly play (hours)"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""

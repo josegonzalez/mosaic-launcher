@@ -5,7 +5,9 @@
 # helper from beside plugin.so, which answers a ping, logs to the plugin's
 # log file and quits once the launcher stops; and with helper/ deleted, it
 # builds and loads without one. Both are built from copies of template/,
-# and their paks hold the helper only when it was built
+# and their paks hold the helper only when it was built, and its language
+# pack. Installed as its own pak in Tools/desktop, its own Spanish shows
+# with the bundled localization's language set to es
 template="$WORK/plugins/example.plugin"
 TP_LOG="$CARD/.userdata/desktop/logs/example.txt"
 
@@ -73,7 +75,38 @@ if command -v zip >/dev/null && command -v unzip >/dev/null; then
 	grep -qx "lib/aarch64/example-helper" "$WORK/template/pak.txt" || fail "the template's pak has no helper"
 	tp_pak "$WORK/template-nohelper"
 	if grep -q "example-helper" "$WORK/template-nohelper/pak.txt"; then fail "the pak without helper/ has a helper"; fi
+	grep -qx "res/lang/es.po" "$WORK/template/pak.txt" || fail "the template's pak has no res/lang/es.po"
 else
 	echo "skipping the template's paks: no zip or unzip"
 fi
+
+# installed as its own pak, its Spanish from res/lang/es.po is used by the
+# bundled localization: the game list draws its action's hint as MOSTRAR
+TP_PAK="$CARD/Tools/desktop/Example.pak"
+rm -rf "$template" "$TP_PAK"
+mkdir -p "$TP_PAK"
+cp "$WORK/template/plugin.txt" "$TP_PAK/"
+cp -R "$WORK/template/lib" "$WORK/template/res" "$TP_PAK/"
+PRESSER="$WORK/presser.so"
+if [ "$(uname -s)" = Darwin ]; then
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -undefined dynamic_lookup "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" \
+		|| fail "building presser"
+else
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" -ldl || fail "building presser"
+fi
+make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" localization >/dev/null || fail "building localization"
+printf 'language=es\n' >"$STATE/localization.cfg"
+printf 'localization=on\nexample=on\n' >"$STATE/plugins.txt"
+texts="$WORK/template-es-texts.txt"
+log="$WORK/template-es.log"
+rm -f "$texts"
+PRESSER_KEYS=wait PRESSER_LOG="$texts" SMOKE_PRELOAD="$PRESSER"
+export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+run_launcher "$log" "presser: done" "plugins: loaded example" || fail "the launcher exited early with the template's pak in Spanish"
+unset PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
+grep -qF "plugin localization: bundled pack $TP_PAK/res/lang/es.po read, 3 translated" "$log" \
+	|| fail "localization didn't read the template pak's Spanish: $(grep -F "plugin localization: " "$log")"
+drew "MOSTRAR"
+grep -qxF "SHOW" "$texts" && fail "the game list drew SHOW with the template's Spanish on"
+rm -rf "$TP_PAK" "$WORK/plugins/localization.plugin" "$STATE/localization.cfg" "$STATE/plugins.txt" "$texts"
 rm -rf "$template" "$WORK/template" "$WORK/template-nohelper" "$TP_LOG"

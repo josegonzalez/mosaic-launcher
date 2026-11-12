@@ -11,6 +11,9 @@
 # With a helper/ folder, its .c files build the plugin's helper program,
 # $(HELPER), beside plugin.so in each lib/<arch>/. Delete helper/ to go
 # without one.
+#
+# res/, with the plugin's language packs in res/lang/<code>.po, goes into
+# the pak when there is one. po/ is only for making them, and stays out.
 ###########################################################
 
 .PHONY: all build desktop pak clean
@@ -48,7 +51,7 @@ pak:
 	$(if $(HELPER_SRC),chmod +x lib/aarch64/$(HELPER))
 	mkdir -p build
 	rm -f "build/$(NAME).pak.zip"
-	zip -r "build/$(NAME).pak.zip" plugin.txt launch.sh lib/aarch64 sdk/LICENSE
+	zip -r "build/$(NAME).pak.zip" plugin.txt launch.sh lib/aarch64 sdk/LICENSE $(wildcard res)
 
 clean:
 	rm -rf lib build

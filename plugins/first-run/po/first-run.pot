@@ -1,0 +1,172 @@
+# The first-run plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: first-run\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: first_run.c
+#, c-format
+msgid "%i of %i"
+msgstr ""
+
+#: first_run.c
+msgid "A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins."
+msgstr ""
+
+#: first_run.c
+msgid "All set"
+msgstr ""
+
+#: plugin.txt
+msgid "Already shown"
+msgstr ""
+
+#: first_run.c plugin.txt
+msgid "First run"
+msgstr ""
+
+#: plugin.txt
+msgid "First run button"
+msgstr ""
+
+#: first_run.c
+msgid "Haptic feedback"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: first_run.c
+msgid "Left and right change the selected setting, saved at once. Settings has them too."
+msgstr ""
+
+#: first_run.c
+msgid "Off"
+msgstr ""
+
+#: first_run.c
+msgid "On"
+msgstr ""
+
+#: first_run.c
+msgid "Once it's done or skipped it won't open by itself again."
+msgstr ""
+
+#: first_run.c
+msgid "Once it's done or skipped it won't open by itself again. The First run tile on the quick menu opens it."
+msgstr ""
+
+#: first_run.c
+msgid "PIN"
+msgstr ""
+
+#: plugin.txt
+msgid "PIN page"
+msgstr ""
+
+#: first_run.c
+msgid "Plugins"
+msgstr ""
+
+#: first_run.c
+msgid "Plugins to try:"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu tile"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: first_run.c
+msgid "Settings"
+msgstr ""
+
+#: plugin.txt
+msgid "Settings page"
+msgstr ""
+
+#: first_run.c
+msgid "Show battery percentage"
+msgstr ""
+
+#: first_run.c
+msgid "Show clock"
+msgstr ""
+
+#: plugin.txt
+msgid "Suggested plugins"
+msgstr ""
+
+#: first_run.c
+msgid "That's it."
+msgstr ""
+
+#: first_run.c
+msgid "That's it. The First run tile on the quick menu opens this again."
+msgstr ""
+
+#: first_run.c
+msgid "The launcher has a PIN."
+msgstr ""
+
+#: first_run.c
+msgid "The launcher has no PIN."
+msgstr ""
+
+#: first_run.c
+msgid "This goes over a few settings and plugins. A goes on, B goes back, and Y skips the rest."
+msgstr ""
+
+#: first_run.c
+msgid "Turn them on in Tools > Launcher > Plugins. They start the next time the launcher does."
+msgstr ""
+
+#: first_run.c
+msgid "Volume and display notifications"
+msgstr ""
+
+#: first_run.c
+msgid "Welcome"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: wizard_model.c
+msgid "a Favorites folder, Y adds a game"
+msgstr ""
+
+#: wizard_model.c
+msgid "a home screen with your last game"
+msgstr ""
+
+#: wizard_model.c
+msgid "more game switcher styles"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""
+
+#: wizard_model.c
+msgid "search every game by name"
+msgstr ""

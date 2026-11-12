@@ -1,0 +1,165 @@
+# The system-info plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: system-info\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: info_model.c
+#, c-format
+msgid "%i of 3 bars"
+msgstr ""
+
+#: info_model.c
+#, c-format
+msgid "%i%%, charging"
+msgstr ""
+
+#: info_model.c
+#, c-format
+msgid "%lldd %lldh %lldm"
+msgstr ""
+
+#: info_model.c
+#, c-format
+msgid "%lldh %lldm"
+msgstr ""
+
+#: info_model.c
+#, c-format
+msgid "%lldm"
+msgstr ""
+
+#: info_model.c
+#, c-format
+msgid "%s free of %s"
+msgstr ""
+
+#: info_model.c
+msgid "Battery"
+msgstr ""
+
+#: info_model.c
+#, c-format
+msgid "Battery over the last %i game, %s of play"
+msgid_plural "Battery over the last %i games, %s of play"
+msgstr[0] ""
+msgstr[1] ""
+
+#: info_model.c
+msgid "GB"
+msgstr ""
+
+#: info_model.c
+msgid "IP address"
+msgstr ""
+
+#: info_model.c
+msgid "KB"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: info_model.c
+msgid "MB"
+msgstr ""
+
+#: info_model.c
+msgid "Memory"
+msgstr ""
+
+#: system_info.c
+msgid "No battery history: battery-logger hasn't logged a game yet"
+msgstr ""
+
+#: info_model.c
+msgid "PB"
+msgstr ""
+
+#: info_model.c
+msgid "Platform"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu tile"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: info_model.c
+msgid "Storage"
+msgstr ""
+
+#: plugin.txt system_info.c
+msgid "System info"
+msgstr ""
+
+#: plugin.txt
+msgid "System info button"
+msgstr ""
+
+#: info_model.c
+msgid "TB"
+msgstr ""
+
+#: info_model.c
+msgid "Uptime"
+msgstr ""
+
+#: info_model.c
+msgid "Version"
+msgstr ""
+
+#: info_model.c
+msgid "Wi-Fi"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: info_model.c
+msgid "checking"
+msgstr ""
+
+#: info_model.c
+msgid "hidden network"
+msgstr ""
+
+#: info_model.c
+msgid "no address yet"
+msgstr ""
+
+#: info_model.c plugin.txt
+msgid "none"
+msgstr ""
+
+#: info_model.c
+msgid "not connected"
+msgstr ""
+
+#: info_model.c
+msgid "off"
+msgstr ""
+
+#: info_model.c
+msgid "unavailable"
+msgstr ""

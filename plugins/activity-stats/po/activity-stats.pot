@@ -1,0 +1,161 @@
+# The activity-stats plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: activity-stats\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: activity_model.c
+#, c-format
+msgid "%i days: %s"
+msgstr ""
+
+#: activity_model.c
+#, c-format
+msgid "%i days: no play history"
+msgstr ""
+
+#: activity_model.c
+#, c-format
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] ""
+msgstr[1] ""
+
+#: activity_model.c
+#, c-format
+msgid "%lld session"
+msgid_plural "%lld sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: activity_model.c
+#, c-format
+msgid "%lldh"
+msgstr ""
+
+#: activity_model.c
+#, c-format
+msgid "%lldh %lldm"
+msgstr ""
+
+#: activity_model.c
+#, c-format
+msgid "%lldm"
+msgstr ""
+
+#: activity_model.c
+#, c-format
+msgid "%s a day"
+msgstr ""
+
+#: activity_model.c
+msgid "30 days"
+msgstr ""
+
+#: activity_model.c
+msgid "7 days"
+msgstr ""
+
+#: activity_model.c
+msgid "<1m"
+msgstr ""
+
+#: activity_stats.c
+msgid "Activity"
+msgstr ""
+
+#: plugin.txt
+msgid "Activity button"
+msgstr ""
+
+#: plugin.txt
+msgid "Activity stats"
+msgstr ""
+
+#: activity_stats.c
+#, c-format
+msgid "Couldn't open %s"
+msgstr ""
+
+#: activity_model.c
+msgid "Fri"
+msgstr ""
+
+#: activity_model.c
+msgid "Games"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: activity_model.c
+msgid "Launches"
+msgstr ""
+
+#: activity_model.c
+msgid "Mon"
+msgstr ""
+
+#: activity_stats.c
+msgid "No play history"
+msgstr ""
+
+#: activity_stats.c
+msgid "Nothing played yet"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu tile"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: activity_model.c
+msgid "Sat"
+msgstr ""
+
+#: activity_model.c
+msgid "Sun"
+msgstr ""
+
+#: activity_model.c
+msgid "Thu"
+msgstr ""
+
+#: activity_model.c
+msgid "Tue"
+msgstr ""
+
+#: activity_model.c
+msgid "Unknown game"
+msgstr ""
+
+#: activity_model.c
+msgid "Wed"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""

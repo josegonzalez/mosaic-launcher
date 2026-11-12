@@ -1,0 +1,73 @@
+# Spanish for the power-plus plugin, from po/power-plus.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "1"
+msgstr "1"
+
+msgid "10"
+msgstr "10"
+
+msgid "12"
+msgstr "12"
+
+msgid "15"
+msgstr "15"
+
+msgid "2"
+msgstr "2"
+
+msgid "24"
+msgstr "24"
+
+msgid "3"
+msgstr "3"
+
+msgid "4"
+msgstr "4"
+
+msgid "5"
+msgstr "5"
+
+msgid "8"
+msgstr "8"
+
+#, c-format
+msgid "Asleep for %ld min, powering off"
+msgstr "Suspendida %ld min, apagando"
+
+#, c-format
+msgid "Battery at %d%%, charge soon"
+msgstr "Batería al %d%%, cárgala pronto"
+
+#, c-format
+msgid "Battery at %d%%, powering off in %ds"
+msgstr "Batería al %d%%, apagando en %d s"
+
+msgid "Hours asleep before powering off"
+msgstr "Horas en suspensión antes de apagar"
+
+msgid "Low battery guard"
+msgstr "Protección de batería baja"
+
+msgid "Low battery power off at (%)"
+msgstr "Apagar con batería baja al (%)"
+
+msgid "Low battery warning at (%)"
+msgstr "Aviso de batería baja al (%)"
+
+msgid "Power off after a long sleep"
+msgstr "Apagar tras una suspensión larga"
+
+msgid "Power off cancelled"
+msgstr "Apagado cancelado"
+
+msgid "Power plus"
+msgstr "Energía plus"

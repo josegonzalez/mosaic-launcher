@@ -1,0 +1,180 @@
+# Spanish for the gamification plugin, from po/gamification.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%i day streak"
+msgid_plural "%i day streak"
+msgstr[0] "Racha de %i día"
+msgstr[1] "Racha de %i días"
+
+#, c-format
+msgid "%i quest done"
+msgid_plural "%i quests done"
+msgstr[0] "%i misión cumplida"
+msgstr[1] "%i misiones cumplidas"
+
+#, c-format
+msgid "%lldh"
+msgstr "%lld h"
+
+#, c-format
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgid "%lldm"
+msgstr "%lld min"
+
+msgid "1"
+msgstr "1"
+
+msgid "10"
+msgstr "10"
+
+msgid "120"
+msgstr "120"
+
+msgid "14"
+msgstr "14"
+
+msgid "15"
+msgstr "15"
+
+msgid "2"
+msgstr "2"
+
+msgid "20"
+msgstr "20"
+
+msgid "3"
+msgstr "3"
+
+msgid "30"
+msgstr "30"
+
+msgid "4"
+msgstr "4"
+
+msgid "45"
+msgstr "45"
+
+msgid "5"
+msgstr "5"
+
+msgid "6"
+msgstr "6"
+
+msgid "60"
+msgstr "60"
+
+msgid "7"
+msgstr "7"
+
+msgid "90"
+msgstr "90"
+
+#, c-format
+msgid "Best %i day"
+msgid_plural "Best %i days"
+msgstr[0] "Mejor racha: %i día"
+msgstr[1] "Mejor racha: %i días"
+
+msgid "Daily games"
+msgstr "Juegos diarios"
+
+msgid "Daily play (minutes)"
+msgstr "Juego diario (minutos)"
+
+msgid "Days a week"
+msgstr "Días a la semana"
+
+msgid "Done"
+msgstr "Hecho"
+
+msgid "Gamification"
+msgstr "Gamificación"
+
+#, c-format
+msgid "Go back to a game you haven't played in %i days"
+msgstr "Vuelve a un juego que no hayas jugado en %i días"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "No streak"
+msgstr "Sin racha"
+
+#, c-format
+msgid "Play %i different games today"
+msgid_plural "Play %i different games today"
+msgstr[0] "Juega a %i juego distinto hoy"
+msgstr[1] "Juega a %i juegos distintos hoy"
+
+#, c-format
+msgid "Play for %i hour this week"
+msgid_plural "Play for %i hours this week"
+msgstr[0] "Juega %i hora esta semana"
+msgstr[1] "Juega %i horas esta semana"
+
+#, c-format
+msgid "Play for %i hour today"
+msgid_plural "Play for %i hours today"
+msgstr[0] "Juega %i hora hoy"
+msgstr[1] "Juega %i horas hoy"
+
+#, c-format
+msgid "Play for %i minutes today"
+msgid_plural "Play for %i minutes today"
+msgstr[0] "Juega %i minuto hoy"
+msgstr[1] "Juega %i minutos hoy"
+
+#, c-format
+msgid "Play on %i days this week"
+msgid_plural "Play on %i days this week"
+msgstr[0] "Juega %i día esta semana"
+msgstr[1] "Juega %i días esta semana"
+
+#, c-format
+msgid "Quest done: %s"
+msgstr "Misión cumplida: %s"
+
+msgid "Quests"
+msgstr "Misiones"
+
+msgid "Quests button"
+msgstr "Botón de misiones"
+
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Start a game you've never played"
+msgstr "Empieza un juego que nunca hayas jugado"
+
+msgid "Streak day (minutes)"
+msgstr "Día de racha (minutos)"
+
+msgid "Toasts"
+msgstr "Avisos"
+
+msgid "Weekly play (hours)"
+msgstr "Juego semanal (horas)"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "none"
+msgstr "ninguno"

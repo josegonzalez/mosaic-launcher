@@ -1,0 +1,63 @@
+# The genre-view plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: genre-view\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "1"
+msgstr ""
+
+#: plugin.txt
+msgid "2"
+msgstr ""
+
+#: plugin.txt
+msgid "3"
+msgstr ""
+
+#: plugin.txt
+msgid "4"
+msgstr ""
+
+#: plugin.txt
+msgid "Consoles a genre needs"
+msgstr ""
+
+#: plugin.txt
+msgid "Folders that aren't genres"
+msgstr ""
+
+#: plugin.txt
+msgid "Genre view"
+msgstr ""
+
+#: genre_view.c
+msgid "Genres"
+msgstr ""
+
+#: plugin.txt
+msgid "Show the system"
+msgstr ""
+
+#: plugin.txt
+msgid "always"
+msgstr ""
+
+#: plugin.txt
+msgid "off"
+msgstr ""
+
+#: plugin.txt
+msgid "shared"
+msgstr ""

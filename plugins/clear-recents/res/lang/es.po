@@ -1,0 +1,49 @@
+# Spanish for the clear-recents plugin, from po/clear-recents.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "CLEAR"
+msgstr "BORRAR"
+
+msgid "CLEAR ALL"
+msgstr "BORRAR TODO"
+
+msgid "Clear all recently played games?"
+msgstr "¿Borrar todos los juegos recientes?"
+
+msgid "Clear recents"
+msgstr "Borrar recientes"
+
+msgid "Clear recents tile on the quick menu"
+msgstr "Icono de borrar recientes en el menú rápido"
+
+msgid "Couldn't remove that"
+msgstr "No se pudo quitar"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "REMOVE"
+msgstr "QUITAR"
+
+msgid "Recently Played button"
+msgstr "Botón de recientes"
+
+msgid "Recents cleared"
+msgstr "Recientes borrados"
+
+msgid "Removed from recents"
+msgstr "Quitado de recientes"
+
+msgid "Y"
+msgstr "Y"

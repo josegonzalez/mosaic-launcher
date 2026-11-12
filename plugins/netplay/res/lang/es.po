@@ -1,0 +1,40 @@
+# Spanish for the netplay plugin, from po/netplay.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Host a game"
+msgstr "Crear partida"
+
+msgid "Host address"
+msgstr "Dirección del anfitrión"
+
+msgid "Join a game"
+msgstr "Unirse a una partida"
+
+msgid "NETPLAY"
+msgstr "NETPLAY"
+
+msgid "Netplay"
+msgstr "Juego en red"
+
+msgid "Netplay (needs NextUI netplay)"
+msgstr "Juego en red (necesita el netplay de NextUI)"
+
+msgid "Netplay couldn't start this game"
+msgstr "El juego en red no pudo iniciar este juego"
+
+msgid "No emulator for netplay"
+msgstr "No hay emulador para juego en red"
+
+msgid "Port"
+msgstr "Puerto"
+
+msgid "Type a host name or IP address, with :port for another port"
+msgstr "Escribe un nombre de host o una dirección IP, con :puerto para otro puerto"

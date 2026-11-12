@@ -4,6 +4,8 @@
 #
 #   <name>.plugin/plugin.txt
 #   <name>.plugin/lib/$(ARCH)/plugin.so
+#   <name>.plugin/res/              a copy of its res/, when it has one,
+#                                   such as its language packs in res/lang/
 #
 # Devices: ARCH=aarch64 with the tg5040 toolchain, the oldest sysroot, so
 # one build runs on every device. Desktop: ARCH=desktop-<os>-<arch>.
@@ -46,6 +48,8 @@ $(PLUGINS):
 	$(CC) -shared -fPIC -std=gnu99 -O2 -Wall -Werror -I$(SDK) $(PLUGIN_CFLAGS) $(wildcard $@/*.c) $(PLUGIN_LIBS) \
 		-o $(OUT)/$@.plugin/lib/$(ARCH)/plugin.so
 	$(if $(PLUGIN_SHIP),cp $(PLUGIN_SHIP) $(OUT)/$@.plugin/lib/$(ARCH)/)
+	rm -rf $(OUT)/$@.plugin/res
+	$(if $(wildcard $@/res),cp -R $@/res $(OUT)/$@.plugin/res)
 
 clean:
 	rm -rf $(OUT)

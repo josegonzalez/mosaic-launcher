@@ -1,0 +1,80 @@
+# The screenshot-viewer plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: screenshot-viewer\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: screenshot_viewer.c
+msgid "Can't show this screenshot"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "Couldn't delete that"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "DELETE"
+msgstr ""
+
+#: screenshot_viewer.c
+#, c-format
+msgid "Delete this screenshot?\n%s"
+msgstr ""
+
+#: plugin.txt
+msgid "Delete with Y"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "No screenshots"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu tile"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "Screenshot deleted"
+msgstr ""
+
+#: plugin.txt
+msgid "Screenshot viewer"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "Screenshots"
+msgstr ""
+
+#: plugin.txt
+msgid "Screenshots button"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""

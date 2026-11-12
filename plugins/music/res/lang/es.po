@@ -1,0 +1,96 @@
+# Spanish for the music plugin, from po/music.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "10"
+msgstr "10"
+
+msgid "3"
+msgstr "3"
+
+msgid "5"
+msgstr "5"
+
+msgid "During games"
+msgstr "Durante los juegos"
+
+msgid "Lock screen"
+msgstr "Bloquear pantalla"
+
+msgid "Locked: SELECT then START to unlock"
+msgstr "Bloqueado: SELECT y luego START para desbloquear"
+
+msgid "Music"
+msgstr "Música"
+
+msgid "Music can't play"
+msgstr "La música no puede sonar"
+
+msgid "Music can't play on"
+msgstr "La música no puede seguir"
+
+msgid "Music can't play that"
+msgstr "La música no puede reproducir eso"
+
+msgid "Music folder"
+msgstr "Carpeta de música"
+
+#, c-format
+msgid "No music in %s"
+msgstr "No hay música en %s"
+
+msgid "Now playing pill (seconds)"
+msgstr "Píldora de reproducción (segundos)"
+
+msgid "Paused"
+msgstr "En pausa"
+
+msgid "Play or pause music"
+msgstr "Reproducir o pausar la música"
+
+msgid "Playing"
+msgstr "Reproduciendo"
+
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgid "Repeat"
+msgstr "Repetir"
+
+#, c-format
+msgid "Repeat %s"
+msgstr "Repetir: %s"
+
+msgid "Resume after power-off"
+msgstr "Reanudar tras apagar"
+
+msgid "Shuffle"
+msgstr "Aleatorio"
+
+msgid "Stay awake while playing"
+msgstr "No suspender mientras suena"
+
+msgid "all"
+msgstr "todo"
+
+msgid "always"
+msgstr "siempre"
+
+msgid "off"
+msgstr "desactivado"
+
+msgid "one"
+msgstr "una"
+
+msgid "pause"
+msgstr "pausar"
+
+msgid "play"
+msgstr "seguir"

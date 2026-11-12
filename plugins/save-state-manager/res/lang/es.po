@@ -1,0 +1,72 @@
+# Spanish for the save-state-manager plugin, from po/save-state-manager.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Auto"
+msgstr "Auto"
+
+msgid "Couldn't delete that state"
+msgstr "No se pudo borrar ese estado"
+
+msgid "DELETE"
+msgstr "BORRAR"
+
+msgid "Default"
+msgstr "Predeterminado"
+
+#, c-format
+msgid "Delete this save state?\n%s"
+msgstr "¿Borrar este estado guardado?\n%s"
+
+msgid "Delete with Y"
+msgstr "Borrar con Y"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "No preview"
+msgstr "Sin vista previa"
+
+msgid "No save states"
+msgstr "No hay estados guardados"
+
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SAVE STATES"
+msgstr "ESTADOS GUARDADOS"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Save state deleted"
+msgstr "Estado guardado borrado"
+
+msgid "Save state manager"
+msgstr "Gestor de estados guardados"
+
+msgid "Save states"
+msgstr "Estados guardados"
+
+msgid "Save states button"
+msgstr "Botón de estados guardados"
+
+#, c-format
+msgid "Slot %d"
+msgstr "Ranura %d"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "none"
+msgstr "ninguno"

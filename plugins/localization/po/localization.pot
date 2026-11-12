@@ -1,0 +1,198 @@
+# The localization plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: localization\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: localization.c
+#, c-format
+msgid "Add names to map.txt in %d folder?"
+msgid_plural "Add names to map.txt in %d folders?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: localization.c
+#, c-format
+msgid "Added names to map.txt in %d folder"
+msgid_plural "Added names to map.txt in %d folders"
+msgstr[0] ""
+msgstr[1] ""
+
+#: plugin.txt
+msgid "Fallback font"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: plugin.txt
+msgid "Language"
+msgstr ""
+
+#: plugin.txt
+msgid "Language pack folder"
+msgstr ""
+
+#: localization.c
+msgid "Lines already in a map.txt are kept."
+msgstr ""
+
+#: plugin.txt
+msgid "Localization"
+msgstr ""
+
+#: localization.c
+msgid "No names lists for this language"
+msgstr ""
+
+#: localization.c
+msgid "No names to add to map.txt"
+msgstr ""
+
+#: plugin.txt
+msgid "Other language code"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: localization.c
+msgid "WRITE"
+msgstr ""
+
+#: localization.c
+msgid "Write map.txt names"
+msgstr ""
+
+#: plugin.txt
+msgid "Write map.txt names button"
+msgstr ""
+
+#: plugin.txt
+msgid "Write map.txt names tile"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "ca"
+msgstr ""
+
+#: plugin.txt
+msgid "cs"
+msgstr ""
+
+#: plugin.txt
+msgid "da"
+msgstr ""
+
+#: plugin.txt
+msgid "de"
+msgstr ""
+
+#: plugin.txt
+msgid "el"
+msgstr ""
+
+#: plugin.txt
+msgid "es"
+msgstr ""
+
+#: plugin.txt
+msgid "fi"
+msgstr ""
+
+#: plugin.txt
+msgid "fr"
+msgstr ""
+
+#: plugin.txt
+msgid "hu"
+msgstr ""
+
+#: plugin.txt
+msgid "it"
+msgstr ""
+
+#: plugin.txt
+msgid "ja"
+msgstr ""
+
+#: plugin.txt
+msgid "ko"
+msgstr ""
+
+#: plugin.txt
+msgid "nl"
+msgstr ""
+
+#: plugin.txt
+msgid "no"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""
+
+#: plugin.txt
+msgid "off"
+msgstr ""
+
+#: plugin.txt
+msgid "other"
+msgstr ""
+
+#: plugin.txt
+msgid "pl"
+msgstr ""
+
+#: plugin.txt
+msgid "pt"
+msgstr ""
+
+#: plugin.txt
+msgid "pt_BR"
+msgstr ""
+
+#: plugin.txt
+msgid "ru"
+msgstr ""
+
+#: plugin.txt
+msgid "sv"
+msgstr ""
+
+#: plugin.txt
+msgid "tr"
+msgstr ""
+
+#: plugin.txt
+msgid "uk"
+msgstr ""
+
+#: plugin.txt
+msgid "zh_CN"
+msgstr ""
+
+#: plugin.txt
+msgid "zh_TW"
+msgstr ""

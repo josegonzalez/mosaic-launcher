@@ -74,12 +74,6 @@ typedef struct PoCatalog {
 PoCatalog* Po_parse(const char* text, size_t len, char* err, size_t err_size);
 void Po_free(PoCatalog* catalog);
 
-// The msgctxt a pack keeps a string under, for the strings slot's
-// translate: the launcher's own (plugin_id NULL) are in their context, or
-// none, and a plugin's in its own context when it gives one, else under
-// its id.
-const char* Po_context(const char* plugin_id, const char* context);
-
 // The translation of msgid in context (NULL for none), msgstr or msgstr[0],
 // or NULL when there's none.
 const char* Po_find(const PoCatalog* catalog, const char* context, const char* msgid);

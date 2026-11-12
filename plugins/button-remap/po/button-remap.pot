@@ -1,0 +1,51 @@
+# The button-remap plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: button-remap\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "A button"
+msgstr ""
+
+#: plugin.txt
+msgid "Button remap"
+msgstr ""
+
+#: plugin.txt
+msgid "L2 button"
+msgstr ""
+
+#: plugin.txt
+msgid "R2 button"
+msgstr ""
+
+#: plugin.txt
+msgid "Resume on press"
+msgstr ""
+
+#: plugin.txt
+msgid "Resume with A"
+msgstr ""
+
+#: plugin.txt
+msgid "START button"
+msgstr ""
+
+#: plugin.txt
+msgid "X button"
+msgstr ""
+
+#: plugin.txt
+msgid "Y button"
+msgstr ""

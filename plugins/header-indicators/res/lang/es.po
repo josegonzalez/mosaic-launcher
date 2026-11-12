@@ -1,0 +1,25 @@
+# Spanish for the header-indicators plugin, from po/header-indicators.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "FPS"
+msgstr "FPS"
+
+msgid "Free storage"
+msgstr "Espacio libre"
+
+msgid "Header indicators"
+msgstr "Indicadores de cabecera"
+
+msgid "Profile badge"
+msgstr "Distintivo de perfil"
+
+msgid "SSH dot"
+msgstr "Punto de SSH"

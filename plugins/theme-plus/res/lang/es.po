@@ -1,0 +1,109 @@
+# Spanish for the theme-plus plugin, from po/theme-plus.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "10"
+msgstr "10"
+
+msgid "15"
+msgstr "15"
+
+msgid "2"
+msgstr "2"
+
+msgid "20"
+msgstr "20"
+
+msgid "3"
+msgstr "3"
+
+msgid "4.5"
+msgstr "4.5"
+
+msgid "5"
+msgstr "5"
+
+msgid "7"
+msgstr "7"
+
+msgid "8"
+msgstr "8"
+
+msgid "Background colour"
+msgstr "Color de fondo"
+
+msgid "Contrast"
+msgstr "Contraste"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Screen margins"
+msgstr "Márgenes de la pantalla"
+
+msgid "Stock"
+msgstr "Original"
+
+msgid "Text size"
+msgstr "Tamaño del texto"
+
+msgid "Theme"
+msgstr "Tema"
+
+msgid "Theme button"
+msgstr "Botón de tema"
+
+msgid "Theme plus"
+msgstr "Tema plus"
+
+msgid "UI size"
+msgstr "Tamaño de la interfaz"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "auto"
+msgstr "auto"
+
+msgid "compact"
+msgstr "compacto"
+
+msgid "large"
+msgstr "grande"
+
+msgid "larger"
+msgstr "más grande"
+
+msgid "largest"
+msgstr "el más grande"
+
+msgid "none"
+msgstr "ninguno"
+
+msgid "off"
+msgstr "desactivado"
+
+msgid "small"
+msgstr "pequeño"
+
+msgid "stock"
+msgstr "original"
+
+msgid "theme"
+msgstr "tema"

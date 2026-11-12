@@ -1,0 +1,58 @@
+# Spanish for the transitions plugin, from po/transitions.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Ease"
+msgstr "Suavizado"
+
+msgid "Speed"
+msgstr "Velocidad"
+
+msgid "Style"
+msgstr "Estilo"
+
+msgid "Transition styles"
+msgstr "Estilos de transición"
+
+msgid "fade"
+msgstr "fundido"
+
+msgid "fast"
+msgstr "rápida"
+
+msgid "in"
+msgstr "entrada"
+
+msgid "in_out"
+msgstr "entrada y salida"
+
+msgid "linear"
+msgstr "lineal"
+
+msgid "normal"
+msgstr "normal"
+
+msgid "off"
+msgstr "desactivado"
+
+msgid "out"
+msgstr "salida"
+
+msgid "slide"
+msgstr "deslizar"
+
+msgid "slide_fade"
+msgstr "deslizar y fundir"
+
+msgid "slow"
+msgstr "lenta"
+
+msgid "stock"
+msgstr "original"

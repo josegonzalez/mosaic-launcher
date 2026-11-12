@@ -762,10 +762,6 @@ PoCatalog* Po_parse(const char* text, size_t len, char* err, size_t err_size) {
 ///////////////////////////////////////
 // lookups
 
-const char* Po_context(const char* plugin_id, const char* context) {
-	return context || !plugin_id ? context : plugin_id;
-}
-
 const char* Po_find(const PoCatalog* catalog, const char* context, const char* msgid) {
 	const PoEntry* e = findEntry(catalog, context, msgid);
 	return e ? e->str[0] : NULL;

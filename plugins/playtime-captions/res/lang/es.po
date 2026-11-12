@@ -1,0 +1,159 @@
+# Spanish for the playtime-captions plugin, from po/playtime-captions.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] "hace %i día"
+msgstr[1] "hace %i días"
+
+#, c-format
+msgid "%i month ago"
+msgid_plural "%i months ago"
+msgstr[0] "hace %i mes"
+msgstr[1] "hace %i meses"
+
+#, c-format
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] "%i sesión"
+msgstr[1] "%i sesiones"
+
+#, c-format
+msgid "%i week ago"
+msgid_plural "%i weeks ago"
+msgstr[0] "hace %i semana"
+msgstr[1] "hace %i semanas"
+
+#, c-format
+msgid "%i year ago"
+msgid_plural "%i years ago"
+msgstr[0] "hace %i año"
+msgstr[1] "hace %i años"
+
+#, c-format
+msgid "%i/%i achievements"
+msgstr "%i/%i logros"
+
+#, c-format
+msgid "%id"
+msgstr "%i d"
+
+#, c-format
+msgid "%imo"
+msgstr "%i m"
+
+#, c-format
+msgid "%iw"
+msgstr "%i sem"
+
+#, c-format
+msgid "%ix"
+msgstr "%ix"
+
+#, c-format
+msgid "%iy"
+msgstr "%i a"
+
+#, c-format
+msgid "%lldh"
+msgstr "%lld h"
+
+#, c-format
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgid "%s %i"
+msgstr "%s %i"
+
+#, c-format
+msgid "%s %i, %i"
+msgstr "%s %i, %i"
+
+msgid "<1m"
+msgstr "<1 min"
+
+msgid "Achievements"
+msgstr "Logros"
+
+msgid "Apr"
+msgstr "abr"
+
+msgid "Aug"
+msgstr "ago"
+
+msgid "Dec"
+msgstr "dic"
+
+msgid "Feb"
+msgstr "feb"
+
+msgid "Format"
+msgstr "Formato"
+
+msgid "Jan"
+msgstr "ene"
+
+msgid "Jul"
+msgstr "jul"
+
+msgid "Jun"
+msgstr "jun"
+
+msgid "Last played"
+msgstr "Última partida"
+
+msgid "Mar"
+msgstr "mar"
+
+msgid "May"
+msgstr "may"
+
+msgid "Never played"
+msgstr "Sin jugar"
+
+msgid "Nov"
+msgstr "nov"
+
+msgid "Oct"
+msgstr "oct"
+
+msgid "Play time"
+msgstr "Tiempo de juego"
+
+msgid "Play time captions"
+msgstr "Rótulos de tiempo de juego"
+
+msgid "Sep"
+msgstr "sept"
+
+msgid "Sessions"
+msgstr "Sesiones"
+
+msgid "compact"
+msgstr "compacto"
+
+msgid "date"
+msgstr "fecha"
+
+msgid "relative"
+msgstr "relativo"
+
+msgid "today"
+msgstr "hoy"
+
+msgid "yesterday"
+msgstr "ayer"

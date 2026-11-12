@@ -1,0 +1,100 @@
+# Spanish for the screensaver plugin, from po/screensaver.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "10"
+msgstr "10"
+
+msgid "120"
+msgstr "120"
+
+msgid "12h"
+msgstr "12 h"
+
+msgid "15"
+msgstr "15"
+
+msgid "20"
+msgstr "20"
+
+msgid "24h"
+msgstr "24 h"
+
+msgid "30"
+msgstr "30"
+
+msgid "300"
+msgstr "300"
+
+msgid "45"
+msgstr "45"
+
+msgid "5"
+msgstr "5"
+
+msgid "60"
+msgstr "60"
+
+msgid "600"
+msgstr "600"
+
+msgid "AM"
+msgstr "a. m."
+
+msgid "Change"
+msgstr "Cambiar"
+
+msgid "Clock"
+msgstr "Reloj"
+
+msgid "Game art"
+msgstr "Arte de los juegos"
+
+msgid "Image folder"
+msgstr "Carpeta de imágenes"
+
+msgid "Images"
+msgstr "Imágenes"
+
+msgid "PM"
+msgstr "p. m."
+
+msgid "Screensaver"
+msgstr "Salvapantallas"
+
+msgid "Seconds per image"
+msgstr "Segundos por imagen"
+
+msgid "Show after idle (seconds)"
+msgstr "Mostrar tras inactividad (segundos)"
+
+msgid "box"
+msgstr "caja"
+
+msgid "fade"
+msgstr "fundido"
+
+msgid "folder"
+msgstr "carpeta"
+
+msgid "games"
+msgstr "juegos"
+
+msgid "off"
+msgstr "desactivado"
+
+msgid "screenshot"
+msgstr "captura"
+
+msgid "screenshots"
+msgstr "capturas"
+
+msgid "slide"
+msgstr "deslizar"

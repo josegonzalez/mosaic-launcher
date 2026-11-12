@@ -1,0 +1,55 @@
+# Spanish for the art-backdrop plugin, from po/art-backdrop.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "0"
+msgstr "0"
+
+msgid "25"
+msgstr "25"
+
+msgid "50"
+msgstr "50"
+
+msgid "75"
+msgstr "75"
+
+msgid "Art backdrop"
+msgstr "Fondo con arte"
+
+msgid "Dim"
+msgstr "Atenuar"
+
+msgid "Fall back to the box"
+msgstr "Usar la caja si no hay"
+
+msgid "Fall back to the screenshot"
+msgstr "Usar la captura si no hay"
+
+msgid "Fall back to the thumbnail"
+msgstr "Usar la miniatura si no hay"
+
+msgid "Height"
+msgstr "Altura"
+
+msgid "Style"
+msgstr "Estilo"
+
+msgid "full"
+msgstr "completo"
+
+msgid "gradient"
+msgstr "degradado"
+
+msgid "half"
+msgstr "mitad"
+
+msgid "third"
+msgstr "tercio"

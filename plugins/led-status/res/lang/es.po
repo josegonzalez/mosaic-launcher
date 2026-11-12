@@ -1,0 +1,79 @@
+# Spanish for the led-status plugin, from po/led-status.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "10"
+msgstr "10"
+
+msgid "15"
+msgstr "15"
+
+msgid "20"
+msgstr "20"
+
+msgid "25"
+msgstr "25"
+
+msgid "30"
+msgstr "30"
+
+msgid "40"
+msgstr "40"
+
+msgid "50"
+msgstr "50"
+
+msgid "60"
+msgstr "60"
+
+msgid "70"
+msgstr "70"
+
+msgid "LED colour follows"
+msgstr "El color del LED sigue"
+
+msgid "LED status (unsupported on desktop)"
+msgstr "Estado por LED (no disponible en escritorio)"
+
+msgid "Red at or below (%)"
+msgstr "Rojo en o por debajo de (%)"
+
+msgid "Theme colour"
+msgstr "Color del tema"
+
+msgid "Yellow at or below (%)"
+msgstr "Amarillo en o por debajo de (%)"
+
+msgid "accent"
+msgstr "accent"
+
+msgid "accent2"
+msgstr "accent2"
+
+msgid "background"
+msgstr "fondo"
+
+msgid "battery"
+msgstr "batería"
+
+msgid "hint"
+msgstr "pista"
+
+msgid "list_text"
+msgstr "list_text"
+
+msgid "list_text_selected"
+msgstr "list_text_selected"
+
+msgid "main"
+msgstr "principal"
+
+msgid "theme"
+msgstr "tema"

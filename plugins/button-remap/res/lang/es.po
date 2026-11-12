@@ -1,0 +1,37 @@
+# Spanish for the button-remap plugin, from po/button-remap.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "A button"
+msgstr "Botón A"
+
+msgid "Button remap"
+msgstr "Reasignar botones"
+
+msgid "L2 button"
+msgstr "Botón L2"
+
+msgid "R2 button"
+msgstr "Botón R2"
+
+msgid "Resume on press"
+msgstr "Reanudar al pulsar"
+
+msgid "Resume with A"
+msgstr "Reanudar con A"
+
+msgid "START button"
+msgstr "Botón START"
+
+msgid "X button"
+msgstr "Botón X"
+
+msgid "Y button"
+msgstr "Botón Y"

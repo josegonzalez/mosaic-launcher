@@ -1,0 +1,206 @@
+# The playtime-captions plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: playtime-captions\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: captions_model.c
+#, c-format
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: captions_model.c
+#, c-format
+msgid "%i month ago"
+msgid_plural "%i months ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: captions_model.c
+#, c-format
+msgid "%i session"
+msgid_plural "%i sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: captions_model.c
+#, c-format
+msgid "%i week ago"
+msgid_plural "%i weeks ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: captions_model.c
+#, c-format
+msgid "%i year ago"
+msgid_plural "%i years ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: captions_model.c
+#, c-format
+msgid "%i/%i achievements"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%id"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%imo"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%iw"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%ix"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%iy"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%lldh"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%lldh %lldm"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%lldm"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%s %i"
+msgstr ""
+
+#: captions_model.c
+#, c-format
+msgid "%s %i, %i"
+msgstr ""
+
+#: captions_model.c
+msgid "<1m"
+msgstr ""
+
+#: plugin.txt
+msgid "Achievements"
+msgstr ""
+
+#: captions_model.c
+msgid "Apr"
+msgstr ""
+
+#: captions_model.c
+msgid "Aug"
+msgstr ""
+
+#: captions_model.c
+msgid "Dec"
+msgstr ""
+
+#: captions_model.c
+msgid "Feb"
+msgstr ""
+
+#: plugin.txt
+msgid "Format"
+msgstr ""
+
+#: captions_model.c
+msgid "Jan"
+msgstr ""
+
+#: captions_model.c
+msgid "Jul"
+msgstr ""
+
+#: captions_model.c
+msgid "Jun"
+msgstr ""
+
+#: plugin.txt
+msgid "Last played"
+msgstr ""
+
+#: captions_model.c
+msgid "Mar"
+msgstr ""
+
+#: captions_model.c
+msgid "May"
+msgstr ""
+
+#: captions_model.c plugin.txt
+msgid "Never played"
+msgstr ""
+
+#: captions_model.c
+msgid "Nov"
+msgstr ""
+
+#: captions_model.c
+msgid "Oct"
+msgstr ""
+
+#: plugin.txt
+msgid "Play time"
+msgstr ""
+
+#: plugin.txt
+msgid "Play time captions"
+msgstr ""
+
+#: captions_model.c
+msgid "Sep"
+msgstr ""
+
+#: plugin.txt
+msgid "Sessions"
+msgstr ""
+
+#: plugin.txt
+msgid "compact"
+msgstr ""
+
+#: plugin.txt
+msgid "date"
+msgstr ""
+
+#: plugin.txt
+msgid "relative"
+msgstr ""
+
+#: captions_model.c
+msgid "today"
+msgstr ""
+
+#: captions_model.c
+msgid "yesterday"
+msgstr ""

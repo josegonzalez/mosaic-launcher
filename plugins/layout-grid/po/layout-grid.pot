@@ -1,0 +1,63 @@
+# The layout-grid plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: layout-grid\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "1"
+msgstr ""
+
+#: plugin.txt
+msgid "2"
+msgstr ""
+
+#: plugin.txt
+msgid "3"
+msgstr ""
+
+#: plugin.txt
+msgid "4"
+msgstr ""
+
+#: plugin.txt
+msgid "5"
+msgstr ""
+
+#: plugin.txt
+msgid "6"
+msgstr ""
+
+#: plugin.txt
+msgid "7"
+msgstr ""
+
+#: plugin.txt
+msgid "8"
+msgstr ""
+
+#: plugin.txt
+msgid "Columns"
+msgstr ""
+
+#: plugin.txt
+msgid "Grid layout"
+msgstr ""
+
+#: plugin.txt
+msgid "Rows"
+msgstr ""
+
+#: plugin.txt
+msgid "auto"
+msgstr ""

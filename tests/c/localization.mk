@@ -1,6 +1,8 @@
 LOCALIZATION := ../../plugins/localization
 
-$(BUILD)/test_localization: test_localization.c $(wildcard $(LOCALIZATION)/*.c $(LOCALIZATION)/*.h $(LOCALIZATION)/res/*.po) \
+$(BUILD)/test_localization: test_localization.c $(wildcard $(LOCALIZATION)/*.c $(LOCALIZATION)/*.h \
+		$(LOCALIZATION)/res/lang/launcher/*.po ../../plugins/*/res/lang/*.po ../../plugins/*/po/*.pot \
+		../../template/res/lang/*.po ../../template/po/*.pot) \
 		../../po/launcher.pot $(SDK)/mosaic_plugin.h check.h
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -I$(LOCALIZATION) -DTEST_DIR=\"$(BUILD)/localization\" \

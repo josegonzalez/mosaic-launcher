@@ -1,0 +1,35 @@
+# The header-indicators plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: header-indicators\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "FPS"
+msgstr ""
+
+#: plugin.txt
+msgid "Free storage"
+msgstr ""
+
+#: plugin.txt
+msgid "Header indicators"
+msgstr ""
+
+#: plugin.txt
+msgid "Profile badge"
+msgstr ""
+
+#: plugin.txt
+msgid "SSH dot"
+msgstr ""

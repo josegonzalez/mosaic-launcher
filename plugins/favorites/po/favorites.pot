@@ -1,0 +1,60 @@
+# The favorites plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: favorites\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: favorites.c
+#, c-format
+msgid "%s is full"
+msgstr ""
+
+#: favorites.c
+#, c-format
+msgid "Added to %s"
+msgstr ""
+
+#: plugin.txt
+msgid "Collection"
+msgstr ""
+
+#: favorites.c
+#, c-format
+msgid "Couldn't save %s"
+msgstr ""
+
+#: favorites.c
+msgid "FAVORITE"
+msgstr ""
+
+#: plugin.txt
+msgid "Favorites"
+msgstr ""
+
+#: plugin.txt
+msgid "Pin to top"
+msgstr ""
+
+#: favorites.c
+msgid "REMOVE"
+msgstr ""
+
+#: favorites.c
+#, c-format
+msgid "Remove %.120s from %.60s?"
+msgstr ""
+
+#: favorites.c
+#, c-format
+msgid "Removed from %s"
+msgstr ""

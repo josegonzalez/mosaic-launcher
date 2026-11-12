@@ -1,0 +1,92 @@
+# The tags plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: tags\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: tags.c
+#, c-format
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] ""
+msgstr[1] ""
+
+#: tags.c
+msgid "Couldn't save tags"
+msgstr ""
+
+#: tags.c
+msgid "Couldn't tag that"
+msgstr ""
+
+#: tags.c
+msgid "DELETE"
+msgstr ""
+
+#: tags.c
+#, c-format
+msgid "Delete the tag %s?"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: tags.c
+msgid "New tag"
+msgstr ""
+
+#: tags.c
+msgid "Not a tag name"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: tags.c
+msgid "TAGS"
+msgstr ""
+
+#: plugin.txt
+msgid "Tag tiles on the quick menu"
+msgstr ""
+
+#: plugin.txt tags.c
+msgid "Tags"
+msgstr ""
+
+#: plugin.txt
+msgid "Tags button"
+msgstr ""
+
+#: plugin.txt
+msgid "Tags folder on the root"
+msgstr ""
+
+#: tags.c
+msgid "Too many tags"
+msgstr ""
+
+#: tags.c
+msgid "Untag its games to delete it"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: tags.c
+msgid "unused"
+msgstr ""

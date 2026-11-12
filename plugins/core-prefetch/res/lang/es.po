@@ -1,0 +1,49 @@
+# Spanish for the core-prefetch plugin, from po/core-prefetch.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "10"
+msgstr "10"
+
+msgid "100"
+msgstr "100"
+
+msgid "16"
+msgstr "16"
+
+msgid "20"
+msgstr "20"
+
+msgid "32"
+msgstr "32"
+
+msgid "4"
+msgstr "4"
+
+msgid "50"
+msgstr "50"
+
+msgid "64"
+msgstr "64"
+
+msgid "8"
+msgstr "8"
+
+msgid "Core prefetch (unsupported on desktop)"
+msgstr "Precarga de núcleos (no disponible en escritorio)"
+
+msgid "Longest it waits (ms)"
+msgstr "Espera máxima (ms)"
+
+msgid "Most to read ahead (MB)"
+msgstr "Máximo a leer por adelantado (MB)"
+
+msgid "Warm the game too"
+msgstr "Precargar también el juego"

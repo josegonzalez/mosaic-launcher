@@ -1,0 +1,122 @@
+# Spanish for the activity-stats plugin, from po/activity-stats.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%i days: %s"
+msgstr "%i días: %s"
+
+#, c-format
+msgid "%i days: no play history"
+msgstr "%i días: sin historial de juego"
+
+#, c-format
+msgid "%i game"
+msgid_plural "%i games"
+msgstr[0] "%i juego"
+msgstr[1] "%i juegos"
+
+#, c-format
+msgid "%lld session"
+msgid_plural "%lld sessions"
+msgstr[0] "%lld sesión"
+msgstr[1] "%lld sesiones"
+
+#, c-format
+msgid "%lldh"
+msgstr "%lld h"
+
+#, c-format
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgid "%s a day"
+msgstr "%s al día"
+
+msgid "30 days"
+msgstr "30 días"
+
+msgid "7 days"
+msgstr "7 días"
+
+msgid "<1m"
+msgstr "<1 min"
+
+msgid "Activity"
+msgstr "Actividad"
+
+msgid "Activity button"
+msgstr "Botón de actividad"
+
+msgid "Activity stats"
+msgstr "Estadísticas de actividad"
+
+#, c-format
+msgid "Couldn't open %s"
+msgstr "No se pudo abrir %s"
+
+msgid "Fri"
+msgstr "vie"
+
+msgid "Games"
+msgstr "Juegos"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "Launches"
+msgstr "Inicios"
+
+msgid "Mon"
+msgstr "lun"
+
+msgid "No play history"
+msgstr "Sin historial de juego"
+
+msgid "Nothing played yet"
+msgstr "Aún no se ha jugado nada"
+
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Sat"
+msgstr "sáb"
+
+msgid "Sun"
+msgstr "dom"
+
+msgid "Thu"
+msgstr "jue"
+
+msgid "Tue"
+msgstr "mar"
+
+msgid "Unknown game"
+msgstr "Juego desconocido"
+
+msgid "Wed"
+msgstr "mié"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "none"
+msgstr "ninguno"

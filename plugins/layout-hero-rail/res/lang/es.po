@@ -1,0 +1,49 @@
+# Spanish for the layout-hero-rail plugin, from po/layout-hero-rail.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "0"
+msgstr "0"
+
+msgid "150"
+msgstr "150"
+
+msgid "20"
+msgstr "20"
+
+msgid "300"
+msgstr "300"
+
+msgid "40"
+msgstr "40"
+
+msgid "600"
+msgstr "600"
+
+msgid "Card size"
+msgstr "Tamaño de las tarjetas"
+
+msgid "Hero and card rail layout"
+msgstr "Diseño destacado con fila de tarjetas"
+
+msgid "Logo fade"
+msgstr "Fundido del logo"
+
+msgid "Tint"
+msgstr "Tinte"
+
+msgid "large"
+msgstr "grande"
+
+msgid "medium"
+msgstr "mediano"
+
+msgid "small"
+msgstr "pequeño"

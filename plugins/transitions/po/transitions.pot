@@ -1,0 +1,79 @@
+# The transitions plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: transitions\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "Ease"
+msgstr ""
+
+#: plugin.txt
+msgid "Speed"
+msgstr ""
+
+#: plugin.txt
+msgid "Style"
+msgstr ""
+
+#: plugin.txt
+msgid "Transition styles"
+msgstr ""
+
+#: plugin.txt
+msgid "fade"
+msgstr ""
+
+#: plugin.txt
+msgid "fast"
+msgstr ""
+
+#: plugin.txt
+msgid "in"
+msgstr ""
+
+#: plugin.txt
+msgid "in_out"
+msgstr ""
+
+#: plugin.txt
+msgid "linear"
+msgstr ""
+
+#: plugin.txt
+msgid "normal"
+msgstr ""
+
+#: plugin.txt
+msgid "off"
+msgstr ""
+
+#: plugin.txt
+msgid "out"
+msgstr ""
+
+#: plugin.txt
+msgid "slide"
+msgstr ""
+
+#: plugin.txt
+msgid "slide_fade"
+msgstr ""
+
+#: plugin.txt
+msgid "slow"
+msgstr ""
+
+#: plugin.txt
+msgid "stock"
+msgstr ""

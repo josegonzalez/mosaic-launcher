@@ -1,0 +1,16 @@
+# Spanish for the numeric-prefix plugin, from po/numeric-prefix.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Hide the number"
+msgstr "Ocultar el número"
+
+msgid "Numeric prefix ordering"
+msgstr "Orden por prefijo numérico"

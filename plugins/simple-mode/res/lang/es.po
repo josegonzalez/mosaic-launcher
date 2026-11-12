@@ -1,0 +1,37 @@
+# Spanish for the simple-mode plugin, from po/simple-mode.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Hide settings tiles"
+msgstr "Ocultar iconos de ajustes"
+
+msgid "LEAVE"
+msgstr "SALIR"
+
+msgid "Leave simple mode?"
+msgstr "¿Salir del modo simple?"
+
+msgid "PIN to leave simple mode"
+msgstr "PIN para salir del modo simple"
+
+msgid "Simple mode"
+msgstr "Modo simple"
+
+msgid "Simple mode off"
+msgstr "Modo simple desactivado"
+
+msgid "Simple mode on"
+msgstr "Modo simple activado"
+
+msgid "Tools are off in simple mode"
+msgstr "Las herramientas no están en el modo simple"
+
+msgid "Wrong PIN"
+msgstr "PIN incorrecto"

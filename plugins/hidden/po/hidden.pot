@@ -1,0 +1,63 @@
+# The hidden plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: hidden\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: hidden.c
+msgid "Couldn't hide that"
+msgstr ""
+
+#: hidden.c
+msgid "Couldn't save hidden games"
+msgstr ""
+
+#: hidden.c
+msgid "HIDE"
+msgstr ""
+
+#: hidden.c
+msgid "Hidden"
+msgstr ""
+
+#: plugin.txt
+msgid "Hidden games"
+msgstr ""
+
+#: plugin.txt
+msgid "Hide button"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: hidden.c
+msgid "UNHIDE"
+msgstr ""
+
+#: hidden.c
+msgid "Unhidden"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""

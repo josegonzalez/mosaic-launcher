@@ -1,0 +1,124 @@
+# Spanish for the system-info plugin, from po/system-info.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid "%i of 3 bars"
+msgstr "%i de 3 barras"
+
+#, c-format
+msgid "%i%%, charging"
+msgstr "%i%%, cargando"
+
+#, c-format
+msgid "%lldd %lldh %lldm"
+msgstr "%lld d %lld h %lld min"
+
+#, c-format
+msgid "%lldh %lldm"
+msgstr "%lld h %lld min"
+
+#, c-format
+msgid "%lldm"
+msgstr "%lld min"
+
+#, c-format
+msgid "%s free of %s"
+msgstr "%s libres de %s"
+
+msgid "Battery"
+msgstr "Batería"
+
+#, c-format
+msgid "Battery over the last %i game, %s of play"
+msgid_plural "Battery over the last %i games, %s of play"
+msgstr[0] "Batería en la última partida (%i), %s de juego"
+msgstr[1] "Batería en las últimas %i partidas, %s de juego"
+
+msgid "GB"
+msgstr "GB"
+
+msgid "IP address"
+msgstr "Dirección IP"
+
+msgid "KB"
+msgstr "KB"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "MB"
+msgstr "MB"
+
+msgid "Memory"
+msgstr "Memoria"
+
+msgid "No battery history: battery-logger hasn't logged a game yet"
+msgstr "Sin historial de batería: battery-logger aún no ha registrado ninguna partida"
+
+msgid "PB"
+msgstr "PB"
+
+msgid "Platform"
+msgstr "Plataforma"
+
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Storage"
+msgstr "Almacenamiento"
+
+msgid "System info"
+msgstr "Información del sistema"
+
+msgid "System info button"
+msgstr "Botón de información del sistema"
+
+msgid "TB"
+msgstr "TB"
+
+msgid "Uptime"
+msgstr "Tiempo encendido"
+
+msgid "Version"
+msgstr "Versión"
+
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "checking"
+msgstr "comprobando"
+
+msgid "hidden network"
+msgstr "red oculta"
+
+msgid "no address yet"
+msgstr "aún sin dirección"
+
+msgid "none"
+msgstr "ninguno"
+
+msgid "not connected"
+msgstr "no conectado"
+
+msgid "off"
+msgstr "desactivado"
+
+msgid "unavailable"
+msgstr "no disponible"

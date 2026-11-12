@@ -1,0 +1,129 @@
+# The music plugin's name, setting labels and choice options, from its
+# plugin.txt, and the fixed text its code hands the launcher. Written
+# by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: music\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "3"
+msgstr ""
+
+#: plugin.txt
+msgid "5"
+msgstr ""
+
+#: plugin.txt
+msgid "During games"
+msgstr ""
+
+#: music.c
+msgid "Lock screen"
+msgstr ""
+
+#: music.c
+msgid "Locked: SELECT then START to unlock"
+msgstr ""
+
+#: music.c plugin.txt
+msgid "Music"
+msgstr ""
+
+#: music.c
+msgid "Music can't play"
+msgstr ""
+
+#: music.c
+msgid "Music can't play on"
+msgstr ""
+
+#: music.c
+msgid "Music can't play that"
+msgstr ""
+
+#: plugin.txt
+msgid "Music folder"
+msgstr ""
+
+#: music.c
+#, c-format
+msgid "No music in %s"
+msgstr ""
+
+#: plugin.txt
+msgid "Now playing pill (seconds)"
+msgstr ""
+
+#: music.c
+msgid "Paused"
+msgstr ""
+
+#: music.c
+msgid "Play or pause music"
+msgstr ""
+
+#: music.c
+msgid "Playing"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu tile"
+msgstr ""
+
+#: plugin.txt
+msgid "Repeat"
+msgstr ""
+
+#: music.c
+#, c-format
+msgid "Repeat %s"
+msgstr ""
+
+#: plugin.txt
+msgid "Resume after power-off"
+msgstr ""
+
+#: music.c plugin.txt
+msgid "Shuffle"
+msgstr ""
+
+#: plugin.txt
+msgid "Stay awake while playing"
+msgstr ""
+
+#: music_model.c plugin.txt
+msgid "all"
+msgstr ""
+
+#: plugin.txt
+msgid "always"
+msgstr ""
+
+#: music_model.c plugin.txt
+msgid "off"
+msgstr ""
+
+#: music_model.c plugin.txt
+msgid "one"
+msgstr ""
+
+#: plugin.txt
+msgid "pause"
+msgstr ""
+
+#: plugin.txt
+msgid "play"
+msgstr ""

@@ -3,6 +3,9 @@
 // program (helper.c and helper/) that answers a ping. Replace it with your
 // own.
 //
+// Its text is translated from res/lang/<code>.po, made from po/example.pot
+// (see README.md).
+//
 // Keep `id` here in step with id= in plugin.txt.
 
 #include <stdio.h>
@@ -14,6 +17,12 @@
 
 static const MosaicHost* host;
 
+// Fixed text, translated by the strings slot's owner from this plugin's
+// own language packs.
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static int canShow(void* data) {
 	(void)data;
 	return host->selected_entry() != NULL;
@@ -24,7 +33,7 @@ static void show(void* data) {
 	const MosaicEntry* entry = host->selected_entry();
 	if (!entry) return;
 	char message[160];
-	snprintf(message, sizeof(message), "Selected: %s", host->entry_name(entry));
+	snprintf(message, sizeof(message), tr("Selected: %s"), host->entry_name(entry));
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 	else host->log(ID, message);
 }
