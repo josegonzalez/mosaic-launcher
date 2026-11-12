@@ -46,6 +46,12 @@ const MosaicPlugin* Plugins_at(int i);
 int Plugins_bindings(int screen, const Binding** bindings);
 int Plugins_bindButton(int screen, int button, int trigger, const char* action_id);
 
+// FN1 to FN3 (index 0 to 2): the device's name for one, or "" when it
+// lacks it, and what a press runs, the user's binding from Settings when
+// there is one and otherwise a plugin's (host->fn_bind), or "" for none.
+const char* Plugins_fnName(int index);
+const char* Plugins_fnAction(int index);
+
 #define PLUGIN_BINDING_MAX 16
 #define PLUGIN_OVERRIDE_MAX 16
 

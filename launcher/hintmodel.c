@@ -19,18 +19,22 @@ static const struct {
 	{ MOSAIC_BUTTON_POWER, "POWER" },
 };
 
-const char* Hint_glyph(int button) {
+const char* Hint_glyph(int button, const char* const* fn_names) {
 	for (size_t i = 0; i < sizeof(glyphs) / sizeof(glyphs[0]); i++) {
 		if (glyphs[i].button == button) return glyphs[i].glyph;
+	}
+	if (fn_names && button >= MOSAIC_BUTTON_FN1 && button <= MOSAIC_BUTTON_FN3) {
+		const char* name = fn_names[button - MOSAIC_BUTTON_FN1];
+		return name && name[0] ? name : NULL;
 	}
 	return NULL;
 }
 
-int Hints_check(int group, const MosaicHint* hints, int count, const char** names) {
+int Hints_check(int group, const MosaicHint* hints, int count, const char* const* fn_names, const char** names) {
 	if (group != MOSAIC_HINTS_LEFT && group != MOSAIC_HINTS_RIGHT) return -1;
 	if (!hints || count < 1 || count > HINTS_MAX || !names) return -1;
 	for (int i = 0; i < count; i++) {
-		names[i] = Hint_glyph(hints[i].button);
+		names[i] = Hint_glyph(hints[i].button, fn_names);
 		if (!names[i] || !hints[i].label || !hints[i].label[0] || hints[i].label[0] == '\n') return -1;
 	}
 	return 0;

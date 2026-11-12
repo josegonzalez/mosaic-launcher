@@ -23,6 +23,7 @@
 #include "screenmodel.h"
 #include "caller.h"
 #include "plugincfg.h"
+#include "fnbinds.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -841,6 +842,117 @@ static const char* hostHomeScreen(void) {
 	return ScreenSet_homeId(&screens);
 }
 
+///////////////////////////////////////
+// FN buttons
+
+static FnBinds fn_binds; // plugins' bindings of FN1 to FN3, never saved
+
+// The device's names for FN1 to FN3, from its platform.h. Desktop has
+// none; its tests can stand a comma-separated list in for a device's with
+// MOSAIC_LAUNCHER_FN_FAKE, eg. "L3,R3,HOME". Device builds never read it.
+static const char* fnName(int index) {
+	if (IS_DESKTOP) {
+		static char fake[FN_COUNT][FN_NAME_MAX];
+		FnBinds_parseNames(getenv("MOSAIC_LAUNCHER_FN_FAKE"), fake);
+		return index >= 0 && index < FN_COUNT ? fake[index] : "";
+	}
+	switch (index) {
+		case 0: return BTN_FN1_NAME;
+		case 1: return BTN_FN2_NAME;
+		case 2: return BTN_FN3_NAME;
+		default: return "";
+	}
+}
+
+const char* Plugins_fnName(int index) {
+	const char* name = fnName(index);
+	return name ? name : "";
+}
+
+static int fnIndex(int button) {
+	if (button < MOSAIC_BUTTON_FN1 || button > MOSAIC_BUTTON_FN3) return -1;
+	return button - MOSAIC_BUTTON_FN1;
+}
+
+static int fnPresent(int index) {
+	return index >= 0 && Plugins_fnName(index)[0];
+}
+
+// The user's choice in Settings takes over from a plugin's binding as soon
+// as the launcher sees it.
+static const char* fnUser(int index) {
+	const char* user = CFG_getFnAction(index);
+	char dropped[FN_OWNER_MAX];
+	if (FnBinds_yield(&fn_binds, index, user, dropped, sizeof(dropped))) {
+		LOG_info("plugins: %s's binding of FN%i is dropped, as the user assigned it in Settings\n", dropped, index + 1);
+	}
+	return user;
+}
+
+const char* Plugins_fnAction(int index) {
+	return FnBinds_effective(&fn_binds, index, fnUser(index), NULL);
+}
+
+static const char* hostFnName(int button) {
+	return Plugins_fnName(fnIndex(button));
+}
+
+static int hostFnBinding(int button, MosaicFnBinding* out) {
+	int index = fnIndex(button);
+	// it can drop a binding, so only on the launcher's thread
+	if (!callingPlugin("fn_binding") || !out || out->size < sizeof(out->size) || !fnPresent(index)) return -1;
+	const char* owner = NULL;
+	const char* action = FnBinds_effective(&fn_binds, index, fnUser(index), &owner);
+	MosaicFnBinding full;
+	memset(&full, 0, sizeof(full));
+	full.size = out->size;
+	full.by = owner ? MOSAIC_FN_PLUGIN : action[0] ? MOSAIC_FN_USER : MOSAIC_FN_NONE;
+	snprintf(full.action, sizeof(full.action), "%s", action);
+	snprintf(full.plugin_id, sizeof(full.plugin_id), "%s", owner ? owner : "");
+	// only the fields the plugin knows about
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return 0;
+}
+
+static int hostFnBind(int button, const char* action) {
+	LoadedPlugin* p = callingPlugin("fn_bind");
+	if (!p) return -1;
+	int index = fnIndex(button);
+	int rc = FnBinds_bind(&fn_binds, index, p->id, action, fnPresent(index), index >= 0 ? fnUser(index) : NULL);
+	switch (rc) {
+		case FN_BIND_OK:
+			LOG_info("plugins: %s bound FN%i (%s) to %s\n", p->id, index + 1, Plugins_fnName(index), action);
+			return 0;
+		case FN_BIND_MISSING:
+			LOG_info("plugins: %s can't bind FN%i: this device doesn't have it\n", p->id, index + 1);
+			break;
+		case FN_BIND_USER:
+			LOG_info("plugins: %s can't bind FN%i: the user assigned it in Settings\n", p->id, index + 1);
+			break;
+		case FN_BIND_TAKEN:
+			LOG_info("plugins: %s can't bind FN%i: %s bound it first\n", p->id, index + 1, fn_binds.owner[index]);
+			break;
+		default:
+			LOG_warn("plugins: %s can't bind button %i to %s\n", p->id, button, action ? action : "(null)");
+			break;
+	}
+	return -1;
+}
+
+static int hostFnRelease(int button) {
+	LoadedPlugin* p = callingPlugin("fn_release");
+	if (!p) return -1;
+	int index = fnIndex(button);
+	if (FnBinds_release(&fn_binds, index, p->id) != 0) return -1;
+	LOG_info("plugins: %s released FN%i\n", p->id, index + 1);
+	return 0;
+}
+
+// Unloading a plugin frees its buttons for another.
+static void fnReleaseAll(const char* plugin_id) {
+	if (FnBinds_releaseAll(&fn_binds, plugin_id) > 0) LOG_info("plugins: %s's FN bindings are released\n", plugin_id);
+}
+
 // Surfaces belong to a loaded plugin, the one whose init is running included.
 static int isLoaded(const char* plugin_id) {
 	for (int i = 0; plugin_id && i < loaded_count; i++) {
@@ -1105,6 +1217,10 @@ static const MosaicHost host = {
 	.plugins_count = hostPluginsCount,
 	.plugin_info = hostPluginInfo,
 	.cfg_read = hostCfgRead,
+	.fn_name = hostFnName,
+	.fn_binding = hostFnBinding,
+	.fn_bind = hostFnBind,
+	.fn_release = hostFnRelease,
 };
 
 ///////////////////////////////////////
@@ -1229,6 +1345,7 @@ static void load(const PluginManifest* m) {
 		hostLedClear(m->id);
 		// none can be open: open_screen refuses from init
 		ScreenSet_dropOwner(&screens, loaded_count - 1);
+		fnReleaseAll(m->id);
 		freeSurfaces(m->id);
 		Audio_closeFor(m->id, "as it declined to start");
 		PluginCfg_free(&p->cfg);
@@ -1561,6 +1678,7 @@ void Plugins_quit(void) {
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) AS_PLUGIN(i) p->plugin->quit();
 		// turning a plugin off, or a launch, gives the user's colour back
 		hostLedClear(p->id);
+		fnReleaseAll(p->id);
 		freeSurfaces(p->id);
 		PluginCfg_free(&p->cfg);
 		dlclose(p->handle);

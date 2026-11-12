@@ -74,7 +74,8 @@ enum MosaicButton {
 	// power button are the launcher's: the quick menu, brightness and sleep.
 	// FN1 to FN3 are the buttons stock's Settings lets the user assign (L3
 	// and R3 on the Brick, L4, R4 and HOME on the Brick Pro, HOME on the
-	// tg5050); a device without one never presses it.
+	// tg5050); a device without one never presses it. A plugin binds them
+	// as Settings does with fn_bind.
 	MOSAIC_BUTTON_MENU,
 	MOSAIC_BUTTON_POWER,
 	MOSAIC_BUTTON_FN1,
@@ -350,6 +351,23 @@ typedef struct MosaicPlayGame {
 	int orphan;             // 1 for a game carried over from Onion, known only by its name
 } MosaicPlayGame;
 
+// Whose binding an FN button runs, for host->fn_binding.
+enum MosaicFnBy {
+	MOSAIC_FN_NONE,   // unassigned, so it does nothing
+	MOSAIC_FN_USER,   // the user's, from stock's Settings
+	MOSAIC_FN_PLUGIN, // a plugin's, from fn_bind
+};
+
+// An FN button's binding, for host->fn_binding. The plugin sets size to
+// sizeof(MosaicFnBinding) before asking, and the launcher fills in only
+// the fields that fit in it, so fields are only added at the end.
+typedef struct MosaicFnBinding {
+	size_t size;        // sizeof(MosaicFnBinding) in the plugin
+	int by;             // enum MosaicFnBy
+	char action[256];   // what it runs: "action:<id>" or "pak:<folder>", or "" with MOSAIC_FN_NONE
+	char plugin_id[64]; // the plugin that bound it, with MOSAIC_FN_PLUGIN, else ""
+} MosaicFnBinding;
+
 // What the theme slot's owner supplies, for MosaicPlugin's theme. The
 // launcher sets size to sizeof(MosaicTheme) in the launcher and every
 // field to its "stock's" value before asking, so a theme sets only what it
@@ -445,9 +463,10 @@ enum MosaicScreenFlag {
 
 // A button hint for host->draw_hints: a button and what it does there,
 // such as { MOSAIC_BUTTON_B, "BACK" }. The button is any enum MosaicButton
-// but the d-pad and FN1 to FN3, named as stock names it (A, B, X, Y, L1,
-// R1, L2, R2, START, SELECT, MENU, POWER). The label is one line, in
-// upper case like stock's.
+// but the d-pad, named as stock names it (A, B, X, Y, L1, R1, L2, R2,
+// START, SELECT, MENU, POWER), and FN1 to FN3 by the device's name for
+// them (see fn_name), such as HOME, on a launcher with fn_name and a
+// device that has them. The label is one line, in upper case like stock's.
 typedef struct MosaicHint {
 	int button;
 	const char* label;
@@ -1215,6 +1234,38 @@ typedef struct MosaicHost {
 	// works where cfg_get does. Check for it with
 	// MOSAIC_HOST_HAS(host, cfg_read).
 	const char* (*cfg_read)(const char* plugin_id, const char* key, const char* fallback);
+
+	// FN1 to FN3 (MOSAIC_BUTTON_FN1 to MOSAIC_BUTTON_FN3), the buttons
+	// stock's Settings lets the user assign to a Tools pak or an action.
+	// fn_name returns the device's name for one, such as "L3", "R4" or
+	// "HOME", or "" when the device lacks it (the h700 and desktop lack all
+	// three) and for any other button. fn_binding fills out (see
+	// MosaicFnBinding) with what the button runs when pressed and whose
+	// binding it is, and returns 0, or -1 for a button the device lacks, a
+	// NULL out, or where cfg_get is refused. fn_bind binds a button for the
+	// calling plugin, which the launcher knows as for cfg_get, to action:
+	// "action:<id>" for an action from register_action or one of the game
+	// list's own, or "pak:<folder>" for a Tools pak, the folder relative to
+	// Tools/<platform>, such as "pak:Clock.pak". A press runs it as the
+	// user's own binding would: from the game list, the game switcher and
+	// the quick menu, doing nothing while the action is unknown or
+	// unavailable or the pak isn't there. Bindings are held in memory and
+	// never written to stock's settings. The user's choice always wins: a
+	// plugin can only bind a button the user left unassigned in Settings,
+	// and once the user assigns it, the plugin's binding is dropped, which
+	// fn_binding then shows as MOSAIC_FN_USER. The first plugin to bind a
+	// button keeps it, and can bind it again to another action, until it
+	// releases it with fn_release or is unloaded. fn_bind returns 0, or -1
+	// for a button the device lacks, a bad action, a button the user
+	// assigned or another plugin holds, or where cfg_get is refused; the
+	// launcher logs each refusal. fn_release returns 0, or -1 when the
+	// calling plugin doesn't hold the button. Plugins show what they bound
+	// only with their own hints (see draw_hints). Check for them with
+	// MOSAIC_HOST_HAS(host, fn_release).
+	const char* (*fn_name)(int button);
+	int (*fn_binding)(int button, MosaicFnBinding* out);
+	int (*fn_bind)(int button, const char* action);
+	int (*fn_release)(int button);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

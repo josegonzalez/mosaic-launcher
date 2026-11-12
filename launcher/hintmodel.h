@@ -19,14 +19,16 @@ typedef struct HintMetrics {
 } HintMetrics;
 
 // The name stock draws for button, eg. "A", "MENU" or "POWER", or NULL
-// for one it has no hint for (the d-pad, FN1 to FN3, anything else).
-const char* Hint_glyph(int button);
+// for one it has no hint for (the d-pad, anything else). FN1 to FN3 take
+// the device's names for them from fn_names, eg. "HOME", and are NULL
+// where it's NULL or the name is "", as on a device without the button.
+const char* Hint_glyph(int button, const char* const* fn_names);
 
 // Checks a group and its hints, writing each one's button name to glyphs
 // (room for HINTS_MAX). Returns 0, or -1 for a bad group, a count other
 // than 1 to HINTS_MAX, a NULL hints, an unnamed button or a NULL or
-// empty label.
-int Hints_check(int group, const MosaicHint* hints, int count, const char** glyphs);
+// empty label. fn_names is as for Hint_glyph.
+int Hints_check(int group, const MosaicHint* hints, int count, const char* const* fn_names, const char** glyphs);
 
 // Which hint stock keeps on a skinny screen: the left group's first and
 // the right group's last, as stock's own screens pass them.

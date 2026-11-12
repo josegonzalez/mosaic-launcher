@@ -38,7 +38,9 @@ void PluginScreen_render(void) {
 int PluginScreen_drawHints(SDL_Surface* surface, const MosaicScreenView* view, int group, const MosaicHint* hints,
 	int count, MosaicRect* drawn) {
 	const char* glyphs[HINTS_MAX];
-	if (!surface || !view || Hints_check(group, hints, count, glyphs) != 0) return -1;
+	// FN1 to FN3 by the device's names, such as HOME, where it has them
+	const char* fn_names[] = { Plugins_fnName(0), Plugins_fnName(1), Plugins_fnName(2) };
+	if (!surface || !view || Hints_check(group, hints, count, fn_names, glyphs) != 0) return -1;
 	char labels[HINTS_MAX][HINT_LABEL_MAX];
 	char* pairs[HINTS_MAX * 2 + 1];
 	int widths[HINTS_MAX];

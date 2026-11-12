@@ -161,10 +161,11 @@ int openPak(char* path) {
 	return 1;
 }
 
-// Run the action bound to a user-assignable button (0 == FN1, 1 == FN2).
-// Returns 1 if something was launched.
+// Run the action bound to a user-assignable button (0 == FN1, 1 == FN2,
+// 2 == FN3): the user's from Settings, or a plugin's when the user left it
+// unassigned. Returns 1 if something was launched.
 int runFnAction(int index) {
-	const char* action = CFG_getFnAction(index);
+	const char* action = Plugins_fnAction(index);
 	if (!action || !action[0]) return 0; // unassigned
 
 	// a registered launcher action, eg. "action:gamelist.back"
