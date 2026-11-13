@@ -304,6 +304,12 @@ void Plugins_started(void);
 
 void Plugins_quit(void);
 
+// Around each frame the main loop draws, for plugins' screen captures:
+// begin before anything is drawn and shown once it's on screen. They do
+// nothing with no plugins loaded.
+void Plugins_frameBegin(void);
+void Plugins_frameShown(void);
+
 // Every plugin found, loading or not, without loading any. The settings
 // screens use this to list them.
 int Plugins_discover(const PluginManifest** out);

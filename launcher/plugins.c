@@ -24,6 +24,7 @@
 #include "caller.h"
 #include "plugincfg.h"
 #include "fnbinds.h"
+#include "capture.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -953,6 +954,69 @@ static void fnReleaseAll(const char* plugin_id) {
 	if (FnBinds_releaseAll(&fn_binds, plugin_id) > 0) LOG_info("plugins: %s's FN bindings are released\n", plugin_id);
 }
 
+///////////////////////////////////////
+// screen captures
+
+// Only with plugins loaded, so with none a frame costs what stock's does.
+static int capturing(void) {
+	return loaded_count > 0 && !settings_only;
+}
+
+void Plugins_frameBegin(void) {
+	if (capturing()) Capture_frameBegin(currentScreen == SCREEN_MODAL || currentScreen == SCREEN_QUICKMENU);
+}
+
+void Plugins_frameShown(void) {
+	if (capturing()) Capture_frameShown();
+}
+
+// The calling plugin, on the launcher's thread, and not from its init,
+// where no frame has been shown, or a hook that draws, whose frame isn't
+// done.
+static LoadedPlugin* captureCaller(const char* call) {
+	LoadedPlugin* p = callingPlugin(call);
+	if (!p) return NULL;
+	const char* why = NULL;
+	if (initializing >= 0) why = "not from init";
+	else if (layout_rendering || decorating || backgrounding || generating || screen_drawing || transition_owner >= 0)
+		why = "not while drawing";
+	if (!why) return p;
+	LOG_info("plugins: %s's %s refused: %s\n", p->id, call, why);
+	return NULL;
+}
+
+static SDL_Surface* captureFrame(LoadedPlugin* p, const char* call, int* owned) {
+	const char* why = "";
+	SDL_Surface* frame = Capture_frame(owned, &why);
+	if (!frame) LOG_info("plugins: %s's %s refused: %s\n", p->id, call, why);
+	return frame;
+}
+
+static MosaicSurface* hostCaptureScreen(void) {
+	LoadedPlugin* p = captureCaller("capture_screen");
+	if (!p) return NULL;
+	int owned = 0;
+	SDL_Surface* frame = captureFrame(p, "capture_screen", &owned);
+	if (!frame) return NULL;
+	// the plugin's own copy, against its budget
+	MosaicSurface* copy = PluginDraw_surfaceNew(p->id, frame->w, frame->h);
+	if (copy) SDL_BlitSurface(frame, NULL, (SDL_Surface*)copy, NULL);
+	if (owned) SDL_FreeSurface(frame);
+	return copy;
+}
+
+static int hostSaveScreenshot(char* path, size_t size) {
+	LoadedPlugin* p = captureCaller("save_screenshot");
+	if (!p) return -1;
+	int owned = 0;
+	SDL_Surface* frame = captureFrame(p, "save_screenshot", &owned);
+	if (!frame) return -1;
+	int rc = Capture_save(frame, path, size);
+	if (owned) SDL_FreeSurface(frame);
+	if (rc == 0) LOG_info("plugins: %s saved a screenshot\n", p->id);
+	return rc;
+}
+
 // Surfaces belong to a loaded plugin, the one whose init is running included.
 static int isLoaded(const char* plugin_id) {
 	for (int i = 0; plugin_id && i < loaded_count; i++) {
@@ -1221,6 +1285,8 @@ static const MosaicHost host = {
 	.fn_binding = hostFnBinding,
 	.fn_bind = hostFnBind,
 	.fn_release = hostFnRelease,
+	.capture_screen = hostCaptureScreen,
+	.save_screenshot = hostSaveScreenshot,
 };
 
 ///////////////////////////////////////
@@ -1685,6 +1751,7 @@ void Plugins_quit(void) {
 	}
 	loaded_count = 0;
 	listed = 0;
+	Capture_quit();
 	PlayHistory_quit();
 	RAProgress_quit();
 	// a refresh or connect still running is stopped and reaped first

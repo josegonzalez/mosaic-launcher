@@ -416,6 +416,10 @@ msgstr ""
 msgid "SWITCHER"
 msgstr ""
 
+#: launcher/capture.c
+msgid "Screenshot saved"
+msgstr ""
+
 #: vendor/NextUI/skeleton/EXTRAS/Roms
 msgctxt "systems"
 msgid "Sega 32X"

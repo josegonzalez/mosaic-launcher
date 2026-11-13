@@ -219,6 +219,8 @@ int main (int argc, char *argv[]) {
 		Plugins_selection(now);
 
 		if(state.dirty) {
+			// what's on screen now, before it's cleared, for plugins' captures
+			Plugins_frameBegin();
 			tmpOldScreen = NULL;
 			switcherSur = NULL;
 			// NOTE:22 This causes slowdown when CFG_getMenuTransitions is set to false because animationdirection turns > 0 somewhere but is never set back to 0 and so this code runs on every action, will fix later
@@ -310,6 +312,7 @@ int main (int argc, char *argv[]) {
 			if(!state.startgame) { // dont flip if game gonna start
 				Overlays_render();
 				GFX_flip(screen);
+				Plugins_frameShown();
 			}
 			Plugins_started(); // a frame is up, so plugins survived starting
 

@@ -5,7 +5,8 @@
 # the grid, opens the full view, steps on and deletes the oldest after the
 # confirm, then backs out to the grid and the list. A link to a file
 # outside the folder and a macOS ._ file aren't listed, and the link's
-# file stays
+# file stays. Then its capture action saves the screen, from the list and
+# from its own screen
 SV_SHOTS="$CARD/Screenshots"
 SV_OUTSIDE="$CARD/Screenshot Outside"
 [ -e "$SV_SHOTS" ] && mv "$SV_SHOTS" "$WORK/screenshots.saved"
@@ -39,6 +40,19 @@ if [ ! -L "$SV_SHOTS/Linked.2026-12-01-00-00-00.png" ] || [ ! -f "$SV_OUTSIDE/Se
 	fail "screenshot-viewer touched the link"
 fi
 grep -qF "plugins: screenshot-viewer's screen screenshot-viewer.main's" "$log" && fail "screenshot-viewer's screen was turned off"
+
+# its capture action saves the game list, which then shows in the grid,
+# and a capture from the grid shows there too, on the same selection
+rm -f "$SV_SHOTS"/*.png
+printf 'steps=action:screenshot-viewer.capture,action:screenshot-viewer.open,wait,wait,wait,wait,wait,action:screenshot-viewer.capture,b\n' >"$STATE/screener.cfg"
+run_launcher "$WORK/screenshot-viewer-capture.log" "plugin screener: done" || fail "the launcher exited early capturing with screenshot-viewer"
+log="$WORK/screenshot-viewer-capture.log"
+plugin=screenshot-viewer
+[ "$(grep -c "plugin screenshot-viewer: saved $SV_SHOTS/Launcher\." "$log")" -eq 2 ] || fail "screenshot-viewer didn't save twice"
+expect "1 screenshots in $SV_SHOTS"
+expect "grid 0 of 1: Launcher, "
+expect "grid 1 of 2: Launcher, "
+[ "$(find "$SV_SHOTS" -name 'Launcher.*.png' | wc -l | tr -d ' ')" -eq 2 ] || fail "screenshot-viewer's captures aren't in $SV_SHOTS"
 rm -rf "$SV_SHOTS" "$SV_OUTSIDE"
 [ -e "$WORK/screenshots.saved" ] && mv "$WORK/screenshots.saved" "$SV_SHOTS"
 rm -rf "$WORK/plugins/screenshot-viewer.plugin" "$WORK/plugins/screener.plugin" "$STATE/screener.cfg"

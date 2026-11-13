@@ -23,6 +23,10 @@ msgid "Couldn't delete that"
 msgstr ""
 
 #: screenshot_viewer.c
+msgid "Couldn't save a screenshot"
+msgstr ""
+
+#: screenshot_viewer.c
 msgid "DELETE"
 msgstr ""
 
@@ -69,6 +73,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Screenshots button"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "Take screenshot"
 msgstr ""
 
 #: plugin.txt

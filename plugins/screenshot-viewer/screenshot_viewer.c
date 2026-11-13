@@ -7,6 +7,12 @@
 // setting), or button-remap or an FN button (action:screenshot-viewer.open).
 // It's available while the folder has a screenshot.
 //
+// The screenshot-viewer.capture action saves what's on screen with the
+// launcher's save_screenshot, as Screenshots/Launcher.<date>.png, or what
+// a menu it runs from opened over. It binds no button itself: the user
+// puts it on one, such as an FN button set to
+// action:screenshot-viewer.capture.
+//
 // The screen starts on a grid of thumbnails, with the selected one's game
 // and date on a pill in the top left; the d-pad moves through it, A shows
 // the selected one across the screen and B closes it. In the full view
@@ -31,6 +37,7 @@
 #define ID "screenshot-viewer"
 #define SCREEN_ID ID ".main"
 #define ACTION_ID ID ".open"
+#define CAPTURE_ID ID ".capture"
 #define THUMB_COPIES 40
 #define FULL_COPIES 3
 
@@ -42,6 +49,7 @@ static int selected = 0;
 static int first_row = 0;
 static int cols = 1; // the grid's, for up and down
 static int full = 0; // 1 in the full view
+static int viewing = 0; // 1 while the screen is open
 static char pending[SV_NAME_MAX]; // the file the confirm is about
 static char shown[SV_NAME_MAX + 128];
 
@@ -286,6 +294,7 @@ static void askDelete(void) {
 static int enter(void* data) {
 	(void)data;
 	int count = SV_scan(dir, &list);
+	viewing = 1;
 	selected = 0;
 	first_row = 0;
 	full = 0;
@@ -298,6 +307,7 @@ static int enter(void* data) {
 
 static void leave(void* data) {
 	(void)data;
+	viewing = 0;
 	copiesClear();
 	SV_listFree(&list);
 }
@@ -374,6 +384,29 @@ static void openViewer(void* data) {
 	if (rc != 0) say("couldn't open the screenshots screen");
 }
 
+static void capture(void* data) {
+	(void)data;
+	char path[SV_PATH_MAX];
+	if (host->save_screenshot(path, sizeof(path)) != 0) {
+		say("couldn't save a screenshot");
+		if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Couldn't save a screenshot"));
+		return;
+	}
+	char message[SV_PATH_MAX + 16];
+	snprintf(message, sizeof(message), "saved %s", path);
+	say(message);
+	// a capture of the viewer itself shows in it, on the same selection
+	if (!viewing) return;
+	char was[SV_NAME_MAX] = "";
+	if (selected < list.count) snprintf(was, sizeof(was), "%s", list.shots[selected].file);
+	SV_scan(dir, &list);
+	selected = 0;
+	for (int i = 0; i < list.count; i++) {
+		if (!strcmp(list.shots[i].file, was)) selected = i;
+	}
+	host->request_redraw();
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(dir, sizeof(dir), "%s/Screenshots", host->sdcard_path);
@@ -399,6 +432,10 @@ static int init(const MosaicHost* h) {
 	if (host->register_action(ACTION_ID, "Screenshots", canOpen, openViewer, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 1;
+	}
+	if (MOSAIC_HOST_HAS(host, save_screenshot)
+			&& host->register_action(CAPTURE_ID, "Take screenshot", NULL, capture, NULL) != 0) {
+		say("couldn't register " CAPTURE_ID);
 	}
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
 			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {

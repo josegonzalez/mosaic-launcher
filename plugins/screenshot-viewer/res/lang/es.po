@@ -15,6 +15,9 @@ msgstr "No se puede mostrar esta captura"
 msgid "Couldn't delete that"
 msgstr "No se pudo borrar"
 
+msgid "Couldn't save a screenshot"
+msgstr "No se pudo guardar la captura"
+
 msgid "DELETE"
 msgstr "BORRAR"
 
@@ -51,6 +54,9 @@ msgstr "Capturas"
 
 msgid "Screenshots button"
 msgstr "Botón de capturas"
+
+msgid "Take screenshot"
+msgstr "Hacer captura"
 
 msgid "Y"
 msgstr "Y"

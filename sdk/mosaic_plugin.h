@@ -1266,6 +1266,28 @@ typedef struct MosaicHost {
 	int (*fn_binding)(int button, MosaicFnBinding* out);
 	int (*fn_bind)(int button, const char* action);
 	int (*fn_release)(int button);
+
+	// The last frame shown, the whole screen as it was composited,
+	// overlays, pills and the status pill included. While the launcher's
+	// dialogs (confirm, keyboard, choose) or the quick menu show, and from
+	// the callback a dialog runs as it closes, it's the last frame shown
+	// before the first of them opened, so an action run from a menu
+	// captures what the menu opened over. capture_screen returns it as a
+	// screen_width by screen_height surface of the calling plugin's own,
+	// which the launcher knows as for cfg_get, counted against its 32 MiB
+	// and freed with surface_free. save_screenshot saves it as a PNG in
+	// Screenshots on the card, named as stock names a game's,
+	// Launcher.<YYYY-MM-DD-HH-MM-SS>.png (a second save in the same second
+	// replaces the first, as stock's does), copies its full path to path
+	// (size bytes) when path isn't NULL, and shows "Screenshot saved" when
+	// stock's screenshot notification setting is on. Both work only on the
+	// launcher's thread, from a plugin's hooks and callbacks but not its
+	// init, outside rendering, and the launcher logs each refusal:
+	// capture_screen returns NULL and save_screenshot -1 then, as for a
+	// surface over the budget or a file that can't be written. Check for
+	// them with MOSAIC_HOST_HAS(host, save_screenshot).
+	MosaicSurface* (*capture_screen)(void);
+	int (*save_screenshot)(char* path, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
