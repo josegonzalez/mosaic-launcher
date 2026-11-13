@@ -13,6 +13,12 @@ static int contrast = 0;
 static char font_path[512];          // "" for stock's
 static char fallback_path[512];      // "" for none
 static ThemeWalls walls;
+static int hint_style = MOSAIC_HINT_STYLE_USER;
+
+// thememodel.c numbers stock's hint styles without config.h
+_Static_assert(THEME_HINT_STOCK_TEXT == INPUT_STYLE_TEXT && THEME_HINT_STOCK_SHAPES == INPUT_STYLE_SHAPES
+	&& INPUT_STYLE_ABXY == INPUT_STYLE_TEXT + 1 && INPUT_STYLE_CARDINALS == INPUT_STYLE_ABXY + 1
+	&& INPUT_STYLE_SHAPES == INPUT_STYLE_CARDINALS + 1, "stock's hint styles moved");
 
 static ThemeStock stockNow(void) {
 	ThemeStock stock = {
@@ -69,6 +75,14 @@ int Theme_uiSize(int which) {
 
 const char* Theme_fallbackFont(void) {
 	return active ? fallback_path : "";
+}
+
+int Theme_hintStock(int stock) {
+	return active ? ThemeModel_hintStock(hint_style, stock) : stock;
+}
+
+int Theme_hintStyle(void) {
+	return ThemeModel_hintStyle(Theme_hintStock(CFG_getInputPromptStyle()));
 }
 
 const char* Theme_fontPath(const char* stock) {
@@ -169,6 +183,14 @@ int Theme_set(const char* owner, const MosaicTheme* theme) {
 		refusals++;
 	}
 
+	hint_style = t.hint_style;
+	if (!ThemeModel_hintStyleOk(hint_style)) {
+		char field[32];
+		snprintf(field, sizeof(field), "hint_style %d", hint_style);
+		refuse(owner, field, "isn't from 0 to 4");
+		hint_style = MOSAIC_HINT_STYLE_USER;
+	}
+
 	cardFont(owner, "font", t.font, font_path, sizeof(font_path));
 	cardFont(owner, "fallback_font", t.fallback_font, fallback_path, sizeof(fallback_path));
 	cardFile(owner, "wallpaper", t.wallpaper, walls.main, sizeof(walls.main));
@@ -179,6 +201,10 @@ int Theme_set(const char* owner, const MosaicTheme* theme) {
 	GFX_themeChanged();
 	LOG_info("plugins: %s supplies the theme: pill %d, button %d, padding %d, %d rows, text step %d, font %s\n",
 		owner, PILL_SIZE, BUTTON_SIZE, PADDING, MAIN_ROW_COUNT, UI_textStep(), font_path[0] ? font_path : "stock's");
+	if (hint_style != MOSAIC_HINT_STYLE_USER) {
+		static const char* names[] = { "", "text", "ABXY", "cardinals", "shapes" };
+		LOG_info("plugins: %s's theme draws button hints as %s, over the user's style\n", owner, names[hint_style]);
+	}
 	return refusals;
 }
 
@@ -190,6 +216,7 @@ void Theme_clear(void) {
 	fallback_path[0] = '\0';
 	memset(&walls, 0, sizeof(walls));
 	contrast = 0;
+	hint_style = MOSAIC_HINT_STYLE_USER;
 	if (was) GFX_themeChanged();
 }
 

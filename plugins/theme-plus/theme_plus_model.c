@@ -95,6 +95,14 @@ int TP_parseInt(const char* text, int lo, int hi, int* out) {
 	return 0;
 }
 
+int TP_parseHintStyle(const char* text) {
+	static const char* names[] = { "text", "abxy", "cardinals", "shapes" };
+	for (int i = 0; text && i < 4; i++) {
+		if (!strcasecmp(text, names[i])) return MOSAIC_HINT_STYLE_TEXT + i;
+	}
+	return -1;
+}
+
 int TP_relativePathOk(const char* path) {
 	if (!path || !path[0] || path[0] == '/' || strlen(path) >= TP_PATH_MAX || strchr(path, '\\')) return 0;
 	const char* part = path;
@@ -200,6 +208,11 @@ int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx) {
 		else if (!strcmp(key, "pill_size")) setInt(&out->pill_size, key, value, 18, 60, number, log, ctx);
 		else if (!strcmp(key, "button_size")) setInt(&out->button_size, key, value, 12, 56, number, log, ctx);
 		else if (!strcmp(key, "padding")) setInt(&out->padding, key, value, 1, 30, number, log, ctx);
+		else if (!strcmp(key, "hint_style")) {
+			int style = TP_parseHintStyle(value);
+			if (style < 0) say(log, ctx, "line %d: hint_style %s isn't text, abxy, cardinals or shapes, dropped", number, value);
+			else out->hint_style = style;
+		}
 		else say(log, ctx, "line %d: unknown key %s, ignored", number, key);
 	}
 	return 0;
@@ -541,4 +554,6 @@ void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const 
 	if (MOSAIC_THEME_HAS(theme, pill_size)) theme->pill_size = pill;
 	if (MOSAIC_THEME_HAS(theme, button_size)) theme->button_size = button;
 	if (MOSAIC_THEME_HAS(theme, padding)) theme->padding = padding;
+
+	if (parsed && parsed->hint_style && MOSAIC_THEME_HAS(theme, hint_style)) theme->hint_style = parsed->hint_style;
 }

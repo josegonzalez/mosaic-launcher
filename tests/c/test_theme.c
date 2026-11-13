@@ -210,6 +210,41 @@ static void testColors(void) {
 	CHECK(copy[3] == 0xffffffff || copy[3] == 0x000000ff);
 }
 
+// Stock numbers its hint styles -1 (text) to 2 (shapes), as config.h's
+// INPUT_STYLE_* do.
+static void testHintStyle(void) {
+	CHECK(ThemeModel_hintStyleOk(MOSAIC_HINT_STYLE_USER));
+	CHECK(ThemeModel_hintStyleOk(MOSAIC_HINT_STYLE_TEXT));
+	CHECK(ThemeModel_hintStyleOk(MOSAIC_HINT_STYLE_SHAPES));
+	CHECK(!ThemeModel_hintStyleOk(-1));
+	CHECK(!ThemeModel_hintStyleOk(5));
+
+	// unset, the user's Settings style, whatever it is
+	for (int stock = -1; stock <= 2; stock++) CHECK(ThemeModel_hintStock(MOSAIC_HINT_STYLE_USER, stock) == stock);
+	CHECK(ThemeModel_hintStock(MOSAIC_HINT_STYLE_USER, 7) == 7);
+	// a theme's style over the user's
+	for (int stock = -1; stock <= 2; stock++) {
+		CHECK(ThemeModel_hintStock(MOSAIC_HINT_STYLE_TEXT, stock) == -1);
+		CHECK(ThemeModel_hintStock(MOSAIC_HINT_STYLE_ABXY, stock) == 0);
+		CHECK(ThemeModel_hintStock(MOSAIC_HINT_STYLE_CARDINALS, stock) == 1);
+		CHECK(ThemeModel_hintStock(MOSAIC_HINT_STYLE_SHAPES, stock) == 2);
+	}
+	// one the theme can't set leaves the user's
+	CHECK(ThemeModel_hintStock(9, 1) == 1);
+	CHECK(ThemeModel_hintStock(-1, 2) == 2);
+
+	// back to the SDK's numbers for host->hint_style
+	CHECK(ThemeModel_hintStyle(-1) == MOSAIC_HINT_STYLE_TEXT);
+	CHECK(ThemeModel_hintStyle(0) == MOSAIC_HINT_STYLE_ABXY);
+	CHECK(ThemeModel_hintStyle(1) == MOSAIC_HINT_STYLE_CARDINALS);
+	CHECK(ThemeModel_hintStyle(2) == MOSAIC_HINT_STYLE_SHAPES);
+	CHECK(ThemeModel_hintStyle(3) == MOSAIC_HINT_STYLE_TEXT);
+	CHECK(ThemeModel_hintStyle(-2) == MOSAIC_HINT_STYLE_TEXT);
+	for (int style = MOSAIC_HINT_STYLE_TEXT; style <= MOSAIC_HINT_STYLE_SHAPES; style++) {
+		CHECK(ThemeModel_hintStyle(ThemeModel_hintStock(style, 0)) == style);
+	}
+}
+
 static void testCardFile(void) {
 	char base[] = "/tmp/mosaic-test-theme-XXXXXX";
 	CHECK(mkdtemp(base) != NULL);
@@ -297,6 +332,7 @@ int main(void) {
 	testResolve();
 	testCheckSizes();
 	testColors();
+	testHintStyle();
 	testCardFile();
 	testWallpapers();
 	CHECK_DONE();

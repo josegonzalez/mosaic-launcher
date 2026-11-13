@@ -1,9 +1,10 @@
 #ifndef HINTMODEL_H
 #define HINTMODEL_H
 
-// The SDL-free half of host->draw_hints: checking a plugin's hints, the
-// names stock draws for their buttons, and where stock's
-// GFX_blitButtonGroup puts the pill. screen_plugin.c measures and draws.
+// The SDL-free half of host->draw_hints and host->draw_button: checking a
+// plugin's hints, the names stock draws for their buttons, and where
+// stock's GFX_blitButtonGroup puts the pill. screen_plugin.c and
+// plugindraw.c measure and draw.
 
 #include <stddef.h>
 #include "mosaic_plugin.h"
@@ -19,10 +20,16 @@ typedef struct HintMetrics {
 } HintMetrics;
 
 // The name stock draws for button, eg. "A", "MENU" or "POWER", or NULL
-// for one it has no hint for (the d-pad, anything else). FN1 to FN3 take
-// the device's names for them from fn_names, eg. "HOME", and are NULL
-// where it's NULL or the name is "", as on a device without the button.
+// for one it has no hint for. FN1 to FN3 take the device's names for them
+// from fn_names, eg. "HOME", and are NULL where it's NULL or the name is
+// "", as on a device without the button. The d-pad and enum MosaicGlyph,
+// which stock has icons for but never draws, are "UP", "DOWN", "LEFT",
+// "RIGHT", "U/D", "L/R" and "DPAD".
 const char* Hint_glyph(int button, const char* const* fn_names);
+
+// For the launcher's build of api.c: which of the d-pad's names glyph is,
+// 0 to 6 in the order Hint_glyph lists them, or -1 for any other name.
+int Hint_dpad(const char* glyph);
 
 // Checks a group and its hints, writing each one's button name to glyphs
 // (room for HINTS_MAX). Returns 0, or -1 for a bad group, a count other

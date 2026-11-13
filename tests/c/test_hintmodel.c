@@ -17,11 +17,16 @@ static void testGlyphs(void) {
 	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_SELECT, NULL), "SELECT");
 	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_MENU, NULL), "MENU");
 	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_POWER, NULL), "POWER");
-	// stock draws no hint for the d-pad, and FN buttons differ by device
-	CHECK(Hint_glyph(MOSAIC_BUTTON_UP, NULL) == NULL);
-	CHECK(Hint_glyph(MOSAIC_BUTTON_DOWN, NULL) == NULL);
-	CHECK(Hint_glyph(MOSAIC_BUTTON_LEFT, NULL) == NULL);
-	CHECK(Hint_glyph(MOSAIC_BUTTON_RIGHT, NULL) == NULL);
+	// the d-pad, which stock has icons for but never draws
+	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_UP, NULL), "UP");
+	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_DOWN, NULL), "DOWN");
+	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_LEFT, NULL), "LEFT");
+	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_RIGHT, NULL), "RIGHT");
+	CHECK_STR(Hint_glyph(MOSAIC_GLYPH_UP_DOWN, NULL), "U/D");
+	CHECK_STR(Hint_glyph(MOSAIC_GLYPH_LEFT_RIGHT, NULL), "L/R");
+	CHECK_STR(Hint_glyph(MOSAIC_GLYPH_DPAD, NULL), "DPAD");
+	CHECK(Hint_glyph(MOSAIC_GLYPH_DPAD + 1, NULL) == NULL);
+	// FN buttons differ by device
 	CHECK(Hint_glyph(MOSAIC_BUTTON_FN1, NULL) == NULL);
 	CHECK(Hint_glyph(MOSAIC_BUTTON_FN3, NULL) == NULL);
 	CHECK(Hint_glyph(-1, NULL) == NULL);
@@ -37,8 +42,31 @@ static void testGlyphs(void) {
 	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_FN2, brick), "R3");
 	CHECK(Hint_glyph(MOSAIC_BUTTON_FN3, brick) == NULL);
 	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_A, brick), "A");
-	CHECK(Hint_glyph(MOSAIC_BUTTON_UP, brick) == NULL);
+	CHECK_STR(Hint_glyph(MOSAIC_BUTTON_UP, brick), "UP");
 	CHECK(Hint_glyph(99, brick) == NULL);
+}
+
+// The d-pad's names the launcher's api.c maps to the sheet's icons, in
+// its order; stock's own names, and the d-pad's in another case, aren't
+// any.
+static void testDpad(void) {
+	CHECK(Hint_dpad("UP") == 0);
+	CHECK(Hint_dpad("DOWN") == 1);
+	CHECK(Hint_dpad("LEFT") == 2);
+	CHECK(Hint_dpad("RIGHT") == 3);
+	CHECK(Hint_dpad("U/D") == 4);
+	CHECK(Hint_dpad("L/R") == 5);
+	CHECK(Hint_dpad("DPAD") == 6);
+	for (int button = MOSAIC_BUTTON_UP; button <= MOSAIC_BUTTON_RIGHT; button++) {
+		CHECK(Hint_dpad(Hint_glyph(button, NULL)) == button - MOSAIC_BUTTON_UP);
+	}
+	for (int glyph = MOSAIC_GLYPH_UP_DOWN; glyph <= MOSAIC_GLYPH_DPAD; glyph++) {
+		CHECK(Hint_dpad(Hint_glyph(glyph, NULL)) == glyph - MOSAIC_GLYPH_UP_DOWN + 4);
+	}
+	static const char* stock[] = { "A", "B", "X", "Y", "L1", "R1", "L2", "R2", "START", "SELECT", "MENU", "POWER",
+		"HOME", "L3", "R3", "L4", "R4", "MNU", "SEL", "BRGHT", "CLTMP", "Up", "up", "Dpad", "" };
+	for (size_t i = 0; i < sizeof(stock) / sizeof(stock[0]); i++) CHECK(Hint_dpad(stock[i]) == -1);
+	CHECK(Hint_dpad(NULL) == -1);
 }
 
 static void testCheck(void) {
@@ -69,13 +97,17 @@ static void testCheck(void) {
 	CHECK(Hints_check(MOSAIC_HINTS_LEFT, back, 1, NULL, NULL) == -1);
 
 	// buttons and labels
-	MosaicHint dpad[] = { { MOSAIC_BUTTON_UP, "UP" } };
+	MosaicHint dpad[] = { { MOSAIC_BUTTON_UP, "UP" }, { MOSAIC_GLYPH_LEFT_RIGHT, "PAGE" } };
+	MosaicHint unknown[] = { { 99, "UNKNOWN" } };
 	MosaicHint fn[] = { { MOSAIC_BUTTON_FN2, "FN" } };
 	MosaicHint none[] = { { MOSAIC_BUTTON_A, NULL } };
 	MosaicHint empty[] = { { MOSAIC_BUTTON_A, "" } };
 	MosaicHint blank[] = { { MOSAIC_BUTTON_A, "\nOPEN" } };
 	MosaicHint second[] = { { MOSAIC_BUTTON_A, "OPEN" }, { MOSAIC_BUTTON_FN1, "FN" } };
-	CHECK(Hints_check(MOSAIC_HINTS_LEFT, dpad, 1, NULL, names) == -1);
+	CHECK(Hints_check(MOSAIC_HINTS_LEFT, dpad, 2, NULL, names) == 0);
+	CHECK_STR(names[0], "UP");
+	CHECK_STR(names[1], "L/R");
+	CHECK(Hints_check(MOSAIC_HINTS_LEFT, unknown, 1, NULL, names) == -1);
 	CHECK(Hints_check(MOSAIC_HINTS_LEFT, fn, 1, NULL, names) == -1);
 	CHECK(Hints_check(MOSAIC_HINTS_LEFT, none, 1, NULL, names) == -1);
 	CHECK(Hints_check(MOSAIC_HINTS_LEFT, empty, 1, NULL, names) == -1);
@@ -193,6 +225,7 @@ static void testClear(void) {
 
 int main(void) {
 	testGlyphs();
+	testDpad();
 	testCheck();
 	testPrimary();
 	testLabel();

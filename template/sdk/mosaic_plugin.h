@@ -368,6 +368,28 @@ typedef struct MosaicFnBinding {
 	char plugin_id[64]; // the plugin that bound it, with MOSAIC_FN_PLUGIN, else ""
 } MosaicFnBinding;
 
+// How button hints are drawn, as stock's Settings app offers them (its
+// "Input prompt style"): the button's name as text, or an icon from one of
+// three sets. host->hint_style returns the style in effect, and a theme
+// can pick one with MosaicTheme's hint_style.
+enum MosaicHintStyle {
+	MOSAIC_HINT_STYLE_USER = 0,      // in MosaicTheme only: the user's, from Settings
+	MOSAIC_HINT_STYLE_TEXT = 1,      // Text: the button's name, such as A or START
+	MOSAIC_HINT_STYLE_ABXY = 2,      // ABXY: A, B, X and Y icons
+	MOSAIC_HINT_STYLE_CARDINALS = 3, // Cardinals: a diamond of four dots, the button's filled
+	MOSAIC_HINT_STYLE_SHAPES = 4,    // Shapes: a circle, cross, triangle and square
+};
+
+// D-pad glyphs host->draw_button and host->draw_hints take besides the
+// d-pad's own buttons (MOSAIC_BUTTON_UP to MOSAIC_BUTTON_RIGHT). In the
+// icon styles each is a d-pad icon of that style; in the text style they
+// are words: UP, DOWN, LEFT, RIGHT, and these as U/D, L/R and DPAD.
+enum MosaicGlyph {
+	MOSAIC_GLYPH_UP_DOWN = 32,    // up and down
+	MOSAIC_GLYPH_LEFT_RIGHT = 33, // left and right
+	MOSAIC_GLYPH_DPAD = 34,       // the whole d-pad
+};
+
 // What the theme slot's owner supplies, for MosaicPlugin's theme. The
 // launcher sets size to sizeof(MosaicTheme) in the launcher and every
 // field to its "stock's" value before asking, so a theme sets only what it
@@ -391,6 +413,7 @@ typedef struct MosaicTheme {
 	char wallpaper_list[512];          // a game folder's background where it has no .media/bglist.png and the card no bg.png, or "" for wallpaper
 	char wallpaper_quick[512];         // the quick menu's background where the card has no .media/quick_<name>.png or quick.png, or ""
 	char fallback_font[512];           // a TrueType or OpenType font for the characters the UI font has no glyphs for, or "" for the strings slot's owner's (see fallback_font in MosaicPlugin) or none
+	int hint_style;                    // an enum MosaicHintStyle the launcher draws button hints in over the user's, or MOSAIC_HINT_STYLE_USER for the user's
 } MosaicTheme;
 
 #define MOSAIC_THEME_HAS(theme, field) \
@@ -466,7 +489,9 @@ enum MosaicScreenFlag {
 // but the d-pad, named as stock names it (A, B, X, Y, L1, R1, L2, R2,
 // START, SELECT, MENU, POWER), and FN1 to FN3 by the device's name for
 // them (see fn_name), such as HOME, on a launcher with fn_name and a
-// device that has them. The label is one line, in upper case like stock's.
+// device that has them. On a launcher with draw_button it can also be the
+// d-pad or an enum MosaicGlyph. The label is one line, in upper case like
+// stock's.
 typedef struct MosaicHint {
 	int button;
 	const char* label;
@@ -1288,6 +1313,25 @@ typedef struct MosaicHost {
 	// them with MOSAIC_HOST_HAS(host, save_screenshot).
 	MosaicSurface* (*capture_screen)(void);
 	int (*save_screenshot)(char* path, size_t size);
+
+	// Button hints in the style in effect. hint_style returns an enum
+	// MosaicHintStyle other than MOSAIC_HINT_STYLE_USER: the theme slot's
+	// owner's when its theme sets one (see hint_style in MosaicTheme),
+	// otherwise the user's from stock's Settings. It changes only when the
+	// lists reload. draw_button draws one button as stock's hints draw it,
+	// without a label: in that style, at the button size (ui_size's
+	// MOSAIC_UI_BUTTON, scaled) high, in the theme's colours, its top left
+	// at x and y on surface, one the plugin can draw on (its own, or one
+	// lent to a hook). button is any a MosaicHint takes, the d-pad and enum
+	// MosaicGlyph included: a letter or an icon is a circle as wide as it's
+	// high, and a name such as START, or the d-pad's in the text style, a
+	// wider pill. With surface NULL it draws nothing, to measure. When drawn
+	// isn't NULL it gets the button's rect. draw_button returns 0, or -1
+	// for a surface the plugin can't draw on, a button with no hint (such
+	// as an FN button the device lacks) or x or y out of range. Check for
+	// them with MOSAIC_HOST_HAS(host, draw_button).
+	int (*hint_style)(void);
+	int (*draw_button)(MosaicSurface* surface, int button, int x, int y, MosaicRect* drawn);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1619,8 +1663,8 @@ typedef struct MosaicPlugin {
 	const char* (*translate_plural)(const char* plugin_id, const char* context, const char* singular, const char* plural, unsigned long n);
 
 	// The theme slot. A plugin with slots=theme in its plugin.txt supplies
-	// the launcher's colours, font and fallback font, text size, UI sizes
-	// and wallpapers: theme gets a MosaicTheme with every field at stock's value, sets the
+	// the launcher's colours, font and fallback font, text size, UI sizes,
+	// wallpapers and hint style: theme gets a MosaicTheme with every field at stock's value, sets the
 	// ones it changes and returns 0. Nothing it sets is written to stock's
 	// settings. The launcher asks once every plugin has loaded, before the
 	// first list is built, and again each time the lists reload. A value

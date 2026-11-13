@@ -38,6 +38,10 @@ int PluginDraw_textHeight(int font);
 int PluginDraw_textTruncate(int font, const char* text, int max_width, char* out, size_t size);
 int PluginDraw_drawText(MosaicSurface* target, int font, const char* text, int x, int y, MosaicColor color, int max_width);
 
+// host->draw_button for a button stock names glyph (see Hint_glyph), drawn
+// by stock's hint code without a label; target NULL only measures.
+int PluginDraw_button(MosaicSurface* target, const char* glyph, int x, int y, MosaicRect* drawn);
+
 // The whole of a regular file of up to 16 MiB, to free, or NULL. Opened
 // without blocking, so a FIFO or device can't stall the caller; safe off
 // the main thread.

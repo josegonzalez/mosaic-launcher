@@ -35,6 +35,7 @@ typedef struct TPTheme {
 	char wallpaper_list[TP_PATH_MAX];
 	char wallpaper_quick[TP_PATH_MAX];
 	char fallback_font[TP_PATH_MAX];
+	int hint_style;               // an enum MosaicHintStyle, or MOSAIC_HINT_STYLE_USER
 } TPTheme;
 
 // A palette file in stock's format.
@@ -58,6 +59,11 @@ int TP_parseContrast(const char* text);
 // A whole number from lo to hi, optionally signed. Returns 0 and sets out,
 // or -1.
 int TP_parseInt(const char* text, int lo, int hi, int* out);
+
+// A hint style as stock's Settings names it: text, abxy, cardinals or
+// shapes, ignoring case. Returns an enum MosaicHintStyle, or -1 for
+// anything else.
+int TP_parseHintStyle(const char* text);
 
 // 1 for a path a theme may name: relative, not empty, no "." or ".."
 // part, no empty part, no backslash and shorter than TP_PATH_MAX.

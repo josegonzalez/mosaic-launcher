@@ -25,6 +25,7 @@
 #include "plugincfg.h"
 #include "fnbinds.h"
 #include "capture.h"
+#include "hintmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -1017,6 +1018,15 @@ static int hostSaveScreenshot(char* path, size_t size) {
 	return rc;
 }
 
+///////////////////////////////////////
+// button hints
+
+static int hostDrawButton(MosaicSurface* surface, int button, int x, int y, MosaicRect* drawn) {
+	// FN1 to FN3 by the device's names, such as HOME, as draw_hints takes them
+	const char* fn_names[] = { Plugins_fnName(0), Plugins_fnName(1), Plugins_fnName(2) };
+	return PluginDraw_button(surface, Hint_glyph(button, fn_names), x, y, drawn);
+}
+
 // Surfaces belong to a loaded plugin, the one whose init is running included.
 static int isLoaded(const char* plugin_id) {
 	for (int i = 0; plugin_id && i < loaded_count; i++) {
@@ -1287,6 +1297,8 @@ static const MosaicHost host = {
 	.fn_release = hostFnRelease,
 	.capture_screen = hostCaptureScreen,
 	.save_screenshot = hostSaveScreenshot,
+	.hint_style = Theme_hintStyle,
+	.draw_button = hostDrawButton,
 };
 
 ///////////////////////////////////////

@@ -19,15 +19,40 @@ static const struct {
 	{ MOSAIC_BUTTON_POWER, "POWER" },
 };
 
+// The d-pad's names, in the order Hint_dpad numbers them. Stock draws none
+// of them, so its own hints never match one.
+static const struct {
+	int button;
+	const char* glyph;
+} dpad[] = {
+	{ MOSAIC_BUTTON_UP, "UP" },
+	{ MOSAIC_BUTTON_DOWN, "DOWN" },
+	{ MOSAIC_BUTTON_LEFT, "LEFT" },
+	{ MOSAIC_BUTTON_RIGHT, "RIGHT" },
+	{ MOSAIC_GLYPH_UP_DOWN, "U/D" },
+	{ MOSAIC_GLYPH_LEFT_RIGHT, "L/R" },
+	{ MOSAIC_GLYPH_DPAD, "DPAD" },
+};
+
 const char* Hint_glyph(int button, const char* const* fn_names) {
 	for (size_t i = 0; i < sizeof(glyphs) / sizeof(glyphs[0]); i++) {
 		if (glyphs[i].button == button) return glyphs[i].glyph;
+	}
+	for (size_t i = 0; i < sizeof(dpad) / sizeof(dpad[0]); i++) {
+		if (dpad[i].button == button) return dpad[i].glyph;
 	}
 	if (fn_names && button >= MOSAIC_BUTTON_FN1 && button <= MOSAIC_BUTTON_FN3) {
 		const char* name = fn_names[button - MOSAIC_BUTTON_FN1];
 		return name && name[0] ? name : NULL;
 	}
 	return NULL;
+}
+
+int Hint_dpad(const char* glyph) {
+	for (size_t i = 0; glyph && i < sizeof(dpad) / sizeof(dpad[0]); i++) {
+		if (!strcmp(dpad[i].glyph, glyph)) return (int)i;
+	}
+	return -1;
 }
 
 int Hints_check(int group, const MosaicHint* hints, int count, const char* const* fn_names, const char** names) {

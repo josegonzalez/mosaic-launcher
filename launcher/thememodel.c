@@ -224,3 +224,17 @@ const char* ThemeModel_wallpaper(const ThemeWalls* walls, int spot) {
 	}
 	return path && path[0] ? path : NULL;
 }
+
+int ThemeModel_hintStyleOk(int style) {
+	return style >= MOSAIC_HINT_STYLE_USER && style <= MOSAIC_HINT_STYLE_SHAPES;
+}
+
+int ThemeModel_hintStock(int theme_style, int stock) {
+	if (theme_style < MOSAIC_HINT_STYLE_TEXT || theme_style > MOSAIC_HINT_STYLE_SHAPES) return stock;
+	return theme_style - MOSAIC_HINT_STYLE_TEXT + THEME_HINT_STOCK_TEXT;
+}
+
+int ThemeModel_hintStyle(int stock) {
+	if (stock < THEME_HINT_STOCK_TEXT || stock > THEME_HINT_STOCK_SHAPES) return MOSAIC_HINT_STYLE_TEXT;
+	return stock - THEME_HINT_STOCK_TEXT + MOSAIC_HINT_STYLE_TEXT;
+}

@@ -214,6 +214,26 @@ static void testParseTheme(void) {
 	CHECK(t.font[0] == '\0' && t.wallpaper[0] == '\0' && t.wallpaper_list[0] == '\0' && t.wallpaper_quick[0] == '\0');
 	CHECK(t.fallback_font[0] == '\0');
 
+	// the hint style, as stock's Settings names them
+	CHECK(TP_parseHintStyle("text") == MOSAIC_HINT_STYLE_TEXT);
+	CHECK(TP_parseHintStyle("ABXY") == MOSAIC_HINT_STYLE_ABXY);
+	CHECK(TP_parseHintStyle("Cardinals") == MOSAIC_HINT_STYLE_CARDINALS);
+	CHECK(TP_parseHintStyle("shapes") == MOSAIC_HINT_STYLE_SHAPES);
+	CHECK(TP_parseHintStyle("shape") == -1);
+	CHECK(TP_parseHintStyle("user") == -1);
+	CHECK(TP_parseHintStyle("") == -1);
+	CHECK(TP_parseHintStyle("2") == -1);
+	CHECK(TP_parseHintStyle(NULL) == -1);
+	logCount = 0;
+	CHECK(TP_parseTheme("hint_style = Shapes\n", &t, capture, NULL) == 0);
+	CHECK(logCount == 0);
+	CHECK(t.hint_style == MOSAIC_HINT_STYLE_SHAPES);
+	CHECK(TP_parseTheme("color1=0x112233\n", &t, capture, NULL) == 0);
+	CHECK(t.hint_style == MOSAIC_HINT_STYLE_USER);
+	CHECK(TP_parseTheme("hint_style=abxy\nhint_style=round\n", &t, capture, NULL) == 0);
+	CHECK(loggedLine("line 2: hint_style round isn't text, abxy, cardinals or shapes, dropped"));
+	CHECK(t.hint_style == MOSAIC_HINT_STYLE_ABXY);
+
 	// a newer format isn't used at all
 	logCount = 0;
 	CHECK(TP_parseTheme("version=2\ncolor1=0x112233\n", &t, capture, NULL) == -1);
@@ -564,6 +584,26 @@ static void testApply(void) {
 	t = stockTheme();
 	TP_apply(&t, NULL, NULL, mocha, &none, NULL, NULL);
 	CHECK(t.colors[0] == 0xCBA6F7 && t.colors[6] == 0x1E1E2E);
+
+	// the theme's hint style, and the user's (unset) without one
+	CHECK(parsed.hint_style == MOSAIC_HINT_STYLE_USER);
+	t = stockTheme();
+	TP_apply(&t, &parsed, CARD "/Themes/Night", mocha, &none, NULL, NULL);
+	CHECK(t.hint_style == MOSAIC_HINT_STYLE_USER);
+	TPTheme styled = parsed;
+	styled.hint_style = MOSAIC_HINT_STYLE_CARDINALS;
+	t = stockTheme();
+	TP_apply(&t, &styled, CARD "/Themes/Night", mocha, &o, NULL, NULL);
+	CHECK(t.hint_style == MOSAIC_HINT_STYLE_CARDINALS);
+	t = stockTheme();
+	TP_apply(&t, NULL, NULL, mocha, &none, NULL, NULL);
+	CHECK(t.hint_style == MOSAIC_HINT_STYLE_USER);
+	// one from before hint_style
+	t = stockTheme();
+	t.size = offsetof(MosaicTheme, hint_style);
+	t.hint_style = 77;
+	TP_apply(&t, &styled, CARD "/Themes/Night", mocha, &none, NULL, NULL);
+	CHECK(t.hint_style == 77);
 
 	// an older launcher's smaller MosaicTheme: fields past its size are left alone
 	t = stockTheme();

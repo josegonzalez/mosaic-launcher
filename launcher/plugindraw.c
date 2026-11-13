@@ -374,6 +374,21 @@ int PluginDraw_drawText(MosaicSurface* target, int which, const char* text, int 
 	return width;
 }
 
+int PluginDraw_button(MosaicSurface* target, const char* glyph, int x, int y, MosaicRect* drawn) {
+	SDL_Surface* dst = NULL;
+	if (target && !(dst = drawable(target))) return -1;
+	if (!glyph || !inRange(x) || !inRange(y)) return -1;
+	// stock's own hint drawing, with no label, so the style, sizes and
+	// colours are its hints'
+	lockFonts();
+	int w = GFX_getButtonWidth("", (char*)glyph);
+	SDL_Rect at = { x, y, 0, 0 };
+	if (dst) GFX_blitButton("", (char*)glyph, dst, &at);
+	unlockFonts();
+	if (drawn) *drawn = (MosaicRect){ x, y, w, SCALE1(BUTTON_SIZE) };
+	return 0;
+}
+
 ///////////////////////////////////////
 // lending to render hooks
 

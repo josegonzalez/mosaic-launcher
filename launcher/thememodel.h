@@ -96,6 +96,23 @@ int ThemeModel_clampContrast(uint32_t colors[7], int min_tenths);
 // reason in why.
 int ThemeModel_cardFile(const char* card_root, const char* path, char* out, size_t size, const char** why);
 
+// Stock's hint styles (config.h's INPUT_STYLE_*, which theme.c checks
+// these against): text, then its three icon sets.
+#define THEME_HINT_STOCK_TEXT -1
+#define THEME_HINT_STOCK_SHAPES 2
+
+// 1 for a hint style a theme may set: an enum MosaicHintStyle,
+// MOSAIC_HINT_STYLE_USER included.
+int ThemeModel_hintStyleOk(int style);
+
+// The stock hint style the launcher draws in: theme_style's, or stock (the
+// user's, from Settings) for MOSAIC_HINT_STYLE_USER or anything else.
+int ThemeModel_hintStock(int theme_style, int stock);
+
+// The enum MosaicHintStyle for a stock hint style. One stock doesn't have,
+// which stock's Settings never writes, is MOSAIC_HINT_STYLE_TEXT.
+int ThemeModel_hintStyle(int stock);
+
 // The wallpaper spots.
 enum {
 	THEME_WALL_MAIN,  // stock's <sd>/bg.png, which a folder with no .media/bg.png falls back to
