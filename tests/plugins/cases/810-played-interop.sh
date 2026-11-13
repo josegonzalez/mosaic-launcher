@@ -61,10 +61,10 @@ pi_plugins() {
 }
 
 # pi_home <name> <id=on...>: home-dashboard and those plugins, presser
-# going to the Stats tab
+# going to the Stats tab and back to Home, so both draw, then to Stats
 pi_home() {
 	pi_plugins home-dashboard=on "$@"
-	PRESSER_KEYS="r1" PRESSER_LOG="$WORK/$1.texts" SMOKE_PRELOAD="$PRESSER"
+	PRESSER_KEYS="r1 l1 r1" PRESSER_LOG="$WORK/$1.texts" SMOKE_PRELOAD="$PRESSER"
 	export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
 	run_launcher "$WORK/$1.log" "presser: done" || fail "the launcher exited early with home-dashboard ($1)"
 	unset PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
@@ -99,6 +99,7 @@ printf '/Roms/Played Interop (PIT)/Played.gb\n/Roms/Played Interop (PIT)/Fresh.g
 printf 'unplayed_only=on\nfrom=favorites\n' >"$STATE/random-game.cfg"
 printf 'steps=action:random-game.pick\n' >"$STATE/seeker.cfg"
 for i in 1 2 3; do
+	: >"$RECENTS"
 	pi_plugins row-badges=on random-game=on favorites=on seeker=on
 	log="$WORK/played-interop-random-$i.log"
 	run_launcher "$log" && fail "the launcher didn't quit to launch random-game's pick ($i)"
@@ -124,7 +125,7 @@ log="$WORK/played-interop-quests.log"
 run_launcher "$log" "plugin screener: done" || fail "the launcher exited early with gamification"
 plugin=gamification
 expect "left out play: it needs 50 minutes, and the limit leaves 20"
-expect "play 40/90 left out, games 0/3"
+grep -qF "; play 40/90 left out, games 0/3" "$log" || fail "gamification didn't show the daily quest left out"
 grep -q "^left_out=play " "$PI_GM_STATE/state.txt" 2>/dev/null || fail "gamification didn't keep the quest left out"
 
 unset TZ

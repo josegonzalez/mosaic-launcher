@@ -504,8 +504,8 @@ expect "can't open 2: Gone"
 grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's list was turned off"
 
 # switcher-plus's captions: Game was played 2h 15m over 2 sessions 3 days
-# ago and Other never, in playtime-captions' defaults while it isn't
-# loaded and in its settings while it is. Local time is about noon, as for
+# ago and Other never, none while playtime-captions isn't loaded and its
+# captions.text, in its settings, while it is. Local time is about noon, as for
 # tracker
 [ -f "$PLAY_DB" ] && mv "$PLAY_DB" "$WORK/game_logs.sqlite.saved"
 now=$(date +%s)
@@ -526,15 +526,14 @@ printf 'steps=action:gamelist.switcher,right,b\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/switcher-plus-captions.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's captions"
 log="$WORK/switcher-plus-captions.log"
 expect "style full, captions on"
-expect "captions time on, last on, sessions off, format relative, never off, achievements off"
-expect "showing 0 of 3: Saved Game, preview drawn, resume, style full, caption 2h 15m · 3 days ago"
+expect "captions on, but nobody provides captions.text, so there are none"
+expect "showing 0 of 3: Saved Game, preview drawn, resume, style full, no caption"
 expect "showing 1 of 3: Other, preview none, open, style full, no caption"
 grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's screen was turned off with captions"
 make -s -C "$ROOT/plugins" playtime-captions ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building playtime-captions"
 printf 'sessions=on\nnever=on\n' >"$STATE/playtime-captions.cfg"
 run_launcher "$WORK/switcher-plus-captions-set.log" "plugin screener: done" || fail "the launcher exited early with switcher-plus's captions and playtime-captions"
 log="$WORK/switcher-plus-captions-set.log"
-expect "captions time on, last on, sessions on, format relative, never on, achievements off"
 expect "showing 0 of 3: Saved Game, preview drawn, resume, style full, caption 2h 15m · 3 days ago · 2 sessions"
 expect "showing 1 of 3: Other, preview none, open, style full, caption Never played"
 grep -qF "plugins: switcher-plus's screen switcher-plus.switcher's" "$log" && fail "switcher-plus's screen was turned off with playtime-captions"
