@@ -117,9 +117,9 @@ int SS_idleScreen(const char* current, const char* home);
 // (charging 1, as is_charging returns it).
 int SS_chargingWins(int plugin_on, const char* charging_idle, int charging);
 
-// 1 when plugins.txt's text turns the plugin id on (eg. "charging-screen=on"),
-// the last line for it winning, as the loader reads it.
-int SS_pluginOn(const char* plugins_txt, const char* id);
+// 1 when the plugin id is loaded, as host->plugin_loaded says, or 0 on a
+// launcher without it.
+int SS_pluginLoaded(const MosaicHost* host, const char* id);
 
 // Parses "<level> <charging>", such as "73 1", as charging-screen's
 // test-only battery file holds it. Returns 1, or 0 when it isn't that.

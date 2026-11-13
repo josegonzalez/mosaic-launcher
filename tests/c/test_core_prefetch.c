@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakeloaded.h"
 
 #include "../../plugins/core-prefetch/core_prefetch.c"
 
@@ -135,6 +136,7 @@ static MosaicHost fake = {
 	.userdata_path = USERDATA,
 	.log = fakeLog,
 	.cfg_get = fakeCfgGet,
+	.plugin_loaded = fakePluginLoaded,
 };
 
 ///////////////////////////////////////
@@ -188,12 +190,16 @@ static void testScriptCore(void) {
 }
 
 static void testOverride(void) {
+	MosaicHost h = { .size = sizeof(MosaicHost), .plugin_loaded = fakePluginLoaded };
 	CHECK(!CP_overrideOn(NULL));
-	CHECK(!CP_overrideOn("favorites=on\n"));
-	CHECK(CP_overrideOn("favorites=on\n emulator-override = on \n"));
-	CHECK(!CP_overrideOn("emulator-override=on\nemulator-override=off\n"));
-	CHECK(!CP_overrideOn("emulator-override-x=on\n"));
-	CHECK(CP_overrideOn("emulator-override=on\r\n"));
+	fake_loaded = "favorites,emulator-override-x";
+	CHECK(!CP_overrideOn(&h));
+	fake_loaded = "favorites,emulator-override";
+	CHECK(CP_overrideOn(&h));
+	// an older launcher's table, without plugin_loaded
+	h.size = FAKE_HOST_BEFORE_LOADED;
+	CHECK(!CP_overrideOn(&h));
+	fake_loaded = "";
 
 	char key[CP_PATH_LEN];
 	CHECK(CP_overrideKey(CARD, CARD "/Roms/Game Boy Advance (GBA)/Metroid.gba", key, sizeof(key)));
@@ -352,11 +358,13 @@ static void testPlugin(void) {
 	CHECK(advisedFor(OUTSIDE "/secret.gba", &in_order) == 0);
 	CHECK(advisedFor(gpsp, &in_order) == 3000);
 
-	// emulator-override's choice, only while it's on
+	// emulator-override's choice, only while it's loaded: not while it's
+	// only on in plugins.txt, as when its init declined
 	writeFile(USERDATA "/launcher/emulator-override.txt", "/Roms/Game Boy Advance (GBA)/Metroid.gba\tMGBA\n");
+	writeFile(USERDATA "/launcher/plugins.txt", "emulator-override=on\n");
 	CHECK(launchGame(metroid, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(advisedFor(gpsp, &in_order) == 3000 && advisedFor(mgba, &in_order) == 0);
-	writeFile(USERDATA "/launcher/plugins.txt", "emulator-override=on\n");
+	fake_loaded = "emulator-override";
 	CHECK(launchGame(metroid, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(advisedFor(gpsp, &in_order) == 0 && advisedFor(mgba, &in_order) == 4000);
 	CHECK(strstr(logged, "the core from MGBA.pak") != NULL);
@@ -365,6 +373,7 @@ static void testPlugin(void) {
 	CHECK(launchGame(metroid, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(advisedFor(gpsp, &in_order) == 3000);
 	unlink(USERDATA "/launcher/plugins.txt");
+	fake_loaded = "";
 
 	// the time and byte settings
 	strcpy(cfg_mb, "1");

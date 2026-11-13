@@ -27,7 +27,6 @@
 
 #define ID "core-prefetch"
 #define CHUNK (1024 * 1024)          // bytes per posix_fadvise call
-#define CHOICES_MAX 16384            // the most of plugins.txt read
 #define OVERRIDE_MAX (1024 * 1024)   // the most of emulator-override.txt read, as it reads it
 
 static const MosaicHost* host;
@@ -66,10 +65,8 @@ static long long (*now_ms)(void) = nowMs;
 // valid choice for it.
 static int overridePak(const char* path, char* out, size_t size) {
 	char file[CP_PATH_LEN];
-	char choices[CHOICES_MAX];
 	char key[CP_PATH_LEN];
-	snprintf(file, sizeof(file), "%s/launcher/plugins.txt", host->userdata_path);
-	if (CP_readText(file, choices, sizeof(choices)) < 0 || !CP_overrideOn(choices)) return 0;
+	if (!CP_overrideOn(host)) return 0;
 	if (!CP_overrideKey(host->sdcard_path, path, key, sizeof(key))) return 0;
 	snprintf(file, sizeof(file), "%s/launcher/emulator-override.txt", host->userdata_path);
 	return CP_overridePak(file, key, OVERRIDE_MAX, out, size);

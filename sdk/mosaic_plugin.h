@@ -335,6 +335,7 @@ typedef struct MosaicPluginInfo {
 	size_t size;   // sizeof(MosaicPluginInfo) in the plugin
 	char id[64];   // its id, as in its plugin.txt
 	char res[600]; // its resource folder, <its folder>/res, which may not be there
+	char description[256]; // its plugin.txt's description, or "" without one; an older launcher leaves it
 } MosaicPluginInfo;
 
 // A game in the play history, for host->play_game_info. The plugin sets
@@ -1450,6 +1451,19 @@ typedef struct MosaicHost {
 	int (*event_value)(const char* payload, const char* key, char* out, size_t size);
 	int (*set_changed)(const char* name);
 	int (*set_names)(void (*each)(const char* name, void* data), void* data);
+
+	// Other plugins: plugin_loaded returns 1 when the plugin with that id
+	// is on and its init succeeded, and 0 for one that's off, missing,
+	// declined, skipped or paused after a crash. has_capability returns 1
+	// when such a plugin lists name in its plugin.txt's provides=, matched
+	// exactly, else 0; the launcher's own features are checked with
+	// MOSAIC_HOST_HAS instead. From init they answer for the plugins that
+	// loaded before it, and 0 for the plugin itself and later ones, so list
+	// a plugin in optional= to load after it. In the Launcher pak's
+	// settings they answer for the strings and theme slots' owners only.
+	// Check for them with MOSAIC_HOST_HAS(host, has_capability).
+	int (*plugin_loaded)(const char* id);
+	int (*has_capability)(const char* name);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

@@ -113,6 +113,9 @@ static void manifestField(const char* key, const char* value, void* data) {
 	else if (!strcmp(key, "slots")) copyField(m->slots, sizeof(m->slots), value);
 	else if (!strcmp(key, "requires")) copyField(m->requires, sizeof(m->requires), value);
 	else if (!strcmp(key, "conflicts")) copyField(m->conflicts, sizeof(m->conflicts), value);
+	else if (!strcmp(key, "optional")) copyField(m->optional, sizeof(m->optional), value);
+	else if (!strcmp(key, "provides")) copyField(m->provides, sizeof(m->provides), value);
+	else if (!strcmp(key, "description")) copyField(m->description, sizeof(m->description), value);
 }
 
 int Manifest_parse(const char* text, PluginManifest* out) {
@@ -290,6 +293,8 @@ char* PluginSet_setChoice(const char* choices, const char* id, int on) {
 	return out;
 }
 
+static void orderOptional(PluginDecision* out, int n);
+
 int PluginSet_resolve(const PluginManifest* manifests, int count, const char* choices, PluginDecision* out) {
 	static Choices c;
 	memset(&c, 0, sizeof(c));
@@ -399,7 +404,53 @@ int PluginSet_resolve(const PluginManifest* manifests, int count, const char* ch
 		}
 	}
 
+	orderOptional(out, n);
 	return n;
+}
+
+// Whether d waits for a loading plugin that isn't placed yet: one its
+// optional= names, other than itself.
+static int waitsFor(const PluginDecision* d, const PluginDecision* rest, int rest_count) {
+	if (!d->load || !d->manifest->optional[0]) return 0;
+	for (int i = 0; i < rest_count; i++) {
+		const PluginDecision* other = &rest[i];
+		if (other == d || !other->load || !strcmp(other->manifest->id, d->manifest->id)) continue;
+		if (csvHas(d->manifest->optional, other->manifest->id)) return 1;
+	}
+	return 0;
+}
+
+// Moves each loading plugin after the loading plugins its optional= names:
+// each place goes to the first plugin, in the order so far, that waits for
+// none of those left, or, when every one left waits (they name each other),
+// to the first of them.
+static void orderOptional(PluginDecision* out, int n) {
+	static PluginDecision rest[PLUGIN_MAX];
+	int rest_count = n;
+	memcpy(rest, out, sizeof(PluginDecision) * (size_t)n);
+	for (int placed = 0; placed < n; placed++) {
+		int pick = 0;
+		for (int i = 0; i < rest_count; i++) {
+			if (!waitsFor(&rest[i], rest, rest_count)) {
+				pick = i;
+				break;
+			}
+		}
+		out[placed] = rest[pick];
+		memmove(&rest[pick], &rest[pick + 1], sizeof(PluginDecision) * (size_t)(rest_count - pick - 1));
+		rest_count--;
+	}
+}
+
+const char* PluginSet_orderBroken(const PluginDecision* out, int count, int index) {
+	if (index < 0 || index >= count) return NULL;
+	const PluginDecision* d = &out[index];
+	if (!d->load || !d->manifest->optional[0]) return NULL;
+	for (int i = index + 1; i < count; i++) {
+		if (!out[i].load || !strcmp(out[i].manifest->id, d->manifest->id)) continue;
+		if (csvHas(d->manifest->optional, out[i].manifest->id)) return out[i].manifest->id;
+	}
+	return NULL;
 }
 
 int PluginSet_onlySlots(PluginDecision* out, int count, const char* slots, const char* why) {

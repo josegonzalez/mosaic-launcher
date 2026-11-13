@@ -39,6 +39,9 @@ typedef struct PluginManifest {
 	char slots[256];     // comma-separated exclusive slots this plugin claims
 	char requires[256];  // comma-separated ids that must also load
 	char conflicts[256]; // comma-separated ids that can't load alongside it
+	char optional[256];  // comma-separated ids it loads after when they load, and does without
+	char provides[256];  // comma-separated capabilities it offers, for has_capability
+	char description[256]; // one line about it, for plugin_info
 	char dir[512];       // the plugin's directory
 	int bundled;         // 1: ships in Launcher.pak, off by default; 0: its own pak, on by default
 	PluginSetting settings[PLUGIN_SETTINGS_MAX];
@@ -83,13 +86,21 @@ int Manifest_res(const PluginManifest* m, char* out, size_t size);
 //   slot.<name>=<id>  which plugin owns an exclusive slot
 //
 // Fills out with one decision per manifest, in load order, and returns the
-// count. choices may be NULL.
+// count. choices may be NULL. Once it's decided which plugins load, each
+// that does is moved after the loading plugins its optional= names, the
+// rest keeping their order; optional= never changes which plugins load.
+// Plugins that name each other load in their usual order, and
+// PluginSet_orderBroken says which.
 int PluginSet_resolve(const PluginManifest* manifests, int count, const char* choices, PluginDecision* out);
 
 // After PluginSet_resolve: keeps loading only the plugins that claim one
 // of slots (comma-separated), refusing the rest with why. The plugins they
 // require aren't kept for them. Returns how many still load.
 int PluginSet_onlySlots(PluginDecision* out, int count, const char* slots, const char* why);
+
+// After PluginSet_resolve: the first loading plugin that out[index] names
+// in optional= but loads after it, as they name each other, or NULL.
+const char* PluginSet_orderBroken(const PluginDecision* out, int count, int index);
 
 // True when id appears in a comma-separated list.
 int csvHas(const char* csv, const char* id);

@@ -2,6 +2,7 @@
 #define PREFETCH_MODEL_H
 
 #include <stddef.h>
+#include "mosaic_plugin.h"
 
 // The core prefetch's logic, with no SDL and no host: which emulator pak
 // a game launches with, which core its launch.sh runs, which files the
@@ -44,10 +45,9 @@ int CP_scriptCore(const char* script, const char* pak_dir, const char* sdcard, c
 ///////////////////////////////////////
 // emulator-override
 
-// 1 when plugins.txt's text turns emulator-override on: its last
-// emulator-override=on|off line says on. It's bundled, so it's off without
-// one.
-int CP_overrideOn(const char* choices);
+// 1 when emulator-override is loaded, as host->plugin_loaded says, or 0 on
+// a launcher without it.
+int CP_overrideOn(const MosaicHost* host);
 
 // The card-relative key emulator-override keeps a game's choice under: the
 // .m3u named after the game's folder when there's one, or the game's own

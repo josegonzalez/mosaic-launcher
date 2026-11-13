@@ -20,7 +20,7 @@
 // and the suspend timeout runs from there as usual.
 //
 // It gives way to charging-screen: while the device charges and
-// charging-screen is on in plugins.txt with its idle setting on, this
+// charging-screen is loaded with its idle setting on, this
 // screen doesn't open, so charging-screen's opens instead. Neither opens
 // over the other, since both open only over the game list or home. For the tests
 // only, MOSAIC_CHARGING_SCREEN_FAKE, charging-screen's test battery, is
@@ -520,12 +520,9 @@ static int init(const MosaicHost* h) {
 		say("the folder setting isn't a folder on the card, so there are no images");
 	}
 
-	char path[SS_PATH_MAX];
-	snprintf(path, sizeof(path), "%s/launcher/plugins.txt", host->userdata_path);
-	char* text = readFile(path);
-	favorites_on = SS_pluginOn(text, "favorites");
-	charging_on = SS_pluginOn(text, CHARGING_ID);
-	free(text);
+	// both load before it, as its optional= asks
+	favorites_on = SS_pluginLoaded(host, "favorites");
+	charging_on = SS_pluginLoaded(host, CHARGING_ID);
 	snprintf(collection_path, sizeof(collection_path), "%s/Collections/%s.txt", host->sdcard_path,
 		SS_collectionName(publicSetting("favorites", "collection", "Favorites")));
 

@@ -58,7 +58,7 @@ static int stats_on = 1;
 static int shelf_on = 1;
 static char pico_tags[256];
 
-static int favorites_loaded = 0; // favorites=on in plugins.txt
+static int favorites_loaded = 0; // favorites loaded before this plugin, as its optional= asks
 static char collection_path[MAX_PATH_LEN + 160];
 
 typedef struct Item {
@@ -873,11 +873,7 @@ static int init(const MosaicHost* h) {
 	shelf_on = setting("shelf", "on");
 	snprintf(pico_tags, sizeof(pico_tags), "%s", host->cfg_get("pico8_tags", "P8,PICO8,PICO"));
 
-	char path[MAX_PATH_LEN];
-	snprintf(path, sizeof(path), "%s/launcher/plugins.txt", host->userdata_path);
-	char* text = readFile(path);
-	favorites_loaded = HD_pluginOn(text, "favorites");
-	free(text);
+	favorites_loaded = HD_pluginLoaded(host, "favorites");
 	snprintf(collection_path, sizeof(collection_path), "%s/Collections/%s.txt", host->sdcard_path,
 		HD_collectionName(publicSetting("favorites", "collection", "Favorites")));
 

@@ -133,25 +133,8 @@ const char* FR_describe(const char* id) {
 	return NULL;
 }
 
-int FR_pluginOn(const char* plugins_txt, const char* id) {
-	if (!plugins_txt || !id || !id[0]) return 0;
-	size_t len = strlen(id);
-	int on = 0;
-	const char* line = plugins_txt;
-	while (*line) {
-		const char* end = strchr(line, '\n');
-		if (!end) end = line + strlen(line);
-		const char* a = line;
-		const char* b = end;
-		while (a < b && isSpace(*a)) a++;
-		while (b > a && isSpace(b[-1])) b--;
-		// the last line for the plugin wins, as the loader reads it
-		if ((size_t)(b - a) > len && !strncmp(a, id, len) && a[len] == '=') {
-			on = (size_t)(b - a) == len + 3 && !strncmp(a + len + 1, "on", 2);
-		}
-		line = *end ? end + 1 : end;
-	}
-	return on;
+int FR_pluginLoaded(const MosaicHost* host, const char* id) {
+	return host && id && id[0] && MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded(id);
 }
 
 // Cuts line until line + "..." fits max_w, then adds the dots.

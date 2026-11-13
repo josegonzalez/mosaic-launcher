@@ -12,7 +12,8 @@
 //
 // Plugins can't set the PIN or turn plugins on, so those pages only say
 // what's there and point to Tools > Launcher > Plugins. The plugins page
-// reads plugins.txt to show On or Off, and never writes it.
+// shows On for a suggested plugin that's loaded, as plugin_loaded says,
+// and Off otherwise.
 //
 // It opens from tick, as open_screen is refused from init: on the first
 // frame showing the game list or the home slot's screen, which is where
@@ -21,7 +22,6 @@
 // shows, and opens by itself at most once a run.
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "mosaic_plugin.h"
 #include "wizard_model.h"
@@ -35,7 +35,6 @@
 #define PILL_SIZE 30
 #define BUTTON_PADDING 12
 #define TEXT_LINES 12
-#define PLUGINS_TXT_MAX (64 * 1024)
 #define DEFAULT_SUGGEST "home-dashboard,switcher-plus,favorites,search"
 
 static const MosaicHost* host;
@@ -81,16 +80,6 @@ static int setting(const char* key, const char* fallback) {
 	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
-static char* readAll(const char* path, size_t limit) {
-	FILE* f = fopen(path, "r");
-	if (!f) return NULL;
-	char* text = malloc(limit + 1);
-	size_t n = text ? fread(text, 1, limit, f) : 0;
-	fclose(f);
-	if (text) text[n] = '\0';
-	return text;
-}
-
 ///////////////////////////////////////
 // what the pages show, read as the wizard opens
 
@@ -108,11 +97,7 @@ static int readToggles(void) {
 }
 
 static void readPlugins(void) {
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/launcher/plugins.txt", host->userdata_path);
-	char* text = readAll(path, PLUGINS_TXT_MAX);
-	for (int i = 0; i < suggest_count; i++) suggest_on[i] = FR_pluginOn(text, suggest[i]);
-	free(text);
+	for (int i = 0; i < suggest_count; i++) suggest_on[i] = FR_pluginLoaded(host, suggest[i]);
 }
 
 static void logRows(void) {

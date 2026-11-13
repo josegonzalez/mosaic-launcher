@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include "check.h"
+#include "fakeloaded.h"
 #include "words.h"
 #include "../../plugins/home-dashboard/home_dashboard.c"
 
@@ -228,17 +229,17 @@ static void testPico(void) {
 }
 
 static void testFavorites(void) {
-	CHECK(HD_pluginOn("favorites=on\n", "favorites"));
-	CHECK(HD_pluginOn("hidden=on\r\nfavorites=on\r\n", "favorites"));
-	CHECK(HD_pluginOn("favorites=on", "favorites"));
-	CHECK(!HD_pluginOn("favorites=off\n", "favorites"));
-	CHECK(!HD_pluginOn("favorites=on\nfavorites=off\n", "favorites"));
-	CHECK(HD_pluginOn("favorites=off\nfavorites=on\n", "favorites"));
-	CHECK(!HD_pluginOn("favorites-plus=on\n", "favorites"));
-	CHECK(!HD_pluginOn("slot.home=favorites\n", "favorites"));
-	CHECK(!HD_pluginOn("favorites=onward\n", "favorites"));
-	CHECK(!HD_pluginOn(NULL, "favorites"));
-	CHECK(!HD_pluginOn("", "favorites"));
+	MosaicHost h = { .size = sizeof(MosaicHost), .plugin_loaded = fakePluginLoaded };
+	fake_loaded = "hidden,favorites";
+	CHECK(HD_pluginLoaded(&h, "favorites"));
+	CHECK(!HD_pluginLoaded(&h, "favorites-plus"));
+	CHECK(!HD_pluginLoaded(&h, ""));
+	CHECK(!HD_pluginLoaded(&h, NULL));
+	CHECK(!HD_pluginLoaded(NULL, "favorites"));
+	// an older launcher's table, without plugin_loaded
+	h.size = FAKE_HOST_BEFORE_LOADED;
+	CHECK(!HD_pluginLoaded(&h, "favorites"));
+	fake_loaded = "";
 
 	CHECK_STR(HD_collectionName("Faves"), "Faves");
 	CHECK_STR(HD_collectionName(""), "Favorites");
@@ -400,6 +401,7 @@ static long long fakePlayTime(const char* p) { return strstr(p, "Metroid") ? 720
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
+	.plugin_loaded = fakePluginLoaded,
 	.sdcard_path = TEST_SDCARD_PATH,
 	.userdata_path = TEST_SDCARD_PATH "/.userdata/desktop",
 	.log = fakeLog,
@@ -457,7 +459,7 @@ static void reset(const char* m) {
 }
 
 static void testPlugin(void) {
-	writeFile(TEST_SDCARD_PATH "/.userdata/desktop/launcher/plugins.txt", "favorites=on\nhome-dashboard=on\n");
+	fake_loaded = "favorites,home-dashboard";
 	writeFile(TEST_SDCARD_PATH "/Collections/Favorites.txt", "/Roms/GB/Tetris.gb\n/Roms/GB/Gone.gb\n/Roms/NES/Zelda.nes\n");
 	writeFile(TEST_SDCARD_PATH "/Roms/GB/Tetris.gb", "");
 	writeFile(TEST_SDCARD_PATH "/Roms/NES/Zelda.nes", "");
@@ -510,8 +512,10 @@ static void testPlugin(void) {
 	press(MOSAIC_BUTTON_L1);
 	CHECK(tab == HD_TAB_STATS);
 
-	// without favorites on, no pinned tab, and stats keeps its place
-	writeFile(TEST_SDCARD_PATH "/.userdata/desktop/launcher/plugins.txt", "home-dashboard=on\n");
+	// without favorites loaded, no pinned tab, and stats keeps its place,
+	// even with plugins.txt turning it on (it's on but declined to start)
+	writeFile(TEST_SDCARD_PATH "/.userdata/desktop/launcher/plugins.txt", "favorites=on\nhome-dashboard=on\n");
+	fake_loaded = "home-dashboard";
 	logged[0] = '\0';
 	CHECK(init(&fake) == 0);
 	CHECK(registered.enter(registered.data) == 0);

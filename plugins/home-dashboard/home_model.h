@@ -102,9 +102,9 @@ int HD_tagIn(const char* tag, const char* tags);
 // a dot file.
 int HD_isPicoCart(const char* name);
 
-// 1 when plugins.txt's text turns the plugin id on (eg. "favorites=on"),
-// by its last line for id.
-int HD_pluginOn(const char* plugins_txt, const char* id);
+// 1 when the plugin id is loaded, as host->plugin_loaded says, or 0 on a
+// launcher without it.
+int HD_pluginLoaded(const MosaicHost* host, const char* id);
 // The collection favorites keeps its list in, from its "collection"
 // setting: the value, or "Favorites" when it's empty or has a "/".
 const char* HD_collectionName(const char* setting);

@@ -27,6 +27,23 @@ static const PluginDecision* decision(int n, const char* id) {
 	return NULL;
 }
 
+// The loading plugins' ids, in load order, each followed by ;
+static const char* order(int n) {
+	static char ids[256];
+	ids[0] = '\0';
+	for (int i = 0; i < n; i++) {
+		if (out[i].load) snprintf(ids + strlen(ids), sizeof(ids) - strlen(ids), "%s;", out[i].manifest->id);
+	}
+	return ids;
+}
+
+static int indexOf(int n, const char* id) {
+	for (int i = 0; i < n; i++) {
+		if (!strcmp(out[i].manifest->id, id)) return i;
+	}
+	return -1;
+}
+
 static int loads(int n, const char* id) {
 	const PluginDecision* d = decision(n, id);
 	return d && d->load;
@@ -294,6 +311,86 @@ int main(void) {
 	n = PluginSet_resolve(manifests, count, "words=off\nlooks=off\nlooks2=off\n", out);
 	CHECK(PluginSet_onlySlots(out, n, "strings,theme", "settings only") == 0);
 	for (int i = 0; i < n; i++) CHECK(!out[i].load);
+
+	// provides=, optional= and description=
+	CHECK(Manifest_parse("id=fav\nprovides= sets.favorites , events.fav.added\noptional=a,b\ndescription= Keeps favorites \n", &m) == 0);
+	CHECK(csvHas(m.provides, "sets.favorites"));
+	CHECK(csvHas(m.provides, "events.fav.added"));
+	CHECK(!csvHas(m.provides, "sets"));
+	CHECK(csvHas(m.optional, "b"));
+	CHECK_STR(m.description, "Keeps favorites");
+	CHECK(Manifest_parse("id=bare\n", &m) == 0);
+	CHECK_STR(m.provides, "");
+	CHECK_STR(m.optional, "");
+	CHECK_STR(m.description, "");
+
+	// optional=: after the named plugins when they load, the rest keeping
+	// their order
+	reset();
+	add("id=dash\noptional=fav", 0);
+	add("id=plain", 0);
+	add("id=fav", 0);
+	add("id=late", 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	CHECK_STR(order(n), "plain;fav;dash;late;");
+	CHECK(PluginSet_orderBroken(out, n, indexOf(n, "dash")) == NULL);
+	// plugins.txt's order first, then optional=
+	n = PluginSet_resolve(manifests, count, "late=on\ndash=on\nfav=on\n", out);
+	CHECK_STR(order(n), "late;fav;dash;plain;");
+	// fine without it: off, missing or refused
+	n = PluginSet_resolve(manifests, count, "fav=off\n", out);
+	CHECK(loads(n, "dash"));
+	CHECK_STR(order(n), "dash;plain;late;");
+	reset();
+	add("id=dash\noptional=fav,missing", 0);
+	add("id=fav\nconflicts=dash", 0);
+	add("id=other", 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	// the conflict is decided in the usual order, before optional= moves anything
+	CHECK(loads(n, "dash") && !loads(n, "fav"));
+	CHECK_STR(decision(n, "fav")->reason, "conflicts with dash");
+	CHECK_STR(order(n), "dash;other;");
+	// it never loads a plugin for it, unlike requires=
+	reset();
+	add("id=dash\noptional=fav", 0);
+	add("id=fav", 1);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	CHECK(loads(n, "dash") && !loads(n, "fav"));
+	// a chain, and requires= alone doesn't order
+	reset();
+	add("id=a\noptional=b", 0);
+	add("id=b\noptional=c", 0);
+	add("id=c", 0);
+	add("id=d\nrequires=e", 0);
+	add("id=e", 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	CHECK_STR(order(n), "c;b;a;d;e;");
+	// naming itself is ignored
+	reset();
+	add("id=self\noptional=self", 0);
+	add("id=next", 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	CHECK_STR(order(n), "self;next;");
+	CHECK(PluginSet_orderBroken(out, n, 0) == NULL);
+	// a cycle loads in the usual order, and says so
+	reset();
+	add("id=x\noptional=y", 0);
+	add("id=y\noptional=x", 0);
+	add("id=z\noptional=x", 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	CHECK_STR(order(n), "x;y;z;");
+	CHECK_STR(PluginSet_orderBroken(out, n, indexOf(n, "x")), "y");
+	CHECK(PluginSet_orderBroken(out, n, indexOf(n, "y")) == NULL);
+	CHECK(PluginSet_orderBroken(out, n, indexOf(n, "z")) == NULL);
+	CHECK(PluginSet_orderBroken(out, n, -1) == NULL);
+	CHECK(PluginSet_orderBroken(out, n, n) == NULL);
+	// a plugin that's off keeps its place among the decisions, with no wait
+	reset();
+	add("id=x\noptional=y", 1);
+	add("id=y", 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	CHECK(n == 2 && !loads(n, "x"));
+	CHECK_STR(out[0].manifest->id, "x");
 
 	CHECK_DONE();
 }

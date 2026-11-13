@@ -1,6 +1,8 @@
 id=smart-collections
 name=Smart Collections
 api=1
+# the smart:<name> entry sets
+provides=sets.smart
 # the franchises that ship with the plugin, such as Mario, Zelda and Sonic
 setting.builtin=toggle|Built-in franchises|on
 # more franchises, comma-separated, eg. Kirby, Bomberman

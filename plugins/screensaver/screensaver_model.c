@@ -165,23 +165,8 @@ int SS_chargingWins(int plugin_on, const char* charging_idle, int charging) {
 	return parseSeconds(s) != 0;
 }
 
-int SS_pluginOn(const char* plugins_txt, const char* id) {
-	if (!plugins_txt || !id || !id[0]) return 0;
-	size_t len = strlen(id);
-	int on = 0;
-	const char* line = plugins_txt;
-	while (*line) {
-		const char* end = strchr(line, '\n');
-		if (!end) end = line + strlen(line);
-		const char* stop = end;
-		while (stop > line && (stop[-1] == '\r' || stop[-1] == ' ' || stop[-1] == '\t')) stop--;
-		while (line < stop && (*line == ' ' || *line == '\t')) line++;
-		if ((size_t)(stop - line) > len && !strncmp(line, id, len) && line[len] == '=') {
-			on = (size_t)(stop - line) == len + 3 && !strncmp(line + len + 1, "on", 2);
-		}
-		line = *end ? end + 1 : end;
-	}
-	return on;
+int SS_pluginLoaded(const MosaicHost* host, const char* id) {
+	return host && id && id[0] && MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded(id);
 }
 
 int SS_parseFake(const char* text, int* level, int* charging) {

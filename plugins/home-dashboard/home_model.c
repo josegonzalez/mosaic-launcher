@@ -220,24 +220,8 @@ int HD_isPicoCart(const char* name) {
 	return endsWithCase(name, ".p8") || endsWithCase(name, ".p8.png");
 }
 
-int HD_pluginOn(const char* plugins_txt, const char* id) {
-	if (!plugins_txt || !id || !id[0]) return 0;
-	size_t len = strlen(id);
-	int on = 0;
-	const char* line = plugins_txt;
-	while (*line) {
-		const char* end = strchr(line, '\n');
-		if (!end) end = line + strlen(line);
-		const char* stop = end;
-		while (stop > line && (stop[-1] == '\r' || stop[-1] == ' ' || stop[-1] == '\t')) stop--;
-		while (line < stop && (*line == ' ' || *line == '\t')) line++;
-		// the last line for the plugin wins, as the loader reads it
-		if ((size_t)(stop - line) > len && !strncmp(line, id, len) && line[len] == '=') {
-			on = (size_t)(stop - line) == len + 3 && !strncmp(line + len + 1, "on", 2);
-		}
-		line = *end ? end + 1 : end;
-	}
-	return on;
+int HD_pluginLoaded(const MosaicHost* host, const char* id) {
+	return host && id && id[0] && MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded(id);
 }
 
 const char* HD_collectionName(const char* setting) {

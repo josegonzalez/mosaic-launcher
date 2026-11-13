@@ -75,8 +75,9 @@ int FR_parseIds(const char* text, char ids[][FR_ID_MAX], int max);
 // wizard knows, or NULL.
 const char* FR_describe(const char* id);
 
-// 1 when plugins.txt's text turns id on (its last id= line says on).
-int FR_pluginOn(const char* plugins_txt, const char* id);
+// 1 when the plugin id is loaded, as host->plugin_loaded says, or 0 on a
+// launcher without it.
+int FR_pluginLoaded(const MosaicHost* host, const char* id);
 
 // Wraps text into lines no wider than max_w by width(line, data), at
 // spaces, a word too wide alone taking a line of its own. Fills up to max

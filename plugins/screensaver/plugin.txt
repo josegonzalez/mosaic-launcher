@@ -1,6 +1,8 @@
 id=screensaver
 name=Screensaver
 api=1
+# loads after favorites and charging-screen, which it asks about as it starts
+optional=favorites,charging-screen
 # how long the game list or home is left alone before the screensaver shows
 setting.idle=choice|Show after idle (seconds)|30|off,15,30,45,60,120,300,600
 # where the images come from: recent and favorite games' art, the Screenshots folder, or the folder setting's folder

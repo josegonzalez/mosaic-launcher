@@ -206,27 +206,8 @@ int CP_scriptCore(const char* script, const char* pak_dir, const char* sdcard, c
 ///////////////////////////////////////
 // emulator-override
 
-int CP_overrideOn(const char* choices) {
-	int on = 0;
-	char line[LINE_LEN];
-	const char* p = choices;
-	while ((p = nextLine(p, line, sizeof(line)))) {
-		char* s = line;
-		while (isspace((unsigned char)*s)) s++;
-		const char* id = "emulator-override";
-		size_t len = strlen(id);
-		if (strncmp(s, id, len) != 0) continue;
-		s += len;
-		while (*s == ' ' || *s == '\t') s++;
-		if (*s != '=') continue;
-		s++;
-		while (*s == ' ' || *s == '\t') s++;
-		size_t n = strlen(s);
-		while (n && isspace((unsigned char)s[n - 1])) s[--n] = '\0';
-		if (!strcmp(s, "on")) on = 1;
-		else if (!strcmp(s, "off")) on = 0;
-	}
-	return on;
+int CP_overrideOn(const MosaicHost* host) {
+	return host && MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded("emulator-override");
 }
 
 int CP_overrideKey(const char* sdcard, const char* path, char* key, size_t size) {

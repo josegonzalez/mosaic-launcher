@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakeloaded.h"
 #include "words.h"
 #include "../../plugins/screensaver/screensaver.c"
 
@@ -137,12 +138,16 @@ static void testIdle(void) {
 	CHECK(!SS_chargingWins(1, "60", 0));
 	CHECK(!SS_chargingWins(1, "60", -1));
 
-	CHECK(SS_pluginOn("charging-screen=on\n", "charging-screen"));
-	CHECK(SS_pluginOn("a=off\r\n charging-screen=on \r\n", "charging-screen"));
-	CHECK(!SS_pluginOn("charging-screen=on\ncharging-screen=off\n", "charging-screen"));
-	CHECK(!SS_pluginOn("charging-screen-plus=on\n", "charging-screen"));
-	CHECK(!SS_pluginOn("charging-screen=onn\n", "charging-screen"));
-	CHECK(!SS_pluginOn(NULL, "charging-screen"));
+	MosaicHost h = { .size = sizeof(MosaicHost), .plugin_loaded = fakePluginLoaded };
+	fake_loaded = "favorites,charging-screen";
+	CHECK(SS_pluginLoaded(&h, "charging-screen"));
+	CHECK(!SS_pluginLoaded(&h, "charging-screen-plus"));
+	CHECK(!SS_pluginLoaded(&h, NULL));
+	CHECK(!SS_pluginLoaded(NULL, "charging-screen"));
+	// an older launcher's table, without plugin_loaded
+	h.size = FAKE_HOST_BEFORE_LOADED;
+	CHECK(!SS_pluginLoaded(&h, "charging-screen"));
+	fake_loaded = "";
 
 	int l = 0, c = 0;
 	CHECK(SS_parseFake("73 1", &l, &c) && l == 73 && c == 1);
@@ -461,6 +466,7 @@ static MosaicHost fakeHost(void) {
 		.log = fakeLog,
 		.cfg_get = fakeCfgGet,
 		.cfg_read = fakeCfgRead,
+		.plugin_loaded = fakePluginLoaded,
 		.request_redraw = fakeRedraw,
 		.recents_count = fakeRecents,
 		.is_charging = fakeCharging,
@@ -616,13 +622,21 @@ static void testPlugin(void) {
 	CHECK(!is_open);
 	plugin.quit();
 
-	// with charging-screen on and charging, it gives way
+	// charging-screen on in plugins.txt but not loaded, as when its init
+	// declined: no giving way
 	snprintf(path, sizeof(path), "%s/launcher/plugins.txt", userdata);
 	FILE* f = fopen(path, "w");
 	if (f) {
 		fputs("charging-screen=on\n", f);
 		fclose(f);
 	}
+	logs[0] = '\0';
+	CHECK(plugin.init(&host_table) == 0);
+	CHECK(strstr(logs, "after charging-screen") == NULL);
+	plugin.quit();
+
+	// with charging-screen loaded and charging, it gives way
+	fake_loaded = "charging-screen";
 	logs[0] = '\0';
 	CHECK(plugin.init(&host_table) == 0);
 	CHECK(strstr(logs, ", after charging-screen while charging\n") != NULL);
@@ -652,6 +666,7 @@ static void testPlugin(void) {
 	frame(480016, none);
 	plugin.quit();
 	unlink(path);
+	fake_loaded = "";
 
 	// an empty folder still opens, black with the clock
 	snprintf(cfg_folder, sizeof(cfg_folder), "Empty");

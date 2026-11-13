@@ -379,8 +379,26 @@ static int hostPluginInfo(int index, MosaicPluginInfo* out) {
 	full.size = out->size;
 	snprintf(full.id, sizeof(full.id), "%s", m->id);
 	Manifest_res(m, full.res, sizeof(full.res));
+	snprintf(full.description, sizeof(full.description), "%s", m->description);
 	// only the fields the plugin knows about
 	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return 0;
+}
+
+// A plugin that's on and whose init succeeded: while one's init runs, it
+// and the plugins after it don't count yet.
+static int hostPluginLoaded(const char* id) {
+	if (!id) return 0;
+	for (int i = 0; i < loaded_count; i++) {
+		if (i != initializing && !strcmp(loaded[i].id, id)) return 1;
+	}
+	return 0;
+}
+static int hostHasCapability(const char* name) {
+	if (!name || !name[0]) return 0;
+	for (int i = 0; i < loaded_count; i++) {
+		if (i != initializing && csvHas(loaded[i].manifest->provides, name)) return 1;
+	}
 	return 0;
 }
 
@@ -1643,6 +1661,8 @@ static const MosaicHost host = {
 	.event_value = hostEventValue,
 	.set_changed = hostSetChanged,
 	.set_names = hostSetNames,
+	.plugin_loaded = hostPluginLoaded,
+	.has_capability = hostHasCapability,
 };
 
 ///////////////////////////////////////
@@ -2060,6 +2080,11 @@ static void start(void) {
 		playLog);
 
 	for (int i = 0; i < n; i++) {
+		const char* before = PluginSet_orderBroken(decisions, n, i);
+		if (before) {
+			LOG_warn("plugins: %s loads before %s, which its optional= names, as they name each other\n",
+				decisions[i].manifest->id, before);
+		}
 		if (decisions[i].load) load(decisions[i].manifest);
 		else LOG_info("plugins: not loading %s: %s\n", decisions[i].manifest->id, decisions[i].reason);
 	}

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakeloaded.h"
 #include "../../plugins/first-run/first_run.c"
 
 #define CARD TEST_SDCARD_PATH
@@ -126,14 +127,17 @@ static void testIds(void) {
 	CHECK(FR_describe("tags") == NULL);
 	CHECK(FR_describe(NULL) == NULL);
 
-	CHECK(FR_pluginOn("favorites=on\n", "favorites") == 1);
-	CHECK(FR_pluginOn("favorites=on\r\nsearch=off\n", "search") == 0);
-	CHECK(FR_pluginOn("  favorites=on  \nfavorites=off", "favorites") == 0);
-	CHECK(FR_pluginOn("favorites=off\nfavorites=on", "favorites") == 1);
-	CHECK(FR_pluginOn("favorites-plus=on\n", "favorites") == 0);
-	CHECK(FR_pluginOn("favorites=one\n", "favorites") == 0);
-	CHECK(FR_pluginOn("slot.home=favorites\n", "favorites") == 0);
-	CHECK(FR_pluginOn(NULL, "favorites") == 0);
+	MosaicHost h = { .size = sizeof(MosaicHost), .plugin_loaded = fakePluginLoaded };
+	fake_loaded = "favorites,search";
+	CHECK(FR_pluginLoaded(&h, "favorites") == 1);
+	CHECK(FR_pluginLoaded(&h, "search") == 1);
+	CHECK(FR_pluginLoaded(&h, "favorites-plus") == 0);
+	CHECK(FR_pluginLoaded(&h, NULL) == 0);
+	CHECK(FR_pluginLoaded(NULL, "favorites") == 0);
+	// an older launcher's table, without plugin_loaded
+	h.size = FAKE_HOST_BEFORE_LOADED;
+	CHECK(FR_pluginLoaded(&h, "favorites") == 0);
+	fake_loaded = "";
 }
 
 static int charWidth(const char* line, void* data) {
@@ -358,6 +362,7 @@ static void setupHost(void) {
 	fake_host.stock_toggle_get = fakeToggleGet;
 	fake_host.stock_toggle_set = fakeToggleSet;
 	fake_host.has_pin = fakeHasPin;
+	fake_host.plugin_loaded = fakePluginLoaded;
 	fake_host.ask_pin = fakeAskPin;
 	fake_host.register_screen = fakeRegister;
 	fake_host.open_screen = fakeOpenScreen;
@@ -414,7 +419,9 @@ static void testPlugin(void) {
 	mkdir(CARD "/.userdata", 0755);
 	mkdir(USERDATA, 0755);
 	mkdir(USERDATA "/launcher", 0755);
-	writeFile(USERDATA "/launcher/plugins.txt", "favorites=on\nsearch=off\n");
+	// search is on but isn't loaded, as when its init declined, so it shows off
+	writeFile(USERDATA "/launcher/plugins.txt", "favorites=on\nsearch=on\n");
+	fake_loaded = "favorites,first-run";
 
 	reset();
 	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
