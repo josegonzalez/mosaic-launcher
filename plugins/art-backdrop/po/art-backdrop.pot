@@ -71,5 +71,9 @@ msgid "half"
 msgstr ""
 
 #: plugin.txt
+msgid "theme"
+msgstr ""
+
+#: plugin.txt
 msgid "third"
 msgstr ""

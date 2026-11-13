@@ -47,3 +47,6 @@ msgstr "mediano"
 
 msgid "small"
 msgstr "pequeño"
+
+msgid "theme"
+msgstr "tema"

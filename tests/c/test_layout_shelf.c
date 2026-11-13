@@ -97,6 +97,12 @@ static void testLayout(void) {
 	CHECK(LS_count("5", 1, 4) == 0);
 	CHECK(LS_count("", 1, 4) == 0);
 	CHECK(LS_count(NULL, 1, 4) == 0);
+	// theme, the default, takes the theme's layout-shelf.shelves; the user's own wins
+	CHECK_STR(LS_themed("theme", "3"), "3");
+	CHECK_STR(LS_themed(NULL, "3"), "3");
+	CHECK(LS_themed("theme", NULL) == NULL);
+	CHECK_STR(LS_themed("auto", "3"), "auto");
+	CHECK_STR(LS_themed("1", "3"), "1");
 	CHECK(LS_autoShelves(519, 3) == 2);
 	CHECK(LS_autoShelves(340, 2) == 2);
 	CHECK(LS_autoShelves(100, 3) == 1);
@@ -321,6 +327,17 @@ static int replaced_index = -1; // the entry it's for, or -1 for none
 static int blits_of_video = 0;
 static MosaicRect blit_video, blit_video_src;
 static const char* shelves_cfg = "auto";
+static const char* theme_shelves = NULL; // the theme's layout-shelf.shelves
+static void (*onThemeChanged)(const char*, const char*, void*);
+static const char* fakeThemeValue(const char* key, const char* fallback) {
+	return !strcmp(key, "layout-shelf.shelves") && theme_shelves ? theme_shelves : fallback;
+}
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	CHECK(!strcmp(name, "launcher.theme_changed"));
+	onThemeChanged = on_event;
+	return 0;
+}
 static char logged[256];
 
 static void fakeLog(const char* id, const char* m) {
@@ -870,6 +887,41 @@ static void testReplacement(void) {
 	animate_cfg = "on";
 }
 
+// the theme's layout-shelf.shelves while the setting is at theme, followed
+// on launcher.theme_changed, and the user's own over it
+static void testThemeShelves(void) {
+	setUp();
+	fake_host.theme_value = fakeThemeValue;
+	fake_host.subscribe = fakeSubscribe;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	MosaicInput in = { sizeof(MosaicInput), 0, 0, 0, 0 };
+	unsigned int consumed = 0;
+	MosaicListView v = makeView(0);
+	shelves_cfg = "theme";
+	theme_shelves = "1";
+	onThemeChanged = NULL;
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(onThemeChanged != NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(shelves_setting == 1);
+	theme_shelves = "3";
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(shelves_setting == 3);
+	theme_shelves = NULL;
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(shelves_setting == 0);
+	theme_shelves = "3";
+	shelves_cfg = "2";
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(shelves_setting == 2);
+	p->quit();
+	theme_shelves = NULL;
+	shelves_cfg = "auto";
+}
+
 int main(void) {
 	testShapes();
 	testLayout();
@@ -882,5 +934,6 @@ int main(void) {
 	testShapesPlugin();
 	testLift();
 	testCache();
+	testThemeShelves();
 	CHECK_DONE();
 }

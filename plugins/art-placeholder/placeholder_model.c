@@ -8,6 +8,11 @@ int PA_style(const char* value) {
 	return value && !strcmp(value, "pattern") ? PA_STYLE_PATTERN : PA_STYLE_TITLE;
 }
 
+const char* PA_themed(const char* setting, const char* theme_value) {
+	if (setting && setting[0] && strcmp(setting, "theme") != 0) return setting;
+	return theme_value;
+}
+
 int PA_size(int kind, int screen_w, int screen_h, int* w, int* h) {
 	// as big as the built-in list shows a thumbnail at stock's default
 	// game art width: 45% of the screen's width and 60% of its height

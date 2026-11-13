@@ -16,6 +16,11 @@
 // recently drawn going first. A copy that can't be made (the plugin's
 // surfaces are full) is drawn straight from the cache's image that frame
 // instead, dimmed as it's drawn.
+//
+// The dim setting at theme, the default, takes the theme slot owner's
+// art-backdrop.dim key, read once the theme is in place and again on
+// launcher.theme_changed; a new dim drops the copies, which have the old
+// one in them.
 
 #include <stdio.h>
 #include <string.h>
@@ -29,6 +34,8 @@
 static const MosaicHost* host;
 static int style = BD_STYLE_GRADIENT;
 static int dim = 0; // alpha of the black over the art
+static char dim_setting[16];
+static int dim_resolved = 0; // 0 until the theme's dim is read, and again when the theme changes
 static int divisor = 1;
 static int kinds[BD_MAX_KINDS];
 static int kind_count = 0;
@@ -123,8 +130,30 @@ static int pick(const MosaicEntry* entry, const MosaicSurface** image) {
 	return MOSAIC_ART_MISSING;
 }
 
+// the dim setting, or the theme's
+static void resolveDim(void) {
+	const char* themed = MOSAIC_HOST_HAS(host, theme_value) ? host->theme_value(ID ".dim", NULL) : NULL;
+	int now = BD_dim(BD_themed(dim_setting, themed));
+	dim_resolved = 1;
+	if (now == dim) return;
+	for (int i = 0; i < BD_COPIES; i++) copyFree(&copies[i]);
+	dim = now;
+	char message[64];
+	snprintf(message, sizeof(message), "dimmed by %i of 255 now", dim);
+	host->log(ID, message);
+}
+
+static void themeChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	resolveDim();
+}
+
 static int backgroundRender(MosaicSurface* screen, const MosaicEntry* selected) {
 	frame++;
+	// the theme is put in place after every plugin's init
+	if (!dim_resolved) resolveDim();
 	if (!selected || host->entry_type(selected) != MOSAIC_ENTRY_ROM) return 0;
 	const char* path = host->entry_path(selected);
 	if (!path || strlen(path) >= MAX_PATH_LEN) return 0;
@@ -179,7 +208,9 @@ static int init(const MosaicHost* h) {
 	const char* style_name = host->cfg_get("style", "gradient");
 	const char* height = host->cfg_get("height", "full");
 	style = BD_style(style_name);
-	dim = BD_dim(host->cfg_get("dim", "50"));
+	snprintf(dim_setting, sizeof(dim_setting), "%s", host->cfg_get("dim", "theme"));
+	dim = BD_dim(BD_themed(dim_setting, NULL));
+	dim_resolved = 0;
 	divisor = BD_height(height);
 	kind_count = BD_kinds(strcmp(host->cfg_get("screenshot", "on"), "off") != 0,
 		strcmp(host->cfg_get("thumbnail", "on"), "off") != 0, strcmp(host->cfg_get("box", "on"), "off") != 0,
@@ -189,6 +220,9 @@ static int init(const MosaicHost* h) {
 	snprintf(message, sizeof(message), "%s, dimmed by %i of 255, over 1/%i of the screen, from %i kinds of art",
 		style == BD_STYLE_FULL ? "full-bleed" : "gradient", dim, divisor, kind_count);
 	host->log(ID, message);
+	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
+		host->log(ID, "couldn't follow theme changes");
+	}
 	return 0;
 }
 

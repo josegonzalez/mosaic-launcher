@@ -238,3 +238,82 @@ int ThemeModel_hintStyle(int stock) {
 	if (stock < THEME_HINT_STOCK_TEXT || stock > THEME_HINT_STOCK_SHAPES) return MOSAIC_HINT_STYLE_TEXT;
 	return stock - THEME_HINT_STOCK_TEXT + MOSAIC_HINT_STYLE_TEXT;
 }
+
+int ThemeModel_extraKeyOk(const char* key) {
+	if (!key) return 0;
+	size_t len = strlen(key);
+	if (len < 3 || len >= THEME_EXTRA_KEY_MAX || key[0] == '.' || key[len - 1] == '.' || !strchr(key, '.')) return 0;
+	for (size_t i = 0; i < len; i++) {
+		char c = key[i];
+		int ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
+		if (!ok) return 0;
+	}
+	return 1;
+}
+
+// The slot for key: its own when it's there already, else a new one, or
+// -1 when they're all taken.
+static int extraSlot(ThemeExtras* extras, const char* key) {
+	for (int i = 0; i < extras->count; i++) {
+		if (!strcmp(extras->keys[i], key)) return i;
+	}
+	return extras->count < MOSAIC_THEME_EXTRA_KEYS ? extras->count++ : -1;
+}
+
+int ThemeModel_extras(const char* text, ThemeExtras* out, ThemeRefusals* refused) {
+	memset(out, 0, sizeof(*out));
+	int count = 0;
+	int number = 0;
+	for (const char* line = text ? text : ""; *line;) {
+		const char* end = strchr(line, '\n');
+		size_t len = end ? (size_t)(end - line) : strlen(line);
+		const char* start = line;
+		line = end ? end + 1 : line + len;
+		number++;
+		if (!len) continue;
+		// for the log: the line, cut short
+		char shown[48];
+		snprintf(shown, sizeof(shown), "%.*s%s", len > 40 ? 40 : (int)len, start, len > 40 ? "..." : "");
+		for (char* c = shown; *c; c++) {
+			if ((unsigned char)*c < 0x20 || *c == 0x7f) *c = '?';
+		}
+		const char* eq = memchr(start, '=', len);
+		size_t key_len = eq ? (size_t)(eq - start) : 0;
+		size_t value_len = eq ? len - key_len - 1 : 0;
+		char key[THEME_EXTRA_KEY_MAX];
+		const char* why = NULL;
+		if (!eq) why = "isn't key=value";
+		else if (key_len >= sizeof(key)) why = "has a key over 63 bytes";
+		else {
+			memcpy(key, start, key_len);
+			key[key_len] = '\0';
+			if (!ThemeModel_extraKeyOk(key)) why = "has no <plugin>.<name> key";
+			else if (value_len > MOSAIC_THEME_EXTRA_VALUE_MAX) why = "has a value over 255 bytes";
+			else {
+				for (size_t i = 0; i < value_len && !why; i++) {
+					unsigned char c = (unsigned char)eq[1 + i];
+					if (c < 0x20 || c == 0x7f) why = "has a control character in its value";
+				}
+			}
+		}
+		int slot = why ? -1 : extraSlot(out, key);
+		if (!why && slot < 0) why = "is past the first 64 keys";
+		if (why) {
+			refuse(refused, "extra line %d (%s) %s", number, shown, why);
+			count++;
+			continue;
+		}
+		snprintf(out->keys[slot], sizeof(out->keys[slot]), "%s", key);
+		memcpy(out->values[slot], eq + 1, value_len);
+		out->values[slot][value_len] = '\0';
+	}
+	return count;
+}
+
+const char* ThemeModel_extraValue(const ThemeExtras* extras, const char* key) {
+	if (!extras || !key) return NULL;
+	for (int i = 0; i < extras->count; i++) {
+		if (!strcmp(extras->keys[i], key)) return extras->values[i];
+	}
+	return NULL;
+}

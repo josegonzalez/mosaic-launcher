@@ -23,6 +23,12 @@
 // percent of the area's: 22, 28 or 34, or medium's for anything else.
 int HR_cardPercent(const char* value);
 
+// The value a setting that can follow the theme gives: the setting itself,
+// or for theme (or NULL or "", unset) the theme's layout-hero-rail.cards, theme_value, which
+// is NULL when the theme doesn't set it. NULL for neither, which HR_cardPercent
+// takes as its default.
+const char* HR_themed(const char* setting, const char* theme_value);
+
 // The tint setting, a percentage from 0 to 100, as the alpha of the theme
 // colour drawn over the hero art, from 0 to 255. Anything else is
 // HR_TINT_DEFAULT.

@@ -11,6 +11,16 @@ static void testStyle(void) {
 	CHECK(PA_style("Pattern") == PA_STYLE_TITLE);
 	CHECK(PA_style("") == PA_STYLE_TITLE);
 	CHECK(PA_style(NULL) == PA_STYLE_TITLE);
+
+	// theme, the default, takes the theme's art-placeholder.style; the user's own wins
+	CHECK_STR(PA_themed("theme", "pattern"), "pattern");
+	CHECK_STR(PA_themed(NULL, "pattern"), "pattern");
+	CHECK_STR(PA_themed("", "pattern"), "pattern");
+	CHECK(PA_themed("theme", NULL) == NULL);
+	CHECK_STR(PA_themed("title", "pattern"), "title");
+	CHECK_STR(PA_themed("pattern", "title"), "pattern");
+	CHECK(PA_style(PA_themed("theme", NULL)) == PA_STYLE_TITLE);
+	CHECK(PA_style(PA_themed("theme", "stripes")) == PA_STYLE_TITLE);
 }
 
 static void testSize(void) {
@@ -247,6 +257,10 @@ static const char* real_art = NULL; // a path art_find has a file for
 static int finds = 0;
 static int themed = 1;
 static const char* style_value = "title";
+static const char* theme_style = NULL; // the theme's art-placeholder.style
+static const char* fakeThemeValue(const char* key, const char* fallback) {
+	return !strcmp(key, "art-placeholder.style") && theme_style ? theme_style : fallback;
+}
 
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	return !strcmp(key, "style") ? style_value : fallback;
@@ -352,6 +366,7 @@ static MosaicHost fakeHost(void) {
 	h.art_find = fakeArtFind;
 	h.art_get = fakeArtGet;
 	h.plugin_art = 1;
+	h.theme_value = fakeThemeValue;
 	return h;
 }
 
@@ -428,6 +443,26 @@ static void testPlugin(void) {
 	}
 	CHECK(round_fills == tiles && tiles > 0);
 	style_value = "title";
+
+	// the theme picks the style while the setting is at theme, read for
+	// each card, and the user's own style wins
+	style_value = "theme";
+	theme_style = "pattern";
+	CHECK(p->init(&h) == 0);
+	reset();
+	CHECK(p->art_surface(&tetris, MOSAIC_ART_THUMBNAIL) != NULL);
+	CHECK(texts == 0 && first_fill == pattern.bg);
+	theme_style = NULL;
+	reset();
+	CHECK(p->art_surface(&tetris, MOSAIC_ART_THUMBNAIL) != NULL);
+	CHECK(texts == 1);
+	theme_style = "pattern";
+	style_value = "title";
+	CHECK(p->init(&h) == 0);
+	reset();
+	CHECK(p->art_surface(&tetris, MOSAIC_ART_THUMBNAIL) != NULL);
+	CHECK(texts == 1);
+	theme_style = NULL;
 
 	// a launcher without generated art declines it
 	MosaicHost old = fakeHost();

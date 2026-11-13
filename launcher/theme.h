@@ -2,8 +2,8 @@
 #define LAUNCHER_THEME_H
 
 // The theme slot over stock's look: its owner's colours, background
-// colour, font, fallback font, text size, UI sizes, wallpapers and hint
-// style, kept in memory only.
+// colour, font, fallback font, text size, UI sizes, wallpapers, hint
+// style and the keys it passes on to other plugins, kept in memory only.
 // Stock's settings are never written. With no theme, everything here
 // answers stock's own values. The UI_* calls uisizes.h makes are here too.
 
@@ -31,6 +31,10 @@ int Theme_fillWallpaper(int spot, char* path, size_t size);
 
 // The theme's fallback font, checked, or "" for none.
 const char* Theme_fallbackFont(void);
+
+// host->theme_value: the value of a key the theme passes on to other
+// plugins, or fallback when it has none or there's no theme.
+const char* Theme_value(const char* key, const char* fallback);
 
 // host->ui_size: an enum MosaicUISize's size, or -1.
 int Theme_uiSize(int which);

@@ -1,6 +1,9 @@
 // Cartridge shelf layout: owns the layout slot and draws the game list as
 // cartridges standing on shelves, as many shelves as its setting asks for
 // or fit the screen, each one's cartridges side by side on a wooden plank.
+// The setting at theme, the default, takes the theme slot owner's
+// layout-shelf.shelves key, or fits the screen without one, read once the
+// theme is in place and again on launcher.theme_changed.
 //
 // Each entry's cartridge takes the shape of the system it's in (see
 // LS_shapeOf): a Game Boy cartridge, nearly square with a ridged grip
@@ -56,6 +59,8 @@
 
 static const MosaicHost* host;
 static int shelves_setting = 0; // 0 for auto
+static char shelves_value[16]; // the setting as set, theme for the theme's
+static int themed = 0; // 0 until the theme's key is read, and again when the theme changes
 static int lift_setting = 1;
 static unsigned long now_ms = 0; // the last tick's
 
@@ -232,7 +237,24 @@ static void followFolder(const MosaicListView* view) {
 	folder_shape = LS_commonShape(shapes, n);
 }
 
+// the shelves setting, or at theme the theme's layout-shelf.shelves
+static void resolveSettings(void) {
+	const char* theme = MOSAIC_HOST_HAS(host, theme_value) ? host->theme_value(ID ".shelves", NULL) : NULL;
+	shelves_setting = LS_count(LS_themed(shelves_value, theme), 1, LS_MAX_SHELVES);
+	themed = 1;
+}
+
+// the theme's keys may have changed
+static void themeChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	themed = 0;
+}
+
 static int layoutShelves(const MosaicListView* view, LSShelves* shelves) {
+	// the theme is put in place after every plugin's init
+	if (!themed) resolveSettings();
 	int scale = host->screen_scale();
 	MosaicRect header = MOSAIC_VIEW_HAS(view, header) ? view->header : (MosaicRect){ 0, 0, 0, 0 };
 	return LS_layout(&view->area, &view->status, &header, scale, shelves_setting, nameHeight(view, scale),
@@ -467,8 +489,12 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a layout");
 		return 1;
 	}
-	shelves_setting = LS_count(host->cfg_get("shelves", "auto"), 1, LS_MAX_SHELVES);
+	snprintf(shelves_value, sizeof(shelves_value), "%s", host->cfg_get("shelves", "theme"));
+	themed = 0;
 	lift_setting = strcmp(host->cfg_get("animate", "on"), "off") != 0;
+	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
+		host->log(ID, "couldn't follow theme changes");
+	}
 	return 0;
 }
 

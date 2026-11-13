@@ -10,9 +10,10 @@
 static void testParse(void) {
 	CHECK(Ls_parseMode("battery") == LS_MODE_BATTERY);
 	CHECK(Ls_parseMode(" theme ") == LS_MODE_THEME);
-	CHECK(Ls_parseMode("themes") == LS_MODE_BATTERY);
-	CHECK(Ls_parseMode("") == LS_MODE_BATTERY);
-	CHECK(Ls_parseMode(NULL) == LS_MODE_BATTERY);
+	CHECK(Ls_parseMode("auto") == LS_MODE_AUTO);
+	CHECK(Ls_parseMode("themes") == LS_MODE_AUTO);
+	CHECK(Ls_parseMode("") == LS_MODE_AUTO);
+	CHECK(Ls_parseMode(NULL) == LS_MODE_AUTO);
 
 	CHECK(Ls_parseThemeColor("main") == MOSAIC_COLOR_MAIN);
 	CHECK(Ls_parseThemeColor("accent") == MOSAIC_COLOR_ACCENT);
@@ -33,6 +34,57 @@ static void testParse(void) {
 	CHECK(Ls_parseNumber("2x", 1, 99, 7) == 7);
 	CHECK(Ls_parseNumber("0", 1, 99, 7) == 7);
 	CHECK(Ls_parseNumber("100", 1, 99, 7) == 7);
+}
+
+// the theme's led-status.colour, and how it and the mode setting combine
+static void testThemeColour(void) {
+	LsSource s;
+	CHECK(Ls_parseColour("0x445566", &s) == 0);
+	CHECK(s.show == LS_SHOW_RGB && s.value == 0x445566 && s.from_theme);
+	CHECK(Ls_parseColour(" #a0B0c0 ", &s) == 0);
+	CHECK(s.show == LS_SHOW_RGB && s.value == 0xA0B0C0);
+	CHECK(Ls_parseColour("hint", &s) == 0);
+	CHECK(s.show == LS_SHOW_THEME && s.value == MOSAIC_COLOR_HINT);
+	CHECK(Ls_parseColour("battery", &s) == 0);
+	CHECK(s.show == LS_SHOW_BATTERY && s.from_theme);
+	s.show = LS_SHOW_THEME;
+	CHECK(Ls_parseColour("445566", &s) == -1);
+	CHECK(Ls_parseColour("0x4455", &s) == -1);
+	CHECK(Ls_parseColour("0x44556677", &s) == -1);
+	CHECK(Ls_parseColour("0x44556g", &s) == -1);
+	CHECK(Ls_parseColour("red", &s) == -1);
+	CHECK(Ls_parseColour("", &s) == -1);
+	CHECK(Ls_parseColour(NULL, &s) == -1);
+	CHECK(s.show == LS_SHOW_THEME); // untouched
+
+	// auto: the theme's, else the battery
+	s = Ls_source(LS_MODE_AUTO, MOSAIC_COLOR_MAIN, "0x445566");
+	CHECK(s.show == LS_SHOW_RGB && s.value == 0x445566 && s.from_theme);
+	s = Ls_source(LS_MODE_AUTO, MOSAIC_COLOR_MAIN, "accent2");
+	CHECK(s.show == LS_SHOW_THEME && s.value == MOSAIC_COLOR_ACCENT2);
+	s = Ls_source(LS_MODE_AUTO, MOSAIC_COLOR_MAIN, NULL);
+	CHECK(s.show == LS_SHOW_BATTERY && !s.from_theme);
+	s = Ls_source(LS_MODE_AUTO, MOSAIC_COLOR_MAIN, "purple");
+	CHECK(s.show == LS_SHOW_BATTERY && !s.from_theme);
+	// the user's mode wins over the theme's colour
+	s = Ls_source(LS_MODE_BATTERY, MOSAIC_COLOR_MAIN, "0x445566");
+	CHECK(s.show == LS_SHOW_BATTERY && !s.from_theme);
+	s = Ls_source(LS_MODE_THEME, MOSAIC_COLOR_MAIN, "0x445566");
+	CHECK(s.show == LS_SHOW_THEME && s.value == MOSAIC_COLOR_MAIN && !s.from_theme);
+
+	char line[96];
+	s = Ls_source(LS_MODE_AUTO, MOSAIC_COLOR_MAIN, "0x445566");
+	Ls_describe(&s, line, sizeof(line));
+	CHECK_STR(line, "0x445566, from the theme");
+	s = Ls_source(LS_MODE_AUTO, MOSAIC_COLOR_MAIN, "list_text");
+	Ls_describe(&s, line, sizeof(line));
+	CHECK_STR(line, "the theme colour list_text, from the theme");
+	s = Ls_source(LS_MODE_THEME, MOSAIC_COLOR_ACCENT, NULL);
+	Ls_describe(&s, line, sizeof(line));
+	CHECK_STR(line, "the theme colour accent");
+	s = Ls_source(LS_MODE_AUTO, MOSAIC_COLOR_ACCENT, NULL);
+	Ls_describe(&s, line, sizeof(line));
+	CHECK_STR(line, "the battery level");
 }
 
 static void testBands(void) {
@@ -135,8 +187,24 @@ static int sets = 0, refuse = 0;
 static int lit = -1;
 static int logs = 0;
 static const char* settings[8][2];
+static const char* themeColour = NULL; // the theme's led-status.colour
+static void (*onThemeChanged)(const char*, const char*, void*);
+static char lastLog[160];
 
-static void fakeLog(const char* id, const char* m) { (void)id; (void)m; logs++; }
+static void fakeLog(const char* id, const char* m) {
+	(void)id;
+	snprintf(lastLog, sizeof(lastLog), "%s", m);
+	logs++;
+}
+static const char* fakeThemeValue(const char* key, const char* fallback) {
+	return !strcmp(key, "led-status.colour") && themeColour ? themeColour : fallback;
+}
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	CHECK_STR(name, "launcher.theme_changed");
+	onThemeChanged = on_event;
+	return 0;
+}
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	for (int i = 0; i < 8 && settings[i][0]; i++) {
 		if (!strcmp(settings[i][0], key)) return settings[i][1];
@@ -167,6 +235,8 @@ static MosaicHost fake = {
 	.led_set_color = fakeSet,
 	.led_clear = fakeClear,
 	.theme_color = fakeTheme,
+	.subscribe = fakeSubscribe,
+	.theme_value = fakeThemeValue,
 };
 
 static void setting(const char* key, const char* value) {
@@ -275,15 +345,85 @@ static void testRefused(void) {
 	refuse = 1;
 	unsigned long now = 0;
 	ticks(&now, 60000);
-	// tried once, logged once
+	// tried once, logged once, after what the LEDs show
 	CHECK(sets == 1);
-	CHECK(logs == 1);
+	CHECK(logs == 2);
 	CHECK(lit == -1);
 	refuse = 0;
 	battery_now = 40;
 	ticks(&now, 70000);
 	CHECK(lit == LS_YELLOW);
 	CHECK(sets == 2);
+}
+
+// auto, the default: the theme's colour, followed live, and the user's
+// mode over it
+static void testThemeKey(void) {
+	memset(settings, 0, sizeof(settings));
+	battery_now = 80;
+	themeColour = NULL;
+	onThemeChanged = NULL;
+	start(&fake);
+	CHECK(onThemeChanged != NULL);
+	unsigned long now = 0;
+	ticks(&now, 1000);
+	CHECK(lit == LS_GREEN);
+	CHECK_STR(lastLog, "the LEDs show the battery level");
+
+	// a new theme with a colour shows at once, not 5 seconds later
+	themeColour = "0x445566";
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK_STR(lastLog, "the LEDs show 0x445566, from the theme");
+	tick(now);
+	CHECK(lit == 0x445566);
+	int logged = logs;
+	ticks(&now, 30000);
+	CHECK(logs == logged);
+	themeColour = "background";
+	theme[MOSAIC_COLOR_BACKGROUND] = 0x010203;
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	tick(now);
+	CHECK(lit == 0x010203);
+	// and one without goes back to the battery
+	themeColour = NULL;
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	tick(now);
+	CHECK(lit == LS_GREEN);
+	CHECK_STR(lastLog, "the LEDs show the battery level");
+
+	// the theme's colour is there from the first frame, after init
+	themeColour = "0x0000FF";
+	start(&fake);
+	now = 0;
+	tick(now);
+	CHECK(lit == 0x0000FF);
+
+	// the user's battery or theme mode wins
+	setting("mode", "battery");
+	start(&fake);
+	now = 0;
+	tick(now);
+	CHECK(lit == LS_GREEN);
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	tick(now);
+	CHECK(lit == LS_GREEN);
+	setting("mode", "theme");
+	setting("theme_color", "hint");
+	theme[MOSAIC_COLOR_HINT] = 0x0A0B0C;
+	start(&fake);
+	now = 0;
+	tick(now);
+	CHECK(lit == 0x0A0B0C);
+
+	// a launcher without theme_value or subscribe: the battery
+	memset(settings, 0, sizeof(settings));
+	MosaicHost old = fake;
+	old.size = offsetof(MosaicHost, subscribe);
+	start(&old);
+	now = 0;
+	tick(now);
+	CHECK(lit == LS_GREEN);
+	themeColour = NULL;
 }
 
 static void testResume(void) {
@@ -309,6 +449,15 @@ static void testUnsupported(void) {
 	afterResume();
 	tick(now);
 	CHECK(sets == 0);
+	// it still says what the LEDs would show, and follows the theme
+	CHECK(logs == 2);
+	CHECK_STR(lastLog, "the LEDs show the battery level");
+	themeColour = "0x445566";
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK_STR(lastLog, "the LEDs show 0x445566, from the theme");
+	ticks(&now, 70000);
+	CHECK(sets == 0);
+	themeColour = NULL;
 	leds = 4;
 
 	// an older launcher, without LED colours
@@ -323,6 +472,7 @@ static void testUnsupported(void) {
 
 int main(void) {
 	testParse();
+	testThemeColour();
 	testBands();
 	testNoFlicker();
 	testBadReadings();
@@ -334,6 +484,7 @@ int main(void) {
 	testFirstReadingBad();
 	testTheme();
 	testRefused();
+	testThemeKey();
 	testResume();
 	testUnsupported();
 	CHECK_DONE();

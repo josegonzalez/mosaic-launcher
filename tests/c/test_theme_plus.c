@@ -241,6 +241,33 @@ static void testParseTheme(void) {
 	// the last value wins, as in stock's palettes
 	CHECK(TP_parseTheme("color1=0x111111\ncolor1=0x222222\n", &t, NULL, NULL) == 0);
 	CHECK(t.colors[0] == 0x222222);
+
+	// unknown keys with a '.' are other plugins', passed on as they are, in
+	// order, without being logged; the launcher checks them
+	logCount = 0;
+	CHECK(TP_parseTheme("color1=0x111111\nled-status.colour = 0x445566\nshadow=on\nlayout-grid.columns=4\n"
+		"led-status.colour=accent\n.odd=1\n", &t, capture, NULL) == 0);
+	CHECK_STR(t.extra, "led-status.colour=0x445566\nlayout-grid.columns=4\nled-status.colour=accent\n.odd=1\n");
+	CHECK(loggedLine("line 3: unknown key shadow, ignored"));
+	CHECK(logCount == 1);
+	CHECK(TP_parseTheme("color1=0x111111\n", &t, capture, NULL) == 0);
+	CHECK(t.extra[0] == '\0');
+	// a long key isn't cut short
+	CHECK(TP_parseTheme("title-disambiguation.a_rather_long_key_name_for_a_test=1\n", &t, NULL, NULL) == 0);
+	CHECK_STR(t.extra, "title-disambiguation.a_rather_long_key_name_for_a_test=1\n");
+	// what doesn't fit is logged and dropped, and the rest kept
+	char big[TP_FILE_MAX];
+	size_t used = 0;
+	for (int i = 0; i < 40; i++) {
+		used += snprintf(big + used, sizeof(big) - used, "p.k%02d=%0100d\n", i, i);
+	}
+	logCount = 0;
+	CHECK(TP_parseTheme(big, &t, capture, NULL) == 0);
+	CHECK(strlen(t.extra) < MOSAIC_THEME_EXTRA_MAX);
+	CHECK(strstr(t.extra, "p.k00=") == t.extra);
+	CHECK(loggedLine("line 39: p.k38 doesn't fit in the 4095 bytes of keys for other plugins, dropped"));
+	CHECK(loggedLine("line 40: p.k39 doesn't fit"));
+	CHECK(logCount == 2);
 }
 
 static void real(const char* path, char* out) {
@@ -606,6 +633,22 @@ static void testApply(void) {
 	TP_apply(&t, &styled, CARD "/Themes/Night", mocha, &none, NULL, NULL);
 	CHECK(t.hint_style == 77);
 
+	// the extra keys, as theme.txt has them; a palette theme has none
+	TPTheme extras = parsed;
+	snprintf(extras.extra, sizeof(extras.extra), "led-status.colour=0x112233\n");
+	t = stockTheme();
+	TP_apply(&t, &extras, CARD "/Themes/Night", mocha, &none, NULL, NULL);
+	CHECK_STR(t.extra, "led-status.colour=0x112233\n");
+	t = stockTheme();
+	TP_apply(&t, NULL, NULL, mocha, &none, NULL, NULL);
+	CHECK(t.extra[0] == '\0');
+	// one from before extra
+	t = stockTheme();
+	t.size = offsetof(MosaicTheme, extra);
+	strcpy(t.extra, "untouched");
+	TP_apply(&t, &extras, CARD "/Themes/Night", mocha, &none, NULL, NULL);
+	CHECK_STR(t.extra, "untouched");
+
 	// an older launcher's smaller MosaicTheme: fields past its size are left alone
 	t = stockTheme();
 	t.size = offsetof(MosaicTheme, font);
@@ -800,12 +843,14 @@ static void testPlugin(void) {
 	cfgValues[0][0] = cfgValues[1][0] = NULL;
 
 	// a theme whose palette is missing keeps its own colours
-	writeFile(CARD "/Themes/Lost/theme.txt", "palette=Gone\ncolor2=0x123456\nmystery=1\n");
+	writeFile(CARD "/Themes/Lost/theme.txt", "palette=Gone\ncolor2=0x123456\nmystery=1\nart-backdrop.dim=25\n");
 	snprintf(cfgTheme, sizeof(cfgTheme), "Lost");
 	t = asked();
 	CHECK(hostLogged("theme.txt: no palette is called Gone, so it's left out"));
 	CHECK(hostLogged("theme.txt: line 3: unknown key mystery, ignored"));
+	CHECK(!hostLogged("art-backdrop.dim"));
 	CHECK(t.colors[0] == MOSAIC_THEME_UNSET && t.colors[1] == 0x123456);
+	CHECK_STR(t.extra, "art-backdrop.dim=25\n");
 
 	snprintf(cfgTheme, sizeof(cfgTheme), "Nowhere");
 	t = asked();

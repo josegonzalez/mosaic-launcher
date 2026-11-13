@@ -2,7 +2,8 @@ id=layout-grid
 name=Grid layout
 api=1
 slots=layout
-# tiles across the screen; auto fits the screen: 3 at 640 wide, 4 at 1024, 5 at 1280
-setting.columns=choice|Columns|auto|auto,2,3,4,5,6,7,8
-# rows of tiles in view; auto keeps the tiles about square
-setting.rows=choice|Rows|auto|auto,1,2,3,4,5,6
+# tiles across the screen; auto fits the screen: 3 at 640 wide, 4 at 1024, 5 at 1280;
+# theme: the theme's layout-grid.columns, or auto without one
+setting.columns=choice|Columns|theme|theme,auto,2,3,4,5,6,7,8
+# rows of tiles in view; auto keeps the tiles about square; theme: the theme's layout-grid.rows, or auto without one
+setting.rows=choice|Rows|theme|theme,auto,1,2,3,4,5,6

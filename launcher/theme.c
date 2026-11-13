@@ -14,6 +14,7 @@ static char font_path[512];          // "" for stock's
 static char fallback_path[512];      // "" for none
 static ThemeWalls walls;
 static int hint_style = MOSAIC_HINT_STYLE_USER;
+static ThemeExtras extras;
 
 // thememodel.c numbers stock's hint styles without config.h
 _Static_assert(THEME_HINT_STOCK_TEXT == INPUT_STYLE_TEXT && THEME_HINT_STOCK_SHAPES == INPUT_STYLE_SHAPES
@@ -157,6 +158,7 @@ int Theme_set(const char* owner, const MosaicTheme* theme) {
 	t.wallpaper_list[sizeof(t.wallpaper_list) - 1] = '\0';
 	t.wallpaper_quick[sizeof(t.wallpaper_quick) - 1] = '\0';
 	t.fallback_font[sizeof(t.fallback_font) - 1] = '\0';
+	t.extra[sizeof(t.extra) - 1] = '\0';
 
 	for (int i = 0; i < MOSAIC_THEME_COLORS; i++) {
 		colors[i] = t.colors[i];
@@ -197,6 +199,16 @@ int Theme_set(const char* owner, const MosaicTheme* theme) {
 	cardFile(owner, "wallpaper_list", t.wallpaper_list, walls.list, sizeof(walls.list));
 	cardFile(owner, "wallpaper_quick", t.wallpaper_quick, walls.quick, sizeof(walls.quick));
 
+	ThemeRefusals extra_refused = {0};
+	int extra_refusals = ThemeModel_extras(t.extra, &extras, &extra_refused);
+	for (int i = 0; i < extra_refused.count; i++) {
+		LOG_warn("plugins: %s's theme %s, so it's left out\n", owner, extra_refused.lines[i]);
+	}
+	if (extra_refusals > extra_refused.count) {
+		LOG_warn("plugins: %s's theme has %d more extra lines left out\n", owner, extra_refusals - extra_refused.count);
+	}
+	refusals += extra_refusals;
+
 	active = 1;
 	GFX_themeChanged();
 	LOG_info("plugins: %s supplies the theme: pill %d, button %d, padding %d, %d rows, text step %d, font %s\n",
@@ -205,6 +217,7 @@ int Theme_set(const char* owner, const MosaicTheme* theme) {
 		static const char* names[] = { "", "text", "ABXY", "cardinals", "shapes" };
 		LOG_info("plugins: %s's theme draws button hints as %s, over the user's style\n", owner, names[hint_style]);
 	}
+	if (extras.count) LOG_info("plugins: %s's theme passes on %d keys to other plugins\n", owner, extras.count);
 	return refusals;
 }
 
@@ -217,6 +230,7 @@ void Theme_clear(void) {
 	memset(&walls, 0, sizeof(walls));
 	contrast = 0;
 	hint_style = MOSAIC_HINT_STYLE_USER;
+	memset(&extras, 0, sizeof(extras));
 	if (was) GFX_themeChanged();
 }
 
@@ -230,4 +244,9 @@ int Theme_fillWallpaper(int spot, char* path, size_t size) {
 	if (!wall) return 0;
 	snprintf(path, size, "%s", wall);
 	return 1;
+}
+
+const char* Theme_value(const char* key, const char* fallback) {
+	const char* value = active ? ThemeModel_extraValue(&extras, key) : NULL;
+	return value ? value : fallback;
 }

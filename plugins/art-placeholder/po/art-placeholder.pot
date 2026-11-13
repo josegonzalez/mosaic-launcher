@@ -27,5 +27,9 @@ msgid "pattern"
 msgstr ""
 
 #: plugin.txt
+msgid "theme"
+msgstr ""
+
+#: plugin.txt
 msgid "title"
 msgstr ""

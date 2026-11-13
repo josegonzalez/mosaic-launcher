@@ -61,3 +61,7 @@ msgstr ""
 #: plugin.txt
 msgid "auto"
 msgstr ""
+
+#: plugin.txt
+msgid "theme"
+msgstr ""

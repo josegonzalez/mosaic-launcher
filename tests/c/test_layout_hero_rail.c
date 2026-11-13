@@ -13,6 +13,13 @@ static void testSettings(void) {
 	CHECK(HR_cardPercent("large") == 34);
 	CHECK(HR_cardPercent("huge") == 28);
 	CHECK(HR_cardPercent(NULL) == 28);
+	// theme, the default, takes the theme's layout-hero-rail.cards; the user's own wins
+	CHECK_STR(HR_themed("theme", "large"), "large");
+	CHECK_STR(HR_themed(NULL, "large"), "large");
+	CHECK(HR_themed("theme", NULL) == NULL);
+	CHECK_STR(HR_themed("small", "large"), "small");
+	CHECK(HR_cardPercent(HR_themed("theme", NULL)) == 28);
+	CHECK(HR_cardPercent("theme") == 28);
 
 	CHECK(HR_tint("0") == 0);
 	CHECK(HR_tint("20") == 51);
@@ -262,6 +269,17 @@ static int faded = -1; // the last blit_alpha's alpha
 static int tinted = 0, banded = 0, belows = 0;
 static char asked[512]; // "<name>:<kind> " for each art_get
 static const char* cards_cfg = "medium";
+static const char* theme_cards = NULL; // the theme's layout-hero-rail.cards
+static void (*onThemeChanged)(const char*, const char*, void*);
+static const char* fakeThemeValue(const char* key, const char* fallback) {
+	return !strcmp(key, "layout-hero-rail.cards") && theme_cards ? theme_cards : fallback;
+}
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	CHECK(!strcmp(name, "launcher.theme_changed"));
+	onThemeChanged = on_event;
+	return 0;
+}
 static const char* fade_cfg = "300";
 static MosaicSurface video = { 720, 480, 0 }; // another plugin's art_replace surface
 static int replaced_index = -1; // the entry it's for, or -1 for none
@@ -670,6 +688,7 @@ static void testPlugin(void) {
 	in.pressed = in.repeated = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN);
 	CHECK(p->layout_input(&in, &v, &consumed) == 0);
 	CHECK(selected_to == 5);
+	CHECK(percent == 34);
 	p->selection_changed(&fake_list.items[0]);
 	tick(6000);
 	CHECK(p->layout_render(&screen_surface, &v) == 0);
@@ -763,6 +782,43 @@ static void testReplacement(void) {
 	p->quit();
 }
 
+// the theme's layout-hero-rail.cards while the setting is at theme,
+// followed on launcher.theme_changed, and the user's own over it
+static void testThemeCards(void) {
+	setUp();
+	fake_host.theme_value = fakeThemeValue;
+	fake_host.subscribe = fakeSubscribe;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	MosaicInput in;
+	memset(&in, 0, sizeof(in));
+	unsigned int consumed = 0;
+	MosaicListView v = makeView(0);
+	cards_cfg = "theme";
+	theme_cards = "small";
+	onThemeChanged = NULL;
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(onThemeChanged != NULL);
+	CHECK(percent == 28); // no theme yet in init
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(percent == 22);
+	theme_cards = "large";
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(percent == 34);
+	theme_cards = NULL;
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(percent == 28);
+	theme_cards = "large";
+	cards_cfg = "small";
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(percent == 22);
+	p->quit();
+	theme_cards = NULL;
+	cards_cfg = "medium";
+}
+
 int main(void) {
 	testSettings();
 	testLayout();
@@ -776,5 +832,6 @@ int main(void) {
 	testPlugin();
 	testReplacement();
 	testPool();
+	testThemeCards();
 	CHECK_DONE();
 }

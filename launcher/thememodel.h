@@ -3,8 +3,9 @@
 
 // The SDL-free half of the theme slot: which of an owner's values are
 // safe to use, the UI sizes worked out from them the way stock's comments
-// in defines.h and platform.h work out its own, the contrast clamp, and
-// which wallpaper fills which spot. theme.c applies the result.
+// in defines.h and platform.h work out its own, the contrast clamp, which
+// wallpaper fills which spot, and the keys passed on to other plugins.
+// theme.c applies the result.
 
 #include <stddef.h>
 #include <stdint.h>
@@ -131,5 +132,26 @@ typedef struct ThemeWalls {
 // NULL for none: the list falls back to the main one, as stock's bglist
 // falls back to bg.png.
 const char* ThemeModel_wallpaper(const ThemeWalls* walls, int spot);
+
+// The keys a theme passes on to other plugins, from MosaicTheme's extra.
+#define THEME_EXTRA_KEY_MAX 64 // a key's size, its terminator included
+typedef struct ThemeExtras {
+	int count;
+	char keys[MOSAIC_THEME_EXTRA_KEYS][THEME_EXTRA_KEY_MAX];
+	char values[MOSAIC_THEME_EXTRA_KEYS][MOSAIC_THEME_EXTRA_VALUE_MAX + 1];
+} ThemeExtras;
+
+// 1 for a key extra may have: 3 to 63 bytes of letters, digits, '_', '-'
+// and '.', with a '.' that isn't its first or last byte.
+int ThemeModel_extraKeyOk(const char* key);
+
+// Reads extra's key=value lines (text may be NULL) into out, skipping
+// empty lines. Each line that isn't one, has a bad key or value, or a new
+// key past MOSAIC_THEME_EXTRA_KEYS is refused, with a line in refused. Of
+// a key given twice the last line wins. Returns how many lines it refused.
+int ThemeModel_extras(const char* text, ThemeExtras* out, ThemeRefusals* refused);
+
+// The value of key, or NULL when extras doesn't have it.
+const char* ThemeModel_extraValue(const ThemeExtras* extras, const char* key);
 
 #endif

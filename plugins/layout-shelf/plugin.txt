@@ -2,7 +2,8 @@ id=layout-shelf
 name=Cartridge shelf layout
 api=1
 slots=layout
-# shelves in view; auto fits the screen: 2 at 640 wide, 1024 and 1280
-setting.shelves=choice|Shelves|auto|auto,1,2,3,4
+# shelves in view; auto fits the screen: 2 at 640 wide, 1024 and 1280;
+# theme: the theme's layout-shelf.shelves, or auto without one
+setting.shelves=choice|Shelves|theme|theme,auto,1,2,3,4
 # the selected cartridge rises off its shelf as the one before drops back, rather than at once
 setting.animate=toggle|Animate the lift|on

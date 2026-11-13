@@ -36,6 +36,7 @@ typedef struct TPTheme {
 	char wallpaper_quick[TP_PATH_MAX];
 	char fallback_font[TP_PATH_MAX];
 	int hint_style;               // an enum MosaicHintStyle, or MOSAIC_HINT_STYLE_USER
+	char extra[MOSAIC_THEME_EXTRA_MAX]; // the keys with a '.' it doesn't know, as key=value lines, for other plugins
 } TPTheme;
 
 // One of stock's palettes, from host->palette_info.
@@ -67,8 +68,11 @@ int TP_parseHintStyle(const char* text);
 int TP_relativePathOk(const char* path);
 
 // Parses theme.txt's text. Each line is key=value; blank lines and ones
-// starting with # are skipped. Unknown keys and lines without = are
-// logged and ignored, and bad values are logged and dropped. Returns 0,
+// starting with # are skipped. Unknown keys with a '.' in them, such as
+// led-status.colour, are other plugins' and go into extra as they are,
+// for the launcher to check; one that doesn't fit is logged and dropped.
+// Other unknown keys and lines without = are logged and ignored, and bad
+// values are logged and dropped. Returns 0,
 // or -1 for a version= newer than TP_VERSION_MAX (also logged), when the
 // theme isn't used.
 int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx);
@@ -159,8 +163,8 @@ int TP_buttonFor(int pill);
 // theme in the folder dir (NULL for a palette theme), its palette (NULL
 // for none), then the overrides. A palette sets all seven colours and the
 // theme's own colours go over it. A path that won't resolve inside dir is
-// logged and dropped. Fields theme doesn't have (MOSAIC_THEME_HAS) are
-// skipped.
+// logged and dropped. The parsed theme's extra keys are passed on as they
+// are. Fields theme doesn't have (MOSAIC_THEME_HAS) are skipped.
 void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const TPPalette* palette,
 	const TPOverrides* overrides, TPLogFn log, void* ctx);
 

@@ -30,6 +30,12 @@ int BD_style(const char* value);
 #define BD_DIM_DEFAULT 50
 int BD_dim(const char* value);
 
+// The value the dim setting gives: the setting itself, or for theme (or
+// NULL or "", unset) the theme's art-backdrop.dim, theme_value, which is
+// NULL when the theme doesn't set it. NULL for neither, which BD_dim
+// takes as its default.
+const char* BD_themed(const char* setting, const char* theme_value);
+
 // How much of the screen's height the height setting gives the art: full,
 // half or third, as a divisor (1, 2 or 3), or 1 for anything else.
 int BD_height(const char* value);

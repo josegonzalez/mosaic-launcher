@@ -16,6 +16,11 @@ int BD_dim(const char* value) {
 	return (percent * 255 + 50) / 100;
 }
 
+const char* BD_themed(const char* setting, const char* theme_value) {
+	if (setting && setting[0] && strcmp(setting, "theme") != 0) return setting;
+	return theme_value;
+}
+
 int BD_height(const char* value) {
 	if (value && !strcmp(value, "half")) return 2;
 	if (value && !strcmp(value, "third")) return 3;

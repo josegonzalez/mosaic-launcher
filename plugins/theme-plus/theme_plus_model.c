@@ -160,8 +160,8 @@ int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx) {
 			say(log, ctx, "line %d isn't key=value, ignored", number);
 			continue;
 		}
-		char key[32];
-		char value[TP_PATH_MAX + 32];
+		char key[sizeof(whole)];
+		char value[sizeof(whole)];
 		trimmed(whole, (size_t)(eq - whole), key, sizeof(key));
 		trimmed(eq + 1, strlen(eq + 1), value, sizeof(value));
 
@@ -208,6 +208,16 @@ int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx) {
 			int style = TP_parseHintStyle(value);
 			if (style < 0) say(log, ctx, "line %d: hint_style %s isn't text, abxy, cardinals or shapes, dropped", number, value);
 			else out->hint_style = style;
+		}
+		else if (strchr(key, '.')) {
+			// another plugin's, for the launcher to check and pass on
+			size_t used = strlen(out->extra);
+			size_t len = strlen(key) + 1 + strlen(value) + 1;
+			if (used + len >= sizeof(out->extra)) {
+				say(log, ctx, "line %d: %s doesn't fit in the %d bytes of keys for other plugins, dropped", number, key,
+					(int)sizeof(out->extra) - 1);
+			}
+			else snprintf(out->extra + used, sizeof(out->extra) - used, "%s=%s\n", key, value);
 		}
 		else say(log, ctx, "line %d: unknown key %s, ignored", number, key);
 	}
@@ -498,4 +508,5 @@ void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const 
 	if (MOSAIC_THEME_HAS(theme, padding)) theme->padding = padding;
 
 	if (parsed && parsed->hint_style && MOSAIC_THEME_HAS(theme, hint_style)) theme->hint_style = parsed->hint_style;
+	if (parsed && MOSAIC_THEME_HAS(theme, extra)) copyText(theme->extra, sizeof(theme->extra), parsed->extra);
 }

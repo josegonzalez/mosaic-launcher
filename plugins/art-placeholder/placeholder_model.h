@@ -29,6 +29,12 @@ enum PAStyle {
 // The style a setting's value names, or title for anything else.
 int PA_style(const char* value);
 
+// The value the style setting gives: the setting itself, or for theme (or
+// NULL or "", unset) the theme's art-placeholder.style, theme_value,
+// which is NULL when the theme doesn't set it. NULL for neither, which
+// PA_style takes as title.
+const char* PA_themed(const char* setting, const char* theme_value);
+
 // The size of a card of kind (an enum MosaicArtKind) on a w by h screen:
 // writes it and returns 1 for the thumbnail and the box, or returns 0 for
 // any other kind or a screen too small for one.

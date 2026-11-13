@@ -4,8 +4,8 @@ api=1
 slots=background
 # full: the art over its whole height; gradient: fading out over its bottom half
 setting.style=choice|Style|gradient|gradient,full
-# how much darker the art is, in percent
-setting.dim=choice|Dim|50|0,25,50,75
+# how much darker the art is, in percent; theme: the theme's art-backdrop.dim, or 50 without one
+setting.dim=choice|Dim|theme|theme,0,25,50,75
 # how much of the screen the art covers, from the top
 setting.height=choice|Height|full|full,half,third
 # the game's backdrop comes first; these stand in for a game with none, in this order

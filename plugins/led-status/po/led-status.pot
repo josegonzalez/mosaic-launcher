@@ -79,6 +79,10 @@ msgid "accent2"
 msgstr ""
 
 #: plugin.txt
+msgid "auto"
+msgstr ""
+
+#: plugin.txt
 msgid "background"
 msgstr ""
 

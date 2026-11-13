@@ -15,6 +15,16 @@ static void testCount(void) {
 	CHECK(LG_count("3x", 1, 8) == 0);
 	CHECK(LG_count("", 1, 8) == 0);
 	CHECK(LG_count(NULL, 1, 8) == 0);
+
+	// theme, the default, takes the theme's key; the user's own wins
+	CHECK_STR(LG_themed("theme", "4"), "4");
+	CHECK_STR(LG_themed(NULL, "4"), "4");
+	CHECK_STR(LG_themed("", "4"), "4");
+	CHECK(LG_themed("theme", NULL) == NULL);
+	CHECK_STR(LG_themed("auto", "4"), "auto");
+	CHECK_STR(LG_themed("2", "4"), "2");
+	CHECK(LG_count(LG_themed("theme", NULL), 1, 8) == 0);
+	CHECK(LG_count(LG_themed("theme", "lots"), 1, 8) == 0);
 }
 
 static void testAuto(void) {
@@ -219,6 +229,10 @@ static char letters[16];
 static char names_drawn[128]; // the names under the tiles, each followed by a comma
 static int blits = 0, blits_of_image = 0;
 static const char* columns_cfg = "auto";
+static const char* rows_cfg = NULL;
+static const char* theme_columns = NULL; // the theme's layout-grid.columns
+static const char* theme_rows = NULL;
+static void (*onThemeChanged)(const char*, const char*, void*);
 static MosaicSurface video = { 720, 480, 0 }; // another plugin's art_replace surface
 static int replaced_index = -1; // the entry it's for, or -1 for none
 static int replacement_asks = 0, blits_of_video = 0;
@@ -227,7 +241,19 @@ static MosaicRect blit_video;
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "columns")) return columns_cfg;
+	if (!strcmp(key, "rows") && rows_cfg) return rows_cfg;
 	return fallback;
+}
+static const char* fakeThemeValue(const char* key, const char* fallback) {
+	if (!strcmp(key, "layout-grid.columns") && theme_columns) return theme_columns;
+	if (!strcmp(key, "layout-grid.rows") && theme_rows) return theme_rows;
+	return fallback;
+}
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	CHECK_STR(name, "launcher.theme_changed");
+	onThemeChanged = on_event;
+	return 0;
 }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
 static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
@@ -502,18 +528,64 @@ static void testPlugin(void) {
 	// a columns setting
 	columns_cfg = "3";
 	CHECK(p->init(&fake_host) == 0);
-	CHECK(columns_setting == 3);
 	resetCounts();
 	consumed = 0;
 	v = makeView(1);
 	in.pressed = in.repeated = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN);
 	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(columns_setting == 3);
 	CHECK(selected_to == 4);
 	columns_cfg = "auto";
 
 	// a launcher without art_get is declined
 	fake_host.art_get = NULL;
 	CHECK(p->init(&fake_host) == 1);
+}
+
+// the theme's layout-grid.columns and rows while the settings are at
+// theme, followed on launcher.theme_changed, and the user's own over them
+static void testThemeKeys(void) {
+	setUp();
+	fake_host.theme_value = fakeThemeValue;
+	fake_host.subscribe = fakeSubscribe;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	MosaicListView v = makeView(0);
+	MosaicInput in;
+	memset(&in, 0, sizeof(in));
+	unsigned int consumed = 0;
+	columns_cfg = "theme";
+	theme_columns = "2";
+	theme_rows = "1";
+	onThemeChanged = NULL;
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(onThemeChanged != NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(columns_setting == 2 && rows_setting == 1);
+
+	theme_columns = "5";
+	theme_rows = NULL;
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(columns_setting == 2); // until the theme changes
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(columns_setting == 5 && rows_setting == 0);
+	theme_columns = NULL;
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(columns_setting == 0);
+
+	// the user's own wins, auto too
+	theme_columns = "5";
+	theme_rows = "2";
+	columns_cfg = "3";
+	rows_cfg = "auto";
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(columns_setting == 3 && rows_setting == 0);
+	p->quit();
+	columns_cfg = "auto";
+	rows_cfg = NULL;
+	theme_columns = theme_rows = NULL;
 }
 
 static void testReplacement(void) {
@@ -659,6 +731,7 @@ int main(void) {
 	testLetter();
 	testShowName();
 	testPlugin();
+	testThemeKeys();
 	testReplacement();
 	testHiddenNames();
 	testCacheLimit();

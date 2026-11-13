@@ -1,11 +1,15 @@
 // Placeholder art: a thumbnail and a box for games with no art, made with
 // art_surface, which the launcher asks only when no file answers. The
 // style setting picks a title card in the theme's colours or a pattern
-// seeded from the rom's path; placeholder_model.h has their sizes,
-// colours and layout. A game with any real art of the kinds the built-in
+// seeded from the rom's path. At theme, the default, the theme slot
+// owner's art-placeholder.style key picks, or a title card without one;
+// it's read for each card, since a new theme comes with the lists
+// reloading, which empties the art cache. placeholder_model.h has their
+// sizes, colours and layout. A game with any real art of the kinds the built-in
 // list shows (thumbnail, box, 3D box, screenshot) gets none, so a layout
 // that asks for the thumbnail first still falls back to a real box.
 
+#include <stdio.h>
 #include "placeholder_model.h"
 #include "mosaic_plugin.h"
 
@@ -13,7 +17,7 @@
 #define FONT MOSAIC_FONT_LARGE
 
 static const MosaicHost* host;
-static int style = PA_STYLE_TITLE;
+static char style_setting[16];
 static int scale = 1;
 
 static MosaicColor opaque(unsigned int rgb) {
@@ -85,7 +89,8 @@ static MosaicSurface* artSurface(const MosaicEntry* entry, int kind) {
 	if (!path || hasArt(entry)) return NULL;
 	MosaicSurface* card = host->surface_new(ID, w, h);
 	if (!card) return NULL;
-	if (style == PA_STYLE_PATTERN) {
+	const char* themed = MOSAIC_HOST_HAS(host, theme_value) ? host->theme_value(ID ".style", NULL) : NULL;
+	if (PA_style(PA_themed(style_setting, themed)) == PA_STYLE_PATTERN) {
 		drawPattern(card, path, w, h);
 	}
 	else {
@@ -102,7 +107,7 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't take generated art, not loading");
 		return 1;
 	}
-	style = PA_style(host->cfg_get("style", "title"));
+	snprintf(style_setting, sizeof(style_setting), "%s", host->cfg_get("style", "theme"));
 	scale = host->screen_scale();
 	return 0;
 }

@@ -16,6 +16,12 @@
 // "auto" and anything else.
 int LG_count(const char* value, int min, int max);
 
+// The value a setting that can follow the theme gives: the setting itself,
+// or for theme (or NULL or "", unset) the theme's layout-grid.columns or layout-grid.rows, theme_value, which
+// is NULL when the theme doesn't set it. NULL for neither, which LG_count
+// takes as its default.
+const char* LG_themed(const char* setting, const char* theme_value);
+
 // Columns for a grid width pixels wide when the setting is auto: one per 80
 // units of stock's layout (scale pixels each), from 2 to LG_MAX_COLUMNS,
 // eg. 3 on a 640 pixel screen at scale 2, 4 on 1024 at scale 3 and 5 on

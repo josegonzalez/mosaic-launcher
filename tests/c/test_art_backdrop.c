@@ -24,6 +24,18 @@ static void testSettings(void) {
 	CHECK(BD_dim("") == 128);
 	CHECK(BD_dim(NULL) == 128);
 
+	// theme, the default, takes the theme's art-backdrop.dim; the user's own wins
+	CHECK_STR(BD_themed("theme", "25"), "25");
+	CHECK_STR(BD_themed(NULL, "25"), "25");
+	CHECK_STR(BD_themed("", "25"), "25");
+	CHECK(BD_themed("theme", NULL) == NULL);
+	CHECK_STR(BD_themed("75", "25"), "75");
+	CHECK_STR(BD_themed("0", NULL), "0");
+	CHECK(BD_dim(BD_themed("theme", NULL)) == 128);
+	CHECK(BD_dim(BD_themed("theme", "10")) == 26);
+	// a theme's value BD_dim doesn't take is the default, as a setting's is
+	CHECK(BD_dim(BD_themed("theme", "dark")) == 128);
+
 	CHECK(BD_height("full") == 1);
 	CHECK(BD_height("half") == 2);
 	CHECK(BD_height("third") == 3);
@@ -428,6 +440,74 @@ static void testPlugin(void) {
 	CHECK(p->init(&h) == 0);
 }
 
+// the theme's art-backdrop.dim, followed live, under the user's own dim
+static const char* themeDim = NULL;
+static void (*onThemeChanged)(const char*, const char*, void*);
+static const char* fakeThemeValue(const char* key, const char* fallback) {
+	return !strcmp(key, "art-backdrop.dim") && themeDim ? themeDim : fallback;
+}
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	CHECK_STR(name, "launcher.theme_changed");
+	onThemeChanged = on_event;
+	return 0;
+}
+
+static void testThemeDim(void) {
+	MosaicHost h = fakeHost();
+	h.theme_value = fakeThemeValue;
+	h.subscribe = fakeSubscribe;
+	const MosaicPlugin* p = mosaic_plugin_get(&h);
+	setCfg("style", "full");
+	themeDim = "25";
+	onThemeChanged = NULL;
+	CHECK(p->init(&h) == 0);
+	CHECK(onThemeChanged != NULL);
+	MosaicEntry a = { "/r/GB/ThemeA.gb", MOSAIC_ENTRY_ROM, BIT(MOSAIC_ART_BACKDROP), MOSAIC_ART_READY };
+	reset();
+	int before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(scales == 1 && pool[before].dimmed == 64);
+
+	// a theme change drops the copy dimmed the old way
+	themeDim = "75";
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(pool[before].freed);
+	reset();
+	before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(scales == 1 && pool[before].dimmed == 191);
+	// the same dim again keeps it
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	CHECK(!pool[before].freed);
+	// no key: the default
+	themeDim = NULL;
+	onThemeChanged("launcher.theme_changed", NULL, NULL);
+	reset();
+	before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(pool[before].dimmed == 128);
+	p->quit();
+
+	// the user's own dim wins
+	setCfg("dim", "0");
+	themeDim = "75";
+	CHECK(p->init(&h) == 0);
+	reset();
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(fills == 0 && pool[pool_count - 1].dimmed == -1);
+	p->quit();
+	setCfg("dim", "theme");
+	CHECK(p->init(&h) == 0);
+	reset();
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(pool[pool_count - 1].dimmed == 191);
+	p->quit();
+	setCfg("dim", NULL);
+	setCfg("style", NULL);
+	themeDim = NULL;
+}
+
 int main(void) {
 	testSettings();
 	testKinds();
@@ -435,5 +515,6 @@ int main(void) {
 	testBands();
 	testSrcBand();
 	testPlugin();
+	testThemeDim();
 	CHECK_DONE();
 }

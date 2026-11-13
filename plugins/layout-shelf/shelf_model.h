@@ -56,6 +56,12 @@ int LS_commonShape(const int* shapes, int n);
 // anything else.
 int LS_count(const char* value, int min, int max);
 
+// The value a setting that can follow the theme gives: the setting itself,
+// or for theme (or NULL or "", unset) the theme's layout-shelf.shelves, theme_value, which
+// is NULL when the theme doesn't set it. NULL for neither, which LS_count
+// takes as its default.
+const char* LS_themed(const char* setting, const char* theme_value);
+
 // Shelves for a room h pixels tall when the setting is auto: one per 110
 // units of stock's layout (scale pixels each), rounded from a half, from 1
 // to LS_MAX_SHELVES; 2 on each of today's screens.

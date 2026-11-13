@@ -20,3 +20,6 @@ msgstr "patrón"
 
 msgid "title"
 msgstr "título"
+
+msgid "theme"
+msgstr "tema"

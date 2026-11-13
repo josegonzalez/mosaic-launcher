@@ -53,3 +53,6 @@ msgstr "mitad"
 
 msgid "third"
 msgstr "tercio"
+
+msgid "theme"
+msgstr "tema"

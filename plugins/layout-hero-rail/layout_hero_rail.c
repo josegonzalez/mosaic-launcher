@@ -1,6 +1,9 @@
 // Hero and card rail layout: owns the layout slot and draws the game list
 // as a row of cards along the bottom, under the selected entry's art across
-// the top with its logo, or else its name, over it.
+// the top with its logo, or else its name, over it. The cards setting at
+// theme, the default, takes the theme slot owner's layout-hero-rail.cards
+// key, or medium without one, read once the theme is in place and again
+// on launcher.theme_changed.
 //
 // The hero is the selected entry's backdrop, or else its screenshot,
 // thumbnail or box, the first that has a file (as art_find reports them,
@@ -64,6 +67,8 @@
 
 static const MosaicHost* host;
 static int percent = 28;
+static char cards_value[16]; // the cards setting as set, theme for the theme's
+static int themed = 0; // 0 until the theme's key is read, and again when the theme changes
 static int tint = 0; // alpha of the accent over the hero
 static int fade_ms = HR_FADE_DEFAULT;
 static int first = 0; // the first card in view
@@ -193,7 +198,29 @@ static int nameHeight(const MosaicListView* view, int scale) {
 	return view->show_names ? host->text_height(MOSAIC_FONT_SMALL) + 2 * scale : 0;
 }
 
+// the cards setting, or at theme the theme's layout-hero-rail.cards
+static void resolveSettings(void) {
+	const char* theme = MOSAIC_HOST_HAS(host, theme_value) ? host->theme_value(ID ".cards", NULL) : NULL;
+	int now = HR_cardPercent(HR_themed(cards_value, theme));
+	themed = 1;
+	if (now == percent) return;
+	percent = now;
+	char message[64];
+	snprintf(message, sizeof(message), "cards %i%% of the height now", percent);
+	host->log(ID, message);
+}
+
+// the theme's keys may have changed
+static void themeChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	themed = 0;
+}
+
 static int layoutFor(const MosaicListView* view, HRLayout* layout) {
+	// the theme is put in place after every plugin's init
+	if (!themed) resolveSettings();
 	int scale = host->screen_scale();
 	MosaicRect header = MOSAIC_VIEW_HAS(view, header) ? view->header : (MosaicRect){ 0, 0, 0, 0 };
 	return HR_layout(&view->area, &view->status, &header, scale, percent, nameHeight(view, scale), layout);
@@ -590,8 +617,9 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a layout");
 		return 1;
 	}
-	const char* size = host->cfg_get("cards", "medium");
-	percent = HR_cardPercent(size);
+	snprintf(cards_value, sizeof(cards_value), "%s", host->cfg_get("cards", "theme"));
+	percent = HR_cardPercent(HR_themed(cards_value, NULL));
+	themed = 0;
 	tint = HR_tint(host->cfg_get("tint", "20"));
 	fade_ms = HR_fadeMs(host->cfg_get("fade", "300"));
 	settles = MOSAIC_HOST_HAS(host, selection_settle_ms);
@@ -605,6 +633,9 @@ static int init(const MosaicHost* h) {
 	snprintf(message, sizeof(message), "cards %i%% of the height, tinted by %i of 255, logo fading in over %i ms%s",
 		percent, tint, fade_ms, settles ? "" : " (no selection events, so it shows at once)");
 	host->log(ID, message);
+	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
+		host->log(ID, "couldn't follow theme changes");
+	}
 	return 0;
 }
 

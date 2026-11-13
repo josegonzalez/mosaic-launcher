@@ -1,5 +1,6 @@
 // thememodel.c: the theme slot's checks, the UI sizes worked out from a
-// theme's, the contrast clamp, card paths and wallpaper spots.
+// theme's, the contrast clamp, card paths, wallpaper spots and the keys
+// passed on to other plugins.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -327,6 +328,79 @@ static void testWallpapers(void) {
 	CHECK(ThemeModel_wallpaper(&walls, 99) == NULL);
 }
 
+static void testExtras(void) {
+	CHECK(ThemeModel_extraKeyOk("led-status.colour"));
+	CHECK(ThemeModel_extraKeyOk("a.b"));
+	CHECK(ThemeModel_extraKeyOk("layout-grid.columns_2"));
+	CHECK(!ThemeModel_extraKeyOk(NULL));
+	CHECK(!ThemeModel_extraKeyOk(""));
+	CHECK(!ThemeModel_extraKeyOk("shadow"));
+	CHECK(!ThemeModel_extraKeyOk(".dim"));
+	CHECK(!ThemeModel_extraKeyOk("dim."));
+	CHECK(!ThemeModel_extraKeyOk("a b.c"));
+	CHECK(!ThemeModel_extraKeyOk("a.b/c"));
+	char longest[THEME_EXTRA_KEY_MAX + 1];
+	memset(longest, 'k', sizeof(longest));
+	longest[1] = '.';
+	longest[THEME_EXTRA_KEY_MAX - 1] = '\0';
+	CHECK(ThemeModel_extraKeyOk(longest));
+	longest[THEME_EXTRA_KEY_MAX - 1] = 'k';
+	longest[THEME_EXTRA_KEY_MAX] = '\0';
+	CHECK(!ThemeModel_extraKeyOk(longest));
+
+	ThemeExtras extras;
+	ThemeRefusals refused = {0};
+	CHECK(ThemeModel_extras(NULL, &extras, &refused) == 0);
+	CHECK(extras.count == 0);
+	CHECK(ThemeModel_extraValue(&extras, "a.b") == NULL);
+
+	// the last of a repeated key wins, empty lines are skipped, an empty value is a value
+	CHECK(ThemeModel_extras("led-status.colour=0x112233\n\nart-backdrop.dim=25\nled-status.colour=accent\nx.empty=\n",
+		&extras, &refused) == 0);
+	CHECK(refused.count == 0);
+	CHECK(extras.count == 3);
+	CHECK_STR(ThemeModel_extraValue(&extras, "led-status.colour"), "accent");
+	CHECK_STR(ThemeModel_extraValue(&extras, "art-backdrop.dim"), "25");
+	CHECK_STR(ThemeModel_extraValue(&extras, "x.empty"), "");
+	CHECK(ThemeModel_extraValue(&extras, "art-backdrop") == NULL);
+	CHECK(ThemeModel_extraValue(&extras, NULL) == NULL);
+	CHECK(ThemeModel_extraValue(NULL, "x.empty") == NULL);
+
+	// each bad line is refused on its own, and the good ones kept
+	char text[2048];
+	char value[MOSAIC_THEME_EXTRA_VALUE_MAX + 2];
+	memset(value, 'v', sizeof(value));
+	value[sizeof(value) - 1] = '\0';
+	snprintf(text, sizeof(text), "shadow=on\nno equals\n.x=1\na.b=tab\there\nc.d=%s\ngood.key=yes\n=empty\nwith space.k=1", value);
+	memset(&refused, 0, sizeof(refused));
+	CHECK(ThemeModel_extras(text, &extras, &refused) == 7);
+	CHECK(extras.count == 1);
+	CHECK_STR(ThemeModel_extraValue(&extras, "good.key"), "yes");
+	CHECK(refused.count == 7);
+	CHECK_STR(refused.lines[0], "extra line 1 (shadow=on) has no <plugin>.<name> key");
+	CHECK_STR(refused.lines[1], "extra line 2 (no equals) isn't key=value");
+	CHECK_STR(refused.lines[3], "extra line 4 (a.b=tab?here) has a control character in its value");
+	CHECK(strstr(refused.lines[4], "has a value over 255 bytes") != NULL);
+	CHECK(strstr(refused.lines[4], "...") != NULL);
+	// a value just at the limit is kept
+	value[MOSAIC_THEME_EXTRA_VALUE_MAX] = '\0';
+	snprintf(text, sizeof(text), "c.d=%s", value);
+	CHECK(ThemeModel_extras(text, &extras, NULL) == 0);
+	CHECK(strlen(ThemeModel_extraValue(&extras, "c.d")) == MOSAIC_THEME_EXTRA_VALUE_MAX);
+
+	// up to MOSAIC_THEME_EXTRA_KEYS keys; a repeat past them still replaces
+	char many[MOSAIC_THEME_EXTRA_MAX];
+	size_t used = 0;
+	for (int i = 0; i < MOSAIC_THEME_EXTRA_KEYS + 2; i++) used += snprintf(many + used, sizeof(many) - used, "p.k%d=%d\n", i, i);
+	used += snprintf(many + used, sizeof(many) - used, "p.k0=again\n");
+	memset(&refused, 0, sizeof(refused));
+	CHECK(ThemeModel_extras(many, &extras, &refused) == 2);
+	CHECK(extras.count == MOSAIC_THEME_EXTRA_KEYS);
+	CHECK_STR(ThemeModel_extraValue(&extras, "p.k0"), "again");
+	CHECK(ThemeModel_extraValue(&extras, "p.k64") == NULL);
+	CHECK(strstr(refused.lines[0], "is past the first 64 keys") != NULL);
+}
+
 int main(void) {
 	testStockFormulas();
 	testResolve();
@@ -335,5 +409,6 @@ int main(void) {
 	testHintStyle();
 	testCardFile();
 	testWallpapers();
+	testExtras();
 	CHECK_DONE();
 }

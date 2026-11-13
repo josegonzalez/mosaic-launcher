@@ -4,6 +4,8 @@
 // What LED status decides, apart from the host, so the host tests can check
 // it on its own.
 
+#include <stddef.h>
+
 #define LS_SAMPLE_MS 5000 // how often to look again; the launcher refreshes the battery every 5 seconds
 #define LS_MARGIN 2       // a band is left upwards only this far above its threshold, so readings around it don't flicker
 
@@ -14,6 +16,7 @@
 enum LsMode {
 	LS_MODE_BATTERY, // red, yellow or green by the battery level
 	LS_MODE_THEME,   // one of stock's theme colours
+	LS_MODE_AUTO,    // the theme's led-status.colour, or the battery without one
 };
 
 enum LsBand {
@@ -59,7 +62,7 @@ int Ls_due(unsigned long* next, unsigned long now);
 ///////////////////////////////////////
 // Settings
 
-// "battery" or "theme"; anything else is battery.
+// "battery", "theme" or "auto"; anything else is auto.
 int Ls_parseMode(const char* setting);
 
 // A theme colour's name in the theme_color setting, as an enum
@@ -70,5 +73,39 @@ int Ls_parseThemeColor(const char* setting);
 // A whole number from a setting such as "20", "20%" or " 20 ", or fallback
 // when it isn't one or is outside min to max.
 int Ls_parseNumber(const char* setting, int min, int max, int fallback);
+
+///////////////////////////////////////
+// What the LEDs show: the mode setting, and in auto mode the theme's
+// led-status.colour key
+
+enum LsShow {
+	LS_SHOW_BATTERY, // the battery's band colour
+	LS_SHOW_RGB,     // a colour of its own
+	LS_SHOW_THEME,   // one of stock's theme colours
+};
+
+typedef struct LsSource {
+	int show;       // an enum LsShow
+	int value;      // LS_SHOW_RGB: 0xRRGGBB; LS_SHOW_THEME: an enum MosaicThemeColor
+	int from_theme; // 1 when the theme's led-status.colour picked it
+} LsSource;
+
+// The theme's led-status.colour: a colour as 0xRRGGBB or #RRGGBB, a theme
+// colour's name as the theme_color setting takes it, or battery. Returns
+// 0 and fills out, or -1 for NULL or anything else.
+int Ls_parseColour(const char* value, LsSource* out);
+
+// What the LEDs show for the mode setting (an enum LsMode), the
+// theme_color setting's colour and the theme's led-status.colour (NULL
+// when the theme doesn't set it): the battery for battery and the
+// theme_color setting's colour for theme, whatever the theme says, and for
+// auto the theme's colour, or the battery when it sets none or one
+// Ls_parseColour doesn't take.
+LsSource Ls_source(int mode, int theme_index, const char* theme_colour);
+
+// For the log: what source shows, such as "the battery level",
+// "0x445566" or "the theme colour accent", and ", from the theme" when
+// the theme picked it.
+void Ls_describe(const LsSource* source, char* out, size_t size);
 
 #endif

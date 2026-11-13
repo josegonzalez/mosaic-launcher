@@ -166,3 +166,8 @@ void LG_letter(const char* name, char* out, size_t size) {
 int LG_showName(int show_names, int hidden, int drew_art) {
 	return show_names && !(hidden && drew_art);
 }
+
+const char* LG_themed(const char* setting, const char* theme_value) {
+	if (setting && setting[0] && strcmp(setting, "theme") != 0) return setting;
+	return theme_value;
+}

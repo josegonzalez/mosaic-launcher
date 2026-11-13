@@ -2,5 +2,5 @@ id=art-placeholder
 name=Placeholder art
 api=1
 # what a game with no art gets: its name on a card in the theme's colours,
-# or a pattern of its own
-setting.style=choice|Style|title|title,pattern
+# or a pattern of its own; theme: the theme's art-placeholder.style, or title without one
+setting.style=choice|Style|theme|theme,title,pattern

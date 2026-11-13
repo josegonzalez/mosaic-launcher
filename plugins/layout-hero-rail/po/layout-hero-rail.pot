@@ -65,3 +65,7 @@ msgstr ""
 #: plugin.txt
 msgid "small"
 msgstr ""
+
+#: plugin.txt
+msgid "theme"
+msgstr ""

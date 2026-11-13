@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mosaic_plugin.h"
@@ -91,25 +92,32 @@ static int is(const char* s, const char* name) {
 
 int Ls_parseMode(const char* setting) {
 	if (setting && is(setting, "theme")) return LS_MODE_THEME;
-	return LS_MODE_BATTERY;
+	if (setting && is(setting, "battery")) return LS_MODE_BATTERY;
+	return LS_MODE_AUTO;
+}
+
+static const struct { const char* name; int index; } colorNames[] = {
+	{"main", MOSAIC_COLOR_MAIN},
+	{"accent", MOSAIC_COLOR_ACCENT},
+	{"accent2", MOSAIC_COLOR_ACCENT2},
+	{"list_text", MOSAIC_COLOR_LIST_TEXT},
+	{"list_text_selected", MOSAIC_COLOR_LIST_TEXT_SELECTED},
+	{"hint", MOSAIC_COLOR_HINT},
+	{"background", MOSAIC_COLOR_BACKGROUND},
+};
+#define COLOR_NAMES (sizeof(colorNames) / sizeof(colorNames[0]))
+
+// a theme colour's name as an enum MosaicThemeColor, or -1
+static int colorIndex(const char* name) {
+	for (size_t i = 0; name && i < COLOR_NAMES; i++) {
+		if (is(name, colorNames[i].name)) return colorNames[i].index;
+	}
+	return -1;
 }
 
 int Ls_parseThemeColor(const char* setting) {
-	static const struct { const char* name; int index; } names[] = {
-		{"main", MOSAIC_COLOR_MAIN},
-		{"accent", MOSAIC_COLOR_ACCENT},
-		{"accent2", MOSAIC_COLOR_ACCENT2},
-		{"list_text", MOSAIC_COLOR_LIST_TEXT},
-		{"list_text_selected", MOSAIC_COLOR_LIST_TEXT_SELECTED},
-		{"hint", MOSAIC_COLOR_HINT},
-		{"background", MOSAIC_COLOR_BACKGROUND},
-	};
-	if (setting) {
-		for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-			if (is(setting, names[i].name)) return names[i].index;
-		}
-	}
-	return MOSAIC_COLOR_ACCENT;
+	int index = colorIndex(setting);
+	return index < 0 ? MOSAIC_COLOR_ACCENT : index;
 }
 
 int Ls_parseNumber(const char* setting, int min, int max, int fallback) {
@@ -121,4 +129,59 @@ int Ls_parseNumber(const char* setting, int min, int max, int fallback) {
 	if (*end == '%') end++;
 	if (*skipSpace(end) || value < min || value > max) return fallback;
 	return (int)value;
+}
+
+int Ls_parseColour(const char* value, LsSource* out) {
+	if (!value) return -1;
+	LsSource source = { LS_SHOW_BATTERY, 0, 1 };
+	const char* p = skipSpace(value);
+	int index = colorIndex(p);
+	if (is(p, "battery")) {
+		// the battery's own colours
+	}
+	else if (index >= 0) {
+		source.show = LS_SHOW_THEME;
+		source.value = index;
+	}
+	else {
+		if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) p += 2;
+		else if (p[0] == '#') p++;
+		else return -1;
+		int digits = 0;
+		while (isxdigit((unsigned char)p[digits])) digits++;
+		if (digits != 6 || *skipSpace(p + digits)) return -1;
+		source.show = LS_SHOW_RGB;
+		source.value = (int)strtol(p, NULL, 16);
+	}
+	*out = source;
+	return 0;
+}
+
+LsSource Ls_source(int mode, int theme_index, const char* theme_colour) {
+	LsSource source = { LS_SHOW_BATTERY, 0, 0 };
+	if (mode == LS_MODE_THEME) {
+		source.show = LS_SHOW_THEME;
+		source.value = theme_index;
+	}
+	else if (mode == LS_MODE_AUTO) {
+		Ls_parseColour(theme_colour, &source);
+	}
+	return source;
+}
+
+void Ls_describe(const LsSource* source, char* out, size_t size) {
+	const char* from = source->from_theme ? ", from the theme" : "";
+	if (source->show == LS_SHOW_RGB) {
+		snprintf(out, size, "0x%06X%s", (unsigned)source->value, from);
+		return;
+	}
+	if (source->show == LS_SHOW_THEME) {
+		const char* name = "?";
+		for (size_t i = 0; i < COLOR_NAMES; i++) {
+			if (colorNames[i].index == source->value) name = colorNames[i].name;
+		}
+		snprintf(out, size, "the theme colour %s%s", name, from);
+		return;
+	}
+	snprintf(out, size, "the battery level%s", from);
 }

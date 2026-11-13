@@ -263,3 +263,8 @@ void HR_letter(const char* name, char* out, size_t size) {
 		}
 	}
 }
+
+const char* HR_themed(const char* setting, const char* theme_value) {
+	if (setting && setting[0] && strcmp(setting, "theme") != 0) return setting;
+	return theme_value;
+}

@@ -32,3 +32,6 @@ msgstr "Estantes"
 
 msgid "auto"
 msgstr "auto"
+
+msgid "theme"
+msgstr "tema"

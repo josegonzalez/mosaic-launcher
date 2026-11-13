@@ -440,8 +440,21 @@ enum MosaicGlyph {
 // layout units, before scaling, as screen_scale says. Paths are full paths
 // to regular files anywhere on the card; a symlink may point anywhere on
 // the card but not off it.
+//
+// extra holds keys the theme passes on to other plugins, each named after
+// the plugin that reads it, as <its id>.<name> (such as led-status.colour),
+// which says what it means; they read them with host->theme_value. A key
+// is 3 to 63 bytes of letters, digits, '_', '-' and '.', with a '.' that
+// isn't its first or last byte, and a value at most
+// MOSAIC_THEME_EXTRA_VALUE_MAX bytes with no control characters. The
+// launcher keeps up to MOSAIC_THEME_EXTRA_KEYS keys; a line that isn't such
+// a key=value, or one past them, is refused and logged, and of a key given
+// twice the last line wins.
 #define MOSAIC_THEME_COLORS 7
 #define MOSAIC_THEME_UNSET -1
+#define MOSAIC_THEME_EXTRA_MAX 4096 // extra's size, its terminator included
+#define MOSAIC_THEME_EXTRA_KEYS 64
+#define MOSAIC_THEME_EXTRA_VALUE_MAX 255
 typedef struct MosaicTheme {
 	size_t size;                       // sizeof(MosaicTheme) in the launcher
 	int colors[MOSAIC_THEME_COLORS];   // color1 to color7 as stock's palettes number them (enum MosaicThemeColor less 1; colors[6] is the background), each 0xRRGGBB or MOSAIC_THEME_UNSET for the user's own
@@ -456,6 +469,7 @@ typedef struct MosaicTheme {
 	char wallpaper_quick[512];         // the quick menu's background where the card has no .media/quick_<name>.png or quick.png, or ""
 	char fallback_font[512];           // a TrueType or OpenType font for the characters the UI font has no glyphs for, or "" for the strings slot's owner's (see fallback_font in MosaicPlugin) or none
 	int hint_style;                    // an enum MosaicHintStyle the launcher draws button hints in over the user's, or MOSAIC_HINT_STYLE_USER for the user's
+	char extra[MOSAIC_THEME_EXTRA_MAX]; // keys for other plugins: key=value lines separated by \n, or "" for none
 } MosaicTheme;
 
 #define MOSAIC_THEME_HAS(theme, field) \
@@ -1566,6 +1580,19 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, action_info).
 	int (*actions_count)(void);
 	int (*action_info)(int index, MosaicActionInfo* out);
+
+	// A key the theme slot's owner passes on with its theme (see extra in
+	// MosaicTheme), such as led-status.colour: its value, or fallback when
+	// the theme doesn't set it, there's no theme slot owner, or its theme
+	// failed. There's no plugin id to pass: a plugin reads the keys named
+	// after its own id, and may read any other. The theme is asked for
+	// once every plugin has loaded, so from init it returns fallback: read
+	// keys where they're used, and again on launcher.theme_changed, which
+	// is published when they change. The returned string stays valid until
+	// the lists next reload. It works where cfg_get does, on the
+	// launcher's thread, and returns fallback elsewhere. Check for it with
+	// MOSAIC_HOST_HAS(host, theme_value).
+	const char* (*theme_value)(const char* key, const char* fallback);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1908,7 +1935,8 @@ typedef struct MosaicPlugin {
 
 	// The theme slot. A plugin with slots=theme in its plugin.txt supplies
 	// the launcher's colours, font and fallback font, text size, UI sizes,
-	// wallpapers and hint style: theme gets a MosaicTheme with every field at stock's value, sets the
+	// wallpapers and hint style, and keys other plugins read with
+	// host->theme_value: theme gets a MosaicTheme with every field at stock's value, sets the
 	// ones it changes and returns 0. Nothing it sets is written to stock's
 	// settings. The launcher asks once every plugin has loaded, before the
 	// first list is built, and again each time the lists reload. A value

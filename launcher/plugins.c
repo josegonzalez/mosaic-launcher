@@ -270,6 +270,12 @@ static const char* hostCfgRead(const char* plugin_id, const char* key, const cha
 	return owner ? PluginCfg_readPublic(&owner->cfg, owner->manifest, key, fallback) : fallback;
 }
 
+// A key the theme slot's owner passes on with its theme, for any plugin.
+static const char* hostThemeValue(const char* key, const char* fallback) {
+	if (!callingPlugin("theme_value") || !key) return fallback;
+	return Theme_value(key, fallback);
+}
+
 static MosaicEntry* hostEntryNew(const char* path, int type, const char* name) {
 	if (!path) return NULL;
 	Entry* entry = name ? Entry_newNamed((char*)path, type, (char*)name) : Entry_new((char*)path, type);
@@ -1752,6 +1758,7 @@ static const MosaicHost host = {
 	.call = hostCall,
 	.actions_count = hostActionsCount,
 	.action_info = hostActionInfo,
+	.theme_value = hostThemeValue,
 };
 
 ///////////////////////////////////////

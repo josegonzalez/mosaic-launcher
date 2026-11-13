@@ -10,6 +10,11 @@
 // art, its strip left blank, and shows on a letter tile. The selected tile
 // sits on a highlight in the theme's main colour.
 //
+// The columns and rows settings at theme, the default, take the theme slot
+// owner's layout-grid.columns and layout-grid.rows keys, or auto without
+// them, read once the theme is in place and again on
+// launcher.theme_changed.
+//
 // The d-pad moves the selection through the grid with select_index (see
 // LG_move for where it wraps); everything else, A, B, X, the shoulders and
 // the letter jumps, stays the launcher's. The rows in view follow the
@@ -39,6 +44,9 @@
 static const MosaicHost* host;
 static int columns_setting = 0; // 0 for auto
 static int rows_setting = 0;
+static char columns_value[16]; // the settings as set, theme for the theme's
+static char rows_value[16];
+static int themed = 0; // 0 until the theme's keys are read, and again when the theme changes
 static int first_row = 0; // the first row in view
 static char window_path[MAX_PATH_LEN]; // the folder first_row is for
 static int window_depth = -1;
@@ -175,7 +183,26 @@ static int hiddenName(const MosaicListView* view, int index) {
 		view->names_hidden[index];
 }
 
+// the settings, or the theme's keys for those at theme
+static void resolveSettings(void) {
+	int has = MOSAIC_HOST_HAS(host, theme_value);
+	columns_setting = LG_count(LG_themed(columns_value, has ? host->theme_value(ID ".columns", NULL) : NULL), 1,
+		LG_MAX_COLUMNS);
+	rows_setting = LG_count(LG_themed(rows_value, has ? host->theme_value(ID ".rows", NULL) : NULL), 1, LG_MAX_ROWS);
+	themed = 1;
+}
+
+// the theme's keys may have changed
+static void themeChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	themed = 0;
+}
+
 static int layoutGrid(const MosaicListView* view, LGGrid* grid) {
+	// the theme is put in place after every plugin's init
+	if (!themed) resolveSettings();
 	int scale = host->screen_scale();
 	MosaicRect header = view->size >= offsetof(MosaicListView, header) + sizeof(view->header)
 		? view->header
@@ -299,8 +326,12 @@ static int init(const MosaicHost* h) {
 		host->log(ID, "this launcher can't draw a layout");
 		return 1;
 	}
-	columns_setting = LG_count(host->cfg_get("columns", "auto"), 1, LG_MAX_COLUMNS);
-	rows_setting = LG_count(host->cfg_get("rows", "auto"), 1, LG_MAX_ROWS);
+	snprintf(columns_value, sizeof(columns_value), "%s", host->cfg_get("columns", "theme"));
+	snprintf(rows_value, sizeof(rows_value), "%s", host->cfg_get("rows", "theme"));
+	themed = 0;
+	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
+		host->log(ID, "couldn't follow theme changes");
+	}
 	return 0;
 }
 
