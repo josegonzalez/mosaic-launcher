@@ -250,20 +250,20 @@ static void drawHints(MosaicSurface* screen, const MosaicScreenView* view, int w
 		!strcmp(out, background));
 
 	// what it refuses
-	MosaicHint dpad[] = { { MOSAIC_BUTTON_UP, "UP" } };
+	MosaicHint unknown[] = { { 99, "UNKNOWN" } };
 	MosaicHint fn[] = { { MOSAIC_BUTTON_FN1, "FN" } };
 	MosaicHint unlabelled[] = { { MOSAIC_BUTTON_A, NULL } };
 	MosaicHint empty[] = { { MOSAIC_BUTTON_A, "" } };
 	MosaicHint three[] = { { MOSAIC_BUTTON_A, "A" }, { MOSAIC_BUTTON_B, "B" }, { MOSAIC_BUTTON_X, "X" } };
 	if (!own) own = host->surface_new(ID, 64, 64);
-	say("hints refused again %i wide %i own %i group %i none %i three %i dpad %i fn %i null %i empty %i",
+	say("hints refused again %i wide %i own %i group %i none %i three %i unknown %i fn %i null %i empty %i",
 		host->draw_hints(screen, pill == &left ? MOSAIC_HINTS_LEFT : MOSAIC_HINTS_RIGHT, switcher_left, 1, NULL),
 		host->draw_hints(screen, MOSAIC_HINTS_LEFT, wide, 2, NULL),
 		host->draw_hints(own, MOSAIC_HINTS_LEFT, switcher_left, 1, NULL),
 		host->draw_hints(screen, 2, switcher_left, 1, NULL),
 		host->draw_hints(screen, MOSAIC_HINTS_LEFT, switcher_left, 0, NULL),
 		host->draw_hints(screen, MOSAIC_HINTS_LEFT, three, 3, NULL),
-		host->draw_hints(screen, MOSAIC_HINTS_LEFT, dpad, 1, NULL),
+		host->draw_hints(screen, MOSAIC_HINTS_LEFT, unknown, 1, NULL),
 		host->draw_hints(screen, MOSAIC_HINTS_LEFT, fn, 1, NULL),
 		host->draw_hints(screen, MOSAIC_HINTS_LEFT, unlabelled, 1, NULL),
 		host->draw_hints(screen, MOSAIC_HINTS_LEFT, empty, 1, NULL));

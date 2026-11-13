@@ -100,7 +100,7 @@ hints_line() {
 		|| fail "screener's $1 hints on $2 weren't where stock puts them: $(grep "plugin screener: hints $1" "$log")"
 	grep -qE "plugin screener: hints $1 .* pill ([0-9A-F]{8}) accent \1 outside clear 1$" "$log" \
 		|| fail "screener's $1 pill wasn't the accent colour, or went past its edge: $(grep "plugin screener: hints $1" "$log")"
-	expect "hints refused again -1 wide -1 own -1 group -1 none -1 three -1 dpad -1 fn -1 null -1 empty -1"
+	expect "hints refused again -1 wide -1 own -1 group -1 none -1 three -1 unknown -1 fn -1 null -1 empty -1"
 	grep -qE "plugin screener: hints drawn [1-9][0-9]* refused 0$" "$log" \
 		|| fail "screener's $1 hints were refused: $(grep "plugin screener: hints drawn" "$log")"
 }
