@@ -261,8 +261,8 @@ static int cfg_sets = 0;
 static char current[1024] = CARD;
 static int lists_ready = 1;
 static char action_id[64];
-static int (*action_available)(void*);
-static void (*action_run)(void*);
+static int (*action_available)(const char*, void*);
+static void (*action_run)(const char*, void*);
 static int bound_button = -1;
 static char toasted[160];
 static char opened[1024];
@@ -314,7 +314,8 @@ static void fakeListPush(MosaicList* l, MosaicEntry* e) {
 }
 static const char* fakeCurrentPath(void) { return lists_ready ? current : NULL; }
 static void fakeRedraw(void) {}
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)label; (void)data;
 	snprintf(action_id, sizeof(action_id), "%s", id);
 	action_available = available;
@@ -360,7 +361,8 @@ static int fakeOpenPath(const char* path, int type) {
 }
 static void fakeReload(void) { reloads++; }
 // gamelist.back goes to the folder above, as far as the root
-static int fakeRunAction(const char* id) {
+static int fakeRunAction(const char* id, const char* path) {
+	(void)path;
 	snprintf(ran, sizeof(ran), "%s", id);
 	runs++;
 	if (!strcmp(id, "gamelist.back")) {
@@ -463,7 +465,7 @@ static void testPlugin(void) {
 	CHECK_STR(p->id, "search");
 	CHECK(p->init(&fake) == 0);
 	CHECK_STR(action_id, "search.open");
-	CHECK(action_available && action_available(NULL));
+	CHECK(action_available && action_available(NULL, NULL));
 	CHECK(bound_button == -1); // no button by default
 
 	// a Search row on the root
@@ -529,7 +531,7 @@ static void testPlugin(void) {
 
 	// map.txt names, accents and case fold; game folders and paks are found
 	keyboards = 0;
-	action_run(NULL); // the action asks from anywhere: recents first now
+	action_run(NULL, NULL); // the action asks from anywhere: recents first now
 	CHECK(chooses == 1 && keyboards == 0);
 	CHECK(choice_count == 2);
 	CHECK_STR(choices[0], "New search");
@@ -581,7 +583,7 @@ static void testPlugin(void) {
 	snprintf(current, sizeof(current), "%s", GB);
 	p->tick(0);
 	chooses = 0;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(chooses == 1 && choice_count == 7);
 	CHECK_STR(choices[6], "mario");
 	opens = 0;
@@ -600,10 +602,10 @@ static void testPlugin(void) {
 	snprintf(current, sizeof(current), "%s", GB);
 	p->tick(0);
 	runs = 0;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	choice_pick(-1, NULL);
 	CHECK(runs == 0);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	choice_pick(0, NULL);
 	keyboard_done(NULL, NULL);
 	CHECK(runs == 0);
@@ -721,7 +723,7 @@ static void testPlugin(void) {
 	freeList(root);
 	keyboards = chooses = 0;
 	cfg_sets = 0;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(keyboards == 1 && chooses == 0);
 	keyboard_done("kirby", NULL);
 	CHECK_STR(fakeCfgGet("query", ""), "kirby");
@@ -733,7 +735,7 @@ static void testPlugin(void) {
 	fake.choose = NULL;
 	CHECK(p->init(&fake) == 0);
 	keyboards = chooses = 0;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(keyboards == 1 && chooses == 0);
 	p->quit();
 

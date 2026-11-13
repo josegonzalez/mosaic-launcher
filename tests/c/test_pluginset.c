@@ -200,6 +200,28 @@ int main(void) {
 	CHECK(Manifest_parse("id=s\nsetting.note=text|Note|||secret\n", &only_secret) == 0);
 	CHECK(!Manifest_isProtected(&only_secret));
 
+	// button:<action id> marks the setting a plugin puts that action's button
+	// by, for action_info; other flags still count, and unknown words don't
+	PluginManifest marked = { .bundled = 1 };
+	CHECK(Manifest_parse(
+		"id=marked\n"
+		"setting.button=choice|Button|Y|none,Y,L2| button:marked.hide , button:marked.unhide,public\n"
+		"setting.extra=choice|Extra|L2|L2,R2|protected,button:other.run,button:\n"
+		"setting.plain=toggle|Plain|on\n", &marked) == 0);
+	CHECK(marked.setting_count == 3);
+	CHECK_STR(marked.settings[0].buttons, "marked.hide,marked.unhide");
+	CHECK_STR(marked.settings[0].options, "none,Y,L2");
+	CHECK(marked.settings[0].flags == SETTING_PUBLIC);
+	CHECK_STR(marked.settings[1].buttons, "other.run"); // an empty id is left out
+	CHECK(marked.settings[1].flags == SETTING_PROTECTED);
+	CHECK_STR(marked.settings[2].buttons, "");
+	CHECK_STR(Manifest_buttonSetting(&marked, "marked.unhide"), "button");
+	CHECK_STR(Manifest_buttonSetting(&marked, "other.run"), "extra");
+	CHECK(Manifest_buttonSetting(&marked, "marked") == NULL);
+	CHECK(Manifest_buttonSetting(&marked, "") == NULL);
+	CHECK(Manifest_buttonSetting(&marked, NULL) == NULL);
+	CHECK(Manifest_buttonSetting(NULL, "marked.hide") == NULL);
+
 	// public, for other plugins' cfg_read, but never on a protected or secret setting
 	PluginManifest pub = { .bundled = 1 };
 	CHECK(Manifest_parse(

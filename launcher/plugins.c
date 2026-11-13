@@ -32,6 +32,7 @@
 #include "events.h"
 #include "callsite.h"
 #include "providers.h"
+#include "actionlist.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -338,10 +339,11 @@ static void hostRequestRedraw(void) {
 	state.dirty = 1;
 }
 
-static int hostRegisterAction(const char* id, const char* label,
-		int (*available)(void* data), void (*run)(void* data), void* data) {
+static int hostRegisterAction(const char* id, const char* label, int flags,
+		int (*available)(const char* path, void* data), void (*run)(const char* path, void* data), void* data) {
 	if (!id || !run) return -1;
 	Action* action = calloc(1, sizeof(Action));
+	action->takes_path = (flags & MOSAIC_ACTION_PATH) != 0;
 	action->id = strdup(id);
 	action->label = strdup(label ? label : id);
 	action->available = available;
@@ -1581,7 +1583,9 @@ static int hostDecorateArt(MosaicSurface* screen, int index, const MosaicRect* a
 static int hostRegisterScreen(const char* id, const MosaicScreenHooks* hooks);
 static int hostOpenScreen(const char* id);
 static int hostCloseScreen(const char* id);
-static int hostRunAction(const char* action_id);
+static int hostRunAction(const char* action_id, const char* path);
+static int hostActionsCount(void);
+static int hostActionInfo(int index, MosaicActionInfo* out);
 static int hostDrawHints(MosaicSurface* screen, int group, const MosaicHint* hints, int count, MosaicRect* drawn);
 
 static void playLog(const char* message) {
@@ -1746,6 +1750,8 @@ static const MosaicHost host = {
 	.has_capability = hostHasCapability,
 	.provide = hostProvide,
 	.call = hostCall,
+	.actions_count = hostActionsCount,
+	.action_info = hostActionInfo,
 };
 
 ///////////////////////////////////////
@@ -2268,6 +2274,7 @@ int Plugins_count(void) {
 // button bindings
 
 static Binding pluginBindings[SCREEN_COUNT][PLUGIN_BINDING_MAX];
+static int pluginBindingOwner[SCREEN_COUNT][PLUGIN_BINDING_MAX]; // index in loaded, or -1
 static int pluginBindingCount[SCREEN_COUNT];
 static Binding overrideBindings[SCREEN_COUNT][PLUGIN_OVERRIDE_MAX];
 static int overrideOwner[SCREEN_COUNT][PLUGIN_OVERRIDE_MAX]; // index in loaded
@@ -2330,6 +2337,9 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 	const ButtonInfo* info = buttonInfo(button);
 	if (!info || pluginBindingCount[screen] >= PLUGIN_BINDING_MAX) return -1;
 
+	const char* caller = Caller_current();
+	LoadedPlugin* owner = caller ? loadedById(caller) : NULL;
+	pluginBindingOwner[screen][pluginBindingCount[screen]] = owner ? (int)(owner - loaded) : -1;
 	Binding* b = &pluginBindings[screen][pluginBindingCount[screen]++];
 	b->button = info->btn;
 	b->trigger = trigger == MOSAIC_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
@@ -2443,6 +2453,88 @@ int Plugins_overrides(int screen, const Binding** bindings) {
 	if (screen < 0 || screen >= SCREEN_COUNT) return 0;
 	*bindings = overrideBindings[screen];
 	return overrideCount[screen];
+}
+
+///////////////////////////////////////
+// listing actions
+
+#define OWN_BINDINGS_MAX 16
+#define ACTION_BINDS_MAX (OWN_BINDINGS_MAX + SCREEN_COUNT * (PLUGIN_OVERRIDE_MAX + PLUGIN_BINDING_MAX) + FN_COUNT)
+
+// A BTN_* as an enum MosaicButton, MENU too, or -1.
+static int mosaicButton(int btn) {
+	if (btn == BTN_MENU) return MOSAIC_BUTTON_MENU;
+	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
+		if (buttons[i].btn == btn) return buttons[i].nui;
+	}
+	return -1;
+}
+
+// A plugin's bind, with the setting it follows when its plugin.txt marks one.
+static ActionBind pluginBind(const Binding* b, int by, int screen, int owner) {
+	const char* plugin_id = owner >= 0 && owner < loaded_count ? loaded[owner].id : NULL;
+	const char* action_id = b->action ? b->action->id : NULL;
+	return (ActionBind){
+		action_id, by, screen, mosaicButton(b->button), b->trigger, plugin_id,
+		plugin_id ? Manifest_buttonSetting(loaded[owner].manifest, action_id) : NULL,
+	};
+}
+
+// Every button an action is on, in effect: the game list's own, then
+// overrides, bind_button's and the FN buttons'.
+static int actionBinds(ActionBind* out) {
+	int n = 0;
+	const Binding* own[OWN_BINDINGS_MAX];
+	int own_count = GameList_ownBindings(own, OWN_BINDINGS_MAX);
+	if (own_count > OWN_BINDINGS_MAX) own_count = OWN_BINDINGS_MAX;
+	for (int i = 0; i < own_count; i++) {
+		out[n++] = (ActionBind){ own[i]->action->id, MOSAIC_BIND_SCREEN, MOSAIC_SCREEN_GAMELIST,
+			mosaicButton(own[i]->button), own[i]->trigger, NULL, NULL };
+	}
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) {
+		for (int i = 0; i < overrideCount[screen]; i++) {
+			// a NULL action leaves the button doing nothing, which still takes it
+			out[n++] = pluginBind(&overrideBindings[screen][i], MOSAIC_BIND_OVERRIDE, screen, overrideOwner[screen][i]);
+		}
+	}
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) {
+		for (int i = 0; i < pluginBindingCount[screen]; i++) {
+			out[n++] = pluginBind(&pluginBindings[screen][i], MOSAIC_BIND_BUTTON, screen, pluginBindingOwner[screen][i]);
+		}
+	}
+	n = ActionList_dropOverridden(out, n);
+	size_t prefix = strlen(FN_ACTION_ACTION_PREFIX);
+	for (int index = 0; index < FN_COUNT; index++) {
+		if (!fnPresent(index)) continue;
+		const char* owner = NULL;
+		const char* action = FnBinds_effective(&fn_binds, index, fnUser(index), &owner);
+		if (strncmp(action, FN_ACTION_ACTION_PREFIX, prefix) != 0) continue;
+		LoadedPlugin* p = owner ? loadedById(owner) : NULL;
+		out[n++] = (ActionBind){ action + prefix, owner ? MOSAIC_BIND_FN_PLUGIN : MOSAIC_BIND_FN_USER, -1,
+			MOSAIC_BUTTON_FN1 + index, MOSAIC_TRIGGER_PRESS, p ? p->id : NULL,
+			p ? Manifest_buttonSetting(p->manifest, action + prefix) : NULL };
+	}
+	return n;
+}
+
+static int hostActionsCount(void) {
+	if (!callingPlugin("actions_count")) return 0;
+	const Action* all[ACTIONS_MAX];
+	int count = Actions_list(all, ACTIONS_MAX);
+	return count < ACTIONS_MAX ? count : ACTIONS_MAX;
+}
+
+static int hostActionInfo(int index, MosaicActionInfo* out) {
+	if (!callingPlugin("action_info") || !out || out->size < sizeof(out->size)) return -1;
+	const Action* all[ACTIONS_MAX];
+	int count = Actions_list(all, ACTIONS_MAX);
+	if (index < 0 || index >= count || index >= ACTIONS_MAX) return -1;
+	const Action* action = all[index];
+	static ActionBind binds[ACTION_BINDS_MAX];
+	int bind_count = actionBinds(binds);
+	MosaicActionInfo full;
+	ActionList_fill(&full, action->id, Action_label(action), action->plugin_id, action->takes_path, binds, bind_count);
+	return ActionList_copy(&full, out);
 }
 
 ///////////////////////////////////////
@@ -3391,16 +3483,21 @@ static int hostCloseScreen(const char* id) {
 	return 0;
 }
 
-static int hostRunAction(const char* action_id) {
+static int hostRunAction(const char* action_id, const char* path) {
 	if (!screenCallAllowed("run_action")) return -1;
 	const Action* action = Actions_find(action_id);
 	if (!action) {
 		LOG_warn("plugins: can't run action %s: there's no such action\n", action_id ? action_id : "(null)");
 		return -1;
 	}
-	if (!Action_available(action)) return -1;
-	Action_run(action);
-	return 0;
+	// with no path given, what a button would give it
+	if (!path || !path[0]) path = Action_buttonPath(action);
+	if (action->takes_path && !path) {
+		LOG_warn("plugins: can't run action %s: it acts on an entry, and none was given or is selected\n", action->id);
+		return -1;
+	}
+	if (!Action_available(action, path)) return -1;
+	return Action_run(action, path);
 }
 
 // After an error the screen stays off until the launcher restarts; it

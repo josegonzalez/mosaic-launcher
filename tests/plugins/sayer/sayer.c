@@ -103,7 +103,8 @@ static const char* translatePlural(const char* plugin_id, const char* context, c
 	return n <= 1 ? "%d jeu" : "%d jeux";
 }
 
-static void shout(void* data) {
+static void shout(const char* path, void* data) {
+	(void)path;
 	(void)data;
 }
 
@@ -153,12 +154,12 @@ static void rootTick(unsigned long now) {
 		root_at = now;
 	}
 	if (root_step == 2 && now - root_at >= 500) {
-		say("ran quick-menu-plus.awake %s%s", host->run_action("quick-menu-plus.awake") == 0 ? "0" : "-1", "");
+		say("ran quick-menu-plus.awake %s%s", host->run_action("quick-menu-plus.awake", NULL) == 0 ? "0" : "-1", "");
 		root_step = 3;
 		root_at = now;
 	}
 	if (root_step == 3 && now - root_at >= 1000) {
-		say("ran theme-plus.pick %s%s", host->run_action("theme-plus.pick") == 0 ? "0" : "-1", "");
+		say("ran theme-plus.pick %s%s", host->run_action("theme-plus.pick", NULL) == 0 ? "0" : "-1", "");
 		root_step = 4;
 		root_at = now;
 	}
@@ -196,7 +197,7 @@ static int init(const MosaicHost* h) {
 	say("init tr Hello = %s%s", host->tr("sayer", NULL, "Hello"), "");
 	MosaicPluginInfo info = { .size = sizeof(info) };
 	say("init plugins %s, first %s", host->plugins_count() == 0 ? "0" : "some", host->plugin_info(0, &info) == -1 ? "-1" : "0");
-	host->register_action("sayer.shout", "SHOUT", NULL, shout, NULL);
+	host->register_action("sayer.shout", "SHOUT", 0, NULL, shout, NULL);
 	host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "sayer.shout");
 	return 0;
 }

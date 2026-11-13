@@ -218,7 +218,8 @@ static void dismissConfirmed(void* data) {
 	changed(message);
 }
 
-static int canDismiss(void* data) {
+static int canDismiss(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	if (!entry || host->entry_type(entry) != MOSAIC_ENTRY_DIR) return 0;
@@ -226,8 +227,9 @@ static int canDismiss(void* data) {
 	return i >= 0 && !SM_setHas(&dismissed, catalog.items[i].name);
 }
 
-static void dismiss(void* data) {
-	if (!canDismiss(data)) return;
+static void dismiss(const char* path, void* data) {
+	(void)path;
+	if (!canDismiss(path, data)) return;
 	int i = collectionAt(host->entry_path(host->selected_entry()));
 	snprintf(pending, sizeof(pending), "%s", catalog.items[i].name);
 	if (!MOSAIC_HOST_HAS(host, confirm)) {
@@ -252,14 +254,16 @@ static void restoreConfirmed(void* data) {
 	changed(tr("Dismissed collections are back"));
 }
 
-static int canRestore(void* data) {
+static int canRestore(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	return entry && dismissed.count > 0 && !strcmp(host->entry_path(entry), folder_path);
 }
 
-static void restore(void* data) {
-	if (!canRestore(data)) return;
+static void restore(const char* path, void* data) {
+	(void)path;
+	if (!canRestore(path, data)) return;
 	if (!MOSAIC_HOST_HAS(host, confirm)) {
 		restoreConfirmed(NULL);
 		return;
@@ -365,11 +369,11 @@ static int init(const MosaicHost* h) {
 	scanned = 0;
 	registerSets();
 
-	if (host->register_action("smart-collections.dismiss", "DISMISS", canDismiss, dismiss, NULL) != 0
+	if (host->register_action("smart-collections.dismiss", "DISMISS", 0, canDismiss, dismiss, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.dismiss") != 0) {
 		say("couldn't bind Y; collections can't be dismissed");
 	}
-	if (host->register_action("smart-collections.restore", "RESTORE", canRestore, restore, NULL) != 0
+	if (host->register_action("smart-collections.restore", "RESTORE", 0, canRestore, restore, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.restore") != 0) {
 		say("couldn't bind Y; dismissed collections can't be brought back");
 	}

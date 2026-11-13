@@ -27,8 +27,8 @@ static const char* tile_setting = NULL;
 static int action_count = 0;
 static char action_id[MAX_ACTIONS][64];
 static char action_label[MAX_ACTIONS][64];
-static int (*action_available[MAX_ACTIONS])(void*);
-static void (*action_run[MAX_ACTIONS])(void*);
+static int (*action_available[MAX_ACTIONS])(const char*, void*);
+static void (*action_run[MAX_ACTIONS])(const char*, void*);
 static int bound_count = 0;
 static int bound_button[4];
 static char bound_action[4][64];
@@ -52,7 +52,8 @@ static int fakeEntryType(const MosaicEntry* e) { return e->type; }
 static const MosaicEntry* fakeSelected(void) { return selected; }
 static const char* fakeCurrentPath(void) { return current; }
 static void fakeRedraw(void) {}
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	if (action_count >= MAX_ACTIONS) return -1;
 	snprintf(action_id[action_count], sizeof(action_id[0]), "%s", id);
@@ -174,10 +175,10 @@ int main(void) {
 	// no recents: no tile, and nothing on the button anywhere
 	snprintf(current, sizeof(current), "%s", RECENTS);
 	selected = NULL;
-	CHECK(!action_available[tile](NULL));
-	CHECK(!action_available[clear](NULL));
-	CHECK(!action_available[remove](NULL));
-	action_run[tile](NULL);
+	CHECK(!action_available[tile](NULL, NULL));
+	CHECK(!action_available[clear](NULL, NULL));
+	CHECK(!action_available[remove](NULL, NULL));
+	action_run[tile](NULL, NULL);
 	CHECK(pending_yes == NULL); // nothing to ask about
 
 	const char* three[] = { GB "/Tetris.gb", GB "/Zelda.gb", CARD "/Tools/test/Clock.pak" };
@@ -186,36 +187,36 @@ int main(void) {
 	// outside Recently Played the button is left alone, but the tile shows
 	snprintf(current, sizeof(current), "%s", GB);
 	selectEntry(GB "/Tetris.gb");
-	CHECK(action_available[tile](NULL));
-	CHECK(!action_available[clear](NULL));
-	CHECK(!action_available[remove](NULL));
+	CHECK(action_available[tile](NULL, NULL));
+	CHECK(!action_available[clear](NULL, NULL));
+	CHECK(!action_available[remove](NULL, NULL));
 	snprintf(current, sizeof(current), "%s", CARD);
-	CHECK(!action_available[clear](NULL));
+	CHECK(!action_available[clear](NULL, NULL));
 
 	// in Recently Played both are on the button
 	snprintf(current, sizeof(current), "%s", RECENTS);
-	CHECK(action_available[clear](NULL));
-	CHECK(action_available[remove](NULL));
+	CHECK(action_available[clear](NULL, NULL));
+	CHECK(action_available[remove](NULL, NULL));
 	selectEntry(GB "/Other.gb"); // not a recent: only clearing
-	CHECK(!action_available[remove](NULL));
-	CHECK(action_available[clear](NULL));
+	CHECK(!action_available[remove](NULL, NULL));
+	CHECK(action_available[clear](NULL, NULL));
 
 	// removing the selected one keeps the rest in order
 	selectEntry(GB "/Zelda.gb");
 	reloads = 0;
-	action_run[remove](NULL);
+	action_run[remove](NULL, NULL);
 	CHECK(recent_count == 2);
 	CHECK_STR(recents[0], GB "/Tetris.gb");
 	CHECK_STR(recents[1], CARD "/Tools/test/Clock.pak");
 	CHECK(reloads == 1);
 	CHECK_STR(toasted, "Removed from recents");
-	CHECK(!action_available[remove](NULL));
+	CHECK(!action_available[remove](NULL, NULL));
 	CHECK(pending_yes == NULL); // without asking
 
 	// clearing asks first, and backing out keeps them
 	toasted[0] = '\0';
 	reloads = clears = 0;
-	action_run[clear](NULL);
+	action_run[clear](NULL, NULL);
 	CHECK(pending_yes != NULL);
 	CHECK_STR(asked, "Clear all recently played games?");
 	CHECK_STR(yes_label, "CLEAR");
@@ -224,19 +225,19 @@ int main(void) {
 	CHECK_STR(toasted, "");
 
 	// saying yes clears, lists again and says so
-	action_run[clear](NULL);
+	action_run[clear](NULL, NULL);
 	answer(1);
 	CHECK(recent_count == 0 && clears == 1);
 	CHECK(reloads == 1);
 	CHECK_STR(toasted, "Recents cleared");
-	CHECK(!action_available[clear](NULL));
-	CHECK(!action_available[tile](NULL)); // the tile goes when the lists reload
+	CHECK(!action_available[clear](NULL, NULL));
+	CHECK(!action_available[tile](NULL, NULL)); // the tile goes when the lists reload
 
 	// the tile clears the same way, from anywhere
 	setRecents(3, three);
 	snprintf(current, sizeof(current), "%s", CARD);
 	reloads = clears = 0;
-	action_run[tile](NULL);
+	action_run[tile](NULL, NULL);
 	CHECK_STR(asked, "Clear all recently played games?");
 	answer(1);
 	CHECK(recent_count == 0 && clears == 1 && reloads == 1);

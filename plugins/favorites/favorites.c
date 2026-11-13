@@ -191,7 +191,8 @@ static int favoriteFor(const MosaicEntry* entry, char* out, size_t size) {
 ///////////////////////////////////////
 // the toggle
 
-static int canToggle(void* data) {
+static int canToggle(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	char path[MAX_PATH_LEN * 2];
 	return favoriteFor(host->selected_entry(), path, sizeof(path));
@@ -243,7 +244,8 @@ static void removeConfirmed(void* data) {
 	pending[0] = '\0';
 }
 
-static void toggle(void* data) {
+static void toggle(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	char path[MAX_PATH_LEN * 2];
@@ -380,7 +382,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't register the favorites set");
 	}
 
-	if (host->register_action("favorites.toggle", "FAVORITE", canToggle, toggle, NULL) != 0
+	if (host->register_action("favorites.toggle", "FAVORITE", 0, canToggle, toggle, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "favorites.toggle") != 0) {
 		say("couldn't bind Y; favorites can't be changed from the game list");
 	}

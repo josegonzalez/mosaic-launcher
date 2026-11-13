@@ -11,15 +11,29 @@
 typedef struct Action {
 	const char* id;          // eg. "gamelist.open"; FN buttons bind as "action:<id>"
 	const char* label;       // hint text, passed through TR() when drawn
-	int (*available)(void* data); // may it run now, and should its hint show; NULL means always
-	void (*run)(void* data);
+	int (*available)(const char* path, void* data); // may it run now, and should its hint show; NULL means always
+	void (*run)(const char* path, void* data);
 	void* data;              // passed to both, eg. a plugin's own state
 	const char* plugin_id;   // whose label it is: NULL for the launcher's own, the plugin's id for a plugin's
+	int takes_path;          // it acts on an entry, and gets its full path; any other gets NULL
 } Action;
 
-// True when the action exists and may run now.
-int Action_available(const Action* action);
-void Action_run(const Action* action);
+// True when the action exists and may run now on path, an entry's full
+// path for an action that takes one, which isn't available without one.
+int Action_available(const Action* action, const char* path);
+
+// Runs the action on path, as Action_available takes it. Returns 0, or -1
+// for no action, or one that takes a path given none, which is logged.
+int Action_run(const Action* action, const char* path);
+
+// What a button gives the action: the selected entry's path while the
+// game list shows, for an action that takes a path, else NULL.
+const char* Action_buttonPath(const Action* action);
+
+// Where Action_buttonPath finds the selected entry: selected returns its
+// full path while the game list shows, and NULL elsewhere or with nothing
+// selected. NULL, as at the start, gives none.
+void Actions_setSelected(const char* (*selected)(void));
 
 // The label to draw, translated as its owner's text.
 char* Action_label(const Action* action);

@@ -19,8 +19,8 @@ static const char* toggles_setting = "";
 static int action_count = 0;
 static char action_id[MAX_ACTIONS][64];
 static char action_label[MAX_ACTIONS][64];
-static int (*action_available[MAX_ACTIONS])(void*);
-static void (*action_run[MAX_ACTIONS])(void*);
+static int (*action_available[MAX_ACTIONS])(const char*, void*);
+static void (*action_run[MAX_ACTIONS])(const char*, void*);
 static void* action_data[MAX_ACTIONS];
 static int tile_count = 0;
 static char tile_action[MAX_ACTIONS][64];
@@ -48,7 +48,8 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (toggles_setting && !strcmp(key, "toggles")) return toggles_setting;
 	return fallback;
 }
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	if (action_count >= MAX_ACTIONS) return -1;
 	action_data[action_count] = data;
 	snprintf(action_id[action_count], sizeof(action_id[0]), "%s", id);
@@ -275,9 +276,9 @@ int main(void) {
 	CHECK(tile_is_on[1] == NULL);
 
 	// stay awake flips, holds off sleep, and is remembered
-	CHECK(action_available[awakeTile](NULL));
+	CHECK(action_available[awakeTile](NULL, NULL));
 	CHECK(!tile_is_on[0](NULL) && inhibit_calls == 0);
-	action_run[awakeTile](NULL);
+	action_run[awakeTile](NULL, NULL);
 	CHECK(tile_is_on[0](NULL) && inhibited == 1);
 	CHECK_STR(toasted, "Staying awake");
 	CHECK(access(QMP_AWAKE_FILE, F_OK) == 0);
@@ -286,15 +287,15 @@ int main(void) {
 	reset();
 	CHECK(p->init(&fake) == 0);
 	CHECK(tile_is_on[0](NULL) && inhibited == 1 && inhibit_calls == 1);
-	action_run[find("quick-menu-plus.awake")](NULL);
+	action_run[find("quick-menu-plus.awake")](NULL, NULL);
 	CHECK(!tile_is_on[0](NULL) && inhibited == 0);
 	CHECK_STR(toasted, "Sleeping as usual");
 	CHECK(access(QMP_AWAKE_FILE, F_OK) != 0);
 
 	// reboot to stock asks first, and backing out does nothing
 	stock = find("quick-menu-plus.stock");
-	CHECK(action_available[stock](NULL));
-	action_run[stock](NULL);
+	CHECK(action_available[stock](NULL, NULL));
+	action_run[stock](NULL, NULL);
 	CHECK(pending_yes != NULL);
 	CHECK_STR(asked, "Reboot to stock NextUI?\nTurn Launcher back on from Tools.");
 	CHECK_STR(yes_label, "REBOOT");
@@ -302,7 +303,7 @@ int main(void) {
 	CHECK(power_offs == 0 && !ranWith("turn-off"));
 
 	// yes turns the launcher off, then reboots
-	action_run[stock](NULL);
+	action_run[stock](NULL, NULL);
 	answer(1);
 	CHECK(ranWith("turn-off"));
 	CHECK(power_offs == 1 && last_reboot == 1);
@@ -310,7 +311,7 @@ int main(void) {
 	// when manage.sh fails it doesn't reboot
 	makePak(1);
 	power_offs = 0;
-	action_run[stock](NULL);
+	action_run[stock](NULL, NULL);
 	answer(1);
 	CHECK(ranWith("turn-off"));
 	CHECK(power_offs == 0);
@@ -320,7 +321,7 @@ int main(void) {
 	reset();
 	setenv("MOSAIC_LAUNCHER_PAK_DIR", TEST_DIR "/qmp-nowhere", 1);
 	p->init(&fake);
-	CHECK(!action_available[find("quick-menu-plus.stock")](NULL));
+	CHECK(!action_available[find("quick-menu-plus.stock")](NULL, NULL));
 
 	// the pak_dir turning the launcher on wrote is found too
 	reset();
@@ -329,7 +330,7 @@ int main(void) {
 	mkdir(USERDATA "/launcher", 0755);
 	writeFile(USERDATA "/launcher/pak_dir", PAK "\n", 0644);
 	p->init(&fake);
-	CHECK(action_available[find("quick-menu-plus.stock")](NULL));
+	CHECK(action_available[find("quick-menu-plus.stock")](NULL, NULL));
 
 	// labels and hidden tiles from the settings
 	reset();
@@ -381,19 +382,19 @@ int main(void) {
 
 	// a tile shows the setting and flips it
 	int shot = find("quick-menu-plus.toggle.screenshot");
-	CHECK(action_available[shot](action_data[shot]));
+	CHECK(action_available[shot](NULL, action_data[shot]));
 	CHECK(!tile_is_on[shot](action_data[shot]));
-	action_run[shot](action_data[shot]);
+	action_run[shot](NULL, action_data[shot]);
 	CHECK(stock_values[2] == 1 && tile_is_on[shot](action_data[shot]));
 	CHECK_STR(toasted, "Screenshot notices on");
-	action_run[shot](action_data[shot]);
+	action_run[shot](NULL, action_data[shot]);
 	CHECK(stock_values[2] == 0);
 	CHECK_STR(toasted, "Screenshot notices off");
 
 	// a refused change says so and leaves it
 	refuse_sets = 1;
 	stock_sets = 0;
-	action_run[shot](action_data[shot]);
+	action_run[shot](NULL, action_data[shot]);
 	CHECK(stock_values[2] == 0 && stock_sets == 0);
 	CHECK_STR(toasted, "Couldn't change Screenshot notices");
 	refuse_sets = 0;

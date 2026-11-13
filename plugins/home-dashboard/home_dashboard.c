@@ -749,11 +749,11 @@ static int input(const MosaicInput* input, void* data) {
 	(void)data;
 	unsigned int pressed = input->pressed;
 	if (pressedBit(pressed, MOSAIC_BUTTON_MENU)) {
-		host->run_action("gamelist.quick_menu");
+		host->run_action("gamelist.quick_menu", NULL);
 		return MOSAIC_SCREEN_STAY;
 	}
 	if (pressedBit(pressed, MOSAIC_BUTTON_SELECT)) {
-		host->run_action("gamelist.switcher");
+		host->run_action("gamelist.switcher", NULL);
 		return MOSAIC_SCREEN_STAY;
 	}
 	if (pressedBit(pressed, MOSAIC_BUTTON_X)) {

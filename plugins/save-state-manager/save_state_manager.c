@@ -539,7 +539,8 @@ static void forget(void) {
 	any_answer = -1;
 }
 
-static int canOpenGame(void* data) {
+static int canOpenGame(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	const char* path = entry ? host->entry_path(entry) : "";
@@ -550,7 +551,8 @@ static int canOpenGame(void* data) {
 	return asked_answer;
 }
 
-static void openGame(void* data) {
+static void openGame(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (selectedGame(&single) != 0) {
 		say("the selected entry isn't a game");
@@ -560,7 +562,8 @@ static void openGame(void* data) {
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the save states screen");
 }
 
-static int canOpenAll(void* data) {
+static int canOpenAll(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (any_answer < 0) any_answer = SM_any(&card);
 	return any_answer;
@@ -570,7 +573,8 @@ static void postReturn(void) {
 	forget();
 }
 
-static void openAll(void* data) {
+static void openAll(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	all = 1;
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the save states screen");
@@ -604,8 +608,8 @@ static int init(const MosaicHost* h) {
 		say("can't register the save states screen");
 		return 1;
 	}
-	if (host->register_action(GAME_ID, "SAVE STATES", canOpenGame, openGame, NULL) != 0
-			|| host->register_action(OPEN_ID, "Save states", canOpenAll, openAll, NULL) != 0) {
+	if (host->register_action(GAME_ID, "SAVE STATES", 0, canOpenGame, openGame, NULL) != 0
+			|| host->register_action(OPEN_ID, "Save states", 0, canOpenAll, openAll, NULL) != 0) {
 		say("couldn't register the save states actions");
 		return 1;
 	}

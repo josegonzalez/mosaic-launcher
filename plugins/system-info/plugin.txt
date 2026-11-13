@@ -4,4 +4,4 @@ api=1
 # a System info tile on the quick menu
 setting.tile=toggle|Quick menu tile|on
 # a game list button that opens system info
-setting.button=choice|System info button|none|none,Y,L2,R2,SELECT
+setting.button=choice|System info button|none|none,Y,L2,R2,SELECT|button:system-info.open

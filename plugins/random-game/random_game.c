@@ -267,7 +267,8 @@ static int scope(void) {
 	return system >= 0 ? system : -3;
 }
 
-static int canPick(void* data) {
+static int canPick(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (!MOSAIC_HOST_HAS(host, open_path)) return 0;
 	int system = scope();
@@ -278,19 +279,22 @@ static int canPick(void* data) {
 	return system >= 0;
 }
 
-static void pickHere(void* data) {
-	if (!canPick(data)) return;
+static void pickHere(const char* path, void* data) {
+	(void)path;
+	if (!canPick(path, data)) return;
 	launch(scope());
 }
 
-static int canPickAll(void* data) {
+static int canPickAll(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (!MOSAIC_HOST_HAS(host, open_path)) return 0;
 	scan();
 	return library.count > 0;
 }
 
-static void pickAll(void* data) {
+static void pickAll(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	launch(-1);
 }
@@ -354,12 +358,12 @@ static int init(const MosaicHost* h) {
 		say("this launcher can't open games for plugins; nothing to do");
 		return 0;
 	}
-	if (host->register_action("random-game.pick", "RANDOM", canPick, pickHere, NULL) != 0
+	if (host->register_action("random-game.pick", "RANDOM", 0, canPick, pickHere, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "random-game.pick") != 0) {
 		say("couldn't bind Y; pick a game from the root row or the quick menu");
 	}
 	if (isOn("tile", "off")) {
-		if (host->register_action("random-game.tile", "Random", canPickAll, pickAll, NULL) != 0
+		if (host->register_action("random-game.tile", "Random", 0, canPickAll, pickAll, NULL) != 0
 				|| !MOSAIC_HOST_HAS(host, quick_tile)
 				|| host->quick_tile("random-game.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
 			say("couldn't add the Random tile");

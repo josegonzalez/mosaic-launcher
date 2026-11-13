@@ -21,7 +21,8 @@ static void say(const char* fmt, ...) {
 	host->log(ID, message);
 }
 
-static void run(void* data) {
+static void run(const char* path, void* data) {
+	(void)path;
 	(void)data;
 }
 
@@ -47,7 +48,7 @@ static int init(const MosaicHost* h) {
 	host = h;
 	say("battery %i, charging %i, leds %i, show_recents %i",
 		host->battery_level(), host->is_charging(), host->led_count(), host->show_recents());
-	host->register_action(ID ".act", "Power", NULL, run, NULL);
+	host->register_action(ID ".act", "Power", 0, NULL, run, NULL);
 	return 0;
 }
 

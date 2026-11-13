@@ -30,6 +30,7 @@ typedef struct PluginSetting {
 	char fallback[128]; // the default
 	char options[256];  // comma-separated, for SETTING_CHOICE
 	int flags;          // enum PluginSettingFlag bits
+	char buttons[256];  // comma-separated ids of the actions it puts on a button, from button:<id> markers
 } PluginSetting;
 
 typedef struct PluginManifest {
@@ -63,6 +64,11 @@ int Manifest_isProtected(const PluginManifest* m);
 // True when the plugin's setting key is public, so other plugins may read
 // it with cfg_read.
 int Manifest_isPublic(const PluginManifest* m, const char* key);
+
+// The key of the plugin's first setting marked button:<action_id>, the
+// setting that says which button the plugin puts that action on, or NULL
+// for none.
+const char* Manifest_buttonSetting(const PluginManifest* m, const char* action_id);
 
 // The index'th of a choice setting's comma-separated options, as the
 // Plugins page lists them: leading spaces dropped, empty ones skipped.

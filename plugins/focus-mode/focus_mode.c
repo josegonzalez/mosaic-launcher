@@ -43,12 +43,14 @@ static int isOn(void* data) {
 	return strcmp(host->cfg_get("on", "on"), "off") != 0;
 }
 
-static int always(void* data) {
+static int always(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return 1;
 }
 
-static void toggle(void* data) {
+static void toggle(const char* path, void* data) {
+	(void)path;
 	int on = !isOn(data);
 	host->cfg_set("on", on ? "on" : "off");
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(on ? tr("Focus mode on") : tr("Focus mode off"));
@@ -77,7 +79,7 @@ static MosaicList* rootReplace(void) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	if (host->register_action("focus-mode.toggle", "Focus", always, toggle, NULL) != 0
+	if (host->register_action("focus-mode.toggle", "Focus", 0, always, toggle, NULL) != 0
 			|| !MOSAIC_HOST_HAS(host, quick_tile)
 			|| host->quick_tile("focus-mode.toggle", MOSAIC_QUICK_TOP, NULL, NULL, isOn) != 0) {
 		host->log(ID, "couldn't add the Focus tile; turn focus mode off from the Launcher pak");

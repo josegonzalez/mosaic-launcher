@@ -1455,16 +1455,13 @@ static int flashbackRender(MosaicSurface* screen, const MosaicScreenView* v, voi
 	return 0;
 }
 
-// The selected entry as a game from RomM, cached per path for the hints
+// The entry at path, a game's file or folder, as a game from RomM, cached
+// per path for the hints
 static char asked_path[RM_PATH_MAX];
 static int asked_answer = -1;
 static RMRecord asked_record;
 
-static int selectedGame(RMRecord* out) {
-	const MosaicEntry* entry = host->selected_entry();
-	int type = entry ? host->entry_type(entry) : -1;
-	if (type != MOSAIC_ENTRY_ROM && type != MOSAIC_ENTRY_DIR) return 0;
-	const char* path = host->entry_path(entry);
+static int gameAt(const char* path, RMRecord* out) {
 	if (!path) return 0;
 	if (asked_answer >= 0 && !strcmp(path, asked_path)) {
 		if (asked_answer) *out = asked_record;
@@ -1472,6 +1469,12 @@ static int selectedGame(RMRecord* out) {
 	}
 	put(asked_path, sizeof(asked_path), "%s", path);
 	asked_answer = 0;
+	// following links, as the game list lists them; a game not on the card
+	// yet, as the RomM folder lists it, is a rom
+	struct stat st;
+	int found = stat(path, &st) == 0;
+	if (found && !S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode)) return 0;
+	int type = found && S_ISDIR(st.st_mode) ? MOSAIC_ENTRY_DIR : MOSAIC_ENTRY_ROM;
 	char key[RM_PATH_MAX];
 	if (type == MOSAIC_ENTRY_DIR) {
 		// a game's folder in Roms, which NextUI opens at its .m3u or .cue
@@ -1501,21 +1504,25 @@ static int selectedGame(RMRecord* out) {
 	return asked_answer;
 }
 
-static int canFlashback(void* data) {
+// path is the game's, from the button's selected entry or a plugin's
+// run_action
+static int canFlashback(const char* path, void* data) {
 	(void)data;
 	RMRecord r;
-	return configured && selectedGame(&r);
+	return configured && gameAt(path, &r);
 }
 
-static void openFlashback(void* data) {
+static void openFlashback(const char* path, void* data) {
 	(void)data;
 	RMRecord r;
-	if (!configured || !selectedGame(&r)) return;
+	if (!configured || !gameAt(path, &r)) return;
 	fb.rom_id = r.rom_id;
 	put(fb.tag, sizeof(fb.tag), "%s", r.tag);
 	put(fb.path, sizeof(fb.path), "%s", r.path);
+	// the name the list shows when it's the selected entry
 	const MosaicEntry* entry = host->selected_entry();
-	put(fb.name, sizeof(fb.name), "%s", entry ? host->entry_name(entry) : baseName(r.path));
+	const char* shown = entry && host->entry_path(entry) && !strcmp(host->entry_path(entry), path) ? host->entry_name(entry) : NULL;
+	put(fb.name, sizeof(fb.name), "%s", shown ? shown : baseName(r.path));
 	sayf("flashback for rom %d, %s", fb.rom_id, baseName(fb.path));
 	statesLoad(fb.tag);
 	if (host->open_screen(FLASHBACK_SCREEN) != 0) say("couldn't open the flashback screen");
@@ -1909,7 +1916,7 @@ static int init(const MosaicHost* h) {
 		if (host->register_screen(DOWNLOAD_SCREEN, &download_hooks) != 0
 				|| host->register_screen(FLASHBACK_SCREEN, &flashback_hooks) != 0) {
 			say("couldn't register its screens");
-		} else if (host->register_action(FLASHBACK_ACTION, "FLASHBACK", canFlashback, openFlashback, NULL) != 0) {
+		} else if (host->register_action(FLASHBACK_ACTION, "FLASHBACK", MOSAIC_ACTION_PATH, canFlashback, openFlashback, NULL) != 0) {
 			say("couldn't register the flashback action");
 		} else {
 			static const struct {

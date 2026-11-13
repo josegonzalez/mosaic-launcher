@@ -382,8 +382,8 @@ static MosaicScreenHooks registered;
 static char registered_id[64];
 static struct {
 	char id[64], label[64];
-	int (*available)(void*);
-	void (*run)(void*);
+	int (*available)(const char*, void*);
+	void (*run)(const char*, void*);
 } actions[4];
 static int action_count = 0;
 static char tile_id[64];
@@ -430,7 +430,8 @@ static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
 	return 0;
 }
 
-static int fakeAction(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	if (action_count >= 4) return -1;
 	snprintf(actions[action_count].id, sizeof(actions[0].id), "%s", id);
@@ -714,25 +715,25 @@ static void testActions(void) {
 	const MosaicPlugin* p = start();
 	int game_action = actionIndex(GAME_ID), all_action = actionIndex(OPEN_ID);
 	selectGame(GB_ROMS "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM);
-	CHECK(actions[game_action].available(NULL) == 1);
-	CHECK(actions[all_action].available(NULL) == 1);
+	CHECK(actions[game_action].available(NULL, NULL) == 1);
+	CHECK(actions[all_action].available(NULL, NULL) == 1);
 	// asked again for the same game: the answer is kept
 	CHECK(system("rm -rf '" SHARED "/GB-gambatte' '" SHARED "/GB-mgba'") == 0);
-	CHECK(actions[game_action].available(NULL) == 1);
+	CHECK(actions[game_action].available(NULL, NULL) == 1);
 	// until a game returns
 	p->post_return();
-	CHECK(actions[game_action].available(NULL) == 0);
+	CHECK(actions[game_action].available(NULL, NULL) == 0);
 	selectGame(CARD "/Roms/PlayStation (PS)/FF7", "FF7", MOSAIC_ENTRY_DIR);
-	CHECK(actions[game_action].available(NULL) == 1);
+	CHECK(actions[game_action].available(NULL, NULL) == 1);
 	selectGame(CARD "/Roms/PlayStation (PS)/FF7/FF7 (Disc 1).cue", "FF7 (Disc 1)", MOSAIC_ENTRY_ROM);
-	CHECK(actions[game_action].available(NULL) == 1);
+	CHECK(actions[game_action].available(NULL, NULL) == 1);
 	selectGame(CARD "/Roms/Game Boy (GB)", "Game Boy", MOSAIC_ENTRY_DIR);
-	CHECK(actions[game_action].available(NULL) == 0);
+	CHECK(actions[game_action].available(NULL, NULL) == 0);
 	selectGame("", "", MOSAIC_ENTRY_ROM);
-	CHECK(actions[game_action].available(NULL) == 0);
+	CHECK(actions[game_action].available(NULL, NULL) == 0);
 	CHECK(system("rm -rf '" SHARED "'") == 0);
 	p->post_return();
-	CHECK(actions[all_action].available(NULL) == 0);
+	CHECK(actions[all_action].available(NULL, NULL) == 0);
 }
 
 // states.last, from the model and through the plugin
@@ -778,7 +779,7 @@ static void testGameScreen(void) {
 	makeCard();
 	start();
 	selectGame(GB_ROMS "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM);
-	actions[actionIndex(GAME_ID)].run(NULL);
+	actions[actionIndex(GAME_ID)].run(NULL, NULL);
 	CHECK_STR(opened_screen, "save-state-manager.main");
 	CHECK_STR(last_log, "Tetris: 3 save states");
 
@@ -841,7 +842,7 @@ static void testGameScreen(void) {
 	CHECK(reloads == 1);
 
 	// the last state: the screen says so
-	actions[actionIndex(GAME_ID)].run(NULL);
+	actions[actionIndex(GAME_ID)].run(NULL, NULL);
 	CHECK_STR(last_log, "Tetris: 1 save states");
 	draw();
 	press(MOSAIC_BUTTON_Y);
@@ -860,7 +861,7 @@ static void testGameScreen(void) {
 static void testAllScreen(void) {
 	makeCard();
 	start();
-	actions[actionIndex(OPEN_ID)].run(NULL);
+	actions[actionIndex(OPEN_ID)].run(NULL, NULL);
 	CHECK_STR(last_log, "5 games with save states");
 	draw();
 	CHECK_STR(last_log, "games 0 of 5: FF7, 1 states");
@@ -895,7 +896,7 @@ static void testAllScreen(void) {
 
 	// no games
 	CHECK(system("rm -rf '" SHARED "'") == 0);
-	actions[actionIndex(OPEN_ID)].run(NULL);
+	actions[actionIndex(OPEN_ID)].run(NULL, NULL);
 	CHECK_STR(last_log, "0 games with save states");
 	draw();
 	CHECK_STR(last_log, "no save states");
@@ -909,7 +910,7 @@ static void testNoDelete(void) {
 	delete_setting = "off";
 	start();
 	selectGame(GB_ROMS "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM);
-	actions[actionIndex(GAME_ID)].run(NULL);
+	actions[actionIndex(GAME_ID)].run(NULL, NULL);
 	draw();
 	CHECK(hints_right_count == 1 && hints_right[0].button == MOSAIC_BUTTON_A);
 	confirm_text[0] = '\0';
@@ -930,7 +931,7 @@ static void testBounded(void) {
 		put(path, "png", 0);
 	}
 	start();
-	actions[actionIndex(OPEN_ID)].run(NULL);
+	actions[actionIndex(OPEN_ID)].run(NULL, NULL);
 	CHECK_STR(last_log, "65 games with save states");
 	peak = live;
 	for (int i = 0; i < 70; i++) {

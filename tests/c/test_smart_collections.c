@@ -18,8 +18,8 @@ struct MosaicList {
 };
 
 static MosaicEntry* selected = NULL;
-static int (*available[4])(void*);
-static void (*run[4])(void*);
+static int (*available[4])(const char*, void*);
+static void (*run[4])(const char*, void*);
 static int actions = 0;
 static int bound_y = 0;
 static int reloads = 0;
@@ -75,7 +75,8 @@ static void fakeListPush(MosaicList* l, MosaicEntry* e) { if (l->count < 64) l->
 static const MosaicEntry* fakeSelected(void) { return selected; }
 static void fakeRedraw(void) {}
 static void fakeReload(void) { reloads++; }
-static int fakeRegister(const char* id, const char* label, int (*avail)(void*), void (*go)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*avail)(const char*, void*), void (*go)(const char*, void*), void* data) {
+	(void)flags;
 	(void)id; (void)label; (void)data;
 	available[actions] = avail;
 	run[actions] = go;
@@ -98,8 +99,8 @@ static int countLines(const char* text) {
 
 static int pressY(void) {
 	for (int i = 0; i < actions; i++) {
-		if (available[i](NULL)) {
-			run[i](NULL);
+		if (available[i](NULL, NULL)) {
+			run[i](NULL, NULL);
 			return 1;
 		}
 	}

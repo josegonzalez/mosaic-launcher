@@ -342,8 +342,8 @@ static MosaicHost fake_host;
 static MosaicScreenHooks registered;
 static char registered_id[64];
 static char action_id[64], action_label[64], tile_id[64];
-static int (*action_available)(void*);
-static void (*action_run)(void*);
+static int (*action_available)(const char*, void*);
+static void (*action_run)(const char*, void*);
 static int bound_button = -1;
 static char last_log[512];
 static int redraws = 0, live = 0, peak = 0, scales = 0;
@@ -383,7 +383,8 @@ static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
 	return 0;
 }
 
-static int fakeAction(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	snprintf(action_id, sizeof(action_id), "%s", id);
 	snprintf(action_label, sizeof(action_label), "%s", label);
@@ -622,13 +623,13 @@ static void testInit(void) {
 static void testAction(void) {
 	makeCard();
 	start();
-	CHECK(action_available(NULL) == 1);
-	action_run(NULL);
+	CHECK(action_available(NULL, NULL) == 1);
+	action_run(NULL, NULL);
 	CHECK_STR(opened_screen, "screenshot-viewer.main");
 	CHECK(system("rm -rf '" SHOTS "'") == 0);
-	CHECK(action_available(NULL) == 0);
+	CHECK(action_available(NULL, NULL) == 0);
 	mkdir(SHOTS, 0755);
-	CHECK(action_available(NULL) == 0);
+	CHECK(action_available(NULL, NULL) == 0);
 }
 
 static void testScreen(void) {

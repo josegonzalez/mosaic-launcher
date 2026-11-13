@@ -223,13 +223,15 @@ static int selectedGame(char* out, size_t size) {
 	return TG_gamePath(host->sdcard_path, host->entry_path(entry), host->entry_type(entry), out, size);
 }
 
-static int canEdit(void* data) {
+static int canEdit(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	char rel[TG_PATH_LEN];
 	return !showing && selectedGame(rel, sizeof(rel));
 }
 
-static void edit(void* data) {
+static void edit(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (showing || !selectedGame(game, sizeof(game))) return;
 	const char* name = host->entry_name(host->selected_entry());
@@ -533,14 +535,16 @@ static MosaicList* virtualDir(const char* path) {
 ///////////////////////////////////////
 // quick menu tiles
 
-static int tileAvailable(void* data) {
+static int tileAvailable(const char* path, void* data) {
+	(void)path;
 	const char* name = tiles[(intptr_t)data];
 	refresh();
 	int tag = TG_find(&store, name);
 	return tag >= 0 && gamesOnCard(tag) > 0;
 }
 
-static void tileOpen(void* data) {
+static void tileOpen(const char* path, void* data) {
+	(void)path;
 	char dir[TG_PATH_LEN + TG_NAME_LEN];
 	tagFolder(tiles[(intptr_t)data], dir, sizeof(dir));
 	if (!host->open_path(dir, MOSAIC_ENTRY_DIR)) say("couldn't open a tag's folder");
@@ -557,7 +561,7 @@ static void addTiles(void) {
 		snprintf(tiles[count], TG_NAME_LEN, "%s", store.tags[i].name);
 		char id[32];
 		snprintf(id, sizeof(id), "tags.tile.%i", count);
-		if (host->register_action(id, tiles[count], tileAvailable, tileOpen, (void*)(intptr_t)count) != 0
+		if (host->register_action(id, tiles[count], 0, tileAvailable, tileOpen, (void*)(intptr_t)count) != 0
 				|| host->quick_tile(id, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
 			say("couldn't add a quick menu tile");
 			break;
@@ -628,7 +632,7 @@ static int init(const MosaicHost* h) {
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
-	if (host->register_action("tags.edit", "TAGS", canEdit, edit, NULL) != 0
+	if (host->register_action("tags.edit", "TAGS", 0, canEdit, edit, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "tags.edit") != 0) {
 		say("couldn't bind a button; tags.edit can still go on an FN button");
 	}

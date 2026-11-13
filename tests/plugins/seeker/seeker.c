@@ -118,7 +118,7 @@ static void tick(unsigned long now) {
 	if (at < step_count && stepAt(at, step, sizeof(step))) {
 		char message[160];
 		if (!strncmp(step, "action:", 7)) {
-			snprintf(message, sizeof(message), "run %s %d", step + 7, host->run_action(step + 7));
+			snprintf(message, sizeof(message), "run %s %d", step + 7, host->run_action(step + 7, NULL));
 			say(message);
 		}
 		else if (scancode(step)) {

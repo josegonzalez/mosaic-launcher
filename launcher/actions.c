@@ -53,23 +53,70 @@ static int fired(const Binding* binding) {
 	return triggered(binding) && (!binding->allows || binding->allows(binding->button));
 }
 
+static const char* (*selectedPath)(void) = NULL;
+
+void Actions_setSelected(const char* (*selected)(void)) {
+	selectedPath = selected;
+}
+
+const char* Action_buttonPath(const Action* action) {
+	if (!action || !action->takes_path || !selectedPath) return NULL;
+	return selectedPath();
+}
+
+// The path the action gets: an entry's for one that takes a path, which
+// has none without one, and NULL for any other.
+static const char* pathFor(const Action* action, const char* path) {
+	if (!action->takes_path) return NULL;
+	return path && path[0] ? path : NULL;
+}
+
 // A plugin's action runs as that plugin (see caller.h).
-int Action_available(const Action* action) {
+int Action_available(const Action* action, const char* path) {
 	if (!action) return 0;
+	path = pathFor(action, path);
+	if (action->takes_path && !path) return 0;
 	int available = 1;
-	if (action->available) AS_CALLER(action->plugin_id) available = action->available(action->data);
+	if (action->available) AS_CALLER(action->plugin_id) available = action->available(path, action->data);
 	return available;
 }
 
-void Action_run(const Action* action) {
-	if (action && action->run) AS_CALLER(action->plugin_id) action->run(action->data);
+#define ACTION_PATH_MAX 1024
+
+int Action_run(const Action* action, const char* path) {
+	if (!action) return -1;
+	path = pathFor(action, path);
+	if (action->takes_path && !path) {
+		LOG_warn("can't run %s: it acts on an entry, and there's none\n", action->id);
+		return -1;
+	}
+	// its own copy, as the entry it came from can go while it runs
+	char copy[ACTION_PATH_MAX];
+	if (path) {
+		if (strlen(path) >= sizeof(copy)) {
+			LOG_warn("can't run %s: the path is too long\n", action->id);
+			return -1;
+		}
+		strcpy(copy, path);
+		path = copy;
+	}
+	if (action->run) AS_CALLER(action->plugin_id) action->run(path, action->data);
+	return 0;
+}
+
+// A binding's action, on what a button gives it.
+static int buttonAvailable(const Action* action) {
+	return Action_available(action, Action_buttonPath(action));
+}
+static void buttonRun(const Action* action) {
+	Action_run(action, Action_buttonPath(action));
 }
 
 int Bindings_dispatch(const Binding* bindings, int count) {
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = &bindings[i];
-		if (fired(binding) && Action_available(binding->action)) {
-			Action_run(binding->action);
+		if (fired(binding) && buttonAvailable(binding->action)) {
+			buttonRun(binding->action);
 			return 1;
 		}
 	}
@@ -80,7 +127,7 @@ int Bindings_hints(const Binding* const* bindings, int count, char** pairs) {
 	int hints = 0;
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = bindings[i];
-		if (!Action_available(binding->action)) continue;
+		if (!buttonAvailable(binding->action)) continue;
 		pairs[hints * 2] = (char*)binding->glyph;
 		pairs[hints * 2 + 1] = Action_label(binding->action);
 		hints++;
@@ -94,7 +141,7 @@ int Bindings_shared(const Binding* bindings, int count, int button, int trigger,
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = &bindings[i];
 		if (binding->button != button || binding->trigger != trigger) continue;
-		if (!Action_available(binding->action)) continue;
+		if (!buttonAvailable(binding->action)) continue;
 		int seen = 0;
 		for (int j = 0; j < i; j++) {
 			if (bindings[j].action == binding->action && bindings[j].button == button && bindings[j].trigger == trigger) seen = 1;
@@ -111,11 +158,11 @@ int Bindings_shared(const Binding* bindings, int count, int button, int trigger,
 int Bindings_dispatchShared(const Binding* bindings, int count, void (*menu)(const Action** actions, int n)) {
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = &bindings[i];
-		if (!fired(binding) || !Action_available(binding->action)) continue;
+		if (!fired(binding) || !buttonAvailable(binding->action)) continue;
 		const Action* actions[SHARED_MAX];
 		int n = Bindings_shared(bindings, count, binding->button, binding->trigger, actions, SHARED_MAX);
 		if (n > SHARED_MAX) n = SHARED_MAX;
-		if (n == 1 || !menu) Action_run(actions[0]);
+		if (n == 1 || !menu) buttonRun(actions[0]);
 		else menu(actions, n);
 		return 1;
 	}
@@ -125,7 +172,7 @@ int Bindings_dispatchShared(const Binding* bindings, int count, void (*menu)(con
 int Bindings_sharedHint(const Binding* bindings, int count, const char** glyph, const char** label) {
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = &bindings[i];
-		if (!Action_available(binding->action)) continue;
+		if (!buttonAvailable(binding->action)) continue;
 		const Action* first;
 		int n = Bindings_shared(bindings, count, binding->button, binding->trigger, &first, 1);
 		*glyph = binding->glyph;

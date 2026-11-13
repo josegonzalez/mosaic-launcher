@@ -300,8 +300,9 @@ static const char* homeName(void) {
 	return home ? home : "none";
 }
 
-static int canOpen(void* data) { (void)data; return 1; }
-static void openMain(void* data) {
+static int canOpen(const char* path, void* data) { (void)path; (void)data; return 1; }
+static void openMain(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	say("action open %i", host->open_screen("screener.main"));
 }
@@ -340,9 +341,9 @@ static int init(const MosaicHost* h) {
 		host->register_screen("screener.main", &good), host->register_screen("gamelist", &good),
 		host->register_screen("", &good), host->register_screen("screener.none", &none),
 		host->open_screen("screener.main"), host->close_screen("screener.main"));
-	say("run from init %i", host->run_action("gamelist.quick_menu"));
+	say("run from init %i", host->run_action("gamelist.quick_menu", NULL));
 	if (MOSAIC_HOST_HAS(host, home_screen)) say("home_screen from init %s", homeName());
-	host->register_action("screener.open", "Open", canOpen, openMain, NULL);
+	host->register_action("screener.open", "Open", 0, canOpen, openMain, NULL);
 	host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "screener.open");
 	return 0;
 }
@@ -377,7 +378,7 @@ static int stepAt(int i, char* out, size_t size) {
 static void runStep(const char* step) {
 	if (!strncmp(step, "open:", 5)) say("open %s %i", step + 5, host->open_screen(step + 5));
 	else if (!strncmp(step, "close:", 6)) say("close %s %i", step + 6, host->close_screen(step + 6));
-	else if (!strncmp(step, "action:", 7)) say("run %s %i", step + 7, host->run_action(step + 7));
+	else if (!strncmp(step, "action:", 7)) say("run %s %i", step + 7, host->run_action(step + 7, NULL));
 	else if (!strncmp(step, "pak:", 4)) say("open pak %i", host->open_path(step + 4, MOSAIC_ENTRY_PAK));
 	else if (!strcmp(step, "confirm")) host->confirm("Screener?", "Yes", onYes, NULL);
 	else if (!strcmp(step, "recents")) {

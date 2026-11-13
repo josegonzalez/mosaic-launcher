@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include "api.h"
 #include "mosaic_plugin.h"
+#include "actions.h"
 
 typedef struct Screen {
 	void (*handleInput)(void);
@@ -30,6 +31,9 @@ const Screen* Screen_get(int id);
 // Registers every screen's actions so FN buttons can bind to them.
 void Screens_init(void);
 void GameList_registerActions(void);
+// The game list's own bindings, whatever plugins override, in up to max of
+// out. Returns how many there are.
+int GameList_ownBindings(const Binding** out, int max);
 
 void QuickMenu_setup(void); // once, after Menu_init
 void QuickMenu_enter(void); // puts the cursor back on the first tile

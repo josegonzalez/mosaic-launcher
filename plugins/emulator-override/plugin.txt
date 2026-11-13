@@ -4,6 +4,6 @@ api=1
 # the emulator.choice service: the emulator pak chosen for a game
 provides=emulator.choice
 # the game list button that picks a game's emulator, shared with other plugins' actions on it
-setting.button=choice|Emulator button|Y|Y,L2,R2
+setting.button=choice|Emulator button|Y|Y,L2,R2|button:emulator-override.choose
 # on lists every emulator pak on the card, not only those known to run the system's games
 setting.all=toggle|List every emulator pak|off

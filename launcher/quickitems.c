@@ -72,7 +72,8 @@ int QuickItem_isOff(const Entry* entry) {
 void QuickItem_activate(const Entry* entry) {
 	const QuickTile* tile = QuickTiles_forEntry(entry);
 	if (tile) {
-		if (Action_available(tile->action)) Action_run(tile->action);
+		const char* path = Action_buttonPath(tile->action);
+		if (Action_available(tile->action, path)) Action_run(tile->action, path);
 		return;
 	}
 	const QuickItem* item = QuickItem_find(entry->name);

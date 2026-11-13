@@ -22,12 +22,12 @@ void LOG_note(int level, const char* fmt, ...) { (void)level; (void)fmt; }
 static int open_ok = 1, back_ok = 1, resume_ok = 1;
 static const char* ran = NULL;
 
-static int canOpen(void* d) { (void)d; return open_ok; }
-static int canBack(void* d) { (void)d; return back_ok; }
-static int canResume(void* d) { (void)d; return resume_ok; }
-static void runOpen(void* d) { (void)d; ran = "open"; }
-static void runBack(void* d) { (void)d; ran = "back"; }
-static void runResume(void* d) { (void)d; ran = "resume"; }
+static int canOpen(const char* p, void* d) { (void)p; (void)d; return open_ok; }
+static int canBack(const char* p, void* d) { (void)p; (void)d; return back_ok; }
+static int canResume(const char* p, void* d) { (void)p; (void)d; return resume_ok; }
+static void runOpen(const char* p, void* d) { (void)p; (void)d; ran = "open"; }
+static void runBack(const char* p, void* d) { (void)p; (void)d; ran = "back"; }
+static void runResume(const char* p, void* d) { (void)p; (void)d; ran = "resume"; }
 
 static const Action resumeAction = { "test.resume", "RESUME", canResume, runResume };
 static const Action openAction = { "test.open", "OPEN", canOpen, runOpen };
@@ -44,11 +44,11 @@ static void release(int btn) { released_button = btn; pressed_button = -1; repea
 
 // Plugin actions that can share Y.
 static int fav_ok = 1, random_ok = 1;
-static int canFav(void* d) { (void)d; return fav_ok; }
-static int canRandom(void* d) { (void)d; return random_ok; }
-static void runFav(void* d) { (void)d; ran = "favorite"; }
-static void runRandom(void* d) { (void)d; ran = "random"; }
-static void runDelete(void* d) { (void)d; ran = "delete"; }
+static int canFav(const char* p, void* d) { (void)p; (void)d; return fav_ok; }
+static int canRandom(const char* p, void* d) { (void)p; (void)d; return random_ok; }
+static void runFav(const char* p, void* d) { (void)p; (void)d; ran = "favorite"; }
+static void runRandom(const char* p, void* d) { (void)p; (void)d; ran = "random"; }
+static void runDelete(const char* p, void* d) { (void)p; (void)d; ran = "delete"; }
 static const Action favAction = { "test.fav", "FAVORITE", canFav, runFav };
 static const Action randomAction = { "test.random", "RANDOM", canRandom, runRandom };
 static const Action deleteAction = { "test.delete", "DELETE", NULL, runDelete };
@@ -266,10 +266,10 @@ static int other_shoulder_down = 0;
 static int jump_ok = 0;
 static int prev_runs = 0, jump_runs = 0;
 static int shoulderAlone(int btn) { (void)btn; return !other_shoulder_down; }
-static int canJump(void* d) { (void)d; return jump_ok; }
-static void runPrev(void* d) { (void)d; ran = "prev"; prev_runs++; }
-static void runNext(void* d) { (void)d; ran = "next"; }
-static void runJump(void* d) { (void)d; ran = "jump"; jump_runs++; }
+static int canJump(const char* p, void* d) { (void)p; (void)d; return jump_ok; }
+static void runPrev(const char* p, void* d) { (void)p; (void)d; ran = "prev"; prev_runs++; }
+static void runNext(const char* p, void* d) { (void)p; (void)d; ran = "next"; }
+static void runJump(const char* p, void* d) { (void)p; (void)d; ran = "jump"; jump_runs++; }
 static const Action prevAction = { "test.prev_letter", "PREVIOUS", NULL, runPrev };
 static const Action nextAction = { "test.next_letter", "NEXT", NULL, runNext };
 static const Action jumpAction = { "test.jump", "SYSTEM", canJump, runJump };
@@ -384,6 +384,82 @@ static void test_override_repeat(void) {
 	letGo();
 }
 
+// Actions that take an entry's path, and what a button gives them.
+static const char* selected = NULL;
+static const char* selectedNow(void) { return selected; }
+static char got_path[64];
+static int path_ok = 1;
+static int canPath(const char* p, void* d) {
+	(void)d;
+	snprintf(got_path, sizeof(got_path), "%s", p ? p : "(null)");
+	return path_ok;
+}
+static void runPath(const char* p, void* d) {
+	(void)d;
+	snprintf(got_path, sizeof(got_path), "%s", p ? p : "(null)");
+	ran = "path";
+}
+
+static void test_paths(void) {
+	static const Action pathAction = { "test.path", "PATH", canPath, runPath, NULL, NULL, 1 };
+	static const Action plainAction = { "test.plain", "PLAIN", canPath, runPath, NULL, NULL, 0 };
+
+	// given a path, it gets it
+	CHECK(Action_available(&pathAction, "/Roms/A.gb"));
+	CHECK_STR(got_path, "/Roms/A.gb");
+	ran = NULL;
+	CHECK(Action_run(&pathAction, "/Roms/B.gb") == 0);
+	CHECK_STR(ran ? ran : "", "path");
+	CHECK_STR(got_path, "/Roms/B.gb");
+
+	// without one it isn't available and is refused, without being asked
+	got_path[0] = '\0';
+	ran = NULL;
+	CHECK(!Action_available(&pathAction, NULL));
+	CHECK(!Action_available(&pathAction, ""));
+	CHECK(Action_run(&pathAction, NULL) == -1);
+	CHECK(Action_run(&pathAction, "") == -1);
+	CHECK(ran == NULL && !got_path[0]);
+	path_ok = 0;
+	CHECK(!Action_available(&pathAction, "/Roms/A.gb"));
+	path_ok = 1;
+
+	// an action that doesn't take one gets NULL, whatever it's given
+	CHECK(Action_available(&plainAction, "/Roms/A.gb"));
+	CHECK_STR(got_path, "(null)");
+	CHECK(Action_run(&plainAction, "/Roms/A.gb") == 0);
+	CHECK_STR(got_path, "(null)");
+	CHECK(Action_run(NULL, "/Roms/A.gb") == -1);
+	CHECK(!Action_available(NULL, "/Roms/A.gb"));
+
+	// a button gives it the selected entry, while the game list shows
+	CHECK(Action_buttonPath(&pathAction) == NULL); // no source yet
+	Actions_setSelected(selectedNow);
+	selected = "/Roms/Selected.gb";
+	CHECK_STR(Action_buttonPath(&pathAction), "/Roms/Selected.gb");
+	CHECK(Action_buttonPath(&plainAction) == NULL);
+	CHECK(Action_buttonPath(NULL) == NULL);
+	const Binding bound[] = {
+		{ BTN_Y, TRIGGER_PRESS, "Y", &pathAction },
+	};
+	press(BTN_Y);
+	CHECK(Bindings_dispatch(bound, 1) == 1);
+	CHECK_STR(ran ? ran : "", "path");
+	CHECK_STR(got_path, "/Roms/Selected.gb");
+	const Binding* order[] = { &bound[0] };
+	char* pairs[3];
+	CHECK(Bindings_hints(order, 1, pairs) == 1);
+
+	// elsewhere, or with nothing selected, there's none: no run, no hint
+	selected = NULL;
+	press(BTN_Y);
+	CHECK(Bindings_dispatch(bound, 1) == 0);
+	CHECK(ran == NULL);
+	CHECK(Bindings_hints(order, 1, pairs) == 0);
+	CHECK(Bindings_dispatchShared(bound, 1, menu) == 0);
+	Actions_setSelected(NULL);
+}
+
 int main(void) {
 	// dispatch: the fired, available binding runs
 	press(BTN_A);
@@ -460,6 +536,7 @@ int main(void) {
 	test_overrides();
 	test_repeat();
 	test_override_repeat();
+	test_paths();
 
 	CHECK_DONE();
 }

@@ -1083,22 +1083,26 @@ static int inputFilter(const MosaicInput* in, unsigned int* consumed) {
 ///////////////////////////////////////
 // actions
 
-static int alwaysAvailable(void* data) {
+static int alwaysAvailable(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return 1;
 }
 
-static void openPlayer(void* data) {
+static void openPlayer(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (host->open_screen(PLAYER_ID) != 0) say("couldn't open the player");
 }
 
-static void openLock(void* data) {
+static void openLock(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (host->open_screen(LOCK_ID) != 0) say("couldn't open the lock screen");
 }
 
-static void togglePlaying(void* data) {
+static void togglePlaying(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (!daemon_up) askStatus(last_now);
 	if (st.state == MU_STOPPED) say("nothing to pause or play on");
@@ -1265,9 +1269,9 @@ static int init(const MosaicHost* h) {
 		say("couldn't register its screens");
 		return 1;
 	}
-	if (host->register_action(OPEN_ACTION, "Music", alwaysAvailable, openPlayer, NULL) != 0
-		|| host->register_action(LOCK_ACTION, "Lock screen", alwaysAvailable, openLock, NULL) != 0
-		|| host->register_action(TOGGLE_ACTION, "Play or pause music", alwaysAvailable, togglePlaying, NULL) != 0) {
+	if (host->register_action(OPEN_ACTION, "Music", 0, alwaysAvailable, openPlayer, NULL) != 0
+		|| host->register_action(LOCK_ACTION, "Lock screen", 0, alwaysAvailable, openLock, NULL) != 0
+		|| host->register_action(TOGGLE_ACTION, "Play or pause music", 0, alwaysAvailable, togglePlaying, NULL) != 0) {
 		say("couldn't register its actions");
 		return 1;
 	}

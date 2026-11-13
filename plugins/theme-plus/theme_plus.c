@@ -148,7 +148,8 @@ static void picked(int index, void* data) {
 	host->reload_lists();
 }
 
-static void pick(void* data) {
+static void pick(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	loadCatalog();
 	const char* labels[CHOICES_MAX];
@@ -181,7 +182,7 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	findBundled();
-	if (host->register_action(ACTION_ID, "Theme", NULL, pick, NULL) != 0) {
+	if (host->register_action(ACTION_ID, "Theme", 0, NULL, pick, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 0;
 	}

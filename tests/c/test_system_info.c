@@ -378,7 +378,7 @@ static MosaicSurface screen_surface = { 1024, 768 };
 static MosaicHost fake_host;
 static MosaicScreenHooks registered;
 static char registered_id[64], action_id[64], action_label[64], tile_id[64];
-static void (*action_run)(void*);
+static void (*action_run)(const char*, void*);
 static int bound_button = -1;
 static char last_log[2048];
 static char all_log[16384];
@@ -411,7 +411,8 @@ static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
 	return 0;
 }
 
-static int fakeAction(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	(void)available;
 	snprintf(action_id, sizeof(action_id), "%s", id);
@@ -592,7 +593,7 @@ static void testPlugin(void) {
 
 	// no battery history yet
 	all_log[0] = '\0';
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(opened_screen, SCREEN_ID);
 	CHECK(logged("opened, 0 games of battery history"));
 	CHECK(logged("Battery: 85%;"));
@@ -647,7 +648,7 @@ static void testPlugin(void) {
 	writeFile(USERDATA "/launcher/battery-logger.old.csv", BL_HEADER "2026-11-01 10:00:00,A,a,600,100,90,10,60.0,no\n");
 	writeFile(USERDATA "/launcher/battery-logger.csv", BL_HEADER "2026-11-02 10:00:00,B,b,600,80,70,10,60.0,no\n");
 	all_log[0] = '\0';
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(logged("opened, 2 games of battery history"));
 	bars = fills_into_hole = 0;
 	renderOnce();
@@ -661,7 +662,7 @@ static void testPlugin(void) {
 	remove(CARD "/.system/version.txt");
 	level = -1;
 	all_log[0] = '\0';
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(logged("Battery: unavailable;"));
 	CHECK(logged("Version: unavailable"));
 	registered.exit(registered.data);
@@ -678,7 +679,7 @@ static void testPlugin(void) {
 	hole_now = view.status;
 	fills_into_hole = 0;
 	all_log[0] = '\0';
-	action_run(NULL);
+	action_run(NULL, NULL);
 	hint_text[0] = '\0';
 	CHECK(registered.render(&screen_surface, &view, registered.data) == 0);
 	CHECK(fills_into_hole == 0);
@@ -705,7 +706,7 @@ static void testPlugin(void) {
 
 	// on the big screen A does nothing and B closes
 	all_log[0] = '\0';
-	action_run(NULL);
+	action_run(NULL, NULL);
 	renderOnce();
 	CHECK(logged("showing the graph under the rows"));
 	redraws = 0;

@@ -24,8 +24,8 @@ static int registered = 0;
 static int bound_screen = -1, bound_count = 0;
 static int bound_button[4];
 static char bound_action[4][64];
-static int (*available_for[2])(void*);
-static void (*run_for[2])(void*);
+static int (*available_for[2])(const char*, void*);
+static void (*run_for[2])(const char*, void*);
 static int reloads = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
@@ -53,7 +53,8 @@ static const MosaicEntry* fakeSelected(void) { return selected; }
 static const char* fakeCurrentPath(void) { return current; }
 static void fakeRedraw(void) {}
 static void fakeReload(void) { reloads++; }
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)label; (void)data;
 	int i = !strcmp(id, "hidden.unhide");
 	available_for[i] = available;
@@ -226,10 +227,10 @@ int main(void) {
 	CHECK(bound_count == 2 && bound_button[0] == MOSAIC_BUTTON_Y && bound_button[1] == MOSAIC_BUTTON_Y);
 	CHECK_STR(bound_action[0], "hidden.hide");
 	CHECK_STR(bound_action[1], "hidden.unhide");
-	int (*canHide)(void*) = available_for[0];
-	void (*hideIt)(void*) = run_for[0];
-	int (*canUnhide)(void*) = available_for[1];
-	void (*unhideIt)(void*) = run_for[1];
+	int (*canHide)(const char*, void*) = available_for[0];
+	void (*hideIt)(const char*, void*) = run_for[0];
+	int (*canUnhide)(const char*, void*) = available_for[1];
+	void (*unhideIt)(const char*, void*) = run_for[1];
 
 	// nothing hidden: no folder on the root, and every entry kept
 	MosaicList* root = fakeListNew();
@@ -244,24 +245,24 @@ int main(void) {
 	// plain folders can't be hidden; games, paks and game folders can
 	snprintf(current, sizeof(current), "%s", GB);
 	selected = NULL;
-	CHECK(!canHide(NULL));
+	CHECK(!canHide(NULL, NULL));
 	selectEntry(GB, MOSAIC_ENTRY_DIR);
-	CHECK(!canHide(NULL));
+	CHECK(!canHide(NULL, NULL));
 	// nor can another plugin's virtual folders, which leaves their buttons free
 	selectEntry(CARD "/Smart Collections", MOSAIC_ENTRY_DIR);
-	CHECK(!canHide(NULL));
+	CHECK(!canHide(NULL, NULL));
 	selectEntry(CARD "/Smart Collections/Mario", MOSAIC_ENTRY_DIR);
-	CHECK(!canHide(NULL));
+	CHECK(!canHide(NULL, NULL));
 	selectEntry(CARD "/Tools/test/Clock.pak", MOSAIC_ENTRY_PAK);
-	CHECK(canHide(NULL));
+	CHECK(canHide(NULL, NULL));
 	selectEntry(CARD "/Roms/PS/Single", MOSAIC_ENTRY_DIR);
-	CHECK(canHide(NULL));
+	CHECK(canHide(NULL, NULL));
 	selectEntry(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	CHECK(canHide(NULL));
-	CHECK(!canUnhide(NULL)); // only in the Hidden folder
+	CHECK(canHide(NULL, NULL));
+	CHECK(!canUnhide(NULL, NULL)); // only in the Hidden folder
 
 	// hiding saves the full path and lists the folders again
-	hideIt(NULL);
+	hideIt(NULL, NULL);
 	char saved[1024];
 	readText(LIST, saved, sizeof(saved));
 	CHECK_STR(saved, GB "/Tetris.gb\n");
@@ -283,9 +284,9 @@ int main(void) {
 
 	// a disc hides its game folder, which hides the .m3u wherever it's listed
 	selectEntry(CARD "/Roms/PS/Game/Game (Disc 1).cue", MOSAIC_ENTRY_ROM);
-	hideIt(NULL);
+	hideIt(NULL, NULL);
 	selectEntry(CARD "/Tools/test/Clock.pak", MOSAIC_ENTRY_PAK);
-	hideIt(NULL);
+	hideIt(NULL, NULL);
 	readText(LIST, saved, sizeof(saved));
 	CHECK_STR(saved, GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
 	CHECK(!kept(p, CARD "/Roms/PS/Game", CARD "/Roms/PS"));
@@ -322,16 +323,16 @@ int main(void) {
 	// in the Hidden folder the button unhides instead
 	snprintf(current, sizeof(current), "%s", CARD "/Hidden");
 	selectEntry(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	CHECK(!canHide(NULL));
-	CHECK(canUnhide(NULL));
+	CHECK(!canHide(NULL, NULL));
+	CHECK(canUnhide(NULL, NULL));
 	reloads = 0;
-	unhideIt(NULL);
+	unhideIt(NULL, NULL);
 	CHECK(reloads == 1);
 	CHECK_STR(toasted, "Unhidden");
 	readText(LIST, saved, sizeof(saved));
 	CHECK_STR(saved, CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
 	CHECK(kept(p, GB "/Tetris.gb", GB));
-	CHECK(!canUnhide(NULL)); // not hidden any more
+	CHECK(!canUnhide(NULL, NULL)); // not hidden any more
 
 	// edits to the file are picked up
 	writeText(LIST, "# by hand\n" GB "/Zelda.gb\n" GB "/Gone.gb\n");
@@ -342,7 +343,7 @@ int main(void) {
 	// unhiding the last one on the card drops the folder from the root,
 	// but a hidden game whose file is gone stays saved
 	selectEntry(GB "/Zelda.gb", MOSAIC_ENTRY_ROM);
-	unhideIt(NULL);
+	unhideIt(NULL, NULL);
 	readText(LIST, saved, sizeof(saved));
 	CHECK_STR(saved, GB "/Gone.gb\n");
 	root = fakeListNew();

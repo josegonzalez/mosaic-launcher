@@ -54,7 +54,8 @@ static int selectedRecent(void) {
 ///////////////////////////////////////
 // the actions
 
-static int hasRecents(void* data) {
+static int hasRecents(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return host->recents_count() > 0;
 }
@@ -67,22 +68,26 @@ static void cleared(void* data) {
 	host->reload_lists();
 }
 
-static void clearAll(void* data) {
+static void clearAll(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (!host->recents_count()) return;
 	host->confirm(tr("Clear all recently played games?"), tr("CLEAR"), cleared, NULL);
 }
 
-static int canClearHere(void* data) {
-	return inRecents() && hasRecents(data);
+static int canClearHere(const char* path, void* data) {
+	(void)path;
+	return inRecents() && hasRecents(path, data);
 }
 
-static int canRemove(void* data) {
+static int canRemove(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return inRecents() && selectedRecent() >= 0;
 }
 
-static void removeSelected(void* data) {
+static void removeSelected(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (!inRecents()) return;
 	int at = selectedRecent();
@@ -121,15 +126,15 @@ static int init(const MosaicHost* h) {
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
-	if (host->register_action("clear-recents.remove", "REMOVE", canRemove, removeSelected, NULL) != 0
-			|| host->register_action("clear-recents.clear", "CLEAR ALL", canClearHere, clearAll, NULL) != 0
+	if (host->register_action("clear-recents.remove", "REMOVE", 0, canRemove, removeSelected, NULL) != 0
+			|| host->register_action("clear-recents.clear", "CLEAR ALL", 0, canClearHere, clearAll, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "clear-recents.remove") != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "clear-recents.clear") != 0) {
 		say("couldn't bind a button; clear recents from the quick menu");
 	}
 
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0) {
-		if (host->register_action("clear-recents.tile", "Clear recents", hasRecents, clearAll, NULL) != 0
+		if (host->register_action("clear-recents.tile", "Clear recents", 0, hasRecents, clearAll, NULL) != 0
 				|| !MOSAIC_HOST_HAS(host, quick_tile)
 				|| host->quick_tile("clear-recents.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
 			say("couldn't add the Clear recents tile");

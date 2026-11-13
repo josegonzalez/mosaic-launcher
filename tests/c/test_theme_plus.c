@@ -656,7 +656,8 @@ static void fakeCfgSet(const char* key, const char* value) {
 	if (!strcmp(key, "theme")) snprintf(cfgTheme, sizeof(cfgTheme), "%s", value);
 }
 
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)label, (void)available, (void)run, (void)data;
 	actions += !strcmp(id, ACTION_ID);
 	return 0;
@@ -815,7 +816,7 @@ static void testPlugin(void) {
 	// order with the user's marked, on the current one; a pick saves and reloads
 	snprintf(cfgTheme, sizeof(cfgTheme), "night");
 	int reads = paletteReads;
-	pick(NULL);
+	pick(NULL, NULL);
 	CHECK(paletteReads == reads + 1);
 	CHECK(chooseCount == 8);
 	CHECK_STR(chooseLabels[0], "Stock");
@@ -837,7 +838,7 @@ static void testPlugin(void) {
 	if (chooseDone) chooseDone(0, NULL);
 	CHECK_STR(cfgTheme, "stock");
 	CHECK(reloads == 2);
-	pick(NULL);
+	pick(NULL, NULL);
 	CHECK(chooseCursor == 0);
 
 	// picking a palette makes it the launcher's colours; theme.txt's own win over palette=
@@ -846,7 +847,7 @@ static void testPlugin(void) {
 	t = asked();
 	CHECK(hostLogged("theme Mine (palette)"));
 	CHECK(t.colors[6] == 0x010203 && t.colors[0] == 0xFFFFFF && t.font[0] == '\0');
-	pick(NULL);
+	pick(NULL, NULL);
 	CHECK(chooseCursor == 7);
 	writeFile(CARD "/Themes/Mixed/theme.txt", "palette=Mine\ncolor7=0x445566\n");
 	snprintf(cfgTheme, sizeof(cfgTheme), "Mixed");
@@ -858,7 +859,7 @@ static void testPlugin(void) {
 	MosaicHost noPalettes = fake;
 	noPalettes.size = offsetof(MosaicHost, palettes_count);
 	host = &noPalettes;
-	pick(NULL);
+	pick(NULL, NULL);
 	CHECK(chooseCount == 6);
 	CHECK_STR(chooseLabels[3], "Mixed");
 	CHECK_STR(chooseLabels[5], "Nord");

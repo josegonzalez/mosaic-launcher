@@ -117,7 +117,7 @@ void QuickTiles_apply(Array* entries, int row) {
 	}
 	for (int i = 0; i < tile_count; i++) {
 		const QuickTile* tile = &tiles[i];
-		if (tile->row != row || hiddenAt(tile->action->id) >= 0 || !Action_available(tile->action)) continue;
+		if (tile->row != row || hiddenAt(tile->action->id) >= 0 || !Action_available(tile->action, Action_buttonPath(tile->action))) continue;
 		char path[256];
 		snprintf(path, sizeof(path), FN_ACTION_ACTION_PREFIX "%s", tile->action->id);
 		Array_push(entries, Entry_newNamed(path, ENTRY_DIP, (char*)tile->action->label));

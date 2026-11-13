@@ -19,8 +19,8 @@ struct MosaicList {
 static MosaicEntry* selected = NULL;
 static char last_action[64];
 static int bound_screen = -1, bound_button = -1;
-static int (*action_available)(void*) = NULL;
-static void (*action_run)(void*) = NULL;
+static int (*action_available)(const char*, void*) = NULL;
+static void (*action_run)(const char*, void*) = NULL;
 static int redraws = 0;
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
@@ -62,7 +62,8 @@ static MosaicEntry* fakeListGet(const MosaicList* l, int i) { return l->items[i]
 static void fakeListPush(MosaicList* l, MosaicEntry* e) { l->items[l->count++] = e; }
 static const MosaicEntry* fakeSelected(void) { return selected; }
 static void fakeRedraw(void) { redraws++; }
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)label; (void)data;
 	snprintf(last_action, sizeof(last_action), "%s", id);
 	action_available = available;
@@ -240,17 +241,17 @@ int main(void) {
 
 	// plain folders and things off the card can't be favorites
 	selected = NULL;
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	selectEntry(CARD "/Roms/GB", MOSAIC_ENTRY_DIR);
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	selectEntry("/elsewhere/Tetris.gb", MOSAIC_ENTRY_ROM);
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 
 	// adding goes at the end of the collection, and announces the set
 	selectEntry(CARD "/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM);
-	CHECK(action_available(NULL));
+	CHECK(action_available(NULL, NULL));
 	CHECK_STR(fake_set_changed, "");
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(fake_set_changed, "favorites\n");
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
@@ -261,12 +262,12 @@ int main(void) {
 
 	// a multi-disc game's folder, and a disc inside it, both mean its .m3u
 	selectEntry(CARD "/Roms/PS/Game", MOSAIC_ENTRY_DIR);
-	CHECK(action_available(NULL));
-	action_run(NULL);
+	CHECK(action_available(NULL, NULL));
+	action_run(NULL, NULL);
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n/Roms/PS/Game/Game.m3u\n");
 	selectEntry(CARD "/Roms/PS/Game/Game (Disc 1).cue", MOSAIC_ENTRY_ROM);
-	action_run(NULL); // same game, so this asks to remove it
+	action_run(NULL, NULL); // same game, so this asks to remove it
 	CHECK_STR(asked, "Remove Game from Favorites?"); // the game, not "Disc 1"
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n/Roms/PS/Game/Game.m3u\n"); // not until answered
@@ -277,14 +278,14 @@ int main(void) {
 
 	// cancelling the dialog keeps the favorite
 	selectEntry(CARD "/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	answer_yes = NULL; // the user chose B
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
 
 	// a single-disc folder means its .cue
 	selectEntry(CARD "/Roms/PS/Single", MOSAIC_ENTRY_DIR);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n/Roms/PS/Single/Single.cue\n");
 
@@ -300,7 +301,7 @@ int main(void) {
 
 	// toggling an existing favorite removes it, keeping the rest in order
 	selectEntry(CARD "/Roms/PS/Game", MOSAIC_ENTRY_DIR);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	sayYes();
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Tetris.gb\n");
@@ -348,7 +349,7 @@ int main(void) {
 	CHECK(p->sort_compare(zelda, tetris, CARD "/Roms/GB") == 0);
 	int reloads_before = reloads;
 	selectEntry(CARD "/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(reloads == reloads_before); // nothing to re-sort
 	writeText(COLLECTION, "/Roms/GB/Zelda.gb\n/Roms/PS/Game/Game.m3u\n");
 
@@ -377,12 +378,12 @@ int main(void) {
 	// a new favorite moves up once the folder is listed again
 	reloads_before = reloads;
 	selectEntry(CARD "/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(reloads == reloads_before + 1);
 	CHECK(p->sort_compare(alpha, tetris, CARD "/Roms/GB") > 0);
 	CHECK(p->sort_compare(zelda, tetris, CARD "/Roms/GB") == 0);
 	// and back down once removed
-	action_run(NULL);
+	action_run(NULL, NULL);
 	sayYes();
 	CHECK(reloads == reloads_before + 2);
 	CHECK(p->sort_compare(alpha, tetris, CARD "/Roms/GB") == 0);

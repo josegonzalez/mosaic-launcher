@@ -369,6 +369,47 @@ typedef struct MosaicFnBinding {
 	char plugin_id[64]; // the plugin that bound it, with MOSAIC_FN_PLUGIN, else ""
 } MosaicFnBinding;
 
+// What register_action's flags say about an action.
+enum MosaicActionFlag {
+	// It acts on an entry, such as a game: its available and run get the
+	// entry's full path, and it's refused without one.
+	MOSAIC_ACTION_PATH = 1 << 0,
+};
+
+// Where an action's binding comes from, for MosaicActionBinding.
+enum MosaicBindBy {
+	MOSAIC_BIND_SCREEN,    // the screen's own, such as A for gamelist.open
+	MOSAIC_BIND_BUTTON,    // a plugin's bind_button
+	MOSAIC_BIND_OVERRIDE,  // a plugin's override_button
+	MOSAIC_BIND_FN_USER,   // an FN button the user assigned in stock's Settings
+	MOSAIC_BIND_FN_PLUGIN, // an FN button a plugin bound with fn_bind
+};
+
+// One button an action is on, for MosaicActionInfo.
+typedef struct MosaicActionBinding {
+	int by;             // enum MosaicBindBy
+	int screen;         // the enum MosaicScreen it's on, or -1 for an FN button, which works wherever FN buttons do
+	int button;         // enum MosaicButton
+	int trigger;        // enum MosaicTrigger
+	char plugin_id[64]; // the plugin that bound it, or "" for the launcher's own and the user's
+	char setting[48];   // the key of that plugin's setting it follows, one its plugin.txt marks button:<action id>, or ""
+} MosaicActionBinding;
+
+#define MOSAIC_ACTION_BINDINGS 8
+
+// A registered action, for host->action_info. The plugin sets size to
+// sizeof(MosaicActionInfo) before asking, and the launcher fills in only
+// the fields that fit in it, so fields are only added at the end.
+typedef struct MosaicActionInfo {
+	size_t size;           // sizeof(MosaicActionInfo) in the plugin
+	char id[64];           // its id, such as gamelist.back or romm.flashback
+	char label[128];       // its label, translated, as the game list's hints show it
+	char plugin_id[64];    // the plugin that registered it, or "" for the launcher's own
+	int takes_path;        // 1 when it was registered with MOSAIC_ACTION_PATH
+	int binding_count;     // the buttons it's on, which can be more than bindings holds
+	MosaicActionBinding bindings[MOSAIC_ACTION_BINDINGS]; // the first of them
+} MosaicActionInfo;
+
 // How button hints are drawn, as stock's Settings app offers them (its
 // "Input prompt style"): the button's name as text, or an icon from one of
 // three sets. host->hint_style returns the style in effect, and a theme
@@ -596,9 +637,14 @@ typedef struct MosaicHost {
 	// Actions are named things the user can do; bindings put them on
 	// buttons. Plugin bindings rank after the screen's own, so they can
 	// only use buttons the screen leaves free. Both return 0 on success.
-	// For now only MOSAIC_SCREEN_GAMELIST accepts bindings.
-	int (*register_action)(const char* id, const char* label,
-		int (*available)(void* data), void (*run)(void* data), void* data);
+	// For now only MOSAIC_SCREEN_GAMELIST accepts bindings. flags is 0 or
+	// enum MosaicActionFlag bits. available and run get the entry's full
+	// path for an action with MOSAIC_ACTION_PATH, and NULL for any other.
+	// A button gives such an action the game list's selected entry while
+	// the game list shows; anywhere else, or with nothing selected, it
+	// isn't available and is refused. available can be NULL for always.
+	int (*register_action)(const char* id, const char* label, int flags,
+		int (*available)(const char* path, void* data), void (*run)(const char* path, void* data), void* data);
 	int (*bind_button)(int screen, int button, int trigger, const char* action_id);
 
 	// Fields below were added after the first release; check for them with
@@ -1144,12 +1190,16 @@ typedef struct MosaicHost {
 	// Runs an action as a button bound to it would: one from
 	// register_action, or one of the game list's own (see override_button),
 	// such as gamelist.quick_menu or gamelist.switcher to open the quick
-	// menu or game switcher from a plugin screen. Returns 0, or -1 for an
-	// unknown action, one that isn't available, and wherever open_screen
-	// is refused. A built-in screen it opens from a plugin screen closes
-	// the plugin screens, as an FN button does. Check for it with
-	// MOSAIC_HOST_HAS(host, run_action).
-	int (*run_action)(const char* action_id);
+	// menu or game switcher from a plugin screen. path is the full path of
+	// the entry an action with MOSAIC_ACTION_PATH acts on, such as a game
+	// for romm.flashback; with NULL or "" it gets what a button would give
+	// it, the game list's selected entry while the game list shows. Other
+	// actions get NULL whatever path is. Returns 0, or -1 for an unknown
+	// action, one that isn't available, one with MOSAIC_ACTION_PATH and no
+	// path, and wherever open_screen is refused. A built-in screen it opens
+	// from a plugin screen closes the plugin screens, as an FN button does.
+	// Check for it with MOSAIC_HOST_HAS(host, run_action).
+	int (*run_action)(const char* action_id, const char* path);
 
 	// The game switcher's recents, for a switcher of a plugin's own (see
 	// MOSAIC_SCREEN_GAME_SWITCHER), alongside recents_count, recent_path and
@@ -1499,6 +1549,23 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, call).
 	int (*provide)(const char* name, int (*fn)(const char* name, const char* args, char* out, size_t size));
 	int (*call)(const char* name, const char* args, char* out, size_t size);
+
+	// Every registered action, the launcher's own (such as gamelist.back)
+	// and plugins', in the order they were registered, with the buttons
+	// each is on. actions_count returns how many there are. action_info
+	// fills out (see MosaicActionInfo) for the one at index and returns 0,
+	// or -1 for an index past the end or a NULL out. Its bindings are the
+	// ones in effect, in this order: the game list's own, then
+	// override_button's, bind_button's and the FN buttons'. A screen's own
+	// and bind_button ones whose button an override took are left out, and
+	// an FN button shows what a press runs, the user's binding or a
+	// plugin's. A plugin's binding has the key of the setting it follows
+	// when that plugin's plugin.txt marks a setting button:<the action's
+	// id>. They work where cfg_get does; elsewhere
+	// actions_count returns 0 and action_info -1. Check for them with
+	// MOSAIC_HOST_HAS(host, action_info).
+	int (*actions_count)(void);
+	int (*action_info)(int index, MosaicActionInfo* out);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

@@ -441,7 +441,7 @@ static int reloads = 0;
 static int registered = 0;
 static int bound = -1;
 static int tiles = 0;
-static void (*action_run)(void*) = NULL;
+static void (*action_run)(const char*, void*) = NULL;
 
 static void fakeLog(const char* id, const char* m) {
 	size_t len = strlen(logged);
@@ -456,7 +456,8 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "font") && cfg_font[0]) return cfg_font;
 	return fallback;
 }
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)label; (void)available; (void)data;
 	if (strcmp(id, MAP_ACTION)) return -1;
 	registered++;
@@ -742,7 +743,7 @@ static void testPlugin(void) {
 
 	// no names lists yet
 	start("xx", NULL);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(toasted, "No names lists for this language");
 	CHECK(asked[0] == '\0');
 
@@ -750,7 +751,7 @@ static void testPlugin(void) {
 	writeFile(LANGS "/xx/GB.txt", "Tetris\tテトリス\n");
 	writeFile(LANGS "/xx/GBC.txt", "The Zelda\tゼルダ\nWario Land 3\tワリオランド3\n");
 	writeFile(LANGS "/xx/SFC.txt", "Mario\tマリオ\n");
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(asked, "X2 2?\nLines already in a map.txt are kept.");
 	CHECK_STR(asked_yes, "XWRITE");
 	CHECK(saidLine("Super Nintendo (SFC)/map.txt isn't a regular file, so it's left alone"));
@@ -762,7 +763,7 @@ static void testPlugin(void) {
 	free(gbc);
 
 	// a run that's cancelled leaves them; the next one asks again
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(answer_yes != NULL);
 	answer_yes(NULL);
 	char* gb = slurp(CARD "/Roms/Game Boy (GB)/map.txt");
@@ -781,7 +782,7 @@ static void testPlugin(void) {
 
 	// with everything named, there's nothing to ask
 	asked[0] = '\0';
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(asked[0] == '\0');
 	CHECK_STR(toasted, "No names to add to map.txt");
 
@@ -789,7 +790,7 @@ static void testPlugin(void) {
 	unlink(CARD "/Roms/Game Boy (GB)/map.txt");
 	unlink(CARD "/Roms/Game Boy Color (GBC)/map.txt");
 	writeFile(CARD "/Roms/Game Boy Color (GBC)/map.txt", "Wario Land 3.gbc\tMy Wario\nZelda, The (USA).gbc\tZ\n");
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(asked, "X1 1?");
 
 	// a file already at map.txt.tmp is left alone, and so is map.txt
@@ -809,7 +810,7 @@ static void testPlugin(void) {
 	writeFile(TEST_DIR "/outside.txt", "outside\n");
 	CHECK(symlink(TEST_DIR "/outside.txt", CARD "/Roms/Game Boy (GB)/map.txt.tmp") == 0);
 	logged[0] = '\0';
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(asked, "X1 1?\nLines already in a map.txt are kept.");
 	answer_yes(NULL);
 	CHECK(saidLine(CARD "/Roms/Game Boy (GB)/map.txt.tmp is already there"));
@@ -824,7 +825,7 @@ static void testPlugin(void) {
 
 	// with the name free again, the write goes ahead
 	unlink(CARD "/Roms/Game Boy (GB)/map.txt.tmp");
-	action_run(NULL);
+	action_run(NULL, NULL);
 	answer_yes(NULL);
 	gb = slurp(CARD "/Roms/Game Boy (GB)/map.txt");
 	CHECK(gb && !strcmp(gb, "Unknown.gb\tU\nTetris (World).gb\tテトリス\n"));

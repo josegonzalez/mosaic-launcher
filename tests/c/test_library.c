@@ -420,9 +420,9 @@ static void test_recents_set_rewrites_a_path(void) {
 
 // Plugin tiles' actions, as a plugin registers them.
 static int tile_ok = 1, light_on = 1;
-static int tileAvailable(void* d) { (void)d; return tile_ok; }
+static int tileAvailable(const char* p, void* d) { (void)p; (void)d; return tile_ok; }
 static int lightIsOn(void* d) { (void)d; return light_on; }
-static void tileRun(void* d) { (void)d; }
+static void tileRun(const char* p, void* d) { (void)p; (void)d; }
 static const Action tileAction = { "test.tile", "Tile", tileAvailable, tileRun };
 static const Action lightAction = { "test.light", "Light", NULL, tileRun };
 

@@ -154,18 +154,21 @@ static void jump(int dir) {
 	}
 }
 
-static int canJump(void* data) {
+static int canJump(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	int current;
 	return mode(&current) != MODE_NONE;
 }
 
-static void prevSystem(void* data) {
+static void prevSystem(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	jump(-1);
 }
 
-static void nextSystem(void* data) {
+static void nextSystem(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	jump(1);
 }
@@ -212,8 +215,8 @@ static int init(const MosaicHost* h) {
 	// fallback wherever there's no system to jump to. Both go on the same
 	// trigger, so a held shoulder keeps doing one or the other.
 	int trigger = MOSAIC_HOST_HAS(host, override_repeat) ? MOSAIC_TRIGGER_REPEAT : MOSAIC_TRIGGER_PRESS;
-	if (host->register_action("platform-jump.prev", "SYSTEM", canJump, prevSystem, NULL) != 0
-			|| host->register_action("platform-jump.next", "SYSTEM", canJump, nextSystem, NULL) != 0
+	if (host->register_action("platform-jump.prev", "SYSTEM", 0, canJump, prevSystem, NULL) != 0
+			|| host->register_action("platform-jump.next", "SYSTEM", 0, canJump, nextSystem, NULL) != 0
 			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, trigger, "platform-jump.prev") != 0
 			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_L1, trigger, "gamelist.prev_letter") != 0
 			|| host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_R1, trigger, "platform-jump.next") != 0

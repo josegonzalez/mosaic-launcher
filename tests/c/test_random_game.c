@@ -32,8 +32,8 @@ static char toasted[64];
 static struct {
 	char id[64];
 	char label[32];
-	int (*available)(void*);
-	void (*run)(void*);
+	int (*available)(const char*, void*);
+	void (*run)(const char*, void*);
 } actions[MAX_FAKE_ACTIONS];
 static int action_count = 0;
 static char bound[64];
@@ -59,7 +59,8 @@ static MosaicList* fakeListNew(void) { return calloc(1, sizeof(MosaicList)); }
 static void fakeListPush(MosaicList* l, MosaicEntry* e) { l->items[l->count++] = e; }
 static const char* fakeCurrentPath(void) { return current; }
 static void fakeRedraw(void) {}
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	if (action_count >= MAX_FAKE_ACTIONS) return -1;
 	snprintf(actions[action_count].id, sizeof(actions[0].id), "%s", id);
@@ -396,17 +397,17 @@ static void testButton(void) {
 
 	// where Y picks
 	snprintf(current, sizeof(current), "%s", CARD);
-	CHECK(actions[at].available(NULL));
+	CHECK(actions[at].available(NULL, NULL));
 	snprintf(current, sizeof(current), "%s", GB "/Sub");
-	CHECK(actions[at].available(NULL));
+	CHECK(actions[at].available(NULL, NULL));
 	snprintf(current, sizeof(current), "%s", CARD "/Recently Played");
-	CHECK(!actions[at].available(NULL));
+	CHECK(!actions[at].available(NULL, NULL));
 	snprintf(current, sizeof(current), "%s", CARD "/Collections/Favorites.txt");
-	CHECK(!actions[at].available(NULL));
+	CHECK(!actions[at].available(NULL, NULL));
 	snprintf(current, sizeof(current), "%s", CARD "/Tools/test");
-	CHECK(!actions[at].available(NULL));
+	CHECK(!actions[at].available(NULL, NULL));
 	snprintf(current, sizeof(current), "%s", CARD "/Roms/Nothing (XX)"); // no emulator, so no games
-	CHECK(!actions[at].available(NULL));
+	CHECK(!actions[at].available(NULL, NULL));
 
 	// in a system folder: only that system, collated folders included,
 	// and never a hidden game
@@ -414,7 +415,7 @@ static void testButton(void) {
 	snprintf(current, sizeof(current), "%s", MGB);
 	for (int i = 0; i < 20; i++) {
 		seed = (unsigned long long)i * 7919 + 1;
-		actions[at].run(NULL);
+		actions[at].run(NULL, NULL);
 		CHECK_STR(opened, GB "/Kirby.gb");
 		CHECK(opened_type == MOSAIC_ENTRY_ROM);
 	}
@@ -422,7 +423,7 @@ static void testButton(void) {
 	// everything there hidden
 	writeText(CARD "/.userdata/test/launcher/hidden.txt", GB "\n" MGB "\n");
 	opened[0] = '\0';
-	actions[at].run(NULL);
+	actions[at].run(NULL, NULL);
 	CHECK_STR(opened, "");
 	CHECK_STR(toasted, "No games to pick from");
 
@@ -432,7 +433,7 @@ static void testButton(void) {
 	int nes = 0, gb = 0;
 	for (int i = 0; i < 200; i++) {
 		seed = (unsigned long long)i * 104729 + 3;
-		actions[at].run(NULL);
+		actions[at].run(NULL, NULL);
 		if (!strncmp(opened, NES "/", strlen(NES "/"))) nes++;
 		if (!strncmp(opened, CARD "/Roms/Game Boy (", strlen(CARD "/Roms/Game Boy ("))) gb++;
 	}
@@ -450,7 +451,7 @@ static void testButton(void) {
 	int kirby = 0;
 	for (int i = 0; i < 300; i++) {
 		seed = (unsigned long long)i * 15485863 + 5;
-		actions[at].run(NULL);
+		actions[at].run(NULL, NULL);
 		if (!strcmp(opened, GB "/Kirby.gb")) kirby++;
 	}
 	CHECK(kirby > 150); // 4 in 6 expected
@@ -508,7 +509,7 @@ static void testRootRow(void) {
 
 	// Y works there too, from every system
 	int at = findAction("random-game.pick");
-	CHECK(at >= 0 && actions[at].available(NULL));
+	CHECK(at >= 0 && actions[at].available(NULL, NULL));
 
 	// the setting turns the row off
 	snprintf(cfg_root, sizeof(cfg_root), "off");
@@ -528,9 +529,9 @@ static void testTile(void) {
 	CHECK_STR(tile_action, "random-game.tile");
 	if (at >= 0) {
 		CHECK_STR(actions[at].label, "Random");
-		CHECK(actions[at].available(NULL));
+		CHECK(actions[at].available(NULL, NULL));
 		snprintf(current, sizeof(current), "%s", CARD "/Tools/test"); // anywhere
-		actions[at].run(NULL);
+		actions[at].run(NULL, NULL);
 		CHECK(opens == 1);
 		CHECK(!strncmp(opened, CARD "/Roms/", strlen(CARD "/Roms/")));
 	}

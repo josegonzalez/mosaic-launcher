@@ -197,8 +197,8 @@ static int fakeOpenPath(const char* path, int type) {
 
 // what init asked for, in order
 static char actions[4][64];
-static int (*availables[4])(void*);
-static void (*runs[4])(void*);
+static int (*availables[4])(const char*, void*);
+static void (*runs[4])(const char*, void*);
 static int action_count = 0;
 static char overrides[8][64];
 static int override_buttons[8];
@@ -206,7 +206,8 @@ static int override_triggers[8];
 static int override_count = 0;
 static int refuse_r1 = 0;
 
-static int fakeRegisterAction(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegisterAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)label;
 	(void)data;
 	snprintf(actions[action_count], sizeof(actions[0]), "%s", id);
@@ -253,13 +254,13 @@ static void reset(void) {
 }
 
 static int canJumpNow(void) {
-	return availables[0](NULL);
+	return availables[0](NULL, NULL);
 }
 static void prev(void) {
-	runs[0](NULL);
+	runs[0](NULL, NULL);
 }
 static void next(void) {
-	runs[1](NULL);
+	runs[1](NULL, NULL);
 }
 
 static void testInit(void) {

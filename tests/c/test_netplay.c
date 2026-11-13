@@ -23,8 +23,8 @@ static char cfg_port[16] = "", cfg_address[64] = "";
 static char toasted[128];
 
 static char action_id[64];
-static int (*action_available)(void*);
-static void (*action_run)(void*);
+static int (*action_available)(const char*, void*);
+static void (*action_run)(const char*, void*);
 static int bound_button = -1, bind_result = 0;
 
 static char chose_title[32];
@@ -54,7 +54,8 @@ static void fakeCfgSet(const char* key, const char* value) {
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
 static int fakeEntryType(const MosaicEntry* e) { return e->type; }
 static const MosaicEntry* fakeSelected(void) { return has_selection ? &selected : NULL; }
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)label; (void)data;
 	snprintf(action_id, sizeof(action_id), "%s", id);
 	action_available = available;
@@ -290,21 +291,21 @@ static void testInit(void) {
 
 static void testAvailable(void) {
 	has_selection = 0;
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	CHECK(action_available(NULL));
+	CHECK(action_available(NULL, NULL));
 	select_(NES "/Hacks", MOSAIC_ENTRY_DIR);
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	select_(CARD "/Tools/test/Files.pak", MOSAIC_ENTRY_PAK);
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	select_(CARD "/Collections/Mine.txt", MOSAIC_ENTRY_ROM);
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 }
 
 static void testHost(void) {
 	reset();
 	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(chose_title, "Netplay");
 	CHECK(chose_count == 2);
 	on_pick(0, NULL);
@@ -326,20 +327,20 @@ static void testHost(void) {
 	reset();
 	snprintf(cfg_port, sizeof(cfg_port), "6000");
 	select_(NES "/Hacks/Zelda.nes", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(0, NULL);
 	CHECK_STR(replaced_program, FC_PAK);
 	CHECK_STR(replaced_args[2], "6000");
 	snprintf(cfg_port, sizeof(cfg_port), "nope");
 	reset();
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(0, NULL);
 	CHECK_STR(replaced_args[2], "55435");
 	cfg_port[0] = '\0';
 
 	// backing out of the choice launches nothing
 	reset();
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(-1, NULL);
 	CHECK(opens == 0);
 }
@@ -348,7 +349,7 @@ static void testJoin(void) {
 	reset();
 	cfg_address[0] = '\0';
 	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(1, NULL);
 	CHECK(on_typed != NULL);
 	CHECK_STR(typed_initial, "");
@@ -364,7 +365,7 @@ static void testJoin(void) {
 
 	// the last address is offered next time, and the port setting fills in
 	reset();
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(1, NULL);
 	CHECK_STR(typed_initial, "192.168.1.20:5000");
 	on_typed("brick.local", NULL);
@@ -373,14 +374,14 @@ static void testJoin(void) {
 
 	// a bad address or a cancelled keyboard launches nothing
 	reset();
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(1, NULL);
 	on_typed("not an address", NULL);
 	CHECK(opens == 0);
 	CHECK(toasted[0] != '\0');
 	CHECK_STR(cfg_address, "brick.local");
 	reset();
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(1, NULL);
 	on_typed(NULL, NULL);
 	CHECK(opens == 0);
@@ -390,7 +391,7 @@ static void testJoin(void) {
 	no_keyboard.keyboard = NULL;
 	CHECK(plugin.init(&no_keyboard) == 0);
 	reset();
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(chose_count == 1);
 	CHECK(plugin.init(&fake) == 0);
 }
@@ -406,7 +407,7 @@ static void testLaunches(void) {
 	reset();
 	open_result = 0;
 	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(0, NULL);
 	CHECK(plugin.pre_launch(&l) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(replaced_count == -1);
@@ -414,7 +415,7 @@ static void testLaunches(void) {
 	// another game launching first takes the choice away
 	reset();
 	open_launches = 0;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(0, NULL);
 	MosaicLaunch other = { .path = NES "/Hacks/Zelda.nes", .type = MOSAIC_ENTRY_ROM };
 	CHECK(plugin.pre_launch(&other) == MOSAIC_LAUNCH_CONTINUE);
@@ -424,7 +425,7 @@ static void testLaunches(void) {
 	// no emulator, or another plugin replaced it first: cancelled, not faked
 	reset();
 	select_(CARD "/Roms/Nothing (XX)/Game.x", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(0, NULL);
 	CHECK(launch_result == MOSAIC_LAUNCH_CANCEL);
 	CHECK(replaced_count == -1);
@@ -432,7 +433,7 @@ static void testLaunches(void) {
 	reset();
 	replace_result = -1;
 	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(0, NULL);
 	CHECK(launch_result == MOSAIC_LAUNCH_CANCEL);
 	CHECK(toasted[0] != '\0');

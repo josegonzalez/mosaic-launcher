@@ -21,8 +21,8 @@ struct MosaicList {
 static const char* favorites_collection = NULL;
 static char focus_on[8] = "";
 static char last_action[64], last_label[64];
-static int (*action_available)(void*) = NULL;
-static void (*action_run)(void*) = NULL;
+static int (*action_available)(const char*, void*) = NULL;
+static void (*action_run)(const char*, void*) = NULL;
 static char tile_action[64];
 static int tile_row = -1;
 static int (*tile_is_on)(void*) = NULL;
@@ -51,7 +51,8 @@ static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
 static MosaicList* fakeListNew(void) { return calloc(1, sizeof(MosaicList)); }
 static void fakeListPush(MosaicList* l, MosaicEntry* e) { l->items[l->count++] = e; }
 static void fakeRedraw(void) {}
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	snprintf(last_action, sizeof(last_action), "%s", id);
 	snprintf(last_label, sizeof(last_label), "%s", label);
@@ -200,7 +201,7 @@ static void testPlugin(void) {
 	CHECK_STR(last_label, "Focus");
 	CHECK_STR(tile_action, "focus-mode.toggle");
 	CHECK(tile_row == MOSAIC_QUICK_TOP);
-	CHECK(action_available(NULL));
+	CHECK(action_available(NULL, NULL));
 	CHECK(tile_is_on(NULL)); // on by default
 
 	// no favorites yet: stock's root
@@ -231,13 +232,13 @@ static void testPlugin(void) {
 	freeList(root);
 
 	// the tile turns it off, back to stock's root, and on again
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(focus_on, "off");
 	CHECK(!tile_is_on(NULL));
 	CHECK(reloads == 1);
 	CHECK_STR(toasted, "Focus mode off");
 	CHECK(p->root_replace() == NULL);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(focus_on, "on");
 	CHECK(reloads == 2);
 	CHECK_STR(toasted, "Focus mode on");

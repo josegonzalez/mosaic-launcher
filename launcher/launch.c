@@ -172,8 +172,9 @@ int runFnAction(int index) {
 	size_t action_prefix_len = strlen(FN_ACTION_ACTION_PREFIX);
 	if (strncmp(action, FN_ACTION_ACTION_PREFIX, action_prefix_len)==0) {
 		const Action* bound = Actions_find(action + action_prefix_len);
-		if (!Action_available(bound)) return 0;
-		Action_run(bound);
+		const char* path = Action_buttonPath(bound);
+		if (!Action_available(bound, path)) return 0;
+		Action_run(bound, path);
 		return 1;
 	}
 

@@ -128,7 +128,8 @@ static int check(void) {
 	return checked_ok;
 }
 
-static int canChoose(void* data) {
+static int canChoose(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return check();
 }
@@ -160,7 +161,8 @@ static void picked(int index, void* data) {
 	forgetCheck(); // clearing the last choice can leave nothing to pick
 }
 
-static void choose(void* data) {
+static void choose(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (!check()) return;
 	refreshMap();
@@ -276,7 +278,7 @@ static int init(const MosaicHost* h) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("emulator.choice", provideChoice) != 0) say("couldn't provide emulator.choice");
-	if (host->register_action(ID ".choose", "EMULATOR", canChoose, choose, NULL) != 0
+	if (host->register_action(ID ".choose", "EMULATOR", 0, canChoose, choose, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, ID ".choose") != 0) {
 		say("couldn't bind " ID ".choose");
 	}

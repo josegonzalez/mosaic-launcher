@@ -16,4 +16,4 @@ setting.sync=toggle|Upload saves after playing|on
 # how many of a game's uploaded saves the server keeps
 setting.keep=choice|Saves kept on the server|10|5,10,20,50
 # the game list button that opens the selected game's Flashback, shared with other plugins' actions on it
-setting.button=choice|Flashback button|Y|none,Y,L2,R2,SELECT
+setting.button=choice|Flashback button|Y|none,Y,L2,R2,SELECT|button:romm.flashback

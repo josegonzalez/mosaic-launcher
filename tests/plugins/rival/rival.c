@@ -19,7 +19,8 @@ static void say(const char* fmt, ...) {
 	host->log(ID, message);
 }
 
-static void runY(void* data) {
+static void runY(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	say("y ran");
 }
@@ -35,7 +36,7 @@ static int init(const MosaicHost* h) {
 	say("override A %i, B %i",
 		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_A, MOSAIC_TRIGGER_RELEASE, "gamelist.open"),
 		host->override_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_B, MOSAIC_TRIGGER_PRESS, "gamelist.back"));
-	host->register_action("rival.y", "RIVAL", NULL, runY, NULL);
+	host->register_action("rival.y", "RIVAL", 0, NULL, runY, NULL);
 	say("bind Y %i", host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "rival.y"));
 	return 0;
 }

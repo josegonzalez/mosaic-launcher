@@ -262,8 +262,8 @@ static int has_selection = 0;
 static char action_id[64];
 static char action_label[64];
 static int action_button = -1;
-static int (*action_available)(void*) = NULL;
-static void (*action_run)(void*) = NULL;
+static int (*action_available)(const char*, void*) = NULL;
+static void (*action_run)(const char*, void*) = NULL;
 static char toasted[128];
 static char logged[2048];
 static char chosen_title[64];
@@ -289,7 +289,8 @@ static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
 static int fakeEntryType(const MosaicEntry* e) { return e->type; }
 static const MosaicEntry* fakeSelected(void) { return has_selection ? &selected_entry : NULL; }
 static void fakeRedraw(void) {}
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run_)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run_)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	snprintf(action_id, sizeof(action_id), "%s", id);
 	snprintf(action_label, sizeof(action_label), "%s", label);
@@ -387,23 +388,23 @@ static void testPlugin(void) {
 
 	// where it's offered
 	has_selection = 0;
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	select_(PS "/Game.bin", MOSAIC_ENTRY_ROM);
-	CHECK(!action_available(NULL)); // nothing else runs PS games
+	CHECK(!action_available(NULL, NULL)); // nothing else runs PS games
 	select_(GB "/Hacks", MOSAIC_ENTRY_DIR);
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	select_(CARD "/Tools/desktop/Thing.pak", MOSAIC_ENTRY_PAK);
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 	select_(GB "/Multi", MOSAIC_ENTRY_DIR);
-	CHECK(action_available(NULL));
+	CHECK(action_available(NULL, NULL));
 
 	// with nothing chosen, games launch as usual
 	CHECK(launch(p, GB "/Tetris.gb", MOSAIC_ENTRY_ROM, cmd, sizeof(cmd)) == MOSAIC_LAUNCH_CONTINUE);
 
 	// picking one
 	select_(GB "/Link's Awakening.gb", MOSAIC_ENTRY_ROM);
-	CHECK(action_available(NULL));
-	action_run(NULL);
+	CHECK(action_available(NULL, NULL));
+	action_run(NULL, NULL);
 	CHECK_STR(chosen_title, "Emulator");
 	CHECK(chosen_count == 3);
 	CHECK_STR(chosen[0], "Default (GB)");
@@ -413,7 +414,7 @@ static void testPlugin(void) {
 	on_pick(2, NULL);
 	CHECK_STR(toasted, "Emulator set to MGBA");
 	CHECK_STR(readText(CHOICES), "/Roms/Game Boy (GB)/Link's Awakening.gb\tMGBA\n");
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(chosen_selected == 2);
 	on_pick(-1, NULL); // backing out changes nothing
 	CHECK_STR(readText(CHOICES), "/Roms/Game Boy (GB)/Link's Awakening.gb\tMGBA\n");
@@ -430,7 +431,7 @@ static void testPlugin(void) {
 
 	// a multi-disc game, chosen from its folder, applies to its discs
 	select_(GB "/Multi", MOSAIC_ENTRY_DIR);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	on_pick(1, NULL);
 	CHECK(launch(p, GB "/Multi/Multi (Disc 1).gb", MOSAIC_ENTRY_ROM, cmd, sizeof(cmd)) == MOSAIC_LAUNCH_REPLACE);
 	snprintf(want, sizeof(want), "'%s/Emus/desktop/GBC.pak/launch.sh' '%s'", card, GB "/Multi/Multi (Disc 1).gb");
@@ -438,7 +439,7 @@ static void testPlugin(void) {
 
 	// Default clears it
 	select_(GB "/Multi", MOSAIC_ENTRY_DIR);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(chosen_selected == 1);
 	on_pick(0, NULL);
 	CHECK_STR(toasted, "Using the default emulator");
@@ -466,12 +467,12 @@ static void testPlugin(void) {
 	writeChoices("/Roms/Sony PlayStation (PS)/Game.bin\tFOO\n");
 	p->post_return();
 	select_(PS "/Game.bin", MOSAIC_ENTRY_ROM);
-	CHECK(action_available(NULL));
-	action_run(NULL);
+	CHECK(action_available(NULL, NULL));
+	action_run(NULL, NULL);
 	CHECK(chosen_count == 1);
 	on_pick(0, NULL);
 	CHECK_STR(readText(CHOICES), "");
-	CHECK(!action_available(NULL));
+	CHECK(!action_available(NULL, NULL));
 
 	// when the launcher refuses the replacement, it launches as usual
 	writeChoices("/Roms/Game Boy (GB)/Tetris.gb\tMGBA\n");
@@ -485,7 +486,7 @@ static void testPlugin(void) {
 	snprintf(cfg_all, sizeof(cfg_all), "on");
 	p = start();
 	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(chosen_count == 5);
 	CHECK(chosen_selected == 3);
 	CHECK_STR(chosen[1], "FOO");

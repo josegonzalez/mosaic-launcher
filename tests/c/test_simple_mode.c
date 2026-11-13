@@ -17,7 +17,7 @@ static char cfg_settings[8] = "";
 static char cfg_pin[SIMPLE_PIN_LEN] = "";
 static int has_pin = 0;
 static char last_action[64], last_label[64];
-static void (*action_run)(void*) = NULL;
+static void (*action_run)(const char*, void*) = NULL;
 static int (*tile_is_on)(void*) = NULL;
 static int tile_row = -1;
 static char hidden[16][32];
@@ -41,7 +41,8 @@ static void fakeCfgSet(const char* key, const char* value) {
 }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
 static void fakeRedraw(void) {}
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)available; (void)data;
 	snprintf(last_action, sizeof(last_action), "%s", id);
 	snprintf(last_label, sizeof(last_label), "%s", label);
@@ -198,7 +199,7 @@ static void testPlugin(void) {
 	CHECK(p->pre_launch(&rom) == MOSAIC_LAUNCH_CONTINUE);
 
 	// no PIN: the tile asks first, then leaves
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(confirm_yes != NULL);
 	CHECK(tile_is_on(NULL));
 	confirm_yes(NULL);
@@ -213,7 +214,7 @@ static void testPlugin(void) {
 	// turning it on needs nothing; without the settings tiles only Tools goes
 	snprintf(cfg_settings, sizeof(cfg_settings), "off");
 	confirm_yes = NULL;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(confirm_yes == NULL);
 	CHECK_STR(cfg_on, "on");
 	CHECK(hidden_count == 2);
@@ -223,7 +224,7 @@ static void testPlugin(void) {
 	// with a PIN: a wrong one stays, a cancel stays, the right one leaves
 	snprintf(cfg_pin, sizeof(cfg_pin), "4321");
 	has_pin = 1;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(confirm_yes == NULL);
 	CHECK(keyboard_done != NULL);
 	keyboard_done("1234", NULL);
@@ -258,18 +259,18 @@ static void testHostPin(void) {
 	// no PIN on the host: a confirm, as before, whatever the cfg says
 	keyboard_done = NULL;
 	confirm_yes = NULL;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(keyboard_done == NULL);
 	CHECK(confirm_yes != NULL);
 	confirm_yes(NULL);
 	CHECK_STR(cfg_on, "off");
 
 	// a PIN on the host: wrong stays, cancelled stays, right leaves
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK_STR(cfg_on, "on");
 	host_pin = 1;
 	confirm_yes = NULL;
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(confirm_yes == NULL);
 	CHECK(keyboard_done == NULL);
 	CHECK_STR(asked_title, "PIN to leave simple mode");

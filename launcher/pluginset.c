@@ -70,6 +70,31 @@ static int settingFlags(const char* field, int type) {
 	return flags;
 }
 
+// The ids after the flags field's button: markers, comma-separated, cut
+// to fit.
+static void settingButtons(const char* field, char* out, size_t size) {
+	out[0] = '\0';
+	size_t used = 0;
+	const char* p = field;
+	while (*p) {
+		while (*p == ',' || isspace((unsigned char)*p)) p++;
+		const char* end = p;
+		while (*end && *end != ',') end++;
+		const char* item_end = end;
+		while (item_end > p && isspace((unsigned char)item_end[-1])) item_end--;
+		if (item_end - p > 7 && !strncmp(p, "button:", 7)) {
+			size_t len = (size_t)(item_end - p - 7);
+			if (used + len + (used ? 1 : 0) < size) {
+				if (used) out[used++] = ',';
+				memcpy(out + used, p + 7, len);
+				used += len;
+				out[used] = '\0';
+			}
+		}
+		p = end;
+	}
+}
+
 // setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]]
 static void manifestSetting(PluginManifest* m, const char* key, const char* value) {
 	if (m->setting_count >= PLUGIN_SETTINGS_MAX || !key[0]) return;
@@ -97,6 +122,7 @@ static void manifestSetting(PluginManifest* m, const char* key, const char* valu
 	copyField(s->fallback, sizeof(s->fallback), parts[2]);
 	copyField(s->options, sizeof(s->options), parts[3] ? parts[3] : "");
 	s->flags = parts[4] ? settingFlags(parts[4], s->type) : 0;
+	settingButtons(parts[4] ? parts[4] : "", s->buttons, sizeof(s->buttons));
 	if (s->type == SETTING_CHOICE && !s->options[0]) return; // nothing to choose from
 	m->setting_count++;
 }
@@ -155,6 +181,14 @@ int Manifest_isPublic(const PluginManifest* m, const char* key) {
 		if (!strcmp(m->settings[i].key, key)) return (m->settings[i].flags & SETTING_PUBLIC) != 0;
 	}
 	return 0;
+}
+
+const char* Manifest_buttonSetting(const PluginManifest* m, const char* action_id) {
+	if (!m || !action_id || !action_id[0]) return NULL;
+	for (int i = 0; i < m->setting_count; i++) {
+		if (csvHas(m->settings[i].buttons, action_id)) return m->settings[i].key;
+	}
+	return NULL;
 }
 
 int Manifest_option(const char* options, int index, char* out, size_t size) {

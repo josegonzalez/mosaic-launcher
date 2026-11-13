@@ -34,12 +34,12 @@ static const char* shown(const char* s) {
 	return s ? s : "(null)";
 }
 
-static int always(void* data) { (void)data; return 1; }
-static void runOne(void* data) { (void)data; say("one ran"); }
-static void runTwo(void* data) { (void)data; say("two ran"); }
-static void runTile(void* data) { (void)data; say("tile ran"); }
+static int always(const char* path, void* data) { (void)path; (void)data; return 1; }
+static void runOne(const char* path, void* data) { (void)path; (void)data; say("one ran"); }
+static void runTwo(const char* path, void* data) { (void)path; (void)data; say("two ran"); }
+static void runTile(const char* path, void* data) { (void)path; (void)data; say("tile ran"); }
 static int lightOn(void* data) { (void)data; return light; }
-static void runLight(void* data) { (void)data; light = !light; }
+static void runLight(const char* path, void* data) { (void)path; (void)data; light = !light; }
 
 static void picked(int index, void* data) {
 	(void)data;
@@ -99,14 +99,14 @@ static int init(const MosaicHost* h) {
 	}
 	plugin.root_with_entries = atoi(host->cfg_get("keep", "1"));
 
-	host->register_action("menus.one", "ONE", always, runOne, NULL);
-	host->register_action("menus.two", "TWO", always, runTwo, NULL);
+	host->register_action("menus.one", "ONE", 0, always, runOne, NULL);
+	host->register_action("menus.two", "TWO", 0, always, runTwo, NULL);
 	int one = host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "menus.one");
 	int two = host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "menus.two");
 	say("bound %i %i", one, two);
 
-	host->register_action("menus.tile", "Menus", always, runTile, NULL);
-	host->register_action("menus.light", "Light", always, runLight, NULL);
+	host->register_action("menus.tile", "Menus", 0, always, runTile, NULL);
+	host->register_action("menus.light", "Light", 0, always, runLight, NULL);
 	say("tiles %i %i, unknown %i, bad row %i",
 		host->quick_tile("menus.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL),
 		host->quick_tile("menus.light", MOSAIC_QUICK_BOTTOM, NULL, NULL, lightOn),

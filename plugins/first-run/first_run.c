@@ -395,7 +395,8 @@ static void leave(void* data) {
 ///////////////////////////////////////
 // opening
 
-static void openWizard(void* data) {
+static void openWizard(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the wizard");
 }
@@ -434,7 +435,7 @@ static int init(const MosaicHost* h) {
 		say("can't register the wizard's screen");
 		return 1;
 	}
-	if (host->register_action(ACTION_ID, "First run", NULL, openWizard, NULL) != 0) {
+	if (host->register_action(ACTION_ID, "First run", 0, NULL, openWizard, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 1;
 	}

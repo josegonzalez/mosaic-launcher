@@ -23,12 +23,14 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
-static int canShow(void* data) {
+static int canShow(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return host->selected_entry() != NULL;
 }
 
-static void show(void* data) {
+static void show(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	if (!entry) return;
@@ -57,7 +59,7 @@ static void startHelper(void) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	if (host->register_action(ID ".show", "SHOW", canShow, show, NULL) != 0) return 1;
+	if (host->register_action(ID ".show", "SHOW", 0, canShow, show, NULL) != 0) return 1;
 	// Y is free on the game list in stock NextUI; another plugin may want it too
 	if (host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, ID ".show") != 0) {
 		host->log(ID, "couldn't bind Y");

@@ -539,8 +539,8 @@ static void testNames(void) {
 static struct {
 	char id[64];
 	char label[32];
-	int (*available)(void*);
-	void (*run)(void*);
+	int (*available)(const char*, void*);
+	void (*run)(const char*, void*);
 	int button;
 } actions[MAX_FAKE_ACTIONS];
 static int action_count = 0;
@@ -571,7 +571,8 @@ static const char* fakeEntryName(const MosaicEntry* e) { return e->name; }
 static int fakeEntryType(const MosaicEntry* e) { return e->type; }
 static const MosaicEntry* fakeSelected(void) { return has_selection ? &selected_entry : NULL; }
 static void fakeRedraw(void) {}
-static int fakeRegister(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	if (action_count >= MAX_FAKE_ACTIONS) return -1;
 	snprintf(actions[action_count].id, sizeof(actions[0].id), "%s", id);
@@ -689,19 +690,19 @@ static void testPlugin(void) {
 
 	// what's available where
 	has_selection = 0;
-	CHECK(!actions[rename_at].available(NULL));
-	CHECK(!actions[delete_at].available(NULL));
+	CHECK(!actions[rename_at].available(NULL, NULL));
+	CHECK(!actions[delete_at].available(NULL, NULL));
 	select_(GB "/Zelda.gb", MOSAIC_ENTRY_ROM, "Zelda");
-	CHECK(actions[rename_at].available(NULL));
-	CHECK(actions[collect_at].available(NULL));
-	CHECK(actions[delete_at].available(NULL));
+	CHECK(actions[rename_at].available(NULL, NULL));
+	CHECK(actions[collect_at].available(NULL, NULL));
+	CHECK(actions[delete_at].available(NULL, NULL));
 	select_(GB "/Hacks", MOSAIC_ENTRY_DIR, "Hacks");
-	CHECK(actions[rename_at].available(NULL));
-	CHECK(!actions[collect_at].available(NULL));
-	CHECK(!actions[delete_at].available(NULL));
+	CHECK(actions[rename_at].available(NULL, NULL));
+	CHECK(!actions[collect_at].available(NULL, NULL));
+	CHECK(!actions[delete_at].available(NULL, NULL));
 	select_(CARD "/Tools/desktop/Thing.pak", MOSAIC_ENTRY_PAK, "Thing");
-	CHECK(actions[collect_at].available(NULL));
-	CHECK(!actions[delete_at].available(NULL));
+	CHECK(actions[collect_at].available(NULL, NULL));
+	CHECK(!actions[delete_at].available(NULL, NULL));
 
 	// rename: the keyboard starts on the shown name, and the name sticks
 	MosaicEntry zelda = { GB "/Zelda.gb", "Zelda", MOSAIC_ENTRY_ROM };
@@ -709,7 +710,7 @@ static void testPlugin(void) {
 	CHECK(p->display_name(&zelda, out, sizeof(out)) == 0);
 	select_(GB "/Zelda.gb", MOSAIC_ENTRY_ROM, "Zelda");
 	reloads = 0;
-	actions[rename_at].run(NULL);
+	actions[rename_at].run(NULL, NULL);
 	CHECK_STR(kb_title, "Rename");
 	CHECK_STR(kb_initial, "Zelda");
 	kb_done("Link's Awakening", NULL);
@@ -721,17 +722,17 @@ static void testPlugin(void) {
 	// renaming never touches the game
 	CHECK(there(GB "/Zelda.gb"));
 	// cancelling changes nothing; an empty name restores it
-	actions[rename_at].run(NULL);
+	actions[rename_at].run(NULL, NULL);
 	CHECK_STR(kb_initial, "Link's Awakening");
 	kb_done(NULL, NULL);
 	CHECK(p->display_name(&zelda, out, sizeof(out)) == 1);
-	actions[rename_at].run(NULL);
+	actions[rename_at].run(NULL, NULL);
 	kb_done("", NULL);
 	CHECK_STR(toasted, "Name restored");
 	CHECK(p->display_name(&zelda, out, sizeof(out)) == 0);
 
 	// add to collection: existing ones, then a new one
-	actions[collect_at].run(NULL);
+	actions[collect_at].run(NULL, NULL);
 	CHECK_STR(chosen_title, "Add to collection");
 	CHECK(chosen_count == 3);
 	CHECK_STR(chosen[0], "arcade");
@@ -741,18 +742,18 @@ static void testPlugin(void) {
 	CHECK_STR(toasted, "Added to Favorites");
 	CHECK_STR(readText(CARD "/Collections/Favorites.txt"),
 		"/Roms/Game Boy (GB)/Tetris.gb\n/Roms/Sony PlayStation (PS)/FF7/FF7.m3u\n/Roms/Game Boy (GB)/Zelda.gb\n");
-	actions[collect_at].run(NULL);
+	actions[collect_at].run(NULL, NULL);
 	on_pick(0, NULL);
 	CHECK_STR(toasted, "Already in arcade");
-	actions[collect_at].run(NULL);
+	actions[collect_at].run(NULL, NULL);
 	on_pick(-1, NULL);
-	actions[collect_at].run(NULL);
+	actions[collect_at].run(NULL, NULL);
 	on_pick(2, NULL);
 	CHECK_STR(kb_title, "New collection");
 	kb_done("a/b", NULL);
 	CHECK_STR(toasted, "That name can't be a collection");
 	CHECK(!there(CARD "/Collections/a"));
-	actions[collect_at].run(NULL);
+	actions[collect_at].run(NULL, NULL);
 	on_pick(2, NULL);
 	kb_done("Zelda games", NULL);
 	CHECK_STR(toasted, "Added to Zelda games");
@@ -760,10 +761,10 @@ static void testPlugin(void) {
 
 	// delete: a game folder, named in the question with what goes with it
 	select_(PS "/FF7/FF7 (Disc 1).cue", MOSAIC_ENTRY_ROM, "Disc 1");
-	actions[rename_at].run(NULL);
+	actions[rename_at].run(NULL, NULL);
 	kb_done("Final Fantasy", NULL);
 	select_(PS "/FF7", MOSAIC_ENTRY_DIR, "FF7");
-	actions[rename_at].run(NULL);
+	actions[rename_at].run(NULL, NULL);
 	kb_done("Final Fantasy VII", NULL);
 	snprintf(recents[0], sizeof(recents[0]), "%s", GB "/Zelda.gb");
 	snprintf(recents[1], sizeof(recents[1]), "%s", PS "/FF7/FF7.m3u");
@@ -771,7 +772,7 @@ static void testPlugin(void) {
 	recent_count = 3;
 	select_(PS "/FF7", MOSAIC_ENTRY_DIR, "Final Fantasy VII");
 	answer_yes = NULL;
-	actions[delete_at].run(NULL);
+	actions[delete_at].run(NULL, NULL);
 	CHECK_STR(asked, "Delete Final Fantasy VII?\nAlso deletes its folder, 2 saves, 1 state and its art.\nThis can't be undone.");
 	CHECK(there(PS "/FF7")); // nothing goes before the answer
 	CHECK(answer_yes != NULL);
@@ -788,12 +789,12 @@ static void testPlugin(void) {
 	CHECK_STR(recents[1], PS "/FF7 Remake.m3u");
 	CHECK_STR(readText(CARD "/Collections/Favorites.txt"), "/Roms/Game Boy (GB)/Tetris.gb\n/Roms/Game Boy (GB)/Zelda.gb\n");
 	CHECK_STR(readText(USERDATA "/launcher/game-actions-names.txt"), "");
-	CHECK(!actions[delete_at].available(NULL));
+	CHECK(!actions[delete_at].available(NULL, NULL));
 
 	// a plain game, from Recently Played
 	select_(GB "/Zelda.gb", MOSAIC_ENTRY_ROM, "Zelda");
-	CHECK(actions[delete_at].available(NULL));
-	actions[delete_at].run(NULL);
+	CHECK(actions[delete_at].available(NULL, NULL));
+	actions[delete_at].run(NULL, NULL);
 	CHECK_STR(asked, "Delete Zelda?\nAlso deletes 1 save.\nThis can't be undone.");
 	answer_yes(NULL);
 	CHECK(!there(GB "/Zelda.gb"));
@@ -810,7 +811,7 @@ static void testPlugin(void) {
 	p = start();
 	delete_at = find("game-actions.delete");
 	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM, "Tetris");
-	actions[delete_at].run(NULL);
+	actions[delete_at].run(NULL, NULL);
 	CHECK_STR(asked, "Delete Tetris?\nAlso deletes its art.\nThis can't be undone.");
 	answer_yes(NULL);
 	CHECK(!there(GB "/Tetris.gb"));
@@ -820,7 +821,7 @@ static void testPlugin(void) {
 	// a long name is cut to fit
 	select_(GB "/Dr. Mario.gb", MOSAIC_ENTRY_ROM, "An extremely long name for a game that goes on and on");
 	answer_yes = NULL;
-	actions[delete_at].run(NULL);
+	actions[delete_at].run(NULL, NULL);
 	CHECK_STR(asked, "Delete An extremely long name for a game that g...?\nAlso deletes its art.\nThis can't be undone.");
 	answer_yes = NULL; // not answered: nothing goes
 	CHECK(there(GB "/Dr. Mario.gb"));

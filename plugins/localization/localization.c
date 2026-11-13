@@ -491,12 +491,14 @@ static void writeMaps(void* data) {
 	say("map.txt names added: %i, in folders: %i", added, folders);
 }
 
-static int mapAvailable(void* data) {
+static int mapAvailable(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return code[0] != '\0';
 }
 
-static void runMap(void* data) {
+static void runMap(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	freeWrites();
 	char dir[700];
@@ -584,7 +586,7 @@ static int init(const MosaicHost* h) {
 	if (!user_pack && !bundled_pack) say("no pack for %s in %s or %s, so the launcher's strings stay English", code, folder, launcher_dir);
 	say("language %s", code);
 
-	if (host->register_action(MAP_ACTION, "Write map.txt names", mapAvailable, runMap, NULL) != 0) {
+	if (host->register_action(MAP_ACTION, "Write map.txt names", 0, mapAvailable, runMap, NULL) != 0) {
 		say("couldn't register " MAP_ACTION);
 		return 0;
 	}

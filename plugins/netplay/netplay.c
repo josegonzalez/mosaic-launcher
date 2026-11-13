@@ -94,7 +94,8 @@ static void modePicked(int index, void* data) {
 	else if (index == 1) host->keyboard(tr("Host address"), host->cfg_get("last_address", ""), addressTyped, NULL);
 }
 
-static int canOpen(void* data) {
+static int canOpen(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	char tag[128];
@@ -102,7 +103,8 @@ static int canOpen(void* data) {
 		&& NP_emuTag(roms_path, host->entry_path(entry), tag, sizeof(tag)) == 0;
 }
 
-static void open_(void* data) {
+static void open_(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	if (!entry || snprintf(picked, sizeof(picked), "%s", host->entry_path(entry)) >= (int)sizeof(picked)) return;
@@ -145,7 +147,7 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	if (!MOSAIC_HOST_HAS(host, keyboard)) say("this launcher has no keyboard; only hosting is offered");
-	if (host->register_action("netplay.open", "NETPLAY", canOpen, open_, NULL) != 0
+	if (host->register_action("netplay.open", "NETPLAY", 0, canOpen, open_, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "netplay.open") != 0) {
 		say("couldn't bind Y; not loading");
 		return 1;

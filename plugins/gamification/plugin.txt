@@ -4,7 +4,7 @@ api=1
 # a Quests tile on the quick menu
 setting.tile=toggle|Quick menu tile|on
 # a game list button that opens the quests
-setting.button=choice|Quests button|none|none,Y,L2,R2,SELECT
+setting.button=choice|Quests button|none|none,Y,L2,R2,SELECT|button:gamification.open
 # the daily quest to play for this long
 setting.daily_minutes=choice|Daily play (minutes)|30|15,30,45,60,90,120
 # the daily quest to play this many different games

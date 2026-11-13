@@ -1,10 +1,12 @@
 #include "launcher.h"
 
-static int canResume(void* data) {
+static int canResume(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return total>0 && state.can_resume;
 }
-static void resumeSelected(void* data) {
+static void resumeSelected(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	Entry* entry = state.top->entries->items[state.top->selected];
 	state.should_resume = 1;
@@ -13,11 +15,13 @@ static void resumeSelected(void* data) {
 	state.dirty = 1;
 }
 
-static int canOpen(void* data) {
+static int canOpen(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return total>0;
 }
-static void openSelected(void* data) {
+static void openSelected(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	Entry* entry = state.top->entries->items[state.top->selected];
 	Entry_open(entry);
@@ -30,12 +34,14 @@ static void openSelected(void* data) {
 	if (total>0) readyResume(state.top->entries->items[state.top->selected]);
 }
 
-static int canGoBack(void* data) {
+static int canGoBack(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	// at the root, back to a plugin's home screen
 	return state.stack->count>1 || Plugins_homeReady();
 }
-static void goBack(void* data) {
+static void goBack(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (state.stack->count<=1) {
 		Plugins_openHome();
@@ -50,7 +56,8 @@ static void goBack(void* data) {
 }
 
 // The previous or next letter in the letter index, as L1 and R1 jump.
-static int canJump(void* data) {
+static int canJump(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return total>0;
 }
@@ -70,18 +77,21 @@ static void jumpTo(int i) {
 		readyResume(state.top->entries->items[selected]);
 	}
 }
-static void prevLetter(void* data) {
+static void prevLetter(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	Entry* entry = state.top->entries->items[selected];
 	jumpTo(entry->alpha-1);
 }
-static void nextLetter(void* data) {
+static void nextLetter(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	Entry* entry = state.top->entries->items[selected];
 	jumpTo(entry->alpha+1);
 }
 
-static void openQuickMenu(void* data) {
+static void openQuickMenu(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	currentScreen = SCREEN_QUICKMENU;
 	QuickMenu_enter();
@@ -89,7 +99,8 @@ static void openQuickMenu(void* data) {
 	folderbgchanged = 1; // The background painting code is a clusterfuck, just force a repaint here
 	if (!HAS_POWER_BUTTON && !state.simple_mode) PWR_enableSleep();
 }
-static void openSwitcher(void* data) {
+static void openSwitcher(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	currentScreen = SCREEN_GAMESWITCHER;
 	state.switcher_selected = 0;
@@ -176,12 +187,16 @@ static void effective(Effective* e) {
 static const Action* menu_actions[ENTRY_MENU_MAX];
 static int menu_count = 0;
 
+// what the menu was opened on, for an action that takes a path
+static char menu_path[1024];
+
 static void menuPicked(int index, void* data) {
 	(void)data;
 	if (index < 0 || index >= menu_count) return;
 	const Action* action = menu_actions[index];
+	const char* path = action->takes_path && menu_path[0] ? menu_path : NULL;
 	// it may have stopped being available while the menu was open
-	if (Action_available(action)) Action_run(action);
+	if (Action_available(action, path)) Action_run(action, path);
 }
 
 // Two or more available actions share the pressed button: list them for the
@@ -194,6 +209,7 @@ static void openEntryMenu(const Action** actions, int n) {
 		labels[i] = Action_label(actions[i]);
 	}
 	Entry* entry = total > 0 ? state.top->entries->items[state.top->selected] : NULL;
+	snprintf(menu_path, sizeof(menu_path), "%s", entry ? entry->path : "");
 	Modal_choose(entry ? entry->name : "", labels, menu_count, 0, menuPicked, NULL);
 }
 
@@ -231,7 +247,24 @@ static int nameHidden(int i) {
 	return state.top->names_hidden && state.top->names_hidden[i];
 }
 
+// The selected entry's path while the game list shows, for actions that
+// take one.
+static const char* selectedPath(void) {
+	if (currentScreen!=SCREEN_GAMELIST || !state.top || state.top->entries->count==0) return NULL;
+	Entry* entry = state.top->entries->items[state.top->selected];
+	return entry->path;
+}
+
+int GameList_ownBindings(const Binding** out, int max) {
+	int n = 0;
+	for (int i = 0; i < BINDING_COUNT; i++) if (n < max) out[n++] = &bindings[i];
+	for (int i = 0; i < LETTER_BINDINGS; i++) if (n < max) out[n++] = &letterBindings[i];
+	for (int i = 0; i < SCREEN_BINDINGS; i++) if (n < max) out[n++] = &screenBindings[i];
+	return SCREEN_BINDINGS + BINDING_COUNT + LETTER_BINDINGS;
+}
+
 void GameList_registerActions(void) {
+	Actions_setSelected(selectedPath);
 	for (int i = 0; i < SCREEN_BINDINGS; i++) Actions_register(screenBindings[i].action);
 	for (int i = 0; i < BINDING_COUNT; i++) Actions_register(bindings[i].action);
 	for (int i = 0; i < LETTER_BINDINGS; i++) Actions_register(letterBindings[i].action);
@@ -511,7 +544,7 @@ void GameList_render(void) {
 		// or an override that put a plugin's action on a button
 		for (int i = 0; i < e.override_count && !extra_glyph; i++) {
 			const Binding* b = &e.overrides[i];
-			if (isOwnAction(b->action) || !Action_available(b->action)) continue;
+			if (isOwnAction(b->action) || !Action_available(b->action, Action_buttonPath(b->action))) continue;
 			extra_glyph = b->glyph;
 			extra_label = Action_label(b->action);
 		}

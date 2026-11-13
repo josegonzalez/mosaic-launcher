@@ -401,12 +401,14 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 ///////////////////////////////////////
 // the action
 
-static int canOpen(void* data) {
+static int canOpen(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return 1;
 }
 
-static void openStats(void* data) {
+static void openStats(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the activity screen");
 }
@@ -430,7 +432,7 @@ static int init(const MosaicHost* h) {
 		say("can't register the activity screen");
 		return 1;
 	}
-	if (host->register_action(ACTION_ID, "Activity", canOpen, openStats, NULL) != 0) {
+	if (host->register_action(ACTION_ID, "Activity", 0, canOpen, openStats, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 1;
 	}

@@ -33,7 +33,8 @@ static int isOn(void* data) {
 	return Simple_isOn(host->cfg_get("on", "on"));
 }
 
-static int always(void* data) {
+static int always(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return 1;
 }
@@ -78,7 +79,8 @@ static void typedPin(const char* text, void* data) {
 	else toast(tr("Wrong PIN"));
 }
 
-static void toggle(void* data) {
+static void toggle(const char* path, void* data) {
+	(void)path;
 	if (!isOn(data)) {
 		setOn(1);
 		return;
@@ -110,7 +112,7 @@ static int preLaunch(const MosaicLaunch* launch) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	if (host->register_action(TOGGLE_ID, "Simple mode", always, toggle, NULL) != 0
+	if (host->register_action(TOGGLE_ID, "Simple mode", 0, always, toggle, NULL) != 0
 			|| !MOSAIC_HOST_HAS(host, quick_tile)
 			|| host->quick_tile(TOGGLE_ID, MOSAIC_QUICK_BOTTOM, NULL, NULL, isOn) != 0) {
 		host->log(ID, "couldn't add the Simple mode tile; turn simple mode off from the Launcher pak");

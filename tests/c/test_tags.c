@@ -298,12 +298,13 @@ static void fakeReload(void) { reloads++; }
 static struct {
 	char id[32];
 	char label[64];
-	int (*available)(void*);
-	void (*run)(void*);
+	int (*available)(const char*, void*);
+	void (*run)(const char*, void*);
 	void* data;
 } actions[ACTIONS];
 static int action_count = 0;
-static int fakeRegisterAction(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeRegisterAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	for (int i = 0; i < action_count; i++) {
 		if (!strcmp(actions[i].id, id)) return -1;
 	}
@@ -452,8 +453,8 @@ static void testPlugin(void) {
 	CHECK(tile_count == 1 && !strcmp(tile_ids[0], "tags.tile.0"));
 	int tile = findAction("tags.tile.0");
 	CHECK(tile >= 0 && !strcmp(actions[tile].label, "Puzzle"));
-	CHECK(actions[tile].available(actions[tile].data));
-	actions[tile].run(actions[tile].data);
+	CHECK(actions[tile].available(NULL, actions[tile].data));
+	actions[tile].run(NULL, actions[tile].data);
 	CHECK_STR(opened, CARD "/Tags/Puzzle");
 
 	// the root's folder lists the tags with games; each lists its games on the card
@@ -479,17 +480,17 @@ static void testPlugin(void) {
 	int edit_at = findAction("tags.edit");
 	CHECK(edit_at >= 0);
 	pick(CARD "/Roms/GB", MOSAIC_ENTRY_DIR, "GB");
-	CHECK(!actions[edit_at].available(NULL));
+	CHECK(!actions[edit_at].available(NULL, NULL));
 	free(picked);
 	picked = NULL;
-	CHECK(!actions[edit_at].available(NULL));
+	CHECK(!actions[edit_at].available(NULL, NULL));
 	pick(CARD "/Roms/GB/Zelda.gb", MOSAIC_ENTRY_ROM, "Zelda");
-	CHECK(actions[edit_at].available(NULL));
-	actions[edit_at].run(NULL);
+	CHECK(actions[edit_at].available(NULL, NULL));
+	actions[edit_at].run(NULL, NULL);
 	CHECK(screen_open);
 	CHECK(strstr(logged, "checklist for /Roms/GB/Zelda.gb: 3 tags") != NULL);
 	CHECK_STR(title, "Zelda");
-	CHECK(!actions[edit_at].available(NULL)); // not again while it shows
+	CHECK(!actions[edit_at].available(NULL, NULL)); // not again while it shows
 
 	// rows: Old, Puzzle, Unused, New tag. A on Puzzle tags Zelda, and the file has it
 	CHECK(on_card[0] == 0 && on_card[1] == 1 && on_card[2] == 0);
@@ -551,16 +552,16 @@ static void testPlugin(void) {
 	// B closes, and the lists reload once for the changes
 	CHECK(press(MOSAIC_BUTTON_B) == MOSAIC_SCREEN_CLOSE);
 	CHECK(reloads == 1);
-	CHECK(actions[edit_at].available(NULL));
+	CHECK(actions[edit_at].available(NULL, NULL));
 
 	// opening and closing without a change doesn't reload
-	actions[edit_at].run(NULL);
+	actions[edit_at].run(NULL, NULL);
 	press(MOSAIC_BUTTON_B);
 	CHECK(reloads == 1);
 
 	// a disc of a multi-disc game is tagged as the game's .m3u
 	pick(CARD "/Roms/PS (PS)/FF7/Disc 1.cue", MOSAIC_ENTRY_ROM, "Disc 1");
-	actions[edit_at].run(NULL);
+	actions[edit_at].run(NULL, NULL);
 	CHECK(strstr(logged, "checklist for /Roms/PS (PS)/FF7/FF7.m3u") != NULL);
 	press(MOSAIC_BUTTON_A);
 	press(MOSAIC_BUTTON_B);
@@ -573,7 +574,7 @@ static void testPlugin(void) {
 	list = virtualDir(CARD "/Tags/Hand");
 	CHECK(list && list->count == 2 && list->items[1]->type == MOSAIC_ENTRY_PAK);
 	listFree(list);
-	CHECK(!actions[tile].available(actions[tile].data)); // Puzzle is gone
+	CHECK(!actions[tile].available(NULL, actions[tile].data)); // Puzzle is gone
 
 	// no tag with a game on the card: no root folder
 	writeFile(STORE, "Hand\nHand\t/Roms/GB/Gone.gb\n");

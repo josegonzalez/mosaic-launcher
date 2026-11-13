@@ -373,18 +373,21 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 ///////////////////////////////////////
 // the action
 
-static int canOpen(void* data) {
+static int canOpen(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return SV_any(dir);
 }
 
-static void openViewer(void* data) {
+static void openViewer(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	int rc = host->open_screen(SCREEN_ID);
 	if (rc != 0) say("couldn't open the screenshots screen");
 }
 
-static void capture(void* data) {
+static void capture(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	char path[SV_PATH_MAX];
 	if (host->save_screenshot(path, sizeof(path)) != 0) {
@@ -429,12 +432,12 @@ static int init(const MosaicHost* h) {
 		say("can't register the screenshots screen");
 		return 1;
 	}
-	if (host->register_action(ACTION_ID, "Screenshots", canOpen, openViewer, NULL) != 0) {
+	if (host->register_action(ACTION_ID, "Screenshots", 0, canOpen, openViewer, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 1;
 	}
 	if (MOSAIC_HOST_HAS(host, save_screenshot)
-			&& host->register_action(CAPTURE_ID, "Take screenshot", NULL, capture, NULL) != 0) {
+			&& host->register_action(CAPTURE_ID, "Take screenshot", 0, NULL, capture, NULL) != 0) {
 		say("couldn't register " CAPTURE_ID);
 	}
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0

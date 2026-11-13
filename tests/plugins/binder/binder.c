@@ -23,7 +23,8 @@ static void say(const char* fmt, ...) {
 	host->log(ID, message);
 }
 
-static void runGo(void* data) {
+static void runGo(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	say("go ran");
 }
@@ -35,7 +36,7 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 	int button = MOSAIC_BUTTON_FN1 + atoi(host->cfg_get("button", "3")) - 1;
-	host->register_action("binder.go", "GO", NULL, runGo, NULL);
+	host->register_action("binder.go", "GO", 0, NULL, runGo, NULL);
 	say("names %s,%s,%s", host->fn_name(MOSAIC_BUTTON_FN1), host->fn_name(MOSAIC_BUTTON_FN2),
 		host->fn_name(MOSAIC_BUTTON_FN3));
 	int rc = host->fn_bind(button, "action:binder.go");

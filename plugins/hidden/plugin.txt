@@ -4,4 +4,4 @@ api=1
 # the hidden entry set
 provides=sets.hidden
 # the game list button that hides the selected game, and unhides it in the Hidden folder
-setting.button=choice|Hide button|Y|Y,L2,R2,SELECT
+setting.button=choice|Hide button|Y|Y,L2,R2,SELECT|button:hidden.hide,button:hidden.unhide

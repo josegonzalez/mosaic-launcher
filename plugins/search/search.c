@@ -311,7 +311,7 @@ static void run(const char* text) {
 // asking
 
 static void cancelled(void) {
-	if (back_on_cancel && inFolder() && MOSAIC_HOST_HAS(host, run_action)) host->run_action("gamelist.back");
+	if (back_on_cancel && inFolder() && MOSAIC_HOST_HAS(host, run_action)) host->run_action("gamelist.back", NULL);
 	back_on_cancel = 0;
 }
 
@@ -349,20 +349,22 @@ static void ask(int from_row) {
 	host->keyboard(tr("Search"), "", typed, NULL);
 }
 
-static int canSearch(void* data) {
+static int canSearch(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return MOSAIC_HOST_HAS(host, keyboard) && MOSAIC_HOST_HAS(host, open_path);
 }
 
-static void searchAction(void* data) {
-	if (canSearch(data)) ask(0);
+static void searchAction(const char* path, void* data) {
+	(void)path;
+	if (canSearch(NULL, data)) ask(0);
 }
 
 ///////////////////////////////////////
 // hooks
 
 static void rootEntries(MosaicList* root) {
-	if (!canSearch(NULL) || !strcmp(host->cfg_get("root", "on"), "off")) return;
+	if (!canSearch(NULL, NULL) || !strcmp(host->cfg_get("root", "on"), "off")) return;
 	host->list_push(root, host->entry_new(folder_path, MOSAIC_ENTRY_DIR, tr("Search")));
 }
 
@@ -413,7 +415,7 @@ static void restore(void) {
 			|| !MOSAIC_HOST_HAS(host, select_index)) return;
 	for (int i = 0; i < 16; i++) {
 		const char* current = host->current_path();
-		if (!current || !strcmp(current, host->sdcard_path) || host->run_action("gamelist.back") != 0) break;
+		if (!current || !strcmp(current, host->sdcard_path) || host->run_action("gamelist.back", NULL) != 0) break;
 	}
 	const char* current = host->current_path();
 	if (!current || strcmp(current, host->sdcard_path) != 0) return;
@@ -447,7 +449,7 @@ static void tick(unsigned long now) {
 		if (!current) return;
 	}
 	int entered = strcmp(current, folder_path) == 0 && strcmp(last_path, folder_path) != 0;
-	int ask_now = entered && seen && !opening && canSearch(NULL);
+	int ask_now = entered && seen && !opening && canSearch(NULL, NULL);
 	if (entered) opening = 0;
 	snprintf(last_path, sizeof(last_path), "%s", current);
 	seen = 1;
@@ -475,11 +477,11 @@ static int init(const MosaicHost* h) {
 	snprintf(query, sizeof(query), "%s", host->cfg_get("query", ""));
 	SE_trim(query);
 
-	if (!canSearch(NULL)) {
+	if (!canSearch(NULL, NULL)) {
 		say("this launcher has no keyboard or can't open folders for plugins; nothing to do");
 		return 0;
 	}
-	if (host->register_action("search.open", "SEARCH", canSearch, searchAction, NULL) != 0) {
+	if (host->register_action("search.open", "SEARCH", 0, canSearch, searchAction, NULL) != 0) {
 		say("couldn't register search.open");
 		return 0;
 	}

@@ -110,7 +110,8 @@ static int stockOn(void* data) {
 	return host->stock_toggle_get(toggle->name) == 1;
 }
 
-static void flipStock(void* data) {
+static void flipStock(const char* path, void* data) {
+	(void)path;
 	const QmpToggle* toggle = data;
 	int on = !stockOn(data);
 	char message[512];
@@ -132,7 +133,8 @@ static int awakeOn(void* data) {
 	return awake;
 }
 
-static int always(void* data) {
+static int always(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return 1;
 }
@@ -147,7 +149,8 @@ static void setAwake(int on) {
 	else unlink(QMP_AWAKE_FILE);
 }
 
-static void toggleAwake(void* data) {
+static void toggleAwake(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	setAwake(!awake);
 	toast(awake ? tr("Staying awake") : tr("Sleeping as usual"));
@@ -195,7 +198,8 @@ static void findPak(void) {
 	fclose(f);
 }
 
-static int canRebootToStock(void* data) {
+static int canRebootToStock(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return pak[0] != '\0';
 }
@@ -217,7 +221,8 @@ static void rebootToStock(void* data) {
 	host->power_off(1);
 }
 
-static void askRebootToStock(void* data) {
+static void askRebootToStock(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	if (!pak[0]) return;
 	host->confirm(tr("Reboot to stock NextUI?\nTurn Launcher back on from Tools."), tr("REBOOT"), rebootToStock, NULL);
@@ -226,8 +231,8 @@ static void askRebootToStock(void* data) {
 ///////////////////////////////////////
 // hooks
 
-static void addTile(const char* id, const char* label, int (*available)(void*), void (*run)(void*), int (*is_on)(void*), void* data) {
-	if (host->register_action(id, label, available, run, data) != 0
+static void addTile(const char* id, const char* label, int (*available)(const char*, void*), void (*run)(const char*, void*), int (*is_on)(void*), void* data) {
+	if (host->register_action(id, label, 0, available, run, data) != 0
 			|| host->quick_tile(id, MOSAIC_QUICK_TOP, NULL, NULL, is_on) != 0) {
 		char message[200];
 		snprintf(message, sizeof(message), "couldn't add the %s tile", label);

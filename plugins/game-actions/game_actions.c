@@ -115,7 +115,8 @@ static int displayName(const MosaicEntry* entry, char* out, size_t size) {
 
 static char renaming[GA_PATH_LEN]; // card-relative, waiting on the keyboard
 
-static int canRename(void* data) {
+static int canRename(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	return relative(selectedPath()) != NULL;
 }
@@ -143,7 +144,8 @@ static void renamed(const char* text, void* data) {
 	reload();
 }
 
-static void rename_(void* data) {
+static void rename_(const char* path, void* data) {
+	(void)path;
 	(void)data;
 	const char* rel = relative(selectedPath());
 	if (!rel) return;
@@ -166,7 +168,8 @@ static GACard card(void) {
 	return c;
 }
 
-static int canDelete(void* data) {
+static int canDelete(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	const char* path = selectedPath();
 	if (!path) return 0;
@@ -238,7 +241,8 @@ static void deleteConfirmed(void* data) {
 	reload();
 }
 
-static void delete_(void* data) {
+static void delete_(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	const char* path = selectedPath();
 	if (!path) return;
@@ -273,7 +277,8 @@ static void freeChoices(void) {
 	choice_count = 0;
 }
 
-static int canCollect(void* data) {
+static int canCollect(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	const char* path = selectedPath();
 	char rel[GA_PATH_LEN];
@@ -326,7 +331,8 @@ static void picked(int index, void* data) {
 	addTo(name);
 }
 
-static void collect(void* data) {
+static void collect(const char* action_path, void* data) {
+	(void)action_path;
 	(void)data;
 	const char* path = selectedPath();
 	if (!path || !GA_collectionPath(host->sdcard_path, path, collecting, sizeof(collecting))) return;
@@ -368,8 +374,8 @@ static const struct {
 	{ "R2", MOSAIC_BUTTON_R2 },
 };
 
-static void add(const char* id, const char* label, int (*available)(void*), void (*run)(void*), int button) {
-	if (host->register_action(id, label, available, run, NULL) != 0
+static void add(const char* id, const char* label, int (*available)(const char*, void*), void (*run)(const char*, void*), int button) {
+	if (host->register_action(id, label, 0, available, run, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, id) != 0) {
 		char message[128];
 		snprintf(message, sizeof(message), "couldn't bind %s", id);

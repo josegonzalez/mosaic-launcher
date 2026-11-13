@@ -75,7 +75,7 @@ static void tick(unsigned long now) {
 	if (toggled || ticks < 3 || !path || strcmp(path, folder) != 0) return;
 	toggled = 1;
 	host->select_index(0);
-	say("toggle %d", host->run_action("favorites.toggle"));
+	say("toggle %d", host->run_action("favorites.toggle", NULL));
 }
 
 static int init(const MosaicHost* h) {

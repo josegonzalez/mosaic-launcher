@@ -178,7 +178,7 @@ static MosaicHost fake_host;
 static MosaicScreenHooks registered;
 static int registered_count = 0;
 static char action_id[64], tile_id[64];
-static void (*action_run)(void*);
+static void (*action_run)(const char*, void*);
 static int bound_button = -1;
 static char all_log[16384];
 static int redraws = 0, opens = 0, open_rc = 0, pin = 0, renders_ok = 0;
@@ -255,7 +255,8 @@ static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
 	return 0;
 }
 
-static int fakeAction(const char* id, const char* label, int (*available)(void*), void (*run)(void*), void* data) {
+static int fakeAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
+	(void)flags;
 	(void)data;
 	(void)available;
 	(void)label;
@@ -495,7 +496,7 @@ static void testPlugin(void) {
 	CHECK(logged("already seen"));
 	p->tick(1);
 	CHECK(opens == 0);
-	action_run(NULL);
+	action_run(NULL, NULL);
 	CHECK(opens == 1);
 	CHECK(logged("pin: set"));
 	press(MOSAIC_BUTTON_A);

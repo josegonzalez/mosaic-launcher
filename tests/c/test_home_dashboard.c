@@ -377,7 +377,8 @@ static int fakeOpenPath(const char* path, int type) {
 	return 1;
 }
 static char ran[64];
-static int fakeRunAction(const char* id) {
+static int fakeRunAction(const char* id, const char* path) {
+	(void)path;
 	snprintf(ran, sizeof(ran), "%s", id);
 	return 0;
 }

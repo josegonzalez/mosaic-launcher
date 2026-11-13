@@ -187,8 +187,8 @@ static int beforeWake(unsigned long now) {
 	return 1;
 }
 
-static int noopAvailable(void* data) { (void)data; return 1; }
-static void noopRun(void* data) { (void)data; }
+static int noopAvailable(const char* path, void* data) { (void)path; (void)data; return 1; }
+static void noopRun(const char* path, void* data) { (void)path; (void)data; }
 
 static int init(const MosaicHost* h) {
 	host = h;
@@ -212,7 +212,7 @@ static int init(const MosaicHost* h) {
 	say("hold_switch %i", host->hold_switch());
 	say("buttons MENU %i POWER %i FN1 %i FN2 %i FN3 %i", MOSAIC_BUTTON_MENU, MOSAIC_BUTTON_POWER,
 		MOSAIC_BUTTON_FN1, MOSAIC_BUTTON_FN2, MOSAIC_BUTTON_FN3);
-	host->register_action("filterer.noop", "Noop", noopAvailable, noopRun, NULL);
+	host->register_action("filterer.noop", "Noop", 0, noopAvailable, noopRun, NULL);
 	say("bind MENU %i POWER %i FN1 %i FN3 %i UP %i",
 		host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_MENU, MOSAIC_TRIGGER_PRESS, "filterer.noop"),
 		host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_POWER, MOSAIC_TRIGGER_PRESS, "filterer.noop"),
