@@ -32,7 +32,8 @@
 #                           plugins/<id>/docs/<name>.png, <id> being the file's
 #
 # A block can also change the card under $CARD before its shot, such as
-# $CARD/Collections/Favorites.txt.
+# $CARD/Collections/Favorites.txt, or export tests/screenshots/device.c's
+# variables for a device's sample values in place of this computer's.
 
 set -u
 
@@ -129,14 +130,18 @@ case "$(uname -s)" in
 	Darwin)
 		LIBRARY_VAR=DYLD_LIBRARY_PATH
 		PRELOAD_VAR=DYLD_INSERT_LIBRARIES
-		"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -undefined dynamic_lookup \
-			"$ROOT/tests/plugins/presser/presser.c" -o "$WORK/presser.so" || exit 1
+		for lib in tests/plugins/presser/presser tests/screenshots/device; do
+			"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -undefined dynamic_lookup \
+				"$ROOT/$lib.c" -o "$WORK/$(basename "$lib").so" || exit 1
+		done
 		;;
 	*)
 		LIBRARY_VAR=LD_LIBRARY_PATH
 		PRELOAD_VAR=LD_PRELOAD
-		"$CC" -shared -fPIC -std=gnu99 -Wall -Werror \
-			"$ROOT/tests/plugins/presser/presser.c" -o "$WORK/presser.so" -ldl || exit 1
+		for lib in tests/plugins/presser/presser tests/screenshots/device; do
+			"$CC" -shared -fPIC -std=gnu99 -Wall -Werror \
+				"$ROOT/$lib.c" -o "$WORK/$(basename "$lib").so" -ldl || exit 1
+		done
 		;;
 esac
 
@@ -220,7 +225,7 @@ shot() {
 	plugins_txt >"$STATE/plugins.txt"
 	# shellcheck disable=SC2086 # elf_args is split on purpose
 	(
-		export "$LIBRARY_VAR=/var/tmp/nextui/lib" "$PRELOAD_VAR=$WORK/presser.so"
+		export "$LIBRARY_VAR=/var/tmp/nextui/lib" "$PRELOAD_VAR=$WORK/presser.so:$WORK/device.so"
 		export MOSAIC_LAUNCHER_PLUGIN_PATH="$PLUGINS" USERDATA_PATH="$CARD/.userdata/desktop" \
 			SDCARD_PATH="$CARD" SYSTEM_PATH="$CARD/.system/desktop" PLATFORM=desktop \
 			MOSAIC_LAUNCHER_PAK_DIR="$ROOT/pak" MOSAIC_LAUNCHER_RUN_DIR="$WORK/run" SDL_AUDIODRIVER=dummy \
