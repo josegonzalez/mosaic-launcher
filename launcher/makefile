@@ -30,7 +30,7 @@ INCDIR = -I. -I../sdk -I$(NEXTUI)/all/common/ -I$(NEXTUI)/$(PLATFORM)/platform/ 
 MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	screens.c screen_gamelist.c screen_switcher.c screen_quickmenu.c art.c quickitems.c quicktiles.c tr.c trmodel.c rootnames.c text.c actions.c transitions.c \
 	pluginset.c pluginorder.c plugins.c toast.c awake.c power.c powerwatch.c pakhooks.c kbmodel.c modal.c \
-	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c caller.c callsite.c plugincfg.c fnbinds.c entrysets.c events.c capturemodel.c capture.c \
+	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c caller.c plugincfg.c fnbinds.c entrysets.c events.c capturemodel.c capture.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
 	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
 	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c \
@@ -70,6 +70,7 @@ PRODUCT = $(BUILD_DIR)/$(TARGET).elf
 # fallback font.
 API_C = $(BUILD_DIR)/api.c
 UISIZES = -include $(CURDIR)/fallbackttf.h -include $(CURDIR)/uisizes.h
+CALLSITE_O = $(BUILD_DIR)/callsite.o
 
 # rcheevos and libchdr, for RetroAchievements hashing; its rules mustn't
 # become the default goal
@@ -79,16 +80,23 @@ include vendor.mk
 
 .PHONY: all clean
 
-all: $(PREFIX_LOCAL)/include/msettings.h $(VENDOR_OBJECTS) $(API_C)
+all: $(PREFIX_LOCAL)/include/msettings.h $(VENDOR_OBJECTS) $(API_C) $(CALLSITE_O)
 	mkdir -p $(BUILD_DIR)
-	$(CC) $(UISIZES) $(SOURCE) $(VENDOR_OBJECTS) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+	$(CC) $(UISIZES) $(SOURCE) $(VENDOR_OBJECTS) $(CALLSITE_O) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+
+# callsite.c needs dladdr, which glibc declares only with _GNU_SOURCE set
+# ahead of every system header, and the forced includes above pull them in
+# first, so it's built on its own.
+$(CALLSITE_O): callsite.c callsite.h
+	mkdir -p $(BUILD_DIR)
+	$(CC) -c -std=gnu99 -D_GNU_SOURCE $(OPT) callsite.c -o $@
 
 $(API_C): $(NEXTUI)/all/common/api.c patches/api.c.patch
 	mkdir -p $(BUILD_DIR)
 	patch -s -o $@ $(NEXTUI)/all/common/api.c patches/api.c.patch || { rm -f $@; exit 1; }
 
 clean:
-	rm -f $(PRODUCT) $(API_C)
+	rm -f $(PRODUCT) $(API_C) $(CALLSITE_O)
 	rm -rf $(VENDOR_OBJ)
 
 # libmsettings is built from the vendored tree, the same way stock does it.
