@@ -30,7 +30,9 @@ python3 -I "$ROOT/tests/plugins/paletter/order.py" "$CARD/.system/res/palettes" 
 	|| fail "listing stock's palettes"
 default_at=$(awk '$1 == 1 && substr($0, 3) == "Default" { print NR - 1; exit }' "$order")
 case_at=$(awk 'substr($0, 3) == "Case 730" { print NR - 1; exit }' "$order")
-[ -n "$default_at" ] && [ -n "$case_at" ] || fail "the fake card has no built-in Default or no Case 730: $(cat "$order")"
+if [ -z "$default_at" ] || [ -z "$case_at" ]; then
+	fail "the fake card has no built-in Default or no Case 730: $(cat "$order")"
+fi
 
 # pal_run <name> <theme-plus config> [presser keys]: until paletter logged the list
 pal_run() {
