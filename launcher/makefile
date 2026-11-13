@@ -34,7 +34,7 @@ MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
 	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
 	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c \
-	theme.c thememodel.c fallback.c fallbackmodel.c smooth.c scalemodel.c
+	theme.c thememodel.c palettes.c fallback.c fallbackmodel.c smooth.c scalemodel.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.
@@ -47,6 +47,7 @@ SOURCE = $(MODULES) \
 	$(NEXTUI)/all/common/scaler.c \
 	$(NEXTUI)/all/common/utils.c \
 	$(NEXTUI)/all/common/config.c \
+	$(NEXTUI)/all/common/palette.c \
 	$(API_C) \
 	$(NEXTUI)/$(PLATFORM)/platform/platform.c
 

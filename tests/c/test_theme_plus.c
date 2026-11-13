@@ -1,7 +1,7 @@
-// The theme-plus plugin: its model on its own (theme.txt and palette
-// files, malformed ones too, paths that try to leave a theme's folder,
-// files on the card, the list of themes and the merge with the
-// settings, the fallback font among them), then the plugin
+// The theme-plus plugin: its model on its own (theme.txt, malformed ones
+// too, paths that try to leave a theme's folder, files on the card, the
+// list of themes with stock's palettes in the host's order and the merge
+// with the settings, the fallback font among them), then the plugin
 // against a fake host, on a card of its own under TEST_SDCARD_PATH.
 
 #define _GNU_SOURCE // dladdr, in theme_plus.c
@@ -243,32 +243,12 @@ static void testParseTheme(void) {
 	CHECK(t.colors[0] == 0x222222);
 }
 
-static void testParsePalette(void) {
-	TPPalette p;
-	CHECK(TP_parsePalette("version=1\nname=Catppuccin Mocha\ncolor1=0xCBA6F7FF\ncolor2=0x181825FF\ncolor3=0x1E1E2EFF\n"
-		"color4=0xCDD6F4FF\ncolor5=0x1E1E2EFF\ncolor6=0xA6ADC8FF\ncolor7=0x1E1E2EFF\n", "Catppuccin Mocha.txt", &p) == 0);
-	CHECK_STR(p.name, "Catppuccin Mocha");
-	CHECK(p.colors[0] == 0xCBA6F7 && p.colors[1] == 0x181825 && p.colors[6] == 0x1E1E2E);
-
-	// no name: the file's, and missing or unreadable colours are stock's
-	CHECK(TP_parsePalette("color1=0x102030\r\ncolor2=nope\nwhatever\nextra=1\n", "My_Own_Palette.TXT", &p) == 0);
-	CHECK_STR(p.name, "My Own Palette");
-	CHECK(p.colors[0] == 0x102030);
-	CHECK(p.colors[1] == TP_STOCK_COLORS[1]);
-	for (int i = 2; i < MOSAIC_THEME_COLORS; i++) CHECK(p.colors[i] == TP_STOCK_COLORS[i]);
-
-	CHECK(TP_parsePalette("version=2\nname=Future\n", "Future.txt", &p) == -1);
-	CHECK(TP_parsePalette("", "", &p) == -1);
-	CHECK(TP_parsePalette(NULL, "Empty.txt", &p) == 0);
-	CHECK_STR(p.name, "Empty");
-}
-
 static void real(const char* path, char* out) {
 	if (!realpath(path, out)) snprintf(out, PATH_MAX, "(missing %s)", path);
 }
 
-// The card: themes, bundled themes and palettes, with paths that try to
-// leave their folder.
+// The card: themes and bundled themes, with paths that try to leave
+// their folder.
 static void makeCard(void) {
 	CHECK(system("rm -rf '" CARD "'") == 0);
 	writeFile(CARD "/Themes/Night/theme.txt", "name=Night\npalette=catppuccin mocha\ncolor1=0x112233\nfont=font.ttf\n"
@@ -292,14 +272,6 @@ static void makeCard(void) {
 	CHECK(symlink("../Elsewhere/Linked", CARD "/Themes/Linked") == 0);
 	writeFile(CARD "/Bundled/nord/theme.txt", "name=Nord\ncolor1=0x88C0D0\n");
 	writeFile(CARD "/Bundled/night/theme.txt", "name=Bundled night\n");
-	writeFile(CARD "/Palettes/Mine.txt", "name=Mine\ncolor7=0x010203\n");
-	writeFile(CARD "/Palettes/Default.txt", "name=Default\ncolor1=0xAAAAAA\n");
-	writeFile(CARD "/Palettes/notes.md", "not a palette\n");
-	writeFile(CARD "/Palettes/Newer.txt", "version=2\n");
-	writeFile(CARD "/.system/res/palettes/Default.txt", "version=1\nname=Default\ncolor1=0xffffffff\n");
-	writeFile(CARD "/.system/res/palettes/Catppuccin Mocha.txt", "name=Catppuccin Mocha\ncolor1=0xCBA6F7FF\ncolor2=0x181825FF\n"
-		"color3=0x1E1E2EFF\ncolor4=0xCDD6F4FF\ncolor5=0x1E1E2EFF\ncolor6=0xA6ADC8FF\ncolor7=0x1E1E2EFF\n");
-	writeFile(CARD "/.system/res/palettes/Night.txt", "name=Night\ncolor1=0x999999\n");
 }
 
 static void testResolve(void) {
@@ -379,16 +351,30 @@ static void testResolve(void) {
 
 static TPCatalog cat;
 
+// stock's palettes as the host lists them, in Settings' order: its own,
+// then the card's, with the user's (Mine) picked in Settings
+static const TPPalette hostPalettes[] = {
+	{ "Default", { 0xFFFFFF, 0x9B2257, 0x1E2329, 0xFFFFFF, 0x000000, 0xFFFFFF, 0x000000 } },
+	{ "Catppuccin Mocha", { 0xCBA6F7, 0x181825, 0x1E1E2E, 0xCDD6F4, 0x1E1E2E, 0xA6ADC8, 0x1E1E2E } },
+	{ "Night", { 0x999999, 0x9B2257, 0x1E2329, 0xFFFFFF, 0x000000, 0xFFFFFF, 0x000000 } },
+	{ "Mine", { 0xFFFFFF, 0x9B2257, 0x1E2329, 0xFFFFFF, 0x000000, 0xFFFFFF, 0x010203 } },
+	{ "Default", { 0xAAAAAA, 0x9B2257, 0x1E2329, 0xFFFFFF, 0x000000, 0xFFFFFF, 0x000000 } },
+};
+#define HOST_PALETTES (int)(sizeof(hostPalettes) / sizeof(hostPalettes[0]))
+#define HOST_SELECTED 3
+
 static void testCatalog(void) {
-	TP_catalog(&cat, CARD "/Themes", CARD "/Bundled", CARD "/Palettes", CARD "/.system/res/palettes");
-	// the card's (by label), the plugin's, then the palettes, each once
-	static const struct { int kind; const char* id; const char* label; } want[] = {
-		{ TP_KIND_CARD, "Bare", "Bare" },
-		{ TP_KIND_CARD, "Night", "Night" },
-		{ TP_KIND_BUNDLED, "nord", "Nord" },
-		{ TP_KIND_PALETTE, "Catppuccin Mocha", "Catppuccin Mocha" },
-		{ TP_KIND_PALETTE, "Default", "Default" },
-		{ TP_KIND_PALETTE, "Mine", "Mine" },
+	TP_catalog(&cat, CARD "/Themes", CARD "/Bundled", hostPalettes, HOST_PALETTES, HOST_SELECTED);
+	// the card's (by label), the plugin's, then the palettes in Settings'
+	// order, not sorted, leaving out Night (a theme's name) and the card's
+	// Default (stock's has its name), with the user's marked
+	static const struct { int kind; const char* id; const char* label; int settings; } want[] = {
+		{ TP_KIND_CARD, "Bare", "Bare", 0 },
+		{ TP_KIND_CARD, "Night", "Night", 0 },
+		{ TP_KIND_BUNDLED, "nord", "Nord", 0 },
+		{ TP_KIND_PALETTE, "Default", "Default", 0 },
+		{ TP_KIND_PALETTE, "Catppuccin Mocha", "Catppuccin Mocha", 0 },
+		{ TP_KIND_PALETTE, "Mine", "Mine", 1 },
 	};
 	int count = (int)(sizeof(want) / sizeof(want[0]));
 	CHECK(cat.theme_count == count);
@@ -396,6 +382,7 @@ static void testCatalog(void) {
 		CHECK(cat.themes[i].kind == want[i].kind);
 		CHECK_STR(cat.themes[i].id, want[i].id);
 		CHECK_STR(cat.themes[i].label, want[i].label);
+		CHECK(cat.themes[i].settings == want[i].settings);
 	}
 	CHECK_STR(cat.themes[1].dir, CARD "/Themes/Night");
 	CHECK_STR(cat.themes[2].dir, CARD "/Bundled/nord");
@@ -412,9 +399,9 @@ static void testCatalog(void) {
 	CHECK(TP_find(&cat, "") == NULL);
 	CHECK(TP_find(&cat, NULL) == NULL);
 
-	// the user's palette comes before stock's of the same name
+	// the first in Settings' order: stock's before the card's of the same name
 	const TPPalette* p = TP_findPalette(&cat, "Default");
-	CHECK(p && p->colors[0] == 0xAAAAAA);
+	CHECK(p && p->colors[0] == 0xFFFFFF);
 	p = TP_findPalette(&cat, "catppuccin mocha");
 	CHECK(p && p->colors[0] == 0xCBA6F7);
 	// a palette shadowed in the list by a theme is still there for palette=
@@ -423,8 +410,22 @@ static void testCatalog(void) {
 	CHECK(TP_findPalette(&cat, "Newer") == NULL);
 	CHECK(TP_findPalette(&cat, NULL) == NULL);
 
-	// missing folders are empty
-	TP_catalog(&cat, CARD "/none", NULL, CARD "/none", NULL);
+	// a palette exactly named like a theme only ignoring case is listed, and
+	// the setting names each by its exact id
+	static const TPPalette upper[] = { { "NORD", { 0 } }, { "nord", { 0 } } };
+	TP_catalog(&cat, CARD "/none", CARD "/Bundled", upper, 2, -1);
+	CHECK(cat.theme_count == 3);
+	CHECK(cat.themes[1].kind == TP_KIND_BUNDLED && cat.themes[2].kind == TP_KIND_PALETTE);
+	CHECK(TP_find(&cat, "NORD") == &cat.themes[2]);
+	CHECK(TP_find(&cat, "nord") == &cat.themes[1]);
+	CHECK(cat.themes[2].settings == 0);
+
+	// no palettes from the host, a selected one past the list, missing folders
+	TP_catalog(&cat, CARD "/Themes", NULL, NULL, 0, 0);
+	CHECK(cat.palette_count == 0 && cat.theme_count == 2);
+	TP_catalog(&cat, CARD "/none", NULL, hostPalettes, 2, 7);
+	CHECK(cat.theme_count == 2 && !cat.themes[0].settings && !cat.themes[1].settings);
+	TP_catalog(&cat, CARD "/none", NULL, NULL, 0, -1);
 	CHECK(cat.theme_count == 0 && cat.palette_count == 0);
 }
 
@@ -490,7 +491,7 @@ static void testOverrides(void) {
 }
 
 static void testApply(void) {
-	TP_catalog(&cat, CARD "/Themes", CARD "/Bundled", CARD "/Palettes", CARD "/.system/res/palettes");
+	TP_catalog(&cat, CARD "/Themes", CARD "/Bundled", hostPalettes, HOST_PALETTES, HOST_SELECTED);
 	TPTheme parsed;
 	char* text = TP_readFile(CARD "/Themes/Night/theme.txt");
 	CHECK(TP_parseTheme(text, &parsed, capture, NULL) == 0);
@@ -691,6 +692,27 @@ static int fakeUiSize(int which) {
 	return 0;
 }
 
+static int paletteReads;
+
+static int fakePalettesCount(void) {
+	paletteReads++;
+	return HOST_PALETTES;
+}
+
+static int fakePaletteInfo(int index, MosaicPalette* out) {
+	if (!out || index < 0 || index >= HOST_PALETTES) return -1;
+	CHECK(out->size == sizeof(MosaicPalette));
+	memset(out, 0, sizeof(*out));
+	out->size = sizeof(*out);
+	snprintf(out->name, sizeof(out->name), "%s", hostPalettes[index].name);
+	memcpy(out->colors, hostPalettes[index].colors, sizeof(out->colors));
+	return 0;
+}
+
+static int fakePaletteSelected(void) {
+	return HOST_SELECTED;
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -706,6 +728,9 @@ static MosaicHost fake = {
 	.choose = fakeChoose,
 	.reload_lists = fakeReload,
 	.ui_size = fakeUiSize,
+	.palettes_count = fakePalettesCount,
+	.palette_info = fakePaletteInfo,
+	.palette_selected = fakePaletteSelected,
 };
 
 static MosaicTheme asked(void) {
@@ -786,16 +811,21 @@ static void testPlugin(void) {
 	CHECK(hostLogged("no theme or palette is called Nowhere, so stock's is used"));
 	CHECK(t.colors[0] == MOSAIC_THEME_UNSET);
 
-	// the picker: Stock, then every theme, on the current one; a pick saves and reloads
+	// the picker: Stock, then every theme, then the palettes in Settings'
+	// order with the user's marked, on the current one; a pick saves and reloads
 	snprintf(cfgTheme, sizeof(cfgTheme), "night");
+	int reads = paletteReads;
 	pick(NULL);
+	CHECK(paletteReads == reads + 1);
 	CHECK(chooseCount == 8);
 	CHECK_STR(chooseLabels[0], "Stock");
 	CHECK_STR(chooseLabels[1], "Bare");
 	CHECK_STR(chooseLabels[2], "Lost");
 	CHECK_STR(chooseLabels[3], "Night");
 	CHECK_STR(chooseLabels[4], "Nord");
-	CHECK_STR(chooseLabels[5], "Catppuccin Mocha");
+	CHECK_STR(chooseLabels[5], "Default");
+	CHECK_STR(chooseLabels[6], "Catppuccin Mocha");
+	CHECK_STR(chooseLabels[7], "Mine (in Settings)");
 	CHECK(chooseCursor == 3);
 	CHECK(chooseDone != NULL);
 	if (chooseDone) chooseDone(4, NULL);
@@ -810,6 +840,30 @@ static void testPlugin(void) {
 	pick(NULL);
 	CHECK(chooseCursor == 0);
 
+	// picking a palette makes it the launcher's colours; theme.txt's own win over palette=
+	if (chooseDone) chooseDone(7, NULL);
+	CHECK_STR(cfgTheme, "Mine");
+	t = asked();
+	CHECK(hostLogged("theme Mine (palette)"));
+	CHECK(t.colors[6] == 0x010203 && t.colors[0] == 0xFFFFFF && t.font[0] == '\0');
+	pick(NULL);
+	CHECK(chooseCursor == 7);
+	writeFile(CARD "/Themes/Mixed/theme.txt", "palette=Mine\ncolor7=0x445566\n");
+	snprintf(cfgTheme, sizeof(cfgTheme), "Mixed");
+	t = asked();
+	CHECK(hostLogged("theme Mixed (card, palette Mine)"));
+	CHECK(t.colors[6] == 0x445566 && t.colors[1] == 0x9B2257);
+
+	// a launcher without the palette calls lists none
+	MosaicHost noPalettes = fake;
+	noPalettes.size = offsetof(MosaicHost, palettes_count);
+	host = &noPalettes;
+	pick(NULL);
+	CHECK(chooseCount == 6);
+	CHECK_STR(chooseLabels[3], "Mixed");
+	CHECK_STR(chooseLabels[5], "Nord");
+	host = &fake;
+
 	// without the theme slot it doesn't start
 	MosaicHost old = fake;
 	old.size = offsetof(MosaicHost, ui_size);
@@ -819,7 +873,6 @@ static void testPlugin(void) {
 int main(void) {
 	testValues();
 	testParseTheme();
-	testParsePalette();
 	makeCard();
 	testResolve();
 	testCatalog();

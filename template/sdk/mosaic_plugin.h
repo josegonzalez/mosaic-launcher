@@ -419,6 +419,17 @@ typedef struct MosaicTheme {
 #define MOSAIC_THEME_HAS(theme, field) \
 	((theme)->size >= offsetof(MosaicTheme, field) + sizeof((theme)->field))
 
+// One of stock's colour palettes, for host->palette_info. The plugin sets
+// size to sizeof(MosaicPalette) before asking, and the launcher fills in
+// only the fields that fit in it, so fields are only added at the end.
+typedef struct MosaicPalette {
+	size_t size;                     // sizeof(MosaicPalette) in the plugin
+	char name[64];                   // the name stock's Settings shows: the file's name=, else its file name without .txt and with underscores as spaces
+	int colors[MOSAIC_THEME_COLORS]; // color1 to color7, each 0xRRGGBB as MosaicTheme takes them (stock's alpha dropped); a colour the file leaves out is stock's default
+	int builtin;                     // 1 for one of stock's own, in .system/res/palettes, or 0 for one in the card's Palettes
+	char path[512];                  // its file's full path
+} MosaicPalette;
+
 // The UI sizes ui_size returns, before scaling.
 enum MosaicUISize {
 	MOSAIC_UI_PILL = 1,      // a row's and a pill's height (stock's PILL_SIZE)
@@ -1332,6 +1343,26 @@ typedef struct MosaicHost {
 	// them with MOSAIC_HOST_HAS(host, draw_button).
 	int (*hint_style)(void);
 	int (*draw_button)(MosaicSurface* surface, int button, int x, int y, MosaicRect* drawn);
+	// Stock's colour palettes, read only, listed as stock's Settings lists
+	// them under Appearance's Color Palette: stock's own (.system/res/
+	// palettes) first, then the card's Palettes, each folder in the order
+	// it reads them from the card, up to the first 64, leaving out a file
+	// for a newer palette format, as Settings does. palettes_count reads
+	// them again and returns how many there are. palette_info fills out
+	// (see MosaicPalette) for the one at index in that list, read the
+	// first time it's asked when palettes_count hasn't been, and returns
+	// 0, or -1 for an index past the end or a NULL out. palette_selected
+	// returns the index in that list of the palette the user picked in
+	// Settings, the first with its name, or -1 when it's Custom: none
+	// picked, the colours edited since, or a palette that's no longer
+	// there, which Settings shows as Custom too. The launcher never applies
+	// a palette or writes stock's settings; the theme slot's owner can use
+	// one's colours in its theme (see MosaicTheme), which then shows only
+	// in the launcher. Check for them with
+	// MOSAIC_HOST_HAS(host, palette_selected).
+	int (*palettes_count)(void);
+	int (*palette_info)(int index, MosaicPalette* out);
+	int (*palette_selected)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

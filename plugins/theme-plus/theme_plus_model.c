@@ -10,10 +10,6 @@
 #include <strings.h>
 #include <sys/stat.h>
 
-const int TP_STOCK_COLORS[MOSAIC_THEME_COLORS] = {
-	0xffffff, 0x9b2257, 0x1e2329, 0xffffff, 0x000000, 0xffffff, 0x000000,
-};
-
 static void say(TPLogFn log, void* ctx, const char* format, ...) {
 	if (!log) return;
 	char line[320];
@@ -218,42 +214,6 @@ int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx) {
 	return 0;
 }
 
-static void nameFromFile(const char* file_name, char* out, size_t size) {
-	size_t len = strlen(file_name);
-	if (len > 4 && !strcasecmp(file_name + len - 4, ".txt")) len -= 4;
-	if (len >= size) len = size - 1;
-	for (size_t i = 0; i < len; i++) out[i] = file_name[i] == '_' ? ' ' : file_name[i];
-	out[len] = '\0';
-}
-
-int TP_parsePalette(const char* text, const char* file_name, TPPalette* out) {
-	memset(out, 0, sizeof(*out));
-	memcpy(out->colors, TP_STOCK_COLORS, sizeof(out->colors));
-	const char* line = text ? text : "";
-	while (*line) {
-		const char* end = strchr(line, '\n');
-		size_t len = end ? (size_t)(end - line) : strlen(line);
-		char whole[256];
-		trimmed(line, len, whole, sizeof(whole));
-		line = end ? end + 1 : line + len;
-		char* eq = strchr(whole, '=');
-		if (!eq) continue;
-		*eq = '\0';
-		const char* value = eq + 1;
-		if (!strcmp(whole, "version")) {
-			int version = 0;
-			if (TP_parseInt(value, 0, 9999, &version) == 0 && version > TP_VERSION_MAX) return -1;
-		}
-		else if (!strcmp(whole, "name")) copyText(out->name, sizeof(out->name), value);
-		else if (!strncmp(whole, "color", 5) && whole[5] >= '1' && whole[5] <= '7' && !whole[6]) {
-			int color = TP_parseColor(value);
-			if (color >= 0) out->colors[whole[5] - '1'] = color;
-		}
-	}
-	if (!out->name[0]) nameFromFile(file_name ? file_name : "", out->name, sizeof(out->name));
-	return out->name[0] ? 0 : -1;
-}
-
 char* TP_readFile(const char* path) {
 	struct stat st;
 	if (!path || stat(path, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > TP_FILE_MAX) return NULL;
@@ -332,25 +292,29 @@ static int compareEntries(const void* a, const void* b) {
 	return order ? order : strcmp(x->id, y->id);
 }
 
-static int listed(const TPCatalog* catalog, const char* id) {
+// 1 when id is "stock" or an earlier entry's, which the setting would
+// name instead: ignoring case for a theme's folder, exactly for a palette,
+// as TP_find looks for an exact id before one ignoring case
+static int listed(const TPCatalog* catalog, const char* id, int exact) {
 	if (!strcasecmp(id, "stock")) return 1;
 	for (int i = 0; i < catalog->theme_count; i++) {
-		if (!strcasecmp(catalog->themes[i].id, id)) return 1;
+		if (exact ? !strcmp(catalog->themes[i].id, id) : !strcasecmp(catalog->themes[i].id, id)) return 1;
 	}
 	return 0;
 }
 
-static void addEntry(TPCatalog* catalog, int kind, const char* id, const char* label, const char* dir) {
-	if (listed(catalog, id)) return;
+static TPEntry* addEntry(TPCatalog* catalog, int kind, const char* id, const char* label, const char* dir) {
+	if (listed(catalog, id, kind == TP_KIND_PALETTE)) return NULL;
 	if (catalog->theme_count >= TP_THEMES_MAX) {
 		catalog->dropped++;
-		return;
+		return NULL;
 	}
 	TPEntry* entry = &catalog->themes[catalog->theme_count++];
 	entry->kind = kind;
 	copyText(entry->id, sizeof(entry->id), id);
 	copyText(entry->label, sizeof(entry->label), label && label[0] ? label : id);
 	copyText(entry->dir, sizeof(entry->dir), dir ? dir : "");
+	return entry;
 }
 
 static void scanThemes(TPCatalog* catalog, const char* dir_path, int kind) {
@@ -377,42 +341,20 @@ static void scanThemes(TPCatalog* catalog, const char* dir_path, int kind) {
 	qsort(catalog->themes + first, (size_t)(catalog->theme_count - first), sizeof(TPEntry), compareEntries);
 }
 
-static void scanPalettes(TPCatalog* catalog, const char* dir_path) {
-	DIR* dir = dir_path ? opendir(dir_path) : NULL;
-	if (!dir) return;
-	struct dirent* ent;
-	while ((ent = readdir(dir)) != NULL) {
-		size_t len = strlen(ent->d_name);
-		if (ent->d_name[0] == '.' || len < 5 || strcasecmp(ent->d_name + len - 4, ".txt")) continue;
-		char file[TP_PATH_MAX];
-		if ((size_t)snprintf(file, sizeof(file), "%s/%s", dir_path, ent->d_name) >= sizeof(file)) continue;
-		char* text = TP_readFile(file);
-		if (!text) continue;
-		TPPalette palette;
-		int ok = TP_parsePalette(text, ent->d_name, &palette) == 0;
-		free(text);
-		if (!ok) continue;
+void TP_catalog(TPCatalog* catalog, const char* themes_dir, const char* bundled_dir,
+		const TPPalette* palettes, int palette_count, int selected) {
+	memset(catalog, 0, sizeof(*catalog));
+	scanThemes(catalog, themes_dir, TP_KIND_CARD);
+	scanThemes(catalog, bundled_dir, TP_KIND_BUNDLED);
+	for (int i = 0; palettes && i < palette_count; i++) {
 		if (catalog->palette_count >= TP_PALETTES_MAX) {
 			catalog->dropped++;
 			continue;
 		}
-		catalog->palettes[catalog->palette_count++] = palette;
+		catalog->palettes[catalog->palette_count++] = palettes[i];
+		TPEntry* entry = addEntry(catalog, TP_KIND_PALETTE, palettes[i].name, palettes[i].name, NULL);
+		if (entry && i == selected) entry->settings = 1;
 	}
-	closedir(dir);
-}
-
-void TP_catalog(TPCatalog* catalog, const char* themes_dir, const char* bundled_dir,
-		const char* user_palettes, const char* builtin_palettes) {
-	memset(catalog, 0, sizeof(*catalog));
-	scanThemes(catalog, themes_dir, TP_KIND_CARD);
-	scanThemes(catalog, bundled_dir, TP_KIND_BUNDLED);
-	scanPalettes(catalog, user_palettes);
-	scanPalettes(catalog, builtin_palettes);
-	int first = catalog->theme_count;
-	for (int i = 0; i < catalog->palette_count; i++) {
-		addEntry(catalog, TP_KIND_PALETTE, catalog->palettes[i].name, catalog->palettes[i].name, NULL);
-	}
-	qsort(catalog->themes + first, (size_t)(catalog->theme_count - first), sizeof(TPEntry), compareEntries);
 }
 
 const TPEntry* TP_find(const TPCatalog* catalog, const char* id) {

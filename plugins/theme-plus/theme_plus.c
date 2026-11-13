@@ -1,18 +1,19 @@
 // Theme plus: owns the theme slot. The theme setting names a theme: a
 // folder <sd>/Themes/<name>/ with a theme.txt (and its own font and
 // wallpapers if it likes), one of the folders this plugin ships in its
-// themes/, or one of stock's palettes as a colours-only theme. "stock"
-// changes nothing. The background, text_size, contrast, ui_size, margins
+// themes/, or one of stock's palettes as a colours-only theme, which the
+// host lists as stock's Settings does. "stock" changes nothing. The background, text_size, contrast, ui_size, margins
 // and fallback_font settings override the theme's values, over stock's
 // too.
 //
 // The theme-plus.pick action lists them with choose, from a Theme tile on
 // the quick menu (the "tile" setting) or a game list button (the "button"
-// setting); picking one saves the setting and reloads the lists, which
-// asks for the theme again, so it shows at once.
+// setting), the palette the user picked in Settings marked; picking one
+// saves the setting and reloads the lists, which asks for the theme
+// again, so it shows at once. Stock's settings are never written.
 //
-// The model (theme.txt and palette files, paths, the list, the merge) is
-// in theme_plus_model.c.
+// The model (theme.txt, paths, the list, the merge) is in
+// theme_plus_model.c.
 
 #define _GNU_SOURCE // dladdr
 #include <dlfcn.h>
@@ -32,6 +33,7 @@ static const MosaicHost* host;
 static TPCatalog catalog;
 static char bundledDir[TP_PATH_MAX];
 static char pickIds[CHOICES_MAX][TP_NAME_MAX];
+static char pickLabels[CHOICES_MAX][TP_NAME_MAX + 32];
 
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
@@ -68,12 +70,26 @@ static void findBundled(void) {
 	if ((size_t)snprintf(bundledDir, sizeof(bundledDir), "%s/themes", path) >= sizeof(bundledDir)) bundledDir[0] = '\0';
 }
 
+// stock's palettes, as the host lists them
+static TPPalette palettes[TP_PALETTES_MAX];
+
 static void loadCatalog(void) {
-	char themes[TP_PATH_MAX], user[TP_PATH_MAX], builtin[TP_PATH_MAX];
+	char themes[TP_PATH_MAX];
 	snprintf(themes, sizeof(themes), "%s/Themes", host->sdcard_path);
-	snprintf(user, sizeof(user), "%s/Palettes", host->sdcard_path);
-	snprintf(builtin, sizeof(builtin), "%s/.system/res/palettes", host->sdcard_path);
-	TP_catalog(&catalog, themes, bundledDir[0] ? bundledDir : NULL, user, builtin);
+	int count = 0;
+	int selected = -1;
+	if (MOSAIC_HOST_HAS(host, palette_selected)) {
+		int listed = host->palettes_count();
+		for (int i = 0; i < listed && count < TP_PALETTES_MAX; i++) {
+			MosaicPalette p = {.size = sizeof(p)};
+			if (host->palette_info(i, &p) != 0) break;
+			snprintf(palettes[count].name, sizeof(palettes[count].name), "%s", p.name);
+			memcpy(palettes[count].colors, p.colors, sizeof(palettes[count].colors));
+			count++;
+		}
+		selected = host->palette_selected();
+	}
+	TP_catalog(&catalog, themes, bundledDir[0] ? bundledDir : NULL, palettes, count, selected);
 	if (catalog.dropped) say("%d themes or palettes past the first %d are left out", catalog.dropped, TP_THEMES_MAX);
 }
 
@@ -145,7 +161,14 @@ static void pick(void* data) {
 	for (int i = 0; i < catalog.theme_count && count < CHOICES_MAX; i++) {
 		if (&catalog.themes[i] == selected) cursor = count;
 		snprintf(pickIds[count], TP_NAME_MAX, "%s", catalog.themes[i].id);
-		labels[count++] = catalog.themes[i].label;
+		if (catalog.themes[i].settings) {
+			// the user's palette from stock's Settings, marked as Settings shows it
+			snprintf(pickLabels[count], sizeof(pickLabels[count]), tr("%s (in Settings)"), catalog.themes[i].label);
+		} else {
+			snprintf(pickLabels[count], sizeof(pickLabels[count]), "%s", catalog.themes[i].label);
+		}
+		labels[count] = pickLabels[count];
+		count++;
 	}
 	if (catalog.theme_count >= CHOICES_MAX) say("only the first %d themes are listed", CHOICES_MAX - 1);
 	if (host->choose(tr("Theme"), labels, count, cursor, picked, NULL) != 0) say("couldn't list the themes");

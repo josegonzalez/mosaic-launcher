@@ -26,6 +26,7 @@
 #include "fnbinds.h"
 #include "capture.h"
 #include "hintmodel.h"
+#include "palettes.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -1299,6 +1300,9 @@ static const MosaicHost host = {
 	.save_screenshot = hostSaveScreenshot,
 	.hint_style = Theme_hintStyle,
 	.draw_button = hostDrawButton,
+	.palettes_count = Palettes_count,
+	.palette_info = Palettes_info,
+	.palette_selected = Palettes_selected,
 };
 
 ///////////////////////////////////////

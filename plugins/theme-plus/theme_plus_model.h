@@ -1,20 +1,20 @@
 #ifndef THEME_PLUS_MODEL_H
 #define THEME_PLUS_MODEL_H
 
-// The SDL-free half of theme-plus: theme.txt and stock's palette files,
-// paths that must stay inside a theme's folder, the list of themes on the
-// card, in the plugin and from stock's palettes, and the settings that
-// override a theme's values, merged into a MosaicTheme.
+// The SDL-free half of theme-plus: theme.txt, paths that must stay inside
+// a theme's folder, the list of themes on the card, in the plugin and from
+// stock's palettes (which the host lists), and the settings that override
+// a theme's values, merged into a MosaicTheme.
 
 #include <stddef.h>
 #include "mosaic_plugin.h"
 
 #define TP_NAME_MAX 64
 #define TP_PATH_MAX 512
-#define TP_FILE_MAX 16384 // theme.txt and palette files are read up to this many bytes
+#define TP_FILE_MAX 16384 // theme.txt is read up to this many bytes
 #define TP_THEMES_MAX 128
-#define TP_PALETTES_MAX 128
-#define TP_VERSION_MAX 1 // the theme.txt and palette format versions this understands
+#define TP_PALETTES_MAX 64 // as many as stock's Settings lists
+#define TP_VERSION_MAX 1 // the theme.txt format version this understands
 #define TP_STEP_UNSET -100
 
 // Logs one line about a file being read, for host->log.
@@ -38,14 +38,11 @@ typedef struct TPTheme {
 	int hint_style;               // an enum MosaicHintStyle, or MOSAIC_HINT_STYLE_USER
 } TPTheme;
 
-// A palette file in stock's format.
+// One of stock's palettes, from host->palette_info.
 typedef struct TPPalette {
 	char name[TP_NAME_MAX];
-	int colors[MOSAIC_THEME_COLORS]; // each 0xRRGGBB; ones the file leaves out are stock's defaults
+	int colors[MOSAIC_THEME_COLORS]; // each 0xRRGGBB
 } TPPalette;
-
-// Stock's default colours, which a palette file's missing colours get.
-extern const int TP_STOCK_COLORS[MOSAIC_THEME_COLORS];
 
 // A colour as stock's palettes write it: 0xRRGGBB or 0xRRGGBBAA (the 0x,
 // or a #, optional), with nothing else on the line. The alpha is dropped.
@@ -76,13 +73,6 @@ int TP_relativePathOk(const char* path);
 // theme isn't used.
 int TP_parseTheme(const char* text, TPTheme* out, TPLogFn log, void* ctx);
 
-// Parses a palette file's text the way stock reads it: version=, name=
-// and color1= to color7=, other lines ignored. A missing name comes from
-// file_name (without .txt, underscores as spaces), and a colour left out
-// or unreadable is stock's default. Returns 0, or -1 for a version newer
-// than TP_VERSION_MAX, which stock skips too.
-int TP_parsePalette(const char* text, const char* file_name, TPPalette* out);
-
 // Reads a regular file of at most TP_FILE_MAX bytes into a new string.
 // Returns NULL when it's missing, isn't a regular file or is too big.
 char* TP_readFile(const char* path);
@@ -111,32 +101,34 @@ typedef struct TPEntry {
 	char id[TP_NAME_MAX];    // what the setting holds: the folder's name, or the palette's
 	char label[TP_NAME_MAX]; // what the picker shows: the theme's name=, or the id
 	char dir[TP_PATH_MAX];   // the folder, for a card or bundled theme
+	int settings;            // 1 for the palette the user picked in stock's Settings
 } TPEntry;
 
 typedef struct TPCatalog {
 	TPEntry themes[TP_THEMES_MAX];
 	int theme_count;
-	TPPalette palettes[TP_PALETTES_MAX]; // every palette, for palette=
+	TPPalette palettes[TP_PALETTES_MAX]; // every palette, in Settings' order, for palette=
 	int palette_count;
 	int dropped; // themes or palettes past the caps
 } TPCatalog;
 
 // Lists the themes: folders in themes_dir (<sd>/Themes) then bundled_dir
 // (or NULL), each a real folder (not a symlink, not starting with .) with
-// a theme.txt, then the palettes in user_palettes (<sd>/Palettes) then
-// builtin_palettes (<sd>/.system/res/palettes). Each group is sorted by
-// label, and one whose id matches an earlier one's (ignoring case) isn't
-// listed, so the card's themes come first, then the plugin's, then the
-// palettes. "stock" is never an id.
+// a theme.txt, each group sorted by label, then palette_count palettes,
+// stock's as host->palette_info lists them, in that order, with selected
+// (host->palette_selected, or -1) marked. A theme whose id matches an
+// earlier one's ignoring case isn't listed, and a palette whose name is
+// exactly an earlier entry's isn't either, since the setting would name
+// that one; "stock" is never an id.
 void TP_catalog(TPCatalog* catalog, const char* themes_dir, const char* bundled_dir,
-	const char* user_palettes, const char* builtin_palettes);
+	const TPPalette* palettes, int palette_count, int selected);
 
 // The listed theme a setting names: the id exactly, else ignoring case,
 // or NULL.
 const TPEntry* TP_find(const TPCatalog* catalog, const char* id);
 
-// The palette named name (exactly, else ignoring case), user palettes
-// before stock's own, or NULL.
+// The first palette, in Settings' order, named name exactly, else the
+// first ignoring case, or NULL.
 const TPPalette* TP_findPalette(const TPCatalog* catalog, const char* name);
 
 // The settings that override a theme: each "theme" (or missing) to keep

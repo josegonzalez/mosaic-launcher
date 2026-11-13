@@ -35,13 +35,14 @@
 # results back, one that translates the launcher's strings, one that
 # supplies the theme and reads it back, one that supplies fallback fonts
 # and reads its text back, one that captures and saves the screen, one
-# that picks the hint style and draws single buttons, and one that crashes
+# that picks the hint style and draws single buttons, one that lists
+# stock's palettes and reads the theme colours back, and one that crashes
 # during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
 # time limit's protected settings and scrolls a long one, reads back those
 # hints, and drives the
-# bundled home dashboard's tabs and modes and the bundled tags plugin's
-# checklist. It also checks the status pill shell
+# bundled home dashboard's tabs and modes, the bundled tags plugin's
+# checklist and the bundled theme plus's theme picker. It also checks the status pill shell
 # paks' status files show.
 #
 # Each case waits up to PLUGIN_TEST_SECONDS (10 by default) for the log
