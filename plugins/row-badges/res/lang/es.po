@@ -17,3 +17,9 @@ msgstr "Puntos de nivel"
 
 msgid "Unplayed dot"
 msgstr "Punto de sin jugar"
+
+msgid "Favorite mark"
+msgstr "Marca de favorito"
+
+msgid "Tag mark"
+msgstr "Marca de etiqueta"

@@ -9,7 +9,12 @@
 // has "min" games.
 //
 // Y on a collection dismisses it; the plugin remembers dismissed ones in
-// its .cfg. Y on the Smart Collections folder brings them all back.
+// its .cfg. Y on the Smart Collections folder brings them all back. While
+// the tags plugin offers tags.copy, Y on a collection opens a menu of
+// Dismiss and Save as tag instead (the launcher's menu for two actions on
+// one button); Save as tag names a new tag on the keyboard, starting from
+// the collection's name, and tags.copy puts it on the collection's games
+// once: the tag doesn't follow the collection afterwards.
 //
 // Other plugins read each collection as the entry set smart:<name> (see
 // set_register), by full path, registered for every franchise as the
@@ -275,6 +280,62 @@ static void restore(const char* path, void* data) {
 }
 
 ///////////////////////////////////////
+// saving as a tag
+
+// The collection waiting on the keyboard.
+static char saving[SM_NAME_LEN];
+
+static void saveTyped(const char* text, void* data) {
+	(void)data;
+	if (!text || !saving[0]) return; // cancelled
+	char args[SM_NAME_LEN * 4 + 32], reply[MOSAIC_CALL_MAX], value[SM_NAME_LEN * 2];
+	snprintf(args, sizeof(args), "tag=%s\nset=smart:%s", text, saving);
+	int rc = host->call("tags.copy", args, reply, sizeof(reply));
+	char message[SM_NAME_LEN * 2 + 256];
+	if (rc < 0) {
+		snprintf(message, sizeof(message), "couldn't save %s as a tag: %d", saving, rc);
+		say(message);
+		host->toast(tr("Couldn't save the tag"));
+		saving[0] = '\0';
+		return;
+	}
+	if (host->event_value(reply, "error", value, sizeof(value)) >= 0) {
+		snprintf(message, sizeof(message), "couldn't save %s as a tag: %s", saving, value);
+		say(message);
+		if (!strcmp(value, "exists")) snprintf(message, sizeof(message), tr("A tag named %s already exists"), text);
+		else if (!strcmp(value, "name")) snprintf(message, sizeof(message), "%s", tr("Not a tag name"));
+		else snprintf(message, sizeof(message), "%s", tr("Couldn't save the tag"));
+		host->toast(message);
+		saving[0] = '\0';
+		return;
+	}
+	char tag[SM_NAME_LEN * 2], games[16];
+	host->event_value(reply, "tag", tag, sizeof(tag));
+	host->event_value(reply, "games", games, sizeof(games));
+	int count = atoi(games);
+	snprintf(message, sizeof(message), "saved %s as the tag %s, %d games", saving, tag, count);
+	say(message);
+	snprintf(message, sizeof(message), trPlural("Saved %d game as %s", "Saved %d games as %s", (unsigned long)count), count, tag);
+	host->toast(message);
+	saving[0] = '\0';
+}
+
+static int canSave(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	if (!MOSAIC_HOST_HAS(host, call) || !MOSAIC_HOST_HAS(host, keyboard) || !MOSAIC_HOST_HAS(host, toast)
+			|| !host->has_capability("tags.copy")) return 0;
+	return canDismiss(NULL, NULL); // a collection that shows
+}
+
+static void saveAsTag(const char* path, void* data) {
+	if (!canSave(path, data)) return;
+	int i = collectionAt(host->entry_path(host->selected_entry()));
+	snprintf(saving, sizeof(saving), "%s", catalog.items[i].name);
+	host->keyboard(tr("Tag name"), saving, saveTyped, NULL);
+}
+
+///////////////////////////////////////
 // hooks
 
 // Shown while any franchise has enough games, even if all are dismissed,
@@ -376,6 +437,10 @@ static int init(const MosaicHost* h) {
 	if (host->register_action("smart-collections.restore", "RESTORE", 0, canRestore, restore, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.restore") != 0) {
 		say("couldn't bind Y; dismissed collections can't be brought back");
+	}
+	if (host->register_action("smart-collections.save_tag", "SAVE AS TAG", 0, canSave, saveAsTag, NULL) != 0
+			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.save_tag") != 0) {
+		say("couldn't bind Y; collections can't be saved as tags");
 	}
 	return 0;
 }

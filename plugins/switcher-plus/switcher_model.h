@@ -62,23 +62,30 @@ void SP_hints(int count, int can_resume, MosaicHint left[2], int* left_count, Mo
 // the recents, kept until they change
 
 typedef struct SPRecents {
-	int count;
+	int count; // the rows shown, -1 to ask again
 	char path[SP_MAX_RECENTS][SP_PATH_MAX];
+	int index[SP_MAX_RECENTS]; // each row's index in the host's recents
 	int known[SP_MAX_RECENTS]; // 1 once info is filled in, -1 when asking failed
 	MosaicRecent info[SP_MAX_RECENTS];
+	int host_count; // the host's recents as last seen, shown or not
+	char host_path[SP_MAX_RECENTS][SP_PATH_MAX];
 } SPRecents;
 
-// how SP_sync and SP_info ask the host
+// how SP_sync and SP_info ask the host, and which recents SP_sync leaves out
 typedef const char* (*SPPathFn)(int index, void* data);
 typedef int (*SPInfoFn)(int index, MosaicRecent* out, void* data);
+typedef int (*SPSkipFn)(const char* path, void* data);
 
-// Compares the recents with count recents whose paths path gives (count
-// past SP_MAX_RECENTS is cut to it). Returns 1 when they changed, forgetting
-// every recent's info, or 0 when they're the same.
-int SP_sync(SPRecents* recents, int count, SPPathFn path, void* data);
+// Compares the host's recents with count recents whose paths path gives
+// (count past SP_MAX_RECENTS is cut to it). When they changed, or count is
+// -1 in recents, it makes the rows again from them, leaving out those
+// skip, when given, returns non-zero for, asked only then, and forgets
+// every row's info; returns 1. Returns 0 when they're the same.
+int SP_sync(SPRecents* recents, int count, SPPathFn path, SPSkipFn skip, void* data);
 
-// The recent at index's info, asked of info only the first time since it
-// changed. NULL past the end, or when info failed.
+// The row at index's info, asked of info, with the row's index in the
+// host's recents, only the first time since it changed. NULL past the end,
+// or when info failed.
 const MosaicRecent* SP_info(SPRecents* recents, int index, SPInfoFn info, void* data);
 
 ///////////////////////////////////////

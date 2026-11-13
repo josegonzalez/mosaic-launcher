@@ -104,15 +104,90 @@ enum {
 // query matches nothing.
 int SE_rank(const char* folded_name, const char* folded_query);
 
+///////////////////////////////////////
+// filters
+
+// What a term of a query can ask for besides the name, each one negated
+// by a leading '-': fav: (in the favorites set), tag:<name> (in that
+// tag's set), unplayed (not played) and system:<name> (in that system).
+enum {
+	SE_FILTER_FAV,
+	SE_FILTER_TAG,
+	SE_FILTER_UNPLAYED,
+	SE_FILTER_SYSTEM,
+};
+
+#define SE_FILTERS_MAX 8
+
+typedef struct SEFilter {
+	int kind;   // an SE_FILTER_ value
+	int negate; // it had a leading '-'
+	char arg[SE_QUERY_LEN]; // tag:'s and system:'s name, as typed
+} SEFilter;
+
+// A query split into the words a name has to match and its filters.
+typedef struct SEQuery {
+	char words[SE_QUERY_LEN]; // the rest of the terms, as typed, space-separated
+	SEFilter filters[SE_FILTERS_MAX];
+	int filter_count;
+} SEQuery;
+
+// Splits a query at its spaces into filters, matched ignoring case (fav:,
+// tag:<name>, unplayed and system:<name>, each with an optional leading
+// '-'), and words, which is every other term, past SE_FILTERS_MAX
+// filters too. A tag: or system: with no name is a word.
+void SE_parse(const char* query, SEQuery* out);
+
+// Text folded as SE_fold does, with its spaces dropped too, so "tag:beatemup"
+// matches "Beat 'em Up".
+void SE_compact(const char* text, char* out, size_t size);
+
+// True when a set's name is tags:<name> for the name a tag: filter gives,
+// both compacted.
+int SE_tagMatches(const char* set_name, const char* arg);
+
+// True when path is in a system folder of roms that a system: filter's
+// name gives: the folder's tag, in its last parentheses, ignoring case
+// (gb for "Game Boy (GB)"), or the start of its name before them,
+// compacted (gameboy, or game for every "Game ..." system).
+int SE_systemMatches(const char* roms, const char* path, const char* arg);
+
+// Whether a game passes a filter, before its negation: 1 or 0.
+typedef int (*SEFilterFn)(const SEGame* game, int filter, const SEFilter* f, void* data);
+
+///////////////////////////////////////
+// searching
+
 typedef struct SEHit {
 	int game; // an index into the index's games
 	int rank;
 } SEHit;
 
-// Every game matching query, which is folded here, best first: by rank,
-// then by folded name, then by path. hits needs room for every game.
-// Returns how many matched.
-int SE_search(const SEIndex* index, const char* query, SEHit* hits);
+// Every game matching query, best first: by rank, then by folded name,
+// then by path. A game matches when its name has every word (folded here)
+// and it passes every filter as test says, negated ones failing it,
+// unplayed ones asked last as they cost the most. With filters and no
+// words every game that passes them matches, as SE_RANK_EXACT. With
+// neither, or filters and no test, nothing matches. hits needs room for
+// every game. Returns how many matched.
+int SE_search(const SEIndex* index, const SEQuery* query, SEFilterFn test, void* data, SEHit* hits);
+
+///////////////////////////////////////
+// paths a set lists
+
+// Full paths, sorted once filled, for asking a set's members quickly.
+typedef struct SEPaths {
+	char** items;
+	int count;
+	int cap;
+	int sorted;
+} SEPaths;
+
+void SE_pathsInit(SEPaths* paths);
+void SE_pathsFree(SEPaths* paths);
+// Returns 0, or -1 when out of memory.
+int SE_pathsAdd(SEPaths* paths, const char* path);
+int SE_pathsHas(SEPaths* paths, const char* path);
 
 ///////////////////////////////////////
 // the order results keep

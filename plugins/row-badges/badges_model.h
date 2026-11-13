@@ -1,6 +1,6 @@
 // Row badges, without the host: which games were played, going by the
-// files stock and minarch leave behind, the tier an .info sidecar gives,
-// and where the dots go in a row. No SDL and no file access, so it's
+// files stock and minarch leave behind, which are in other plugins' sets,
+// the tier an .info sidecar gives, and where the dots go in a row. No SDL and no file access, so it's
 // tested on the host.
 
 #ifndef BADGES_MODEL_H
@@ -32,6 +32,16 @@ int RB_setAdd(RBSet* set, const char* tag, const char* file);
 // Sorts the keys and drops repeats; call it once filled, before RB_setHas.
 void RB_setFinish(RBSet* set);
 int RB_setHas(const RBSet* set, const char* tag, const char* file);
+
+// The same set holding full paths instead, for the games in other
+// plugins' entry sets. RB_pathsAdd returns 0, or -1 when out of memory,
+// past RB_MAX_KEYS or for an empty path; call RB_setFinish once filled.
+int RB_pathsAdd(RBSet* set, const char* path);
+int RB_pathsHas(const RBSet* set, const char* path);
+// RB_pathsHas for a game: path itself, or for a folder (is_dir 1) the
+// <folder>/<folder name>.m3u or .cue inside, as a set records a game
+// folder.
+int RB_hasGame(const RBSet* set, const char* path, int is_dir);
 
 // The system tag stock files a game's saves, states and resume slots
 // under: the system folder's name (the first folder below roms) or what's
@@ -92,14 +102,17 @@ int RB_stateDir(const char* name, char* out, size_t size);
 // else, such as "", "0", "6" or "B".
 int RB_tier(const char* value);
 
-// Lays out an unplayed dot (when unplayed is 1) and tier tier dots, in
-// that order, each dot pixels square, gap apart, with twice the gap between
-// the unplayed dot and the tier dots. With a name (w above 0), they go
-// twice the gap after it, centred on it. Without one, as under a layout
-// that doesn't say, or when they don't fit after it, they go in rect's top
-// right corner, twice the gap in from both edges. Writes up to 1 + RB_MAX_TIER rects to out and returns how many,
-// or 0 when there are none or they don't fit in rect.
-int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, int unplayed, int tier,
+#define RB_MAX_MARKS 3 // one-dot marks: unplayed, favorite and tagged
+
+// Lays out marks one-dot marks (up to RB_MAX_MARKS, such as the unplayed
+// dot) and tier tier dots, in that order, each dot pixels square, gap
+// apart, with twice the gap between the marks and the tier dots. With a
+// name (w above 0), they go twice the gap after it, centred on it.
+// Without one, as under a layout that doesn't say, or when they don't fit
+// after it, they go in rect's top right corner, twice the gap in from both
+// edges. Writes up to RB_MAX_MARKS + RB_MAX_TIER rects to out and returns
+// how many, or 0 when there are none or they don't fit in rect.
+int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, int marks, int tier,
 	MosaicRect* out);
 
 #endif

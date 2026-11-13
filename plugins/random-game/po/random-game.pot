@@ -15,11 +15,49 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: random_game.c
+msgid "All games"
+msgstr ""
+
+#: random_game.c
+#, c-format
+msgid "Collection: %s"
+msgstr ""
+
+#: random_game.c
+msgid "Favorites"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: random_game.c
 msgid "No games to pick from"
+msgstr ""
+
+#: plugin.txt random_game.c
+msgid "Pick from"
+msgstr ""
+
+#: plugin.txt
+msgid "Pick from button"
+msgstr ""
+
+#: plugin.txt
+msgid "Pick from tile on the quick menu"
+msgstr ""
+
+#: random_game.c
+#, c-format
+msgid "Picking from %s"
 msgstr ""
 
 #: plugin.txt
 msgid "Prefer unplayed games"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
 msgstr ""
 
 #: random_game.c
@@ -40,4 +78,17 @@ msgstr ""
 
 #: plugin.txt
 msgid "Random tile on the quick menu"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: random_game.c
+#, c-format
+msgid "Tag: %s"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
 msgstr ""

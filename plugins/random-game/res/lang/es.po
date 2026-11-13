@@ -29,3 +29,39 @@ msgstr "Juego al azar en la raíz"
 
 msgid "Random tile on the quick menu"
 msgstr "Icono de juego al azar en el menú rápido"
+
+msgid "Favorites"
+msgstr "Favoritos"
+
+msgid "Tag: %s"
+msgstr "Etiqueta: %s"
+
+msgid "Collection: %s"
+msgstr "Colección: %s"
+
+msgid "none"
+msgstr "ninguno"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "All games"
+msgstr "Todos los juegos"
+
+msgid "Pick from"
+msgstr "Elegir de"
+
+msgid "Pick from button"
+msgstr "Botón de elegir de"
+
+msgid "Pick from tile on the quick menu"
+msgstr "Mosaico de elegir de en el menú rápido"
+
+msgid "Picking from %s"
+msgstr "Eligiendo de %s"

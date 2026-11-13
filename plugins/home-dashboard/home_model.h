@@ -1,8 +1,7 @@
 // Home dashboard, without the host: the home modes and their tabs, moving
 // through a tab, the text the dashboard shows (play time, last played,
 // RetroAchievements progress), which games are most played, which
-// folders hold Pico-8 carts, reading favorites' collection, and where
-// things go on the screen. No SDL and no file access, so it's tested on
+// folders hold Pico-8 carts, and where things go on the screen. No SDL and no file access, so it's tested on
 // the host.
 
 #ifndef HOME_MODEL_H
@@ -105,13 +104,6 @@ int HD_isPicoCart(const char* name);
 // 1 when the plugin id is loaded, as host->plugin_loaded says, or 0 on a
 // launcher without it.
 int HD_pluginLoaded(const MosaicHost* host, const char* id);
-// The collection favorites keeps its list in, from its "collection"
-// setting: the value, or "Favorites" when it's empty or has a "/".
-const char* HD_collectionName(const char* setting);
-// Reads the next line of a collection file's text from *cursor into out,
-// without its line ending, skipping blank lines. Returns 1, or 0 at the
-// end.
-int HD_nextLine(const char** cursor, char* out, size_t size);
 
 // What A does on a game: "RESUME" with a save state to resume, "PLAY" for
 // a game without one, "OPEN" for a pak.

@@ -24,5 +24,38 @@ msgstr "Modo enfoque desactivado"
 msgid "Focus mode on"
 msgstr "Modo enfoque activado"
 
-msgid "Focus on favorites"
-msgstr "Enfocar en favoritos"
+msgid "Favorites"
+msgstr "Favoritos"
+
+msgid "Tag: %s"
+msgstr "Etiqueta: %s"
+
+msgid "Collection: %s"
+msgstr "Colección: %s"
+
+msgid "none"
+msgstr "ninguno"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Focus on"
+msgstr "Enfocar en"
+
+msgid "Focus on button"
+msgstr "Botón de enfocar en"
+
+msgid "Focus on tile on the quick menu"
+msgstr "Mosaico de enfocar en en el menú rápido"
+
+msgid "Focusing on %s"
+msgstr "Enfocando en %s"
+
+msgid "No sets to focus on"
+msgstr "No hay conjuntos en los que enfocar"

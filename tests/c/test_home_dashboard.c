@@ -6,6 +6,7 @@
 #include <time.h>
 #include "check.h"
 #include "fakeloaded.h"
+#include "fakesets.h"
 #include "words.h"
 #include "../../plugins/home-dashboard/home_dashboard.c"
 
@@ -240,25 +241,6 @@ static void testFavorites(void) {
 	h.size = FAKE_HOST_BEFORE_LOADED;
 	CHECK(!HD_pluginLoaded(&h, "favorites"));
 	fake_loaded = "";
-
-	CHECK_STR(HD_collectionName("Faves"), "Faves");
-	CHECK_STR(HD_collectionName(""), "Favorites");
-	CHECK_STR(HD_collectionName("a/b"), "Favorites");
-	CHECK_STR(HD_collectionName(NULL), "Favorites");
-
-	const char* text = "/Roms/GB/Tetris.gb\r\n\n/Roms/GBA/Metroid.gba\n/Tools/x.pak";
-	const char* cursor = text;
-	char line[64];
-	CHECK(HD_nextLine(&cursor, line, sizeof(line)));
-	CHECK_STR(line, "/Roms/GB/Tetris.gb");
-	CHECK(HD_nextLine(&cursor, line, sizeof(line)));
-	CHECK_STR(line, "/Roms/GBA/Metroid.gba");
-	CHECK(HD_nextLine(&cursor, line, sizeof(line)));
-	CHECK_STR(line, "/Tools/x.pak");
-	CHECK(!HD_nextLine(&cursor, line, sizeof(line)));
-	CHECK(!HD_nextLine(&cursor, line, sizeof(line)));
-	cursor = "\n\r\n";
-	CHECK(!HD_nextLine(&cursor, line, sizeof(line)));
 }
 
 static void testLayout(void) {
@@ -352,6 +334,30 @@ static const char* recent_paths[] = {
 	TEST_SDCARD_PATH "/Tools/desktop/Clock.pak",
 };
 static int recent_total = 3;
+
+// favorites, and what is_filtered hides
+static const char* fav_paths[] = {
+	TEST_SDCARD_PATH "/Roms/GB/Tetris.gb",
+	TEST_SDCARD_PATH "/Roms/GB/Gone.gb",
+	TEST_SDCARD_PATH "/Roms/NES/Zelda.nes",
+};
+static void favList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	for (int i = 0; i < 3; i++) add(fav_paths[i], ctx);
+}
+static int noHas(const char* name, const char* path) {
+	(void)name;
+	(void)path;
+	return 0;
+}
+static int fakeSetListCall(const char* name, void (*each)(const char*, void*), void* data) {
+	int i = fakeSetFind(name);
+	if (i < 0) return -1;
+	if (each) fake_set_list[i](name, each, data);
+	return 0;
+}
+static const char* hidden_path = "";
+static int fakeFiltered(const char* path) { return hidden_path[0] && !strcmp(path, hidden_path); }
 static int fakeRecentsCount(void) { return recent_total; }
 static const char* fakeRecentPath(int i) { return i >= 0 && i < recent_total ? recent_paths[i] : NULL; }
 static int fakeRecentInfo(int i, MosaicRecent* out) {
@@ -422,6 +428,8 @@ static MosaicHost fake = {
 	.recent_info = fakeRecentInfo,
 	.recent_open = fakeRecentOpen,
 	.draw_hints = fakeDrawHints,
+	.set_list = fakeSetListCall,
+	.is_filtered = fakeFiltered,
 };
 
 static void writeFile(const char* path, const char* text) {
@@ -461,7 +469,8 @@ static void reset(const char* m) {
 
 static void testPlugin(void) {
 	fake_loaded = "favorites,home-dashboard";
-	writeFile(TEST_SDCARD_PATH "/Collections/Favorites.txt", "/Roms/GB/Tetris.gb\n/Roms/GB/Gone.gb\n/Roms/NES/Zelda.nes\n");
+	fake_set_count = 0;
+	fakeSetRegister("favorites", noHas, favList);
 	writeFile(TEST_SDCARD_PATH "/Roms/GB/Tetris.gb", "");
 	writeFile(TEST_SDCARD_PATH "/Roms/NES/Zelda.nes", "");
 	writeFile(TEST_SDCARD_PATH "/Roms/Pico-8 (P8)/celeste.p8.png", "");
@@ -513,6 +522,16 @@ static void testPlugin(void) {
 	press(MOSAIC_BUTTON_L1);
 	CHECK(tab == HD_TAB_STATS);
 
+	// what a filter hides is left out of the recents, pinned and carts
+	hidden_path = TEST_SDCARD_PATH "/Roms/NES/Zelda.nes";
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(pinned_count == 1 && !strcmp(pinned[0].name, "Tetris"));
+	hidden_path = TEST_SDCARD_PATH "/Roms/GBA/Metroid.gba";
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(recent_count == 2 && recents[1].recent == 2); // the pak, still opened by its own index
+	hidden_path = "";
+	CHECK(registered.enter(registered.data) == 0);
+
 	// without favorites loaded, no pinned tab, and stats keeps its place,
 	// even with plugins.txt turning it on (it's on but declined to start)
 	writeFile(TEST_SDCARD_PATH "/.userdata/desktop/launcher/plugins.txt", "favorites=on\nhome-dashboard=on\n");
@@ -538,6 +557,11 @@ static void testPlugin(void) {
 	CHECK(cart_count == 2);
 	CHECK_STR(carts[0].name, "Alpha");
 	CHECK_STR(carts[1].name, "celeste");
+	hidden_path = TEST_SDCARD_PATH "/Roms/Pico-8 (P8)/Alpha.p8";
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(cart_count == 1 && !strcmp(carts[0].name, "celeste"));
+	hidden_path = "";
+	CHECK(registered.enter(registered.data) == 0);
 	press(MOSAIC_BUTTON_RIGHT);
 	press(MOSAIC_BUTTON_A);
 	CHECK_STR(opened_path, TEST_SDCARD_PATH "/Roms/Pico-8 (P8)/celeste.p8.png");

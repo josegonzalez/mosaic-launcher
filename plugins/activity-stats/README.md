@@ -19,6 +19,8 @@ There are four tabs:
 - Games: every game in the history, most played first, with its time and sessions.
 - Launches: the same games with the most sessions first.
 
+Games the [`hidden`](../hidden/README.md) plugin hides, or any other plugin's filter, are left out of Games and Launches and their totals. The charts count every game.
+
 | Button | What it does |
 |---|---|
 | **L1** and **R1**, or left and right | Step through the tabs |
@@ -54,6 +56,7 @@ The Activity tile on the quick menu (Quick menu tile on, the default).
 - Reads `game_logs.sqlite`, the play tracker's database, and never writes it.
 - Registers the `activity-stats.open` action, which the `button` setting binds (it is the setting `button:activity-stats.open` names), and a quick menu tile.
 - Takes no slot and provides nothing.
+- Leaves out games `is_filtered` says a plugin's filter hides.
 
 ## Credits
 

@@ -28,6 +28,8 @@ A game is tagged as stock records it in recents: a game folder or a disc of a mu
 
 Names are trimmed, up to 63 bytes, and can't have a slash or start with a dot or `#`.
 
+A [smart collection](../smart-collections/README.md) can become a tag too, with Save as tag on it, and [`search`](../search/README.md) finds a tag's games with `tag:<name>`.
+
 ## Screenshots
 
 A game's tag checklist, with the default settings.
@@ -53,6 +55,7 @@ Each tag's tile on the quick menu.
 ## For plugin authors
 
 - Provides the `tags:<name>` entry sets (`provides=sets.tags`), with the name exactly as the tag has it. They're announced as changed (`launcher.set_changed`) each time a game is tagged or untagged with it, or it's deleted.
+- Provides the `tags.copy` service (`provides=tags.copy`), which makes a new tag from another set's games, once: the tag doesn't follow the set afterwards. Call it with `tag=<name>` and `set=<set name>`. It replies `tag=<the name as saved>` and `games=<how many>`, or `error=` with `exists` (a tag already has the name, ignoring case), `name` (not a name a tag can have), `set` (nobody registered the set), `empty` (no games in it), `full` (too many tags or games) or `save` (the file couldn't be written). smart-collections' Save as tag calls it.
 - Registers the `tags.edit` action, which the `button` setting follows.
 - The tags are in `.userdata/<platform>/launcher/tags.txt`: a tag's name on a line of its own, then a line for each of its games with the name, a tab and the game's card-relative path. It's written to a temporary file that replaces it, so a power cut leaves the old file or the new one, and read again whenever it changes. Games no longer on the card stay in the file in case the card comes back.
 

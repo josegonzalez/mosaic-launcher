@@ -6,7 +6,7 @@ Replaces the built-in game switcher with your recent games, in a choice of style
 
 It shows the recents wherever stock opens the switcher: **SELECT**, an [FN button](../../docs/glossary.md#fn-button), Settings' start screen, and coming back from a game started from it.
 
-Each recent's details are read from the card once each time it opens, and again only when the recents change. Everything is drawn around the status pill and header widgets.
+Recents the [`hidden`](../hidden/README.md) plugin hides, or any other plugin's filter, aren't shown. Each recent's details are read from the card once each time it opens, and again only when the recents change. Everything is drawn around the status pill and header widgets.
 
 ## Turn it on
 
@@ -67,6 +67,7 @@ With playtime-captions and Play time captions on: the caption under the name.
 
 - Owns the `switcher` slot (`slots=switcher`).
 - Asks the `captions.text` service of `playtime-captions` for captions.
+- Leaves out recents `is_filtered` says a plugin's filter hides, and asks again on `launcher.set_changed`.
 
 ## Credits
 

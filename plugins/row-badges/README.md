@@ -1,16 +1,18 @@
 # row-badges
 
-Adds small dots after a row's name: one for games you haven't played, and 1 to 5 dots for a tier.
+Adds small dots after a row's name: one for games you haven't played, one for your favorites, one for games with a tag, and 1 to 5 dots for a tier.
 
 The dots show on the built-in list and in a plugin layout's cells. When there's no room after the name, or the layout doesn't say where it is, the dot goes in the row's or cell's top right corner. Each dot has a thin ring in the theme's background colour, so it shows on a layout's selection or art.
 
 ## Turn it on
 
-Turn on **Row badges** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)), then turn on the dots you want. Both are off by default.
+Turn on **Row badges** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)), then turn on the dots you want. They're all off by default.
 
 ## The dots
 
 - **Unplayed dot:** a dot in the theme's accent colour on games that weren't played.
+- **Favorite mark:** a dot in the theme's secondary accent colour on your [favorites](../favorites/README.md), while that plugin is on.
+- **Tag mark:** a dot in the theme's hint colour on games with any [tag](../tags/README.md), while that plugin is on.
 - **Tier dots:** 1 to 5 dots in the theme's list text colour, for the `tier=` value in a game's or system folder's `.info` sidecar (`<folder>/.media/<name>.info`, so `Roms/.media/Game Boy (GB).info` for a system). The value is a whole number from 1 to 5.
 
 ### What counts as played
@@ -37,6 +39,14 @@ Tier dots on, with tiers in the games' .info files.
 
 ![Tier dots on, with tiers in the games' .info files](docs/tiers.png)
 
+Favorite mark on, with favorites: Libbet and µCity, favorites, are marked.
+
+![Favorite mark on, with Libbet and µCity marked](docs/favorites.png)
+
+Tag mark on, with tags: Libbet and Concentration Room, tagged Puzzle, are marked.
+
+![Tag mark on, with Libbet and Concentration Room marked](docs/tagged.png)
+
 With layout-grid: both on.
 
 ![With layout-grid: both on](docs/with-layout-grid.png)
@@ -47,12 +57,15 @@ With layout-grid: both on.
 |---|---|---|---|
 | Unplayed dot (`unplayed`) | on, off | off | A dot on games that weren't played: not in recents, with no save, state or resume slot, and no session in the play history |
 | Tier dots (`tiers`) | on, off | off | Dots for the `tier=` value, 1 to 5, in a game's or system's `.info` sidecar |
+| Favorite mark (`favorites`) | on, off | off | A dot on your favorites, from the favorites plugin |
+| Tag mark (`tagged`) | on, off | off | A dot on games with any tag, from the tags plugin |
 
-Both are `public` settings, so other plugins can read them with `cfg_read`.
+The unplayed dot and tier dots are `public` settings, so other plugins can read them with `cfg_read`.
 
 ## For plugin authors
 
 - Provides the `games.played` service (`provides=games.played`), the one definition of played. Ask for a game or game folder's `path`, whether or not the dot is on. With the dot off, the card is read for it on the first call after the start, a game's return or a list being built instead (see [plugin-api.md](../../docs/plugin-api.md)).
+- Reads the `favorites` entry set and every `tags:<name>` set (from `set_names`) for the marks while they're on, when a list is built, back from a game and on `launcher.set_changed` for one of them. A set nobody registered has nothing in it.
 - Draws through the row decorators.
 
 ## Credits

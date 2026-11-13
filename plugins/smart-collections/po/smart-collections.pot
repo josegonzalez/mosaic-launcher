@@ -37,6 +37,11 @@ msgstr ""
 
 #: smart_collections.c
 #, c-format
+msgid "A tag named %s already exists"
+msgstr ""
+
+#: smart_collections.c
+#, c-format
 msgid "Bring back %d dismissed collection?"
 msgid_plural "Bring back %d dismissed collections?"
 msgstr[0] ""
@@ -44,6 +49,10 @@ msgstr[1] ""
 
 #: plugin.txt
 msgid "Built-in franchises"
+msgstr ""
+
+#: smart_collections.c
+msgid "Couldn't save the tag"
 msgstr ""
 
 #: smart_collections.c
@@ -69,8 +78,23 @@ msgid "More franchises"
 msgstr ""
 
 #: smart_collections.c
+msgid "Not a tag name"
+msgstr ""
+
+#: smart_collections.c
 msgid "RESTORE"
 msgstr ""
+
+#: smart_collections.c
+msgid "SAVE AS TAG"
+msgstr ""
+
+#: smart_collections.c
+#, c-format
+msgid "Saved %d game as %s"
+msgid_plural "Saved %d games as %s"
+msgstr[0] ""
+msgstr[1] ""
 
 #: plugin.txt
 msgid "Smallest collection"
@@ -78,4 +102,8 @@ msgstr ""
 
 #: plugin.txt smart_collections.c
 msgid "Smart Collections"
+msgstr ""
+
+#: smart_collections.c
+msgid "Tag name"
 msgstr ""

@@ -2,7 +2,9 @@
 // setting's time, a full screen that cycles through images with a slow
 // fade or slide: recent and favorite games' box art or screenshots, the
 // card's Screenshots folder, or a folder of the user's own, with an
-// optional dim clock.
+// optional dim clock. Favorites are the favorites entry set (set_list),
+// and games a plugin's filter hides, such as the hidden plugin's, are left
+// out (is_filtered).
 //
 // It keeps its own idle time, from input_filter, which sees every button
 // on every screen: any button down, another screen showing, or the device
@@ -73,7 +75,6 @@ static int clock_mode = SS_CLOCK_OFF;
 static unsigned long interval_ms = SS_INTERVAL_DEFAULT_MS;
 static char folder[SS_PATH_MAX];
 static int favorites_on = 0, charging_on = 0;
-static char collection_path[SS_PATH_MAX];
 
 // when it opens and closes
 static SsIdle idle;
@@ -191,28 +192,32 @@ static void addGame(const char* path) {
 	}
 }
 
+static int filtered(const char* path) {
+	return MOSAIC_HOST_HAS(host, is_filtered) && host->is_filtered(path);
+}
+
+static int looked = 0; // games looked at for this pool
+
+static void addFavorite(const char* path, void* data) {
+	(void)data;
+	if (looked >= GAMES_MAX) return;
+	looked++;
+	if (!filtered(path)) addGame(path);
+}
+
+// recents, then the favorites entry set, leaving out what a plugin's
+// filter hides
 static void addGames(void) {
-	int looked = 0;
+	looked = 0;
 	int recents = host->recents_count();
 	for (int i = 0; i < recents && looked < GAMES_MAX; i++, looked++) {
 		const char* path = host->recent_path(i);
 		if (!path) break;
 		char copy[SS_PATH_MAX];
 		snprintf(copy, sizeof(copy), "%s", path);
-		addGame(copy);
+		if (!filtered(copy)) addGame(copy);
 	}
-	if (!favorites_on) return;
-	char* text = readFile(collection_path);
-	if (!text) return;
-	const char* cursor = text;
-	char line[SS_PATH_MAX];
-	while (looked < GAMES_MAX && SS_nextLine(&cursor, line, sizeof(line))) {
-		char path[SS_PATH_MAX];
-		if (snprintf(path, sizeof(path), "%s%s", host->sdcard_path, line) >= (int)sizeof(path)) continue;
-		addGame(path);
-		looked++;
-	}
-	free(text);
+	if (favorites_on && MOSAIC_HOST_HAS(host, is_filtered)) host->set_list("favorites", addFavorite, NULL);
 }
 
 static void buildPool(void) {
@@ -523,8 +528,6 @@ static int init(const MosaicHost* h) {
 	// both load before it, as its optional= asks
 	favorites_on = SS_pluginLoaded(host, "favorites");
 	charging_on = SS_pluginLoaded(host, CHARGING_ID);
-	snprintf(collection_path, sizeof(collection_path), "%s/Collections/%s.txt", host->sdcard_path,
-		SS_collectionName(publicSetting("favorites", "collection", "Favorites")));
 
 	MosaicScreenHooks hooks = {
 		.size = sizeof(hooks),

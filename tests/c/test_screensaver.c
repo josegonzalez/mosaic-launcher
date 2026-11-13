@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "check.h"
 #include "fakeloaded.h"
+#include "fakesets.h"
 #include "words.h"
 #include "../../plugins/screensaver/screensaver.c"
 
@@ -234,19 +235,6 @@ static void testPool(void) {
 		unlink(path);
 	}
 	rmdir(dir);
-
-	const char* text = "/Roms/A.gb\r\n\n/Roms/B.gb";
-	const char* cursor = text;
-	char line[64];
-	CHECK(SS_nextLine(&cursor, line, sizeof(line)));
-	CHECK_STR(line, "/Roms/A.gb");
-	CHECK(SS_nextLine(&cursor, line, sizeof(line)));
-	CHECK_STR(line, "/Roms/B.gb");
-	CHECK(!SS_nextLine(&cursor, line, sizeof(line)));
-	CHECK_STR(SS_collectionName("Mine"), "Mine");
-	CHECK_STR(SS_collectionName(""), "Favorites");
-	CHECK_STR(SS_collectionName("../x"), "Favorites");
-	CHECK_STR(SS_collectionName(NULL), "Favorites");
 }
 
 static void testCycle(void) {
@@ -699,11 +687,90 @@ static void testPlugin(void) {
 	rmdir(base);
 }
 
+// The games source: recents, then favorites, each game's box art, and
+// nothing a filter hides.
+static const char* game_recents[2];
+static int gameRecents(void) { return 2; }
+static const char* gameRecentPath(int i) { return i >= 0 && i < 2 ? game_recents[i] : NULL; }
+static struct MosaicEntry* gameEntryNew(const char* path, int type, const char* name) {
+	(void)type;
+	(void)name;
+	return (struct MosaicEntry*)strdup(path); // only art_find reads it, here
+}
+static int gameArtFind(const MosaicEntry* e, int kind, char* out, size_t size) {
+	if (kind != MOSAIC_ART_BOX) return 0;
+	snprintf(out, size, "%s.png", (const char*)e);
+	return 1;
+}
+static int gameFiltered(const char* path) { return strstr(path, "Hidden") != NULL; }
+static void gameFavorites(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add("/tmp/screensaver-games/Roms/NES/Zelda.nes", ctx);
+	add("/tmp/screensaver-games/Roms/NES/Hidden.nes", ctx);
+}
+static int gameHas(const char* name, const char* path) {
+	(void)name;
+	(void)path;
+	return 0;
+}
+static int gameSetList(const char* name, void (*each)(const char*, void*), void* data) {
+	int i = fakeSetFind(name);
+	if (i < 0) return -1;
+	if (each) fake_set_list[i](name, each, data);
+	return 0;
+}
+
+static void testGames(void) {
+	CHECK(system("mkdir -p /tmp/screensaver-games/Roms/GB /tmp/screensaver-games/Roms/NES") == 0);
+	MosaicHost h = fakeHost();
+	h.sdcard_path = "/tmp/screensaver-games";
+	h.recents_count = gameRecents;
+	h.recent_path = gameRecentPath;
+	h.entry_new = gameEntryNew;
+	h.art_find = gameArtFind;
+	h.is_filtered = gameFiltered;
+	h.set_list = gameSetList;
+	host = &h;
+	game_recents[0] = "/tmp/screensaver-games/Roms/GB/Tetris.gb";
+	game_recents[1] = "/tmp/screensaver-games/Roms/GB/Hidden.gb";
+	touch(game_recents[0]);
+	touch(game_recents[1]);
+	touch("/tmp/screensaver-games/Roms/NES/Zelda.nes");
+	touch("/tmp/screensaver-games/Roms/NES/Hidden.nes");
+	fake_set_count = 0;
+	fakeSetRegister("favorites", gameHas, gameFavorites);
+
+	source = SS_SOURCE_GAMES;
+	art = SS_ART_BOX;
+	favorites_on = 1;
+	entry_count = 0;
+	buildPool();
+	CHECK(pool.count == 2);
+	if (pool.count == 2) {
+		CHECK_STR(pool.paths[0], "/tmp/screensaver-games/Roms/GB/Tetris.gb.png");
+		CHECK_STR(pool.paths[1], "/tmp/screensaver-games/Roms/NES/Zelda.nes.png");
+	}
+	// favorites off: recents alone
+	favorites_on = 0;
+	buildPool();
+	CHECK(pool.count == 1);
+	// and with favorites on but nobody registering the set
+	favorites_on = 1;
+	fake_set_count = 0;
+	buildPool();
+	CHECK(pool.count == 1);
+	for (int i = 0; i < entry_count; i++) free(entries[i].entry);
+	entry_count = 0;
+	SS_poolClear(&pool);
+	(void)system("rm -rf /tmp/screensaver-games");
+}
+
 int main(void) {
 	testSettings();
 	testIdle();
 	testPool();
 	testCycle();
 	testPlugin();
+	testGames();
 	CHECK_DONE();
 }

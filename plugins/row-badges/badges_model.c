@@ -64,6 +64,40 @@ int RB_setHas(const RBSet* set, const char* tag, const char* file) {
 	return bsearch(&k, set->keys, (size_t)set->count, sizeof(char*), compareKeys) != NULL;
 }
 
+int RB_pathsAdd(RBSet* set, const char* path) {
+	if (!path || !path[0] || set->count >= RB_MAX_KEYS) return -1;
+	if (set->count == set->cap) {
+		int cap = set->cap ? set->cap * 2 : 64;
+		char** keys = realloc(set->keys, (size_t)cap * sizeof(char*));
+		if (!keys) return -1;
+		set->keys = keys;
+		set->cap = cap;
+	}
+	size_t n = strlen(path) + 1;
+	char* key = malloc(n);
+	if (!key) return -1;
+	memcpy(key, path, n);
+	set->keys[set->count++] = key;
+	return 0;
+}
+
+int RB_pathsHas(const RBSet* set, const char* path) {
+	if (!set->count || !path) return 0;
+	return bsearch(&path, set->keys, (size_t)set->count, sizeof(char*), compareKeys) != NULL;
+}
+
+int RB_hasGame(const RBSet* set, const char* path, int is_dir) {
+	if (RB_pathsHas(set, path)) return 1;
+	if (!is_dir || !path || !set->count) return 0;
+	const char* name = strrchr(path, '/');
+	if (!name) return 0;
+	char file[RB_PATH_MAX * 2];
+	snprintf(file, sizeof(file), "%s%s.m3u", path, name);
+	if (RB_pathsHas(set, file)) return 1;
+	snprintf(file, sizeof(file), "%s%s.cue", path, name);
+	return RB_pathsHas(set, file);
+}
+
 // The system folder's name in path below roms, and where the rest starts
 // (past its slash), or NULL for a path that isn't a file inside one.
 static const char* systemFolder(const char* roms, const char* path, char* folder, size_t size) {
@@ -226,15 +260,16 @@ int RB_tier(const char* value) {
 	return tier;
 }
 
-int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, int unplayed, int tier,
+int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, int marks, int tier,
 	MosaicRect* out) {
 	if (!rect || dot <= 0 || gap < 0) return 0;
-	unplayed = unplayed ? 1 : 0;
+	if (marks < 0) marks = 0;
+	if (marks > RB_MAX_MARKS) marks = RB_MAX_MARKS;
 	if (tier < 0) tier = 0;
 	if (tier > RB_MAX_TIER) tier = RB_MAX_TIER;
-	int count = unplayed + tier;
+	int count = marks + tier;
 	if (!count) return 0;
-	int width = count * dot + (count - 1) * gap + (unplayed && tier ? gap : 0);
+	int width = count * dot + (count - 1) * gap + (marks && tier ? gap : 0);
 	int margin = gap * 2;
 	int right = rect->x + rect->w - margin;
 	int x = name && name->w > 0 ? name->x + name->w + margin : right;
@@ -248,7 +283,7 @@ int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, i
 	if (x < rect->x || y < rect->y || y + dot > rect->y + rect->h) return 0;
 	for (int i = 0; i < count; i++) {
 		out[i] = (MosaicRect){ x, y, dot, dot };
-		x += dot + gap + (unplayed && i == 0 ? gap : 0);
+		x += dot + gap + (marks && i == marks - 1 ? gap : 0);
 	}
 	return count;
 }

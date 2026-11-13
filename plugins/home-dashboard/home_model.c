@@ -224,31 +224,6 @@ int HD_pluginLoaded(const MosaicHost* host, const char* id) {
 	return host && id && id[0] && MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded(id);
 }
 
-const char* HD_collectionName(const char* setting) {
-	if (!setting || !setting[0] || strchr(setting, '/')) return "Favorites";
-	return setting;
-}
-
-int HD_nextLine(const char** cursor, char* out, size_t size) {
-	const char* p = *cursor;
-	while (p && *p) {
-		const char* end = strchr(p, '\n');
-		if (!end) end = p + strlen(p);
-		const char* stop = end;
-		while (stop > p && stop[-1] == '\r') stop--;
-		const char* next = *end ? end + 1 : end;
-		if (stop > p) {
-			snprintf(out, size, "%.*s", (int)(stop - p), p);
-			*cursor = next;
-			return 1;
-		}
-		p = next;
-	}
-	*cursor = p;
-	if (size) out[0] = '\0';
-	return 0;
-}
-
 const char* HD_openLabel(int type, int can_resume) {
 	if (type == MOSAIC_ENTRY_PAK) return "OPEN";
 	return can_resume ? "RESUME" : "PLAY";

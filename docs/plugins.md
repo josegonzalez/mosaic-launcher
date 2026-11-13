@@ -27,7 +27,7 @@ Nothing is on until you turn it on: with no plugins on, the launcher behaves lik
 - [layout-hero-rail](../plugins/layout-hero-rail/README.md) - Shows the game list as a row of cards under big art for the selected game.
 - [layout-shelf](../plugins/layout-shelf/README.md) - Shows the game list as cartridges standing on shelves.
 - [metadata-band](../plugins/metadata-band/README.md) - Shows a game's year, publisher and genre under its art.
-- [row-badges](../plugins/row-badges/README.md) - Adds dots after a game's name for unplayed games and tiers.
+- [row-badges](../plugins/row-badges/README.md) - Adds dots after a game's name for unplayed, favorite and tagged games and for tiers.
 - [switcher-plus](../plugins/switcher-plus/README.md) - Replaces the game switcher with your recent games in a choice of styles.
 - [theme-plus](../plugins/theme-plus/README.md) - Changes colours, fonts, text size and wallpapers from a theme.
 - [transitions](../plugins/transitions/README.md) - Picks how folders open and close and how the game switcher comes in.
@@ -40,7 +40,7 @@ Nothing is on until you turn it on: with no plugins on, the launcher behaves lik
 - [collate-subfolders](../plugins/collate-subfolders/README.md) - Merges same-named folders from a system's several folders into one.
 - [collections-plus](../plugins/collections-plus/README.md) - Puts your collections on the first screen in your order, with their art.
 - [favorites](../plugins/favorites/README.md) - Adds a Favorites folder and a button to add or remove favorites.
-- [focus-mode](../plugins/focus-mode/README.md) - Makes the first screen list only your favorites.
+- [focus-mode](../plugins/focus-mode/README.md) - Makes the first screen list only your favorites, or the games in a tag or collection.
 - [game-actions](../plugins/game-actions/README.md) - Renames, deletes or adds a game to a collection from one button.
 - [genre-view](../plugins/genre-view/README.md) - Gathers the same genre from every system into one Genres folder.
 - [hidden](../plugins/hidden/README.md) - Hides the games you pick from every list.

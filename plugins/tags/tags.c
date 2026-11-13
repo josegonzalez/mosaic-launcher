@@ -19,7 +19,8 @@
 //
 // Other plugins read each tag as the entry set tags:<name> (see
 // set_register), by the full paths it records; the sets follow the tags
-// as they're added, deleted or edited in the file.
+// as they're added, deleted or edited in the file. They make a new tag
+// from another set's games with the tags.copy service.
 
 #include <stdint.h>
 #include <stdio.h>
@@ -212,6 +213,72 @@ static void tagFolder(const char* name, char* out, size_t size) {
 static void reload(void) {
 	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 	else host->request_redraw();
+}
+
+///////////////////////////////////////
+// the tags.copy service
+
+typedef struct Copying {
+	int tag;
+	int count;
+	int failed;
+} Copying;
+
+static void copyGame(const char* path, void* data) {
+	Copying* copying = data;
+	struct stat st;
+	int type = MOSAIC_ENTRY_ROM;
+	if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) type = endsWith(path, ".pak") ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_DIR;
+	char rel[TG_PATH_LEN];
+	if (!TG_gamePath(host->sdcard_path, path, type, rel, sizeof(rel))) return;
+	int set = TG_set(&store, copying->tag, rel, 1);
+	if (set < 0) copying->failed = 1;
+	else copying->count += set;
+}
+
+// tags.copy: tag=<name>, set=<set>. Puts a new tag on every game the set
+// lists now, once: the tag doesn't follow the set afterwards. Replies
+// tag=<the name as saved> and games=<how many>, or error=exists (a tag
+// has the name), name (not a tag name), set (nobody registered the set),
+// empty (no games in it), full (too many tags or games) or save.
+static int provideCopy(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char typed[TG_NAME_LEN * 2], set[TG_PATH_LEN], clean[TG_NAME_LEN];
+	if (host->event_value(args, "tag", typed, sizeof(typed)) < 0 || host->event_value(args, "set", set, sizeof(set)) <= 0) return -1;
+	refresh();
+	const char* error = NULL;
+	if (!TG_cleanName(typed, clean, sizeof(clean))) error = "name";
+	else if (TG_find(&store, clean) >= 0) error = "exists";
+	else if (host->set_list(set, NULL, NULL) < 0) error = "set";
+	if (error) {
+		snprintf(out, size, "error=%s", error);
+		return 0;
+	}
+
+	int added = 0;
+	int tag = TG_add(&store, clean, &added);
+	if (tag < 0) {
+		snprintf(out, size, "error=full");
+		return 0;
+	}
+	Copying copying = { tag, 0, 0 };
+	host->set_list(set, copyGame, &copying);
+	if (!copying.count || copying.failed) {
+		TG_load(&store, store_path);
+		snprintf(out, size, "error=%s", copying.failed ? "full" : "empty");
+		return 0;
+	}
+	if (save() != 0) {
+		snprintf(out, size, "error=save");
+		return 0;
+	}
+	announce(clean);
+	reload();
+	char message[TG_PATH_LEN + TG_NAME_LEN + 64];
+	snprintf(message, sizeof(message), "copied %i games from %s to tag %s", copying.count, set, clean);
+	say(message);
+	snprintf(out, size, "tag=%s\ngames=%i", clean, copying.count);
+	return 0;
 }
 
 ///////////////////////////////////////
@@ -637,6 +704,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't bind a button; tags.edit can still go on an FN button");
 	}
 	if (setting("tiles")) addTiles();
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("tags.copy", provideCopy) != 0) say("couldn't provide tags.copy");
 
 	char message[96];
 	snprintf(message, sizeof(message), "%i tags, %i with games, root %s", store.count, tagsOnCard(), root_on ? "on" : "off");

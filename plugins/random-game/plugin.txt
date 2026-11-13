@@ -9,3 +9,9 @@ setting.unplayed=toggle|Prefer unplayed games|on
 setting.root=toggle|Random game on the root|on
 # a Random tile on the quick menu that picks from every system
 setting.tile=toggle|Random tile on the quick menu|off
+# the games every pick comes from: all, or an entry set's name, eg. favorites, tags:RPG or smart:Mario
+setting.from=text|Pick from|all
+# a Pick from tile on the quick menu that lists All games and every set to pick from
+setting.from_tile=toggle|Pick from tile on the quick menu|off
+# a game list button that lists All games and every set to pick from
+setting.from_button=choice|Pick from button|none|none,L2,R2,SELECT|button:random-game.from

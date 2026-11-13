@@ -19,6 +19,15 @@ msgid "All systems"
 msgstr ""
 
 #: focus_mode.c
+#, c-format
+msgid "Collection: %s"
+msgstr ""
+
+#: focus_mode.c
+msgid "Favorites"
+msgstr ""
+
+#: focus_mode.c
 msgid "Focus"
 msgstr ""
 
@@ -34,6 +43,44 @@ msgstr ""
 msgid "Focus mode on"
 msgstr ""
 
+#: focus_mode.c plugin.txt
+msgid "Focus on"
+msgstr ""
+
 #: plugin.txt
-msgid "Focus on favorites"
+msgid "Focus on button"
+msgstr ""
+
+#: plugin.txt
+msgid "Focus on tile on the quick menu"
+msgstr ""
+
+#: focus_mode.c
+#, c-format
+msgid "Focusing on %s"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: focus_mode.c
+msgid "No sets to focus on"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: focus_mode.c
+#, c-format
+msgid "Tag: %s"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
 msgstr ""

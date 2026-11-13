@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include "check.h"
+#include "fakeproviders.h"
+#include "fakesets.h"
 #include "../../plugins/search/search.c"
 
 struct MosaicEntry {
@@ -104,6 +106,13 @@ static void testRank(void) {
 	CHECK(SE_rank("", "mario") == -1);
 }
 
+// SE_search for a query with no filters to pass.
+static int find(const SEIndex* index, const char* text, SEHit* hits) {
+	SEQuery query;
+	SE_parse(text, &query);
+	return SE_search(index, &query, NULL, NULL, hits);
+}
+
 static void testSearch(void) {
 	SEIndex index;
 	SE_indexInit(&index);
@@ -122,7 +131,7 @@ static void testSearch(void) {
 	CHECK(index.folder_count == 1 && index.folders[0].mtime == 7);
 
 	SEHit hits[9];
-	int count = SE_search(&index, "  MARIO ", hits);
+	int count = find(&index, "  MARIO ", hits);
 	const char* want[] = {
 		"/r/GB/Mario.gb", "/r/NES/Mario.nes",                  // the name, by path
 		"/r/SNES/Mario Kart.sfc", "/r/N64/Mario Party.z64",   // starting with it, by name
@@ -135,16 +144,16 @@ static void testSearch(void) {
 		&& hits[6].rank == SE_RANK_INSIDE);
 
 	// accents and case fold both ways
-	CHECK(SE_search(&index, "pokemon", hits) == 1);
-	CHECK(SE_search(&index, "POK\xc3\x89MON red", hits) == 1);
-	CHECK(SE_search(&index, "red pok", hits) == 1);
-	CHECK(SE_search(&index, "zelda", hits) == 1 && index.games[hits[0].game].type == MOSAIC_ENTRY_DIR);
-	CHECK(SE_search(&index, "luigi", hits) == 0);
-	CHECK(SE_search(&index, "", hits) == 0);
-	CHECK(SE_search(&index, "!?", hits) == 0);
+	CHECK(find(&index, "pokemon", hits) == 1);
+	CHECK(find(&index, "POK\xc3\x89MON red", hits) == 1);
+	CHECK(find(&index, "red pok", hits) == 1);
+	CHECK(find(&index, "zelda", hits) == 1 && index.games[hits[0].game].type == MOSAIC_ENTRY_DIR);
+	CHECK(find(&index, "luigi", hits) == 0);
+	CHECK(find(&index, "", hits) == 0);
+	CHECK(find(&index, "!?", hits) == 0);
 
 	// the order results keep
-	count = SE_search(&index, "mario", hits);
+	count = find(&index, "mario", hits);
 	SEOrder order;
 	CHECK(SE_orderBuild(&order, &index, hits, count) == 0);
 	CHECK(order.count == 7);
@@ -159,6 +168,113 @@ static void testSearch(void) {
 
 	SE_indexFree(&index);
 	CHECK(index.game_count == 0 && index.folder_count == 0 && index.games == NULL);
+}
+
+static void testParse(void) {
+	SEQuery q;
+	SE_parse("  fav: System:gb  mario -TAG:beaten land unplayed -unplayed tag: -x ", &q);
+	CHECK_STR(q.words, "mario land tag: -x");
+	CHECK(q.filter_count == 5);
+	CHECK(q.filters[0].kind == SE_FILTER_FAV && !q.filters[0].negate);
+	CHECK(q.filters[1].kind == SE_FILTER_SYSTEM && !q.filters[1].negate);
+	CHECK_STR(q.filters[1].arg, "gb");
+	CHECK(q.filters[2].kind == SE_FILTER_TAG && q.filters[2].negate);
+	CHECK_STR(q.filters[2].arg, "beaten");
+	CHECK(q.filters[3].kind == SE_FILTER_UNPLAYED && !q.filters[3].negate);
+	CHECK(q.filters[4].kind == SE_FILTER_UNPLAYED && q.filters[4].negate);
+
+	SE_parse("", &q);
+	CHECK(!q.words[0] && !q.filter_count);
+	SE_parse("- fav:x favorite", &q); // a lone '-', and fav: with more after it, are words
+	CHECK_STR(q.words, "- fav:x favorite");
+	CHECK(!q.filter_count);
+	// past SE_FILTERS_MAX filters, the rest are words
+	SE_parse("fav: fav: fav: fav: fav: fav: fav: fav: unplayed", &q);
+	CHECK(q.filter_count == SE_FILTERS_MAX);
+	CHECK_STR(q.words, "unplayed");
+
+	char out[64];
+	SE_compact("Beat 'em Up!", out, sizeof(out));
+	CHECK_STR(out, "beatemup");
+	CHECK(SE_tagMatches("tags:Beat 'em Up", "beatemup"));
+	CHECK(SE_tagMatches("tags:Beaten", "BEATEN"));
+	CHECK(!SE_tagMatches("tags:Beaten", "beat"));
+	CHECK(!SE_tagMatches("favorites", "favorites"));
+	CHECK(!SE_tagMatches("smart:Mario", "mario"));
+
+	CHECK(SE_systemMatches("/r", "/r/Game Boy (GB)/Tetris.gb", "gb"));
+	CHECK(SE_systemMatches("/r", "/r/Game Boy (GB)/Hacks/Tetris.gb", "GB"));
+	CHECK(SE_systemMatches("/r", "/r/Game Boy (GB)/Tetris.gb", "gameboy"));
+	CHECK(SE_systemMatches("/r", "/r/Game Boy (GB)/Tetris.gb", "game"));
+	CHECK(!SE_systemMatches("/r", "/r/Game Boy Color (GBC)/Tetris.gbc", "gb"));
+	CHECK(!SE_systemMatches("/r", "/r/Game Boy (GB)/Tetris.gb", "boy"));
+	CHECK(SE_systemMatches("/r", "/r/NES/Mario.nes", "nes"));
+	CHECK(!SE_systemMatches("/r", "/r/Tetris.gb", "gb"));
+	CHECK(!SE_systemMatches("/r", "/x/Game Boy (GB)/Tetris.gb", "gb"));
+	CHECK(!SE_systemMatches("/r", "/r/Game Boy (GB)/Tetris.gb", ""));
+
+	SEPaths paths;
+	SE_pathsInit(&paths);
+	CHECK(!SE_pathsHas(&paths, "/a"));
+	CHECK(SE_pathsAdd(&paths, "/c") == 0 && SE_pathsAdd(&paths, "/a") == 0);
+	CHECK(SE_pathsHas(&paths, "/a") && SE_pathsHas(&paths, "/c") && !SE_pathsHas(&paths, "/b"));
+	CHECK(SE_pathsAdd(&paths, "/b") == 0);
+	CHECK(SE_pathsHas(&paths, "/b"));
+	SE_pathsFree(&paths);
+	CHECK(paths.count == 0 && !SE_pathsHas(&paths, "/a"));
+}
+
+// Favorites are the games with "fav" in the path, and played ones "played";
+// counts how many unplayed filters were asked.
+static int unplayed_asked = 0;
+static int fakeTest(const SEGame* game, int filter, const SEFilter* f, void* data) {
+	(void)filter;
+	(void)data;
+	if (f->kind == SE_FILTER_FAV) return strstr(game->path, "fav") != NULL;
+	if (f->kind == SE_FILTER_UNPLAYED) {
+		unplayed_asked++;
+		return strstr(game->path, "played") == NULL;
+	}
+	if (f->kind == SE_FILTER_SYSTEM) return SE_systemMatches("/r", game->path, f->arg);
+	return 0;
+}
+
+static int findWith(const SEIndex* index, const char* text, SEHit* hits) {
+	SEQuery query;
+	SE_parse(text, &query);
+	return SE_search(index, &query, fakeTest, NULL, hits);
+}
+
+static void testFilters(void) {
+	SEIndex index;
+	SE_indexInit(&index);
+	SE_indexAdd(&index, "/r/Game Boy (GB)/fav Mario.gb", "Mario", MOSAIC_ENTRY_ROM);
+	SE_indexAdd(&index, "/r/Game Boy (GB)/played fav Zelda.gb", "Zelda", MOSAIC_ENTRY_ROM);
+	SE_indexAdd(&index, "/r/NES/fav Mario.nes", "Mario Bros", MOSAIC_ENTRY_ROM);
+	SE_indexAdd(&index, "/r/NES/Tetris.nes", "Tetris", MOSAIC_ENTRY_ROM);
+	SE_indexAdd(&index, "/r/Game Boy (GB)/played Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM);
+	SEHit hits[5];
+
+	CHECK(findWith(&index, "fav: system:gb mario", hits) == 1);
+	CHECK_STR(index.games[hits[0].game].path, "/r/Game Boy (GB)/fav Mario.gb");
+	CHECK(findWith(&index, "fav: mario", hits) == 2);
+	CHECK(findWith(&index, "-fav: tetris", hits) == 2);
+	CHECK(findWith(&index, "-fav: unplayed", hits) == 1);
+	CHECK_STR(index.games[hits[0].game].path, "/r/NES/Tetris.nes");
+	CHECK(findWith(&index, "-unplayed", hits) == 2);
+	// filters alone list every game passing them, by name
+	CHECK(findWith(&index, "system:gb", hits) == 3);
+	CHECK_STR(index.games[hits[0].game].path, "/r/Game Boy (GB)/fav Mario.gb");
+	CHECK_STR(index.games[hits[1].game].path, "/r/Game Boy (GB)/played Tetris.gb");
+	CHECK(hits[0].rank == SE_RANK_EXACT);
+	// unplayed is asked only of games passing the rest
+	unplayed_asked = 0;
+	CHECK(findWith(&index, "unplayed system:nes mario", hits) == 1);
+	CHECK(unplayed_asked == 1);
+	// with no way to test filters, nothing passes
+	CHECK(find(&index, "fav: mario", hits) == 0);
+	CHECK(find(&index, "mario", hits) == 2);
+	SE_indexFree(&index);
 }
 
 static void testRecents(void) {
@@ -237,7 +353,7 @@ static void testTiming(void) {
 	for (size_t q = 0; q < sizeof(queries) / sizeof(queries[0]); q++) {
 		start = now_ms();
 		int found = 0;
-		for (int r = 0; r < 10; r++) found = SE_search(&index, queries[q], hits);
+		for (int r = 0; r < 10; r++) found = find(&index, queries[q], hits);
 		double each = (now_ms() - start) / 10;
 		if (each > worst) worst = each;
 		printf("  search \"%s\": %d of %d games in %.3f ms\n", queries[q], found, n, each);
@@ -755,13 +871,160 @@ static void testPlugin(void) {
 	(void)system("rm -rf '" CARD "'");
 }
 
+///////////////////////////////////////
+// the filters against fake sets
+
+static const char* fav_paths[] = { GB "/Kirby.gb", PS "/Crash (USA)/Crash (USA).cue" };
+static const char* tag_paths[] = { GB "/Tetris (World) (Rev 1).gb" };
+
+static void listPaths(const char* const* paths, int count, void (*add)(const char*, void*), void* ctx) {
+	for (int i = 0; i < count; i++) add(paths[i], ctx);
+}
+static void favList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	listPaths(fav_paths, 2, add, ctx);
+}
+static void tagList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	listPaths(tag_paths, 1, add, ctx);
+}
+static int noHas(const char* name, const char* path) {
+	(void)name;
+	(void)path;
+	return 0;
+}
+static int fakeSetListCall(const char* name, void (*each)(const char*, void*), void* data) {
+	int i = fakeSetFind(name);
+	if (i < 0) return -1;
+	if (each) fake_set_list[i](name, each, data);
+	return 0;
+}
+
+// Tetris is the one played game.
+static int playedFn(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	snprintf(out, size, "played=%d", strstr(args, "Tetris") != NULL);
+	return 0;
+}
+
+static void (*set_changed_fn)(const char*, const char*, void*);
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	if (!strcmp(name, "launcher.set_changed")) set_changed_fn = on_event;
+	return 0;
+}
+
+static const char* recent_list[1];
+static int recent_total = 0;
+static int fakeRecentsCount(void) { return recent_total; }
+static const char* fakeRecentPath(int i) { return i >= 0 && i < recent_total ? recent_list[i] : NULL; }
+
+// The results for text, as the folder lists them.
+static MosaicList* results(const char* text) {
+	hits_valid = 0; // recents and the played games change only across launches, but here between searches
+	run(text);
+	return listSearch(&plugin);
+}
+
+static void checkCount(const char* text, int want) {
+	MosaicList* list = results(text);
+	if (list->count != want) printf("  \"%s\": %d results, want %d\n", text, list->count, want);
+	CHECK(list->count == want);
+	freeList(list);
+}
+
+static void testPluginFilters(void) {
+	makeCard();
+	cfg_count = 0;
+	fakeCfgSet("recents", "off");
+	fake.set_list = fakeSetListCall;
+	fake.set_names = fakeSetNames;
+	fake.subscribe = fakeSubscribe;
+	fake.event_value = fakeEventValue;
+	fake.call = fakeCall;
+	fake.recents_count = fakeRecentsCount;
+	fake.recent_path = fakeRecentPath;
+	fake_set_count = 0;
+	fakeSetRegister("favorites", noHas, favList);
+	fakeSetRegister("tags:Beat 'em Up", noHas, tagList);
+	fake_provider_count = 0;
+	fakeProvide("games.played", playedFn);
+	set_changed_fn = NULL;
+
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
+	CHECK(p->init(&fake) == 0);
+	CHECK(set_changed_fn != NULL);
+
+	// a game folder is in a set by its .cue
+	MosaicList* list = results("fav:");
+	CHECK(list->count == 2);
+	CHECK(indexOf(list, GB "/Kirby.gb") >= 0 && indexOf(list, PS "/Crash (USA)") >= 0);
+	freeList(list);
+	checkCount("fav: system:gb", 1);
+	checkCount("FAV: system:ps crash", 1);
+	checkCount("-fav: system:ps", 1); // Crash Bash
+	list = results("-tag:beatemup system:gb");
+	CHECK(list->count == 5 && indexOf(list, GB "/Tetris (World) (Rev 1).gb") < 0);
+	freeList(list);
+	checkCount("tag:beat", 0);
+	checkCount("tag:nothing", 0);
+	checkCount("-tag:nothing system:gb", 6);
+
+	// games.played decides unplayed
+	checkCount("-unplayed", 1);
+	checkCount("unplayed tetris", 0);
+	checkCount("unplayed system:gb", 5);
+	// without it, recents do
+	fake.call = NULL;
+	checkCount("-unplayed", 0);
+	recent_list[0] = GB "/Kirby.gb";
+	recent_total = 1;
+	checkCount("-unplayed", 1);
+	recent_list[0] = PS "/Crash (USA)/Crash (USA).cue";
+	checkCount("-unplayed system:ps", 1); // a file in a game folder plays the folder
+	recent_total = 0;
+	fake.call = fakeCall;
+
+	// a set that changes searches again, and lists the folder again while it's open
+	run("fav:");
+	snprintf(current, sizeof(current), "%s", SEARCH);
+	reloads = 0;
+	CHECK(hits_valid);
+	set_changed_fn("launcher.set_changed", "name=favorites", NULL);
+	CHECK(!hits_valid && reloads == 1);
+	set_changed_fn("launcher.set_changed", "name=favorites", NULL);
+	CHECK(reloads == 1); // nothing searched since
+	fake_set_count = 0; // favorites is off
+	fakeSetRegister("tags:Beat 'em Up", noHas, tagList);
+	checkCount("fav:", 0);
+	checkCount("-fav: system:ps", 2);
+	snprintf(current, sizeof(current), "%s", CARD);
+	p->quit();
+
+	// a launcher without sets: fav: and tag: hold nothing
+	fake.set_list = NULL;
+	fake.set_names = NULL;
+	CHECK(p->init(&fake) == 0);
+	checkCount("fav:", 0);
+	checkCount("-fav: system:ps", 2);
+	p->quit();
+	fake.subscribe = NULL;
+	fake.call = NULL;
+	fake.recents_count = NULL;
+	fake.recent_path = NULL;
+	(void)system("rm -rf '" CARD "'");
+}
+
 int main(void) {
 	testFold();
 	testNames();
 	testRank();
 	testSearch();
+	testParse();
+	testFilters();
 	testRecents();
 	testTiming();
 	testPlugin();
+	testPluginFilters();
 	CHECK_DONE();
 }

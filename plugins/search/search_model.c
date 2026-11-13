@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include "search_model.h"
 
 static int endsWith(const char* s, const char* suffix) {
@@ -317,20 +318,158 @@ static int compareHits(const void* a, const void* b) {
 	return c ? c : strcmp(p->path, q->path);
 }
 
-int SE_search(const SEIndex* index, const char* query, SEHit* hits) {
+// True when game passes every filter of kind (or every kind but it, with
+// others set).
+static int passes(const SEIndex* index, int game, const SEQuery* query, SEFilterFn test, void* data, int kind,
+		int others) {
+	for (int i = 0; i < query->filter_count; i++) {
+		const SEFilter* f = &query->filters[i];
+		if ((f->kind == kind) == (others != 0)) continue;
+		if ((test(&index->games[game], i, f, data) != 0) == (f->negate != 0)) return 0;
+	}
+	return 1;
+}
+
+int SE_search(const SEIndex* index, const SEQuery* query, SEFilterFn test, void* data, SEHit* hits) {
 	char folded[SE_QUERY_LEN * 2];
-	SE_fold(query, folded, sizeof(folded));
-	if (!folded[0]) return 0;
+	SE_fold(query->words, folded, sizeof(folded));
+	if (!folded[0] && !query->filter_count) return 0;
+	if (query->filter_count && !test) return 0;
 
 	int count = 0;
 	for (int i = 0; i < index->game_count; i++) {
-		int rank = SE_rank(index->games[i].folded, folded);
-		if (rank >= 0) hits[count++] = (SEHit){ i, rank };
+		int rank = folded[0] ? SE_rank(index->games[i].folded, folded) : SE_RANK_EXACT;
+		if (rank < 0) continue;
+		if (query->filter_count && (!passes(index, i, query, test, data, SE_FILTER_UNPLAYED, 1)
+				|| !passes(index, i, query, test, data, SE_FILTER_UNPLAYED, 0))) continue;
+		hits[count++] = (SEHit){ i, rank };
 	}
 	sorting = index;
 	if (count > 1) qsort(hits, (size_t)count, sizeof(SEHit), compareHits);
 	sorting = NULL;
 	return count;
+}
+
+///////////////////////////////////////
+// filters
+
+static int startsWithNoCase(const char* s, const char* prefix) {
+	return !strncasecmp(s, prefix, strlen(prefix));
+}
+
+void SE_parse(const char* query, SEQuery* out) {
+	memset(out, 0, sizeof(*out));
+	size_t len = 0;
+	for (const char* p = query ? query : ""; *p; ) {
+		while (*p == ' ') p++;
+		size_t n = strcspn(p, " ");
+		if (!n) break;
+		char term[SE_QUERY_LEN];
+		snprintf(term, sizeof(term), "%.*s", (int)(n < sizeof(term) ? n : sizeof(term) - 1), p);
+		p += n;
+
+		int negate = term[0] == '-' && term[1];
+		const char* body = term + negate;
+		int kind = -1;
+		const char* arg = "";
+		if (!strcasecmp(body, "fav:")) kind = SE_FILTER_FAV;
+		else if (!strcasecmp(body, "unplayed")) kind = SE_FILTER_UNPLAYED;
+		else if (startsWithNoCase(body, "tag:") && body[4]) {
+			kind = SE_FILTER_TAG;
+			arg = body + 4;
+		}
+		else if (startsWithNoCase(body, "system:") && body[7]) {
+			kind = SE_FILTER_SYSTEM;
+			arg = body + 7;
+		}
+		if (kind >= 0 && out->filter_count < SE_FILTERS_MAX) {
+			SEFilter* f = &out->filters[out->filter_count++];
+			f->kind = kind;
+			f->negate = negate;
+			snprintf(f->arg, sizeof(f->arg), "%s", arg);
+			continue;
+		}
+		if (len + 1 + strlen(term) >= sizeof(out->words)) continue;
+		len += (size_t)snprintf(out->words + len, sizeof(out->words) - len, "%s%s", len ? " " : "", term);
+	}
+}
+
+void SE_compact(const char* text, char* out, size_t size) {
+	if (!size) return;
+	char folded[SE_NAME_LEN * 2];
+	SE_fold(text, folded, sizeof(folded));
+	size_t n = 0;
+	for (const char* p = folded; *p && n + 1 < size; p++) {
+		if (*p != ' ') out[n++] = *p;
+	}
+	out[n] = '\0';
+}
+
+int SE_tagMatches(const char* set_name, const char* arg) {
+	if (!set_name || strncmp(set_name, "tags:", 5) != 0 || !arg) return 0;
+	char a[SE_NAME_LEN], b[SE_NAME_LEN];
+	SE_compact(set_name + 5, a, sizeof(a));
+	SE_compact(arg, b, sizeof(b));
+	return a[0] && !strcmp(a, b);
+}
+
+int SE_systemMatches(const char* roms, const char* path, const char* arg) {
+	size_t n = strlen(roms);
+	if (!arg || !arg[0] || strncmp(path, roms, n) != 0 || path[n] != '/') return 0;
+	const char* start = path + n + 1;
+	const char* slash = strchr(start, '/');
+	if (!slash || slash == start) return 0;
+	char folder[SE_NAME_LEN];
+	snprintf(folder, sizeof(folder), "%.*s", (int)(slash - start), start);
+
+	char* open = strrchr(folder, '(');
+	if (open) {
+		char tag[SE_NAME_LEN];
+		snprintf(tag, sizeof(tag), "%s", open + 1);
+		char* close = strchr(tag, ')');
+		if (close) *close = '\0';
+		if (tag[0] && !strcasecmp(tag, arg)) return 1;
+		if (open > folder) *open = '\0';
+	}
+	char name[SE_NAME_LEN], want[SE_NAME_LEN];
+	SE_compact(folder, name, sizeof(name));
+	SE_compact(arg, want, sizeof(want));
+	return want[0] && !strncmp(name, want, strlen(want));
+}
+
+///////////////////////////////////////
+// paths
+
+void SE_pathsInit(SEPaths* paths) {
+	memset(paths, 0, sizeof(*paths));
+}
+
+void SE_pathsFree(SEPaths* paths) {
+	for (int i = 0; i < paths->count; i++) free(paths->items[i]);
+	free(paths->items);
+	SE_pathsInit(paths);
+}
+
+int SE_pathsAdd(SEPaths* paths, const char* path) {
+	if (!path || grow((void**)&paths->items, &paths->cap, paths->count, sizeof(char*)) != 0) return -1;
+	char* copy = strdup(path);
+	if (!copy) return -1;
+	paths->items[paths->count++] = copy;
+	paths->sorted = 0;
+	return 0;
+}
+
+static int comparePaths(const void* a, const void* b) {
+	return strcmp(*(char* const*)a, *(char* const*)b);
+}
+
+int SE_pathsHas(SEPaths* paths, const char* path) {
+	if (!path || !paths->count) return 0;
+	if (!paths->sorted) {
+		qsort(paths->items, (size_t)paths->count, sizeof(char*), comparePaths);
+		paths->sorted = 1;
+	}
+	return bsearch(&path, paths->items, (size_t)paths->count, sizeof(char*), comparePaths) != NULL;
 }
 
 ///////////////////////////////////////

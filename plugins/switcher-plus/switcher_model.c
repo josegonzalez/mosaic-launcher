@@ -67,19 +67,25 @@ void SP_hints(int count, int can_resume, MosaicHint left[2], int* left_count, Mo
 ///////////////////////////////////////
 // the recents
 
-int SP_sync(SPRecents* recents, int count, SPPathFn path, void* data) {
+int SP_sync(SPRecents* recents, int count, SPPathFn path, SPSkipFn skip, void* data) {
 	if (count < 0) count = 0;
 	if (count > SP_MAX_RECENTS) count = SP_MAX_RECENTS;
-	int changed = count != recents->count;
+	int changed = recents->count < 0 || count != recents->host_count;
 	for (int i = 0; i < count; i++) {
 		const char* p = path(i, data);
 		if (!p) p = "";
-		if (!changed && strncmp(recents->path[i], p, SP_PATH_MAX - 1) == 0) continue;
+		if (!changed && strncmp(recents->host_path[i], p, SP_PATH_MAX - 1) == 0) continue;
 		changed = 1;
-		snprintf(recents->path[i], SP_PATH_MAX, "%s", p);
+		snprintf(recents->host_path[i], SP_PATH_MAX, "%s", p);
 	}
 	if (!changed) return 0;
-	recents->count = count;
+	recents->host_count = count;
+	recents->count = 0;
+	for (int i = 0; i < count; i++) {
+		if (skip && skip(recents->host_path[i], data)) continue;
+		memcpy(recents->path[recents->count], recents->host_path[i], SP_PATH_MAX);
+		recents->index[recents->count++] = i;
+	}
 	memset(recents->known, 0, sizeof(recents->known));
 	return 1;
 }
@@ -90,7 +96,7 @@ const MosaicRecent* SP_info(SPRecents* recents, int index, SPInfoFn info, void* 
 		MosaicRecent* r = &recents->info[index];
 		memset(r, 0, sizeof(*r));
 		r->size = sizeof(*r);
-		recents->known[index] = info(index, r, data) == 0 ? 1 : -1;
+		recents->known[index] = info(recents->index[index], r, data) == 0 ? 1 : -1;
 	}
 	return recents->known[index] > 0 ? &recents->info[index] : NULL;
 }

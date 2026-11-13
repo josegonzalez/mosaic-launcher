@@ -173,14 +173,6 @@ int SS_isImage(const char* name);
 // when dir can't be opened.
 int SS_scanFolder(const char* dir, SsPool* pool);
 
-// The next line of text at *cursor into out, without its line ending,
-// skipping empty lines; moves *cursor past it. Returns 0 at the end.
-int SS_nextLine(const char** cursor, char* out, size_t size);
-
-// The collection favorites keeps its list in, from its "collection"
-// setting: the value, or "Favorites" when it's empty or has a "/".
-const char* SS_collectionName(const char* setting);
-
 ///////////////////////////////////////
 // Cycling
 

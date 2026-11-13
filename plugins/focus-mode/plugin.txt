@@ -2,8 +2,13 @@ id=focus-mode
 name=Focus mode
 api=1
 category=Library
-summary=Makes the first screen list only your favorites.
+summary=Makes the first screen list only your favorites, or the games in a tag or collection.
 slots=root
-requires=favorites
-# the root lists only favorites and All systems; the Focus tile on the quick menu flips it too
-setting.on=toggle|Focus on favorites|on
+# the root lists only the set's games and All systems; the Focus tile on the quick menu flips it too
+setting.on=toggle|Focus mode|on
+# the set the root lists: an entry set's name, eg. favorites, tags:RPG or smart:Mario
+setting.set=text|Focus on|favorites
+# a Focus on tile on the quick menu that lists every set to focus on
+setting.pick_tile=toggle|Focus on tile on the quick menu|on
+# a game list button that lists every set to focus on
+setting.pick_button=choice|Focus on button|none|none,L2,R2,SELECT|button:focus-mode.pick

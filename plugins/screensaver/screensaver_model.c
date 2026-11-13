@@ -267,35 +267,6 @@ int SS_scanFolder(const char* dir, SsPool* pool) {
 	return added;
 }
 
-int SS_nextLine(const char** cursor, char* out, size_t size) {
-	if (!size) return 0;
-	const char* s = *cursor;
-	while (*s) {
-		const char* end = strchr(s, '\n');
-		if (!end) end = s + strlen(s);
-		const char* stop = end;
-		while (stop > s && stop[-1] == '\r') stop--;
-		const char* next = *end ? end + 1 : end;
-		if (stop > s) {
-			size_t n = (size_t)(stop - s);
-			if (n >= size) n = size - 1;
-			memcpy(out, s, n);
-			out[n] = '\0';
-			*cursor = next;
-			return 1;
-		}
-		s = next;
-	}
-	*cursor = s;
-	out[0] = '\0';
-	return 0;
-}
-
-const char* SS_collectionName(const char* setting) {
-	if (!setting || !setting[0] || strchr(setting, '/')) return "Favorites";
-	return setting;
-}
-
 ///////////////////////////////////////
 // Cycling
 

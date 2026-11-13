@@ -28,3 +28,20 @@ cfg row-badges unplayed=on tiers=on
 tiers
 press "right a right a right right right"
 shot with-layout-grid
+
+# µCity and Libbet are favorites
+begin
+on favorites row-badges
+cfg row-badges favorites=on
+press "down a down a down down down"
+shot favorites
+
+# Libbet and Concentration Room tagged Puzzle
+begin
+on tags row-badges
+cfg row-badges tagged=on
+printf '%s\t%s\n' \
+	Puzzle "/Roms/Game Boy (GB)/Libbet and the Magic Floor.gb" \
+	Puzzle "/Roms/Nintendo Entertainment System (FC)/Concentration Room.nes" >"$STATE/tags.txt"
+press "down a down a"
+shot tagged

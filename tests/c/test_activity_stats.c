@@ -496,6 +496,9 @@ static long long fakeTimeOn(int days_ago) {
 	return days_ago <= AS_DAYS ? days_played[days_ago] : MOSAIC_PLAY_UNKNOWN;
 }
 
+static const char* filtered_path = "";
+static int fakeFiltered(const char* path) { return filtered_path[0] && !strcmp(path, filtered_path); }
+
 static void setupHost(void) {
 	memset(&fake_host, 0, sizeof(fake_host));
 	fake_host.size = sizeof(MosaicHost);
@@ -523,6 +526,7 @@ static void setupHost(void) {
 	fake_host.play_games_count = fakeGamesCount;
 	fake_host.play_game_info = fakeGameInfo;
 	fake_host.play_time_on = fakeTimeOn;
+	fake_host.is_filtered = fakeFiltered;
 }
 
 static const MosaicPlugin* start(void) {
@@ -654,6 +658,20 @@ static void testScreen(void) {
 	press(MOSAIC_BUTTON_DOWN);
 	draw();
 	CHECK_STR(last_log, "showing Games: 0 of 5: Zelda, 2h 15m \xc2\xb7 2 sessions, can open");
+
+	// a game a filter hides is left out of the lists and their totals
+	registered.exit(NULL);
+	filtered_path = ROMS "/Tetris.gb";
+	CHECK(registered.enter(NULL) == 0);
+	CHECK(game_count == 4);
+	for (int i = 0; i < game_count; i++) CHECK(strcmp(games[i].path, ROMS "/Tetris.gb") != 0);
+	CHECK(strstr(last_log, "history: 4 games, 9 sessions,") == last_log);
+	registered.exit(NULL);
+	filtered_path = "";
+	CHECK(registered.enter(NULL) == 0);
+	CHECK(game_count == 5);
+	tab = AS_TAB_GAMES;
+	selected[0] = 0;
 
 	// a launch that doesn't go ahead says so
 	open_answer = 0;

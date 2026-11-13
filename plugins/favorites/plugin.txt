@@ -6,6 +6,6 @@ summary=Adds a Favorites folder and a button to add or remove favorites.
 # the favorites entry set
 provides=sets.favorites
 # the collection in Collections/ that holds favorites, and the folder's name on the root
-setting.collection=text|Collection|Favorites||public
+setting.collection=text|Collection|Favorites
 # favorites sort first in every folder but Recently Played, collections and Favorites
 setting.pin=toggle|Pin to top|off

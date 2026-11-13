@@ -58,3 +58,23 @@ msgstr "Colección más pequeña"
 
 msgid "Smart Collections"
 msgstr "Colecciones inteligentes"
+
+msgid "A tag named %s already exists"
+msgstr "Ya existe una etiqueta llamada %s"
+
+msgid "Couldn't save the tag"
+msgstr "No se pudo guardar la etiqueta"
+
+msgid "Not a tag name"
+msgstr "No es un nombre de etiqueta"
+
+msgid "SAVE AS TAG"
+msgstr "GUARDAR COMO ETIQUETA"
+
+msgid "Saved %d game as %s"
+msgid_plural "Saved %d games as %s"
+msgstr[0] "Se guardó %d juego como %s"
+msgstr[1] "Se guardaron %d juegos como %s"
+
+msgid "Tag name"
+msgstr "Nombre de la etiqueta"

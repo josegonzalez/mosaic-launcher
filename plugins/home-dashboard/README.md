@@ -64,7 +64,8 @@ Home mode set to minui.
 ## For plugin authors
 
 - Owns the `home` slot (`slots=home`).
-- Lists `favorites` as `optional`, so it loads after it, since it reads the favorites collection as it starts.
+- Lists `favorites` as `optional`, so it loads after it, since it asks as it starts whether favorites is loaded. The Pinned tab is the `favorites` entry set, read with `set_list` each time the screen opens.
+- Leaves out of every tab what `is_filtered` says a plugin's filter hides, such as the [`hidden`](../hidden/README.md) plugin's games.
 - Reads stock's play tracker, the switcher's recents, and the host's `achievements` call.
 
 ## Credits

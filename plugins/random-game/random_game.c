@@ -8,8 +8,16 @@
 // Every game is as likely as any other, so a system with more games is
 // picked more often, except that games not in Recently Played are
 // RG_UNPLAYED_WEIGHT times as likely while the "unplayed" setting is on.
-// Games the hidden plugin hides (its .userdata/<platform>/launcher/
-// hidden.txt) are never picked.
+// Games any plugin's filter hides, such as the hidden plugin's, are never
+// picked (is_filtered).
+//
+// The "from" setting limits every pick to the games in one entry set:
+// all (the default) for every game, or a set's name, such as favorites,
+// tags:<name> or smart:<name>. A set nobody registered, as when its
+// plugin is off, has no games. The random-game.from action lists All
+// games and every set but hidden (set_names) to pick from with choose,
+// from a Pick from tile on the quick menu (the "from_tile" setting), a
+// game list button (the "from_button" setting), or an FN button.
 //
 // The card is scanned once per launcher start, the first time a pick or
 // the root needs it, the way stock lists it: dot files, .disabled and
@@ -38,9 +46,8 @@
 static const MosaicHost* host;
 static char folder_path[RG_PATH_LEN]; // <sd>/Random game, the root row
 static char roms_path[RG_PATH_LEN];   // <sd>/Roms
-static char hidden_path[RG_PATH_LEN + 32]; // <userdata>/launcher/hidden.txt
 static RGLibrary library;
-static RGPathSet hidden;
+static RGPathSet only; // the from setting's set's games, while a pick runs
 static int scanned = 0;
 static unsigned long long seed;
 
@@ -189,13 +196,25 @@ static unsigned long below(unsigned long n, void* data) {
 	return (unsigned long)(RG_xorshift(&seed) % n);
 }
 
+static void addMember(const char* path, void* data) {
+	(void)data;
+	RG_setAdd(&only, path);
+}
+
+static int filtered(const char* path) {
+	return MOSAIC_HOST_HAS(host, is_filtered) && host->is_filtered(path);
+}
+
 // Picks a game from system, or from every system with -1. Returns 1 and
 // writes its path and type, or returns 0 when there's nothing to pick.
 static int pick(int system, char* out, size_t size, int* type) {
 	scan();
 	if (!library.count) return 0;
 
-	if (RG_setLoad(&hidden, hidden_path) != 0) say("couldn't read the hidden list");
+	const char* from = host->cfg_get("from", "all");
+	int all = !from[0] || !strcmp(from, "all");
+	RG_setClear(&only);
+	if (!all && MOSAIC_HOST_HAS(host, is_filtered)) host->set_list(from, addMember, NULL);
 
 	// recent_path's string only lasts until the next call
 	static char recent_copies[MAX_RECENTS][RG_PATH_LEN];
@@ -215,22 +234,23 @@ static int pick(int system, char* out, size_t size, int* type) {
 	unsigned* weights = malloc((size_t)library.count * sizeof(unsigned));
 	if (!weights) return 0;
 	unsigned unplayed = isOn("unplayed", "on") ? RG_UNPLAYED_WEIGHT : 1;
-	unsigned long total = RG_weights(&library, system, &hidden, recents, recent_count, unplayed, weights);
+	unsigned long total = RG_weights(&library, system, all ? NULL : &only, recents, recent_count, unplayed, weights);
 
 	int found = 0;
 	while (total) {
 		int i = RG_pick(weights, library.count, total, below, NULL);
 		if (i < 0) break;
-		if (exists(library.games[i].path)) {
+		if (exists(library.games[i].path) && !filtered(library.games[i].path)) {
 			snprintf(out, size, "%s", library.games[i].path);
 			*type = library.games[i].type;
 			found = 1;
 			break;
 		}
-		total -= weights[i]; // deleted since the scan
+		total -= weights[i]; // deleted since the scan, or hidden
 		weights[i] = 0;
 	}
 	free(weights);
+	RG_setClear(&only);
 
 	if (found) {
 		char message[RG_PATH_LEN + 16];
@@ -300,6 +320,57 @@ static void pickAll(const char* path, void* data) {
 }
 
 ///////////////////////////////////////
+// picking from
+
+#define FROM_MAX 64 // what choose takes, All games among them
+
+static char from_names[FROM_MAX][80]; // "all", then the sets, for the list
+static char from_labels[FROM_MAX][160];
+static int from_count = 0;
+
+static void addFrom(const char* name, void* data) {
+	(void)data;
+	if (!RG_pickable(name) || from_count >= FROM_MAX || strlen(name) >= sizeof(from_names[0])) return;
+	snprintf(from_names[from_count], sizeof(from_names[0]), "%s", name);
+	RG_setLabel(name, tr("Favorites"), tr("Tag: %s"), tr("Collection: %s"), from_labels[from_count], sizeof(from_labels[0]));
+	from_count++;
+}
+
+static void pickedFrom(int index, void* data) {
+	(void)data;
+	if (index < 0 || index >= from_count) return;
+	host->cfg_set("from", from_names[index]);
+	char message[256];
+	snprintf(message, sizeof(message), tr("Picking from %s"), from_labels[index]);
+	toast(message);
+	snprintf(message, sizeof(message), "picking from %s", from_names[index]);
+	say(message);
+}
+
+static int canChooseFrom(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	return MOSAIC_HOST_HAS(host, choose) && MOSAIC_HOST_HAS(host, set_names);
+}
+
+static void chooseFrom(const char* path, void* data) {
+	if (!canChooseFrom(path, data)) return;
+	from_count = 0;
+	snprintf(from_names[0], sizeof(from_names[0]), "all");
+	snprintf(from_labels[0], sizeof(from_labels[0]), "%s", tr("All games"));
+	from_count = 1;
+	host->set_names(addFrom, NULL);
+	const char* labels[FROM_MAX];
+	int current = 0;
+	const char* from = host->cfg_get("from", "all");
+	for (int i = 0; i < from_count; i++) {
+		labels[i] = from_labels[i];
+		if (!strcmp(from_names[i], from)) current = i;
+	}
+	if (host->choose(tr("Pick from"), labels, from_count, current, pickedFrom, NULL) != 0) say("couldn't list the sets");
+}
+
+///////////////////////////////////////
 // hooks
 
 static void rootEntries(MosaicList* root) {
@@ -342,13 +413,21 @@ static void tick(unsigned long now) {
 	host->open_path(shown_path, shown_type);
 }
 
+static const struct {
+	const char* name;
+	int button;
+} buttons[] = {
+	{ "L2", MOSAIC_BUTTON_L2 },
+	{ "R2", MOSAIC_BUTTON_R2 },
+	{ "SELECT", MOSAIC_BUTTON_SELECT },
+};
+
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
 	snprintf(roms_path, sizeof(roms_path), "%s/Roms", host->sdcard_path);
-	snprintf(hidden_path, sizeof(hidden_path), "%s/launcher/hidden.txt", host->userdata_path);
 	RG_init(&library);
-	RG_setInit(&hidden);
+	RG_setInit(&only);
 	scanned = 0;
 	shown_path[0] = '\0';
 	pending = 0;
@@ -369,12 +448,28 @@ static int init(const MosaicHost* h) {
 			say("couldn't add the Random tile");
 		}
 	}
+	if (host->register_action("random-game.from", "Pick from", 0, canChooseFrom, chooseFrom, NULL) != 0) {
+		say("couldn't register random-game.from");
+	}
+	else {
+		const char* name = host->cfg_get("from_button", "none");
+		for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
+			if (strcmp(name, buttons[i].name) != 0) continue;
+			if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, "random-game.from") != 0) {
+				say("couldn't bind the pick from button");
+			}
+		}
+		if (isOn("from_tile", "off") && (!MOSAIC_HOST_HAS(host, quick_tile)
+				|| host->quick_tile("random-game.from", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+			say("couldn't add the Pick from tile");
+		}
+	}
 	return 0;
 }
 
 static void quit(void) {
 	RG_free(&library);
-	RG_setClear(&hidden);
+	RG_setClear(&only);
 }
 
 static const MosaicPlugin plugin = {

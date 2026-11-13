@@ -21,7 +21,10 @@
 //
 // The screen's enter runs each time it opens again (after the quick menu,
 // the switcher or a game), so the tab and selections live here, and the
-// recents, favorites and carts are read again there.
+// recents, favorites and carts are read again there. Favorites are the
+// favorites entry set (set_list), and anything a plugin's filter hides,
+// such as the hidden plugin's games, is left out everywhere (is_filtered).
+// Favorites get nothing else of their own.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -42,14 +45,8 @@
 #define ENTRIES_MAX 512
 #define MOST_PLAYED_MAX 5
 #define ROWS_MAX (RECENTS_MAX + PINNED_MAX + 8)
-#define FILE_MAX 65536
 
 static const MosaicHost* host;
-
-// Another plugin's setting, when it marks it public, else fallback.
-static const char* publicSetting(const char* id, const char* key, const char* fallback) {
-	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
-}
 
 // settings
 static int mode = HD_MODE_DASHBOARD;
@@ -59,7 +56,6 @@ static int shelf_on = 1;
 static char pico_tags[256];
 
 static int favorites_loaded = 0; // favorites loaded before this plugin, as its optional= asks
-static char collection_path[MAX_PATH_LEN + 160];
 
 typedef struct Item {
 	char path[MAX_PATH_LEN];
@@ -167,19 +163,10 @@ static void baseName(const char* path, char* out, size_t size) {
 	if (dot && dot != out) *dot = '\0';
 }
 
-// The whole of a small file, or NULL. Free it.
-static char* readFile(const char* path) {
-	FILE* f = fopen(path, "r");
-	if (!f) return NULL;
-	char* text = malloc(FILE_MAX);
-	if (!text) {
-		fclose(f);
-		return NULL;
-	}
-	size_t n = fread(text, 1, FILE_MAX - 1, f);
-	text[n] = '\0';
-	fclose(f);
-	return text;
+// True when a plugin's filter, such as hidden's, hides path from its
+// folder, so the dashboard leaves it out too.
+static int filtered(const char* path) {
+	return MOSAIC_HOST_HAS(host, is_filtered) && host->is_filtered(path);
 }
 
 static void loadRecents(void) {
@@ -188,6 +175,10 @@ static void loadRecents(void) {
 	for (int i = 0; i < n && recent_count < RECENTS_MAX; i++) {
 		const char* path = host->recent_path(i);
 		if (!path || strlen(path) >= MAX_PATH_LEN) continue;
+		char copy[MAX_PATH_LEN];
+		snprintf(copy, sizeof(copy), "%s", path); // recent_path's string lasts only until the next call
+		if (filtered(copy)) continue;
+		path = copy;
 		Item* item = &recents[recent_count];
 		memset(item, 0, sizeof(*item));
 		snprintf(item->path, sizeof(item->path), "%s", path);
@@ -208,29 +199,27 @@ static void loadRecents(void) {
 	}
 }
 
-// favorites' list, as it keeps it: card-relative paths in its collection
+static void addPinned(const char* path, void* data) {
+	(void)data;
+	if (pinned_count >= PINNED_MAX || strlen(path) >= MAX_PATH_LEN || !exists(path) || filtered(path)) return;
+	Item* item = &pinned[pinned_count];
+	memset(item, 0, sizeof(*item));
+	snprintf(item->path, sizeof(item->path), "%s", path);
+	item->recent = -1;
+	item->available = 1;
+	item->type = endsWith(item->path, ".pak") ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_ROM;
+	item->entry = entryFor(item->path, item->type);
+	const char* name = item->entry ? host->entry_name(item->entry) : NULL;
+	if (name && name[0]) snprintf(item->name, sizeof(item->name), "%s", name);
+	else baseName(item->path, item->name, sizeof(item->name));
+	pinned_count++;
+}
+
+// the favorites entry set, in the order favorites lists it
 static void loadPinned(void) {
 	pinned_count = 0;
-	if (!favorites_loaded) return;
-	char* text = readFile(collection_path);
-	if (!text) return;
-	const char* cursor = text;
-	char line[MAX_PATH_LEN];
-	while (pinned_count < PINNED_MAX && HD_nextLine(&cursor, line, sizeof(line))) {
-		Item* item = &pinned[pinned_count];
-		memset(item, 0, sizeof(*item));
-		if (snprintf(item->path, sizeof(item->path), "%s%s", host->sdcard_path, line) >= (int)sizeof(item->path)) continue;
-		if (!exists(item->path)) continue;
-		item->recent = -1;
-		item->available = 1;
-		item->type = endsWith(item->path, ".pak") ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_ROM;
-		item->entry = entryFor(item->path, item->type);
-		const char* name = item->entry ? host->entry_name(item->entry) : NULL;
-		if (name && name[0]) snprintf(item->name, sizeof(item->name), "%s", name);
-		else baseName(item->path, item->name, sizeof(item->name));
-		pinned_count++;
-	}
-	free(text);
+	if (!favorites_loaded || !MOSAIC_HOST_HAS(host, is_filtered)) return;
+	host->set_list("favorites", addPinned, NULL);
 }
 
 static int byName(const void* a, const void* b) {
@@ -259,7 +248,7 @@ static void loadCarts(void) {
 			memset(item, 0, sizeof(*item));
 			if (snprintf(item->path, sizeof(item->path), "%s/%s", folder, fp->d_name) >= (int)sizeof(item->path)) continue;
 			struct stat st;
-			if (stat(item->path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
+			if (stat(item->path, &st) != 0 || !S_ISREG(st.st_mode) || filtered(item->path)) continue;
 			item->recent = -1;
 			item->available = 1;
 			item->type = MOSAIC_ENTRY_ROM;
@@ -874,8 +863,6 @@ static int init(const MosaicHost* h) {
 	snprintf(pico_tags, sizeof(pico_tags), "%s", host->cfg_get("pico8_tags", "P8,PICO8,PICO"));
 
 	favorites_loaded = HD_pluginLoaded(host, "favorites");
-	snprintf(collection_path, sizeof(collection_path), "%s/Collections/%s.txt", host->sdcard_path,
-		HD_collectionName(publicSetting("favorites", "collection", "Favorites")));
 
 	MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),

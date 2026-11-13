@@ -119,13 +119,20 @@ static void threeRecents(void) {
 	fakeRecent(2, "/sd/Roms/GB/Cherry.gb", "Cherry", 1, "/sd/.minui/GB/Cherry.gb.1.bmp");
 }
 
+static int skip_asks = 0;
+static int skipBanana(const char* path, void* data) {
+	(void)data;
+	skip_asks++;
+	return strstr(path, "Banana") != NULL;
+}
+
 static void testRecents(void) {
 	static SPRecents r;
 	memset(&r, 0, sizeof(r));
 	threeRecents();
-	CHECK(SP_sync(&r, 3, modelPath, NULL) == 1);
+	CHECK(SP_sync(&r, 3, modelPath, NULL, NULL) == 1);
 	CHECK(r.count == 3);
-	CHECK(SP_sync(&r, 3, modelPath, NULL) == 0);
+	CHECK(SP_sync(&r, 3, modelPath, NULL, NULL) == 0);
 
 	// asked once until they change
 	info_asks = 0;
@@ -139,12 +146,12 @@ static void testRecents(void) {
 
 	// a path that changes in place
 	fake_paths[2] = "/sd/Roms/GB/Date.gb";
-	CHECK(SP_sync(&r, 3, modelPath, NULL) == 1);
+	CHECK(SP_sync(&r, 3, modelPath, NULL, NULL) == 1);
 	CHECK_STR(r.path[2], "/sd/Roms/GB/Date.gb");
 	SP_info(&r, 1, modelInfo, NULL);
 	CHECK(info_asks == 2);
 	// one fewer
-	CHECK(SP_sync(&r, 2, modelPath, NULL) == 1);
+	CHECK(SP_sync(&r, 2, modelPath, NULL, NULL) == 1);
 	CHECK(r.count == 2);
 	// a failed ask isn't asked again until they change
 	info_fails = 0;
@@ -153,12 +160,29 @@ static void testRecents(void) {
 	CHECK(info_asks == 3);
 	info_fails = -1;
 	// none, and more than it keeps
-	CHECK(SP_sync(&r, 0, modelPath, NULL) == 1 && r.count == 0);
-	CHECK(SP_sync(&r, 0, modelPath, NULL) == 0);
+	CHECK(SP_sync(&r, 0, modelPath, NULL, NULL) == 1 && r.count == 0);
+	CHECK(SP_sync(&r, 0, modelPath, NULL, NULL) == 0);
 	for (int k = 0; k < SP_MAX_RECENTS + 2; k++) fake_paths[k] = "/sd/Roms/GB/Same.gb";
 	fake_count = SP_MAX_RECENTS + 2;
-	CHECK(SP_sync(&r, fake_count, modelPath, NULL) == 1 && r.count == SP_MAX_RECENTS);
-	CHECK(SP_sync(&r, fake_count, modelPath, NULL) == 0);
+	CHECK(SP_sync(&r, fake_count, modelPath, NULL, NULL) == 1 && r.count == SP_MAX_RECENTS);
+	CHECK(SP_sync(&r, fake_count, modelPath, NULL, NULL) == 0);
+
+	// a skipped recent isn't a row, and a row's info is asked by its index
+	// in the host's recents
+	threeRecents();
+	skip_asks = 0;
+	CHECK(SP_sync(&r, 3, modelPath, skipBanana, NULL) == 1);
+	CHECK(r.count == 2 && r.index[0] == 0 && r.index[1] == 2);
+	CHECK_STR(r.path[1], "/sd/Roms/GB/Cherry.gb");
+	const MosaicRecent* c = SP_info(&r, 1, modelInfo, NULL);
+	CHECK(c && !strcmp(c->name, "Cherry"));
+	CHECK(skip_asks == 3);
+	// asked again only when the recents change, or count is -1
+	CHECK(SP_sync(&r, 3, modelPath, skipBanana, NULL) == 0);
+	CHECK(skip_asks == 3);
+	r.count = -1;
+	CHECK(SP_sync(&r, 3, modelPath, skipBanana, NULL) == 1);
+	CHECK(skip_asks == 6 && r.count == 2);
 	fake_count = 0;
 }
 
@@ -687,6 +711,20 @@ static int fakeDrawHints(MosaicSurface* screen, int group, const MosaicHint* hin
 	return 0;
 }
 
+static const char* filtered_name = ""; // is_filtered hides the path with it in
+static int fakeFiltered(const char* path) { return filtered_name[0] && strstr(path, filtered_name) != NULL; }
+static int fakeNoSets(void (*each)(const char*, void*), void* data) {
+	(void)each;
+	(void)data;
+	return 0;
+}
+static void (*set_changed_fn)(const char*, const char*, void*);
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	if (!strcmp(name, "launcher.set_changed")) set_changed_fn = on_event;
+	return 0;
+}
+
 static void setupHost(void) {
 	memset(&fake_host, 0, sizeof(fake_host));
 	fake_host.size = sizeof(MosaicHost);
@@ -722,6 +760,9 @@ static void setupHost(void) {
 	fake_host.last_played = fakeLastPlayed;
 	fake_host.play_count = fakePlayCount;
 	fake_host.achievements = fakeAchievements;
+	fake_host.is_filtered = fakeFiltered;
+	fake_host.set_names = fakeNoSets;
+	fake_host.subscribe = fakeSubscribe;
 }
 
 static const MosaicPlugin* start(const char* setting) {
@@ -854,6 +895,36 @@ static void testButtons(void) {
 	p->tick(1500);
 	CHECK(release(MOSAIC_BUTTON_SELECT) == MOSAIC_SCREEN_CLOSE);
 	registered.exit(registered.data);
+}
+
+// A recent a filter hides isn't shown, and A and Y act on the one that is.
+static void testFiltered(void) {
+	start("full");
+	threeRecents();
+	filtered_name = "Banana";
+	CHECK(set_changed_fn != NULL);
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(recents.count == 2);
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(selected == 1);
+	opened = -1;
+	tap(MOSAIC_BUTTON_A);
+	CHECK(opened == 2);
+	CHECK_STR(last_log, "opening 1: Cherry");
+	removed = -1;
+	tap(MOSAIC_BUTTON_Y);
+	CHECK(removed == 2 && fake_count == 2);
+	CHECK(recents.count == 1 && selected == 0);
+
+	// a set's change asks again
+	filtered_name = "";
+	redraws = 0;
+	set_changed_fn("launcher.set_changed", "name=hidden", NULL);
+	CHECK(redraws == 1);
+	draw();
+	CHECK(recents.count == 2);
+	registered.exit(registered.data);
+	fake_count = 0;
 }
 
 static void testStyleMoves(void) {
@@ -1146,6 +1217,7 @@ int main(void) {
 	testCaptionPlaces();
 	testInit();
 	testButtons();
+	testFiltered();
 	testStyleMoves();
 	testRender();
 	testCaptions();

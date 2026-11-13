@@ -3,8 +3,8 @@ name=Tags
 api=1
 category=Library
 summary=Lets you put your own tags on games, shown as folders.
-# the tags:<name> entry sets
-provides=sets.tags
+# the tags:<name> entry sets, and the tags.copy service that makes a tag from another set's games
+provides=sets.tags,tags.copy
 # the game list button that opens the selected game's tag checklist, shared with other plugins' actions on it
 setting.button=choice|Tags button|Y|Y,L2,R2|button:tags.edit
 # a Tags folder on the root, with a folder per tag, shown while a tag has a game

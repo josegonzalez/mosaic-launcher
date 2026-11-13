@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "fakesets.h"
 #include "../../plugins/tags/tags.c"
 
@@ -375,6 +376,13 @@ static int fakeDrawHints(MosaicSurface* s, int group, const MosaicHint* hints, i
 	return -1;
 }
 
+static int fakeSetListCall(const char* name, void (*each)(const char*, void*), void* data) {
+	int i = fakeSetFind(name);
+	if (i < 0) return -1;
+	if (each) fake_set_list[i](name, each, data);
+	return 0;
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -408,6 +416,10 @@ static MosaicHost fake = {
 	.set_changed = fakeSetChanged,
 	.set_names = fakeSetNames,
 	.is_filtered = fakeIsFiltered,
+	.event_value = fakeEventValue,
+	.provide = fakeProvide,
+	.call = fakeCall,
+	.set_list = fakeSetListCall,
 };
 
 static int press(int button) {
@@ -614,6 +626,63 @@ static void testPlugin(void) {
 	picked = NULL;
 }
 
+static int source_count = 3;
+static void sourceList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	const char* paths[] = { CARD "/Roms/GB/Zelda.gb", CARD "/Roms/PS (PS)/FF7", CARD "/Roms/GB/Zelda.gb" };
+	for (int i = 0; i < source_count; i++) add(paths[i], ctx);
+}
+static int sourceHas(const char* name, const char* path) {
+	(void)name;
+	(void)path;
+	return 0;
+}
+
+static const char* copy(const char* args) {
+	static char reply[MOSAIC_CALL_MAX];
+	CHECK(fakeCall("tags.copy", args, reply, sizeof(reply)) >= 0);
+	return reply;
+}
+
+static void testCopy(void) {
+	writeFile(STORE, "Puzzle\nPuzzle\t/Roms/GB/Tetris.gb\n");
+	fake_set_count = 0;
+	fake_provider_count = 0;
+	fakeSetRegister("smart:Zelda", sourceHas, sourceList);
+	start();
+	CHECK(fake_provider_count == 1 && !strcmp(fake_provider_names[0], "tags.copy"));
+
+	// a new tag with the set's games now, a game folder by its .m3u
+	fake_set_changed[0] = '\0';
+	reloads = 0;
+	CHECK_STR(copy("tag= Zelda games \nset=smart:Zelda"), "tag=Zelda games\ngames=2");
+	CHECK_STR(fakeSetList("tags:Zelda games"), CARD "/Roms/GB/Zelda.gb\n" CARD "/Roms/PS (PS)/FF7/FF7.m3u\n");
+	CHECK(strstr(fake_set_changed, "tags:Zelda games\n") != NULL);
+	CHECK(reloads == 1);
+	TGStore back;
+	TG_init(&back);
+	CHECK(TG_load(&back, STORE) == 0 && back.count == 2);
+	TG_free(&back);
+
+	// once: the tag doesn't follow the set
+	source_count = 1;
+	CHECK_STR(fakeSetList("tags:Zelda games"), CARD "/Roms/GB/Zelda.gb\n" CARD "/Roms/PS (PS)/FF7/FF7.m3u\n");
+
+	// what it refuses
+	CHECK_STR(copy("tag=zelda GAMES\nset=smart:Zelda"), "error=exists");
+	CHECK_STR(copy("tag=.dot\nset=smart:Zelda"), "error=name");
+	CHECK_STR(copy("tag=Other\nset=smart:Mario"), "error=set");
+	source_count = 0;
+	CHECK_STR(copy("tag=Empty\nset=smart:Zelda"), "error=empty");
+	CHECK(fakeSetFind("tags:Empty") < 0);
+	char reply[64];
+	CHECK(fakeCall("tags.copy", "set=smart:Zelda", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
+	source_count = 3;
+	quit();
+	fake_set_count = 0;
+	fake_provider_count = 0;
+}
+
 int main(void) {
 	CHECK(system("rm -rf '" TEST_SDCARD_PATH "'") == 0);
 	testNames();
@@ -622,5 +691,6 @@ int main(void) {
 	testPaths();
 	testChecklist();
 	testPlugin();
+	testCopy();
 	CHECK_DONE();
 }

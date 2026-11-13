@@ -52,7 +52,8 @@ Clock set to 24h.
 
 ## For plugin authors
 
-- Lists `favorites` and `charging-screen` as `optional`, so it loads after them, since it asks about them as it starts.
+- Lists `favorites` and `charging-screen` as `optional`, so it loads after them, since it asks about them as it starts. The favorites are the `favorites` entry set, read with `set_list`.
+- Leaves out games `is_filtered` says a plugin's filter hides, such as the [`hidden`](../hidden/README.md) plugin's.
 - Reads the card's art, `Screenshots/` and its image folder.
 
 ## Credits

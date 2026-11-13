@@ -17,7 +17,7 @@ static char fake_provider_names[FAKE_PROVIDERS_MAX][64];
 static FakeProviderFn fake_provider_fns[FAKE_PROVIDERS_MAX];
 static int fake_provider_count = 0;
 
-static int fakeProvide(const char* name, FakeProviderFn fn) {
+static __attribute__((unused)) int fakeProvide(const char* name, FakeProviderFn fn) {
 	for (int i = 0; i < fake_provider_count; i++) {
 		if (strcmp(fake_provider_names[i], name) != 0) continue;
 		fake_provider_fns[i] = fn;
@@ -29,7 +29,7 @@ static int fakeProvide(const char* name, FakeProviderFn fn) {
 	return 0;
 }
 
-static int fakeCall(const char* name, const char* args, char* out, size_t size) {
+static __attribute__((unused)) int fakeCall(const char* name, const char* args, char* out, size_t size) {
 	if (out && size) out[0] = '\0';
 	for (int i = 0; i < fake_provider_count; i++) {
 		if (strcmp(fake_provider_names[i], name) != 0) continue;
@@ -45,7 +45,7 @@ static int fakeCall(const char* name, const char* args, char* out, size_t size) 
 }
 
 // As the launcher's: the first line with key, cut to fit, or -1.
-static int fakeEventValue(const char* payload, const char* key, char* out, size_t size) {
+static __attribute__((unused)) int fakeEventValue(const char* payload, const char* key, char* out, size_t size) {
 	if (out && size) out[0] = '\0';
 	if (!payload || !key || !key[0]) return -1;
 	size_t want = strlen(key);

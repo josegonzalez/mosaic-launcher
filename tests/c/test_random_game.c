@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include "check.h"
+#include "fakesets.h"
 #include "../../plugins/random-game/random_game.c"
 
 struct MosaicEntry {
@@ -21,6 +22,8 @@ struct MosaicList {
 #define NES CARD "/Roms/NES (FC)"
 
 static char cfg_root[8] = "", cfg_tile[8] = "", cfg_unplayed[8] = "";
+static char cfg_from[80] = "", cfg_from_tile[8] = "", cfg_from_button[8] = "";
+static const char* filtered_paths = ""; // what is_filtered hides, and what's in them, one a line
 static char current[1024] = CARD;
 static const char* recents[4];
 static int recent_count = 0;
@@ -28,7 +31,7 @@ static char opened[1024];
 static int opened_type = -1, opens = 0;
 static char toasted[64];
 
-#define MAX_FAKE_ACTIONS 4
+#define MAX_FAKE_ACTIONS 6
 static struct {
 	char id[64];
 	char label[32];
@@ -45,9 +48,14 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "root") && cfg_root[0]) return cfg_root;
 	if (!strcmp(key, "tile") && cfg_tile[0]) return cfg_tile;
 	if (!strcmp(key, "unplayed") && cfg_unplayed[0]) return cfg_unplayed;
+	if (!strcmp(key, "from") && cfg_from[0]) return cfg_from;
+	if (!strcmp(key, "from_tile") && cfg_from_tile[0]) return cfg_from_tile;
+	if (!strcmp(key, "from_button") && cfg_from_button[0]) return cfg_from_button;
 	return fallback;
 }
-static void fakeCfgSet(const char* key, const char* value) { (void)key; (void)value; }
+static void fakeCfgSet(const char* key, const char* value) {
+	if (!strcmp(key, "from")) snprintf(cfg_from, sizeof(cfg_from), "%s", value);
+}
 static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
 	MosaicEntry* e = calloc(1, sizeof(MosaicEntry));
 	snprintf(e->path, sizeof(e->path), "%s", path);
@@ -91,6 +99,36 @@ static int fakeQuickTile(const char* id, int row, const char* icon, const char* 
 	return 0;
 }
 
+static int fakeFiltered(const char* path) {
+	size_t len = strlen(path);
+	for (const char* p = filtered_paths; *p;) {
+		size_t n = strcspn(p, "\n");
+		if (n && n <= len && !strncmp(p, path, n) && (path[n] == '\0' || path[n] == '/')) return 1;
+		p += n;
+		if (*p) p++;
+	}
+	return 0;
+}
+static int fakeSetListCall(const char* name, void (*each)(const char*, void*), void* data) {
+	int i = fakeSetFind(name);
+	if (i < 0) return -1;
+	if (each) fake_set_list[i](name, each, data);
+	return 0;
+}
+static int chooses = 0, choice_count = 0, choice_selected = -1;
+static char choices[8][160];
+static void (*choice_pick)(int, void*);
+static int fakeChoose(const char* title, const char* const* list, int count, int selected, void (*on_pick)(int, void*), void* data) {
+	(void)title;
+	(void)data;
+	chooses++;
+	choice_count = count;
+	choice_selected = selected;
+	for (int i = 0; i < count && i < 8; i++) snprintf(choices[i], sizeof(choices[0]), "%s", list[i]);
+	choice_pick = on_pick;
+	return 0;
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -112,6 +150,10 @@ static MosaicHost fake = {
 	.recents_count = fakeRecentsCount,
 	.recent_path = fakeRecentPath,
 	.quick_tile = fakeQuickTile,
+	.choose = fakeChoose,
+	.set_list = fakeSetListCall,
+	.set_names = fakeSetNames,
+	.is_filtered = fakeFiltered,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -216,29 +258,35 @@ static void testNames(void) {
 	CHECK(!RG_mapLookup("", "Kirby.gb", name, sizeof(name)));
 }
 
-static void testHiddenSet(void) {
+static void testSets(void) {
 	RGPathSet set;
 	RG_setInit(&set);
-	CHECK(RG_setLoad(&set, CARD "/missing.txt") == 0);
-	CHECK(set.count == 0);
-	CHECK(!RG_isHidden(&set, "/r/GB/Tetris.gb"));
-
-	writeText(CARD "/hidden-test.txt", "# a comment\n\n/r/GB/Tetris.gb\r\n/r/PS/Disc Game/\n/r/GB/Tetris.gb\n");
-	CHECK(RG_setLoad(&set, CARD "/hidden-test.txt") == 0);
-	CHECK(set.count == 2);
-	CHECK(RG_isHidden(&set, "/r/GB/Tetris.gb"));
-	CHECK(!RG_isHidden(&set, "/r/GB/Tetris.gbc"));
-	CHECK(RG_isHidden(&set, "/r/PS/Disc Game"));
-	CHECK(RG_isHidden(&set, "/r/PS/Disc Game/Disc Game.m3u")); // inside a hidden folder
-	CHECK(!RG_isHidden(&set, "/r/PS/Other.bin"));
-	CHECK(!RG_isHidden(NULL, "/r/GB/Tetris.gb"));
-
-	// a new read replaces the old
-	writeText(CARD "/hidden-test.txt", "/r/GB/Kirby.gb\n");
-	CHECK(RG_setLoad(&set, CARD "/hidden-test.txt") == 0);
-	CHECK(set.count == 1);
-	CHECK(!RG_isHidden(&set, "/r/GB/Tetris.gb"));
+	CHECK(!RG_inSet(&set, "/r/GB/Tetris.gb", MOSAIC_ENTRY_ROM));
+	CHECK(RG_setAdd(&set, "/r/GB/Tetris.gb") == 0);
+	CHECK(RG_setAdd(&set, "/r/GB/Tetris.gb") == 0);
+	CHECK(RG_setAdd(&set, "/r/PS/Disc Game/Disc Game.m3u") == 0);
+	CHECK(RG_setAdd(&set, "/r/PS/Cue Game/Cue Game.cue") == 0);
+	CHECK(set.count == 3);
+	CHECK(RG_inSet(&set, "/r/GB/Tetris.gb", MOSAIC_ENTRY_ROM));
+	CHECK(!RG_inSet(&set, "/r/GB/Tetris.gbc", MOSAIC_ENTRY_ROM));
+	CHECK(RG_inSet(&set, "/r/PS/Disc Game", MOSAIC_ENTRY_DIR)); // a game folder by its .m3u
+	CHECK(RG_inSet(&set, "/r/PS/Cue Game", MOSAIC_ENTRY_DIR));  // or its .cue
+	CHECK(!RG_inSet(&set, "/r/PS/Disc Game", MOSAIC_ENTRY_ROM));
+	CHECK(!RG_inSet(NULL, "/r/GB/Tetris.gb", MOSAIC_ENTRY_ROM));
 	RG_setClear(&set);
+	CHECK(set.count == 0);
+
+	CHECK(RG_pickable("favorites") && RG_pickable("tags:RPG") && RG_pickable("smart:Mario"));
+	CHECK(!RG_pickable("hidden") && !RG_pickable("") && !RG_pickable(NULL));
+	char label[64];
+	RG_setLabel("favorites", "Favs", "Tag %s", "Collection %s", label, sizeof(label));
+	CHECK_STR(label, "Favs");
+	RG_setLabel("tags:RPG", "Favs", "Tag %s", "Collection %s", label, sizeof(label));
+	CHECK_STR(label, "Tag RPG");
+	RG_setLabel("smart:Mario", "Favs", "Tag %s", "Collection %s", label, sizeof(label));
+	CHECK_STR(label, "Collection Mario");
+	RG_setLabel("music.playlist", "Favs", "Tag %s", "Collection %s", label, sizeof(label));
+	CHECK_STR(label, "music.playlist");
 }
 
 static void testPlayed(void) {
@@ -259,26 +307,30 @@ static void testWeights(void) {
 	RG_add(&lib, "/r/GB (GB)/Hidden.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
 	RG_add(&lib, "/r/NES (FC)/Mario.nes", MOSAIC_ENTRY_ROM, "NES (FC)");
 
-	RGPathSet hidden_set;
-	RG_setInit(&hidden_set);
-	RG_setAdd(&hidden_set, "/r/GB (GB)/Hidden.gb");
+	RGPathSet only;
+	RG_setInit(&only);
+	RG_setAdd(&only, "/r/GB (GB)/Tetris.gb");
+	RG_setAdd(&only, "/r/GB (GB)/Kirby.gb");
+	RG_setAdd(&only, "/r/NES (FC)/Mario.nes");
 	const char* played[] = { "/r/GB (GB)/Tetris.gb" };
 
 	unsigned w[4];
-	CHECK(RG_weights(&lib, -1, &hidden_set, played, 1, 4, w) == 9);
+	CHECK(RG_weights(&lib, -1, &only, played, 1, 4, w) == 9);
 	CHECK(w[0] == 1 && w[1] == 4 && w[2] == 0 && w[3] == 4);
 
 	// one system
 	int gb = lib.games[0].system;
-	CHECK(RG_weights(&lib, gb, &hidden_set, played, 1, 4, w) == 5);
+	CHECK(RG_weights(&lib, gb, &only, played, 1, 4, w) == 5);
 	CHECK(w[0] == 1 && w[1] == 4 && w[2] == 0 && w[3] == 0);
 
 	// no unplayed preference: every game alike
-	CHECK(RG_weights(&lib, -1, &hidden_set, played, 1, 1, w) == 3);
+	CHECK(RG_weights(&lib, -1, &only, played, 1, 1, w) == 3);
 	CHECK(w[0] == 1 && w[1] == 1 && w[2] == 0 && w[3] == 1);
 	CHECK(RG_weights(&lib, -1, NULL, NULL, 0, 0, w) == 4);
 
-	RG_setClear(&hidden_set);
+	// an empty set picks nothing
+	RG_setClear(&only);
+	CHECK(RG_weights(&lib, -1, &only, played, 1, 4, w) == 0);
 	RG_free(&lib);
 }
 
@@ -411,7 +463,7 @@ static void testButton(void) {
 
 	// in a system folder: only that system, collated folders included,
 	// and never a hidden game
-	writeText(CARD "/.userdata/test/launcher/hidden.txt", GB "/Tetris.gb\n" MGB "\n");
+	filtered_paths = GB "/Tetris.gb\n" MGB "\n";
 	snprintf(current, sizeof(current), "%s", MGB);
 	for (int i = 0; i < 20; i++) {
 		seed = (unsigned long long)i * 7919 + 1;
@@ -421,14 +473,14 @@ static void testButton(void) {
 	}
 
 	// everything there hidden
-	writeText(CARD "/.userdata/test/launcher/hidden.txt", GB "\n" MGB "\n");
+	filtered_paths = GB "\n" MGB "\n";
 	opened[0] = '\0';
 	actions[at].run(NULL, NULL);
 	CHECK_STR(opened, "");
 	CHECK_STR(toasted, "No games to pick from");
 
 	// on the root: any system
-	unlink(CARD "/.userdata/test/launcher/hidden.txt");
+	filtered_paths = "";
 	snprintf(current, sizeof(current), "%s", CARD);
 	int nes = 0, gb = 0;
 	for (int i = 0; i < 200; i++) {
@@ -538,6 +590,105 @@ static void testTile(void) {
 	cfg_tile[0] = '\0';
 }
 
+static void favList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Kirby.gb", ctx);
+	add(NES "/Disc Game/Disc Game.m3u", ctx);
+	add(CARD "/Tools/test/Clock.pak", ctx); // not a game random-game knows
+}
+static void hiddenList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Tetris.gb", ctx);
+}
+static int noHas(const char* name, const char* path) {
+	(void)name;
+	(void)path;
+	return 0;
+}
+
+static void testFrom(void) {
+	fake_set_count = 0;
+	fakeSetRegister("favorites", noHas, favList);
+	fakeSetRegister("hidden", noHas, hiddenList);
+	fakeSetRegister("tags:Beat 'em Up", noHas, hiddenList);
+	start();
+	int pick = findAction("random-game.pick"), from = findAction("random-game.from");
+	CHECK(pick >= 0 && from >= 0);
+	if (pick < 0 || from < 0) return;
+	CHECK_STR(actions[from].label, "Pick from");
+	CHECK_STR(tile_action, ""); // the tile and button are off by default
+	CHECK_STR(bound, "random-game.pick");
+
+	// the list: All games, then every set but hidden
+	CHECK(actions[from].available(NULL, NULL));
+	chooses = 0;
+	actions[from].run(NULL, NULL);
+	CHECK(chooses == 1 && choice_count == 3 && choice_selected == 0);
+	CHECK_STR(choices[0], "All games");
+	CHECK_STR(choices[1], "Favorites");
+	CHECK_STR(choices[2], "Tag: Beat 'em Up");
+	choice_pick(1, NULL);
+	CHECK_STR(cfg_from, "favorites");
+	CHECK_STR(toasted, "Picking from Favorites");
+	actions[from].run(NULL, NULL);
+	CHECK(choice_selected == 1);
+	choice_pick(-1, NULL); // cancelled
+	CHECK_STR(cfg_from, "favorites");
+
+	// picks come from the set only, a game folder by its .m3u
+	snprintf(current, sizeof(current), "%s", CARD);
+	int kirby = 0, disc = 0;
+	for (int i = 0; i < 60; i++) {
+		seed = (unsigned long long)i * 7919 + 11;
+		actions[pick].run(NULL, NULL);
+		if (!strcmp(opened, GB "/Kirby.gb")) kirby++;
+		if (!strcmp(opened, NES "/Disc Game")) disc++;
+	}
+	CHECK(kirby > 0 && disc > 0 && kirby + disc == 60);
+	// and from the system Y is in
+	snprintf(current, sizeof(current), "%s", NES);
+	actions[pick].run(NULL, NULL);
+	CHECK_STR(opened, NES "/Disc Game");
+	// hidden ones never
+	filtered_paths = NES "/Disc Game\n";
+	snprintf(current, sizeof(current), "%s", CARD);
+	for (int i = 0; i < 10; i++) {
+		seed = (unsigned long long)i * 31 + 7;
+		actions[pick].run(NULL, NULL);
+		CHECK_STR(opened, GB "/Kirby.gb");
+	}
+	filtered_paths = GB "/Kirby.gb\n" NES "/Disc Game\n";
+	opened[0] = '\0';
+	actions[pick].run(NULL, NULL);
+	CHECK_STR(opened, "");
+	CHECK_STR(toasted, "No games to pick from");
+	filtered_paths = "";
+
+	// a set nobody registered, as when its plugin is off, has no games
+	snprintf(cfg_from, sizeof(cfg_from), "smart:Mario");
+	opened[0] = '\0';
+	actions[pick].run(NULL, NULL);
+	CHECK_STR(opened, "");
+	CHECK_STR(toasted, "No games to pick from");
+	actions[from].run(NULL, NULL);
+	CHECK(choice_selected == 0); // not in the list
+	choice_pick(0, NULL);
+	CHECK_STR(cfg_from, "all");
+	actions[pick].run(NULL, NULL);
+	CHECK(opened[0] != '\0');
+
+	// the tile and the button
+	snprintf(cfg_from_tile, sizeof(cfg_from_tile), "on");
+	snprintf(cfg_from_button, sizeof(cfg_from_button), "R2");
+	start();
+	CHECK_STR(tile_action, "random-game.from");
+	CHECK_STR(bound, "random-game.from");
+	CHECK(bound_button == MOSAIC_BUTTON_R2);
+	cfg_from_tile[0] = cfg_from_button[0] = '\0';
+	cfg_from[0] = '\0';
+	fake_set_count = 0;
+}
+
 static void testOldLauncher(void) {
 	fake.size = offsetof(MosaicHost, open_path);
 	start();
@@ -553,7 +704,7 @@ int main(void) {
 	makeCard();
 	testSystems();
 	testNames();
-	testHiddenSet();
+	testSets();
 	testPlayed();
 	testWeights();
 	testPick();
@@ -562,6 +713,7 @@ int main(void) {
 	testButton();
 	testRootRow();
 	testTile();
+	testFrom();
 	testOldLauncher();
 	quit();
 	CHECK_DONE();

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "fakesets.h"
 #include "../../plugins/smart-collections/smart_collections.c"
 
@@ -110,7 +111,7 @@ static int pressY(void) {
 #define CARD TEST_SDCARD_PATH
 #define FOLDER CARD "/Smart Collections"
 
-static const MosaicHost fake = {
+static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
 	.platform = "test",
@@ -313,7 +314,7 @@ static void testPlugin(void) {
 	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "smart-collections");
 	CHECK(p->init(&fake) == 0);
-	CHECK(actions == 2 && bound_y == 2);
+	CHECK(actions == 3 && bound_y == 3);
 
 	// one folder on the root
 	MosaicList* root = fakeListNew();
@@ -452,8 +453,87 @@ static void testPlugin(void) {
 	p->quit();
 }
 
+static char keyboard_initial[128];
+static void (*keyboard_done)(const char*, void*);
+static void fakeKeyboard(const char* title, const char* initial, void (*done)(const char*, void*), void* data) {
+	(void)title;
+	(void)data;
+	snprintf(keyboard_initial, sizeof(keyboard_initial), "%s", initial);
+	keyboard_done = done;
+}
+static int tags_on = 1;
+static int fakeHasCapability(const char* name) { return tags_on && !strcmp(name, "tags.copy"); }
+static char copied[512];
+static const char* copy_reply = "tag=Mario games\ngames=2";
+static int fakeTagsCopy(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	snprintf(copied, sizeof(copied), "%s", args);
+	snprintf(out, size, "%s", copy_reply);
+	return 0;
+}
+
+static void testSaveAsTag(void) {
+	cfg_count = 0;
+	fake.keyboard = fakeKeyboard;
+	fake.has_capability = fakeHasCapability;
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	fake_provider_count = 0;
+	fakeProvide("tags.copy", fakeTagsCopy);
+	actions = 0;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake);
+	CHECK(p->init(&fake) == 0);
+	MosaicList* top = p->virtual_dir(FOLDER);
+	MosaicEntry* mario = named(top, "Mario");
+	CHECK(mario != NULL);
+	if (!mario) return;
+
+	// on a collection, Y has Dismiss and Save as tag, which the launcher
+	// puts in a menu
+	selected = mario;
+	CHECK(available[0](NULL, NULL) && available[2](NULL, NULL));
+	MosaicList* games = p->virtual_dir(FOLDER "/Mario");
+	selected = games->items[0];
+	CHECK(!available[2](NULL, NULL)); // not on a game
+	selected = mario;
+
+	run[2](NULL, NULL);
+	CHECK_STR(keyboard_initial, "Mario");
+	keyboard_done("Mario games", NULL);
+	CHECK_STR(copied, "tag=Mario games\nset=smart:Mario");
+	CHECK_STR(toasted, "Saved 2 games as Mario games");
+
+	// what tags.copy refuses
+	run[2](NULL, NULL);
+	copy_reply = "error=exists";
+	keyboard_done("Mario games", NULL);
+	CHECK_STR(toasted, "A tag named Mario games already exists");
+	run[2](NULL, NULL);
+	copy_reply = "error=empty";
+	keyboard_done("Mario games", NULL);
+	CHECK_STR(toasted, "Couldn't save the tag");
+	// cancelled
+	run[2](NULL, NULL);
+	copied[0] = '\0';
+	keyboard_done(NULL, NULL);
+	CHECK_STR(copied, "");
+
+	// a dismissed collection, or tags off, has no Save as tag
+	tags_on = 0;
+	CHECK(!available[2](NULL, NULL));
+	tags_on = 1;
+	run[0](NULL, NULL);
+	sayYes();
+	CHECK(!available[2](NULL, NULL));
+	p->quit();
+	fake.keyboard = NULL;
+	fake.has_capability = NULL;
+	fake.call = NULL;
+}
+
 int main(void) {
 	testModel();
 	testPlugin();
+	testSaveAsTag();
 	CHECK_DONE();
 }

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "check.h"
 #include "fakeproviders.h"
+#include "fakesets.h"
 #include "../../plugins/row-badges/row_badges.c"
 
 struct MosaicEntry {
@@ -20,9 +21,11 @@ struct MosaicEntry {
 
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 
-static char cfg_unplayed[8] = "off", cfg_tiers[8] = "off";
+static char cfg_unplayed[8] = "off", cfg_tiers[8] = "off", cfg_favorites[8] = "off", cfg_tagged[8] = "off";
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "unplayed")) return cfg_unplayed;
+	if (!strcmp(key, "favorites")) return cfg_favorites;
+	if (!strcmp(key, "tagged")) return cfg_tagged;
 	if (!strcmp(key, "tiers")) return cfg_tiers;
 	return fallback;
 }
@@ -50,6 +53,7 @@ static long long fakePlayTime(const char* path) { return strstr(path, "Tracked")
 static int fakePlayCount(const char* path) { return strstr(path, "Tracked") ? 1 : 0; }
 static int fakeThemeColor(int index) {
 	return index == MOSAIC_COLOR_ACCENT ? 0xAA0000 : index == MOSAIC_COLOR_LIST_TEXT ? 0xFFFFFF
+		: index == MOSAIC_COLOR_ACCENT2 ? 0x00AA00 : index == MOSAIC_COLOR_HINT ? 0x0000AA
 		: index == MOSAIC_COLOR_BACKGROUND ? 0x123456 : -1;
 }
 
@@ -77,6 +81,45 @@ static int fakeDecorateCell(MosaicSurface* s, int i, const MosaicRect* r, const 
 	return -1;
 }
 
+static int fakeSetListCall(const char* name, void (*each)(const char*, void*), void* data) {
+	int i = fakeSetFind(name);
+	if (i < 0) return -1;
+	if (each) fake_set_list[i](name, each, data);
+	return 0;
+}
+static void (*set_changed_fn)(const char*, const char*, void*);
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	if (!strcmp(name, "launcher.set_changed")) set_changed_fn = on_event;
+	return 0;
+}
+static int redraws = 0;
+static void fakeRedraw(void) { redraws++; }
+
+// favorites, and two tags
+static const char* fav_extra = NULL;
+static void favList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Fav.gb", ctx);
+	add(GB "/Both.gb", ctx);
+	add(CARD "/Tools/test/Clock.pak", ctx);
+	if (fav_extra) add(fav_extra, ctx);
+}
+static void rpgList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Both.gb", ctx);
+	add(PS "/Final Fantasy VII/Final Fantasy VII.m3u", ctx);
+}
+static void puzzleList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Tagged.gb", ctx);
+}
+static int noHas(const char* name, const char* path) {
+	(void)name;
+	(void)path;
+	return 0;
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -99,6 +142,10 @@ static MosaicHost fake = {
 	.event_value = fakeEventValue,
 	.provide = fakeProvide,
 	.call = fakeCall,
+	.set_list = fakeSetListCall,
+	.set_names = fakeSetNames,
+	.subscribe = fakeSubscribe,
+	.request_redraw = fakeRedraw,
 };
 
 // what games.played says about path
@@ -276,7 +323,7 @@ int main(void) {
 	CHECK(RB_tier(NULL) == 0);
 
 	// dots after the name
-	MosaicRect rect = { 10, 20, 300, 60 }, name = { 10, 20, 100, 60 }, none = { 10, 20, 0, 60 }, at[1 + RB_MAX_TIER];
+	MosaicRect rect = { 10, 20, 300, 60 }, name = { 10, 20, 100, 60 }, none = { 10, 20, 0, 60 }, at[RB_MAX_MARKS + RB_MAX_TIER];
 	CHECK(RB_place(&rect, &name, 8, 4, 1, 2, at) == 3);
 	CHECK(at[0].x == 118 && at[0].y == 46 && at[0].w == 8 && at[0].h == 8);
 	CHECK(at[1].x == 134 && at[2].x == 146 && at[2].y == 46);
@@ -298,6 +345,26 @@ int main(void) {
 	CHECK(at[1].x + at[1].w == 10 + 300 - 8 && at[0].y == 28 && at[0].x == at[1].x - 16);
 	CHECK(RB_place(&rect, NULL, 8, 4, 1, 0, at) == 1);
 	CHECK(at[0].x == 294 && at[0].y == 28);
+	// three marks, a gap apart, then the tiers twice the gap after them
+	CHECK(RB_place(&rect, &name, 8, 4, 3, 2, at) == 5);
+	CHECK(at[0].x == 118 && at[1].x == 130 && at[2].x == 142 && at[3].x == 158 && at[4].x == 170);
+	CHECK(RB_place(&rect, &name, 8, 4, 9, 0, at) == RB_MAX_MARKS);
+	CHECK(RB_place(&rect, &name, 8, 4, -1, 0, at) == 0);
+
+	// paths other plugins' sets hold
+	RBSet paths;
+	RB_setInit(&paths);
+	CHECK(!RB_pathsHas(&paths, "/a"));
+	CHECK(RB_pathsAdd(&paths, "/r/PS/FF7/FF7.m3u") == 0 && RB_pathsAdd(&paths, "/r/GB/Tetris.gb") == 0);
+	CHECK(RB_pathsAdd(&paths, "/r/GB/Tetris.gb") == 0 && RB_pathsAdd(&paths, "/r/PS/Crash/Crash.cue") == 0);
+	CHECK(RB_pathsAdd(&paths, "") == -1 && RB_pathsAdd(&paths, NULL) == -1);
+	RB_setFinish(&paths);
+	CHECK(paths.count == 3);
+	CHECK(RB_pathsHas(&paths, "/r/GB/Tetris.gb") && !RB_pathsHas(&paths, "/r/GB/Tetris"));
+	CHECK(RB_hasGame(&paths, "/r/GB/Tetris.gb", 0));
+	CHECK(RB_hasGame(&paths, "/r/PS/FF7", 1) && RB_hasGame(&paths, "/r/PS/Crash", 1));
+	CHECK(!RB_hasGame(&paths, "/r/PS/FF7", 0) && !RB_hasGame(&paths, "/r/PS/Other", 1));
+	RB_setFree(&paths);
 	// too small for them
 	MosaicRect small = { 0, 0, 20, 60 };
 	CHECK(RB_place(&small, NULL, 8, 4, 1, 3, at) == 0);
@@ -420,6 +487,55 @@ int main(void) {
 	CHECK(dots(GB "/Tracked.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);
 	CHECK(dots(GB "/Fresh.gb", MOSAIC_ENTRY_ROM, "", 1) == 1);
 	quit();
+
+	// favorite and tag marks, after the unplayed dot and before the tiers
+	fake_set_count = 0;
+	fakeSetRegister("favorites", noHas, favList);
+	fakeSetRegister("tags:RPG", noHas, rpgList);
+	fakeSetRegister("tags:Puzzle", noHas, puzzleList);
+	fakeSetRegister("hidden", noHas, favList); // not a tag
+	strcpy(cfg_unplayed, "off");
+	strcpy(cfg_favorites, "on");
+	CHECK(init(&fake) == 0);
+	CHECK(dots(GB "/Fav.gb", MOSAIC_ENTRY_ROM, "", 1) == 1 && drawn_rgb[0] == 0x00AA00);
+	CHECK(dots(GB "/Tagged.gb", MOSAIC_ENTRY_ROM, "", 1) == 0); // the tag mark is off
+	CHECK(dots(CARD "/Tools/test/Clock.pak", MOSAIC_ENTRY_PAK, "", 1) == 1); // paks too
+	quit();
+	strcpy(cfg_unplayed, "on");
+	strcpy(cfg_tagged, "on");
+	strcpy(cfg_tiers, "on");
+	set_changed_fn = NULL;
+	CHECK(init(&fake) == 0);
+	CHECK(set_changed_fn != NULL);
+	CHECK(dots(GB "/Both.gb", MOSAIC_ENTRY_ROM, "2", 1) == 5);
+	CHECK(drawn_rgb[0] == 0xAA0000 && drawn_rgb[1] == 0x00AA00 && drawn_rgb[2] == 0x0000AA && drawn_rgb[3] == 0xFFFFFF);
+	CHECK(drawn[1].x == drawn[0].x + 8 + 4 && drawn[3].x == drawn[2].x + 8 + 4 + 4);
+	CHECK(dots(GB "/Tagged.gb", MOSAIC_ENTRY_ROM, "", 1) == 2 && drawn_rgb[1] == 0x0000AA);
+	CHECK(dots(GB "/Saved.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);
+	// a game folder by its .m3u
+	CHECK(dots(PS "/Final Fantasy VII", MOSAIC_ENTRY_DIR, "", 1) == 1 && drawn_rgb[0] == 0x0000AA);
+	// a changed set is read again, and other sets' changes are left alone
+	fav_extra = GB "/Saved.gb";
+	redraws = 0;
+	set_changed_fn("launcher.set_changed", "name=hidden", NULL);
+	CHECK(redraws == 0 && dots(GB "/Saved.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);
+	set_changed_fn("launcher.set_changed", "name=favorites", NULL);
+	CHECK(redraws == 1 && dots(GB "/Saved.gb", MOSAIC_ENTRY_ROM, "", 1) == 1);
+	fake_set_count = 0; // tags off
+	set_changed_fn("launcher.set_changed", "name=tags:Puzzle", NULL);
+	CHECK(redraws == 2 && dots(GB "/Tagged.gb", MOSAIC_ENTRY_ROM, "", 1) == 1);
+	CHECK(dots(GB "/Fav.gb", MOSAIC_ENTRY_ROM, "", 1) == 1); // the unplayed dot alone
+	fav_extra = NULL;
+	quit();
+	// a launcher without sets: no marks
+	fake.size = offsetof(MosaicHost, set_register);
+	CHECK(init(&fake) == 0);
+	CHECK(!show_favorites && !show_tagged);
+	quit();
+	fake.size = sizeof(MosaicHost);
+	strcpy(cfg_favorites, "off");
+	strcpy(cfg_tagged, "off");
+	strcpy(cfg_tiers, "off");
 
 	// a launcher without .info sidecars keeps the unplayed dot only
 	strcpy(cfg_unplayed, "on");

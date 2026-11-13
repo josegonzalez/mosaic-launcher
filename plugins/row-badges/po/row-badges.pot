@@ -15,7 +15,15 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: plugin.txt
+msgid "Favorite mark"
+msgstr ""
+
+#: plugin.txt
 msgid "Row badges"
+msgstr ""
+
+#: plugin.txt
+msgid "Tag mark"
 msgstr ""
 
 #: plugin.txt

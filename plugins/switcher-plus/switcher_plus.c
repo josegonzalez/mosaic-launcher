@@ -22,9 +22,11 @@
 // button that opened it does nothing. It draws stock's hints with
 // draw_hints (see SP_hints).
 //
-// recent_info reads the card, so each recent's info is kept until the
-// recents change (their count or any path, checked each frame) and asked
-// again each time the switcher opens. Previews come from art_load, and
+// Recents a plugin's filter hides, such as the hidden plugin's games, are
+// left out (is_filtered), and A and Y act on the recent shown. recent_info
+// reads the card, so each recent's info is kept until the recents change
+// (their count or any path, checked each frame) or a set does
+// (launcher.set_changed), and asked again each time the switcher opens. Previews come from art_load, and
 // each is copied once with surface_scale to the size it's drawn at; the
 // copies, the plugin's own surfaces, are kept until it closes, the least
 // recently drawn going first. Everything is drawn around the status pill
@@ -102,8 +104,23 @@ static int infoOf(int index, MosaicRecent* out, void* data) {
 	return host->recent_info(index, out);
 }
 
+// A recent a plugin's filter hides, such as a hidden game, isn't shown.
+static int skipOf(const char* path, void* data) {
+	(void)data;
+	return path[0] && MOSAIC_HOST_HAS(host, is_filtered) && host->is_filtered(path);
+}
+
+// Any set's change may change what's filtered: ask again on the next frame.
+static void setChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	recents.count = -1;
+	host->request_redraw();
+}
+
 static void sync(void) {
-	SP_sync(&recents, host->recents_count(), pathOf, NULL);
+	SP_sync(&recents, host->recents_count(), pathOf, skipOf, NULL);
 	if (selected >= recents.count) selected = recents.count > 0 ? recents.count - 1 : 0;
 	if (selected < 0) selected = 0;
 }
@@ -466,7 +483,7 @@ static void leave(void* data) {
 
 static void openSelected(void) {
 	const char* name = nameOf(selected);
-	int rc = host->recent_open(selected, 1);
+	int rc = selected < recents.count ? host->recent_open(recents.index[selected], 1) : 0;
 	char message[SP_PATH_MAX + 64];
 	snprintf(message, sizeof(message), rc == 1 ? "opening %i: %s" : "can't open %i: %s", selected, name);
 	say(message);
@@ -474,7 +491,7 @@ static void openSelected(void) {
 
 static void removeSelected(void) {
 	int at = selected;
-	int rc = host->recent_remove(at);
+	int rc = at < recents.count ? host->recent_remove(recents.index[at]) : -1;
 	sync();
 	if (rc == 0) selected = SP_afterRemove(at, recents.count);
 	char message[64];
@@ -585,6 +602,7 @@ static int init(const MosaicHost* h) {
 		say("can't register the switcher screen");
 		return 1;
 	}
+	if (MOSAIC_HOST_HAS(host, set_names)) host->subscribe("launcher.set_changed", setChanged, NULL);
 	char message[64];
 	snprintf(message, sizeof(message), "style %s%s", styleName(style), captions_on ? ", captions on" : "");
 	say(message);

@@ -10,6 +10,7 @@ Turn on **Hidden games** in Launcher > Plugins ([how](../../docs/plugins.md#turn
 
 - On the game list, press **Y** (the Hide button setting picks another) to hide the selected game or [pak](../../docs/glossary.md#pak).
 - A Hidden folder on the first screen, shown while something is hidden, lists them. In it the same button unhides the selected one.
+- Hidden games are also left out of [`search`](../search/README.md) results, [`random-game`](../random-game/README.md)'s picks, [`home-dashboard`](../home-dashboard/README.md), [`switcher-plus`](../switcher-plus/README.md), the [`screensaver`](../screensaver/README.md) and [`activity-stats`](../activity-stats/README.md)' lists.
 
 ## Screenshots
 

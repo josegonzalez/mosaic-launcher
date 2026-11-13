@@ -10,8 +10,10 @@
 // the last 30, from play_time_on, and two lists of every game in the
 // history, from play_games_count and play_game_info: Games, most played
 // first, with each game's time and sessions, and Launches, most sessions
-// first. Up and down move through a list, and A opens the selected game
-// with open_path while its path is on the card. B closes it. Sessions are
+// first. Games a plugin's filter hides, such as the hidden plugin's, are
+// left out of both, and of their totals (is_filtered); the day charts
+// count every game. Up and down move through a list, and A opens the
+// selected game with open_path while its path is on the card. B closes it. Sessions are
 // the tracker's: waking from sleep starts a new one. When the history
 // can't be read every tab says "No play history".
 //
@@ -86,6 +88,8 @@ static void readGames(void) {
 		memset(&info, 0, sizeof(info));
 		info.size = sizeof(info);
 		if (host->play_game_info(i, &info) != 0) continue;
+		// what a plugin's filter hides, such as the hidden plugin's games
+		if (!info.orphan && MOSAIC_HOST_HAS(host, is_filtered) && host->is_filtered(info.path)) continue;
 		ASGame* game = &games[n++];
 		snprintf(game->path, sizeof(game->path), "%s", info.orphan ? "" : info.path);
 		AS_name(info.name, info.path, game->name, sizeof(game->name));

@@ -11,7 +11,15 @@
 //
 // Games match by the name the game list shows for them (map.txt names
 // included), with case, accents and punctuation folded away, and every
-// word of the query in the name, in any order. The best matches come
+// word of the query in the name, in any order. Terms can also be filters,
+// which a game has to pass too, each negated by a leading '-': fav: (in
+// the favorites set), tag:<name> (in that tag's set, names compared
+// without case, accents or spaces), unplayed (games.played says it
+// wasn't, or without that service, it isn't in recents) and system:<name>
+// (a system folder's tag or the start of its name), so "fav: system:gb
+// mario" or "-tag:beaten". A set nobody registered, as when its plugin is
+// off, holds nothing. The results are searched again when a set changes
+// (launcher.set_changed). The best matches come
 // first: the name itself, then names starting with the query, then names
 // with each word starting a word, then the rest, each by name.
 //
@@ -37,6 +45,7 @@
 #define FOLDER_NAME "Search"
 #define MAX_PATH_LEN 512
 #define MAX_DEPTH 3 // subfolders below a system folder that are scanned
+#define SE_RECENTS_LOOKED 64 // more than the game switcher keeps
 #ifndef SE_LAST_FILE
 #define SE_LAST_FILE "/tmp/mosaic-search.last" // the game launched from the results, for post_return
 #endif
@@ -227,6 +236,105 @@ static int cardChanged(void) {
 }
 
 ///////////////////////////////////////
+// filters
+
+// each filter's set's members, for fav: and tag:, while a search runs
+static SEPaths members[SE_FILTERS_MAX];
+static int recent_count = 0;
+static char recent_paths[SE_RECENTS_LOOKED][MAX_PATH_LEN];
+
+static void addMember(const char* path, void* data) {
+	SE_pathsAdd(data, path);
+}
+
+typedef struct TagFind {
+	const char* arg;
+	char name[SE_NAME_LEN + 8];
+} TagFind;
+
+static void findTag(const char* name, void* data) {
+	TagFind* find = data;
+	if (!find->name[0] && SE_tagMatches(name, find->arg)) snprintf(find->name, sizeof(find->name), "%s", name);
+}
+
+// Lists the sets the filters name, once a search. A set nobody registered,
+// as when its plugin is off, has nothing in it.
+static void prepare(const SEQuery* parsed) {
+	int sets = MOSAIC_HOST_HAS(host, set_names);
+	for (int i = 0; i < parsed->filter_count; i++) {
+		SE_pathsInit(&members[i]);
+		const SEFilter* f = &parsed->filters[i];
+		if (!sets) continue;
+		if (f->kind == SE_FILTER_FAV) host->set_list("favorites", addMember, &members[i]);
+		else if (f->kind == SE_FILTER_TAG) {
+			TagFind find = { f->arg, "" };
+			host->set_names(findTag, &find);
+			if (find.name[0]) host->set_list(find.name, addMember, &members[i]);
+		}
+	}
+	recent_count = 0;
+	if (!MOSAIC_HOST_HAS(host, recents_count)) return;
+	int count = host->recents_count();
+	for (int i = 0; i < count && recent_count < SE_RECENTS_LOOKED; i++) {
+		const char* path = host->recent_path(i);
+		if (path) snprintf(recent_paths[recent_count++], MAX_PATH_LEN, "%s", path);
+	}
+}
+
+// A set holds a game folder by its .m3u or .cue, as stock records it.
+static int inSet(SEPaths* set, const SEGame* game) {
+	if (SE_pathsHas(set, game->path)) return 1;
+	if (game->type != MOSAIC_ENTRY_DIR) return 0;
+	const char* name = strrchr(game->path, '/');
+	char file[MAX_PATH_LEN * 2];
+	snprintf(file, sizeof(file), "%s%s.m3u", game->path, name);
+	if (SE_pathsHas(set, file)) return 1;
+	snprintf(file, sizeof(file), "%s%s.cue", game->path, name);
+	return SE_pathsHas(set, file);
+}
+
+// games.played's answer, or without it, whether the game or a file in its
+// folder is in recents.
+static int played(const SEGame* game) {
+	if (MOSAIC_HOST_HAS(host, call)) {
+		char args[MAX_PATH_LEN + 8], reply[64], value[8];
+		snprintf(args, sizeof(args), "path=%s", game->path);
+		if (host->call("games.played", args, reply, sizeof(reply)) >= 0
+				&& host->event_value(reply, "played", value, sizeof(value)) > 0) return !strcmp(value, "1");
+	}
+	size_t len = strlen(game->path);
+	for (int i = 0; i < recent_count; i++) {
+		const char* recent = recent_paths[i];
+		if (!strcmp(recent, game->path) || (!strncmp(recent, game->path, len) && recent[len] == '/')) return 1;
+	}
+	return 0;
+}
+
+static int passesFilter(const SEGame* game, int filter, const SEFilter* f, void* data) {
+	(void)data;
+	switch (f->kind) {
+	case SE_FILTER_FAV:
+	case SE_FILTER_TAG:
+		return inSet(&members[filter], game);
+	case SE_FILTER_UNPLAYED:
+		return !played(game);
+	case SE_FILTER_SYSTEM:
+		return SE_systemMatches(roms_path, game->path, f->arg);
+	}
+	return 0;
+}
+
+// A set changed: the results may have too.
+static void setChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	if (!hits_valid) return;
+	hits_valid = 0;
+	if (inFolder() && MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
+}
+
+///////////////////////////////////////
 // searching
 
 // Searches for query, unless the results for it are still good.
@@ -248,7 +356,11 @@ static void refresh(void) {
 		return;
 	}
 	double start = millis();
-	hit_count = SE_search(&index_, query, hits);
+	SEQuery parsed;
+	SE_parse(query, &parsed);
+	prepare(&parsed);
+	hit_count = SE_search(&index_, &parsed, passesFilter, NULL, hits);
+	for (int i = 0; i < SE_FILTERS_MAX; i++) SE_pathsFree(&members[i]);
 	SE_orderBuild(&order, &index_, hits, hit_count);
 
 	char message[SE_QUERY_LEN + 96];
@@ -481,6 +593,7 @@ static int init(const MosaicHost* h) {
 		say("this launcher has no keyboard or can't open folders for plugins; nothing to do");
 		return 0;
 	}
+	if (MOSAIC_HOST_HAS(host, set_names)) host->subscribe("launcher.set_changed", setChanged, NULL);
 	if (host->register_action("search.open", "SEARCH", 0, canSearch, searchAction, NULL) != 0) {
 		say("couldn't register search.open");
 		return 0;

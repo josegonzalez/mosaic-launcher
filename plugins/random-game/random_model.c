@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mosaic_plugin.h"
 
 static char* copyString(const char* s) {
 	size_t len = strlen(s) + 1;
@@ -159,37 +160,28 @@ int RG_setAdd(RGPathSet* set, const char* path) {
 	return 0;
 }
 
-int RG_setLoad(RGPathSet* set, const char* file) {
-	RG_setClear(set);
-	FILE* f = fopen(file, "r");
-	if (!f) return 0;
-	char line[RG_PATH_LEN * 2];
-	int result = 0;
-	while (fgets(line, sizeof(line), f)) {
-		size_t len = strlen(line);
-		while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = '\0';
-		while (len > 1 && line[len - 1] == '/') line[--len] = '\0';
-		if (!len || line[0] == '#') continue;
-		if (RG_setAdd(set, line) < 0) {
-			result = -1;
-			break;
-		}
-	}
-	fclose(f);
-	return result;
+int RG_inSet(const RGPathSet* set, const char* path, int type) {
+	if (!set || !path) return 0;
+	if (RG_setHas(set, path)) return 1;
+	if (type != MOSAIC_ENTRY_DIR) return 0;
+	const char* name = strrchr(path, '/');
+	if (!name) return 0;
+	char file[RG_PATH_LEN * 2];
+	snprintf(file, sizeof(file), "%s%s.m3u", path, name);
+	if (RG_setHas(set, file)) return 1;
+	snprintf(file, sizeof(file), "%s%s.cue", path, name);
+	return RG_setHas(set, file);
 }
 
-int RG_isHidden(const RGPathSet* hidden, const char* path) {
-	if (!hidden || !hidden->count) return 0;
-	if (RG_setHas(hidden, path)) return 1;
-	const char* slash = strrchr(path, '/');
-	if (!slash || slash == path) return 0;
-	size_t len = (size_t)(slash - path);
-	if (len >= RG_PATH_LEN) return 0;
-	char dir[RG_PATH_LEN];
-	memcpy(dir, path, len);
-	dir[len] = '\0';
-	return RG_setHas(hidden, dir);
+int RG_pickable(const char* name) {
+	return name && name[0] && strcmp(name, "hidden") != 0;
+}
+
+void RG_setLabel(const char* name, const char* fav, const char* tag, const char* smart, char* out, size_t size) {
+	if (!strcmp(name, "favorites")) snprintf(out, size, "%s", fav);
+	else if (!strncmp(name, "tags:", 5)) snprintf(out, size, tag, name + 5);
+	else if (!strncmp(name, "smart:", 6)) snprintf(out, size, smart, name + 6);
+	else snprintf(out, size, "%s", name);
 }
 
 ///////////////////////////////////////
@@ -205,14 +197,14 @@ int RG_isPlayed(const char* path, const char* const* recents, int count) {
 	return 0;
 }
 
-unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* hidden,
+unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* only,
 		const char* const* recents, int recent_count, unsigned unplayed_weight, unsigned* weights) {
 	unsigned long total = 0;
 	if (unplayed_weight < 1) unplayed_weight = 1;
 	for (int i = 0; i < lib->count; i++) {
 		const RGGame* game = &lib->games[i];
 		unsigned weight = 0;
-		if ((system < 0 || game->system == system) && !RG_isHidden(hidden, game->path)) {
+		if ((system < 0 || game->system == system) && (!only || RG_inSet(only, game->path, game->type))) {
 			weight = RG_isPlayed(game->path, recents, recent_count) ? 1 : unplayed_weight;
 		}
 		weights[i] = weight;

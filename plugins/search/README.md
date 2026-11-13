@@ -14,6 +14,17 @@ Turn on **Search** in Launcher > Plugins ([how](../../docs/plugins.md#turning-pl
 
 A game matches when every word of the query is in the name the game list shows for it (`map.txt` names included), in any order, with case, accents and punctuation left out. So "pokemon" finds "Pokémon Red" and "links" finds "Link's Awakening".
 
+Words can be mixed with filters, and a game has to match every word and pass every filter. A `-` in front of a filter turns it around.
+
+| Filter | Finds |
+|---|---|
+| `fav:` | Your [favorites](../favorites/README.md) |
+| `tag:<name>` | Games with that [tag](../tags/README.md), the name typed without spaces, case or accents, so `tag:beatemup` finds "Beat 'em Up" |
+| `unplayed` | Games you haven't played, as [`row-badges`](../row-badges/README.md) counts them while it's on, and otherwise games not in Recently Played |
+| `system:<name>` | Games in a system, by the tag in its folder's name (`system:gb` for `Game Boy (GB)`) or the start of its name (`system:gameboy`) |
+
+So `fav: system:gb mario` finds your Game Boy favorites with Mario in the name, and `-tag:beaten` every game without the Beaten tag. A filter on its own lists every game that passes it. While the plugin a filter needs is off, `fav:` and `tag:` find nothing.
+
 The best matches come first, each by name:
 
 1. The name itself.
@@ -47,7 +58,9 @@ Results for "tobu".
 
 - Registers the `search.open` action, which the `button` setting follows, and adds a root folder.
 - Keeps the query in `.userdata/<platform>/launcher/search.cfg`.
-- Reads the `hidden` entry set.
+- Reads the `favorites` and `tags:<name>` entry sets for `fav:` and `tag:`, and searches again on `launcher.set_changed`.
+- Calls the `games.played` service for `unplayed`, from row-badges.
+- Games any plugin's filter hides, such as [`hidden`](../hidden/README.md)'s, are left out of the results.
 
 ## Credits
 

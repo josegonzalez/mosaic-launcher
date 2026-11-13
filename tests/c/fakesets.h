@@ -15,14 +15,14 @@ static int (*fake_set_has[FAKE_SETS_MAX])(const char* name, const char* path);
 static void (*fake_set_list[FAKE_SETS_MAX])(const char* name, void (*add)(const char* path, void* ctx), void* ctx);
 static int fake_set_count = 0;
 
-static int fakeSetFind(const char* name) {
+static __attribute__((unused)) int fakeSetFind(const char* name) {
 	for (int i = 0; i < fake_set_count; i++) {
 		if (!strcmp(fake_set_names[i], name)) return i;
 	}
 	return -1;
 }
 
-static int fakeSetRegister(const char* name, int (*has)(const char* name, const char* path),
+static __attribute__((unused)) int fakeSetRegister(const char* name, int (*has)(const char* name, const char* path),
 		void (*list)(const char* name, void (*add)(const char* path, void* ctx), void* ctx)) {
 	int i = fakeSetFind(name);
 	if (i < 0) {
@@ -35,7 +35,7 @@ static int fakeSetRegister(const char* name, int (*has)(const char* name, const 
 	return 0;
 }
 
-static int fakeSetUnregister(const char* name) {
+static __attribute__((unused)) int fakeSetUnregister(const char* name) {
 	int i = fakeSetFind(name);
 	if (i < 0) return -1;
 	for (int j = i; j < fake_set_count - 1; j++) {
@@ -50,36 +50,36 @@ static int fakeSetUnregister(const char* name) {
 // The sets announced with set_changed, one name a line, until cleared.
 static char fake_set_changed[2048];
 
-static int fakeSetChanged(const char* name) {
+static __attribute__((unused)) int fakeSetChanged(const char* name) {
 	size_t len = strlen(fake_set_changed);
 	snprintf(fake_set_changed + len, sizeof(fake_set_changed) - len, "%s\n", name);
 	return 0;
 }
 
-static int fakeSetNames(void (*each)(const char* name, void* data), void* data) {
+static __attribute__((unused)) int fakeSetNames(void (*each)(const char* name, void* data), void* data) {
 	for (int i = 0; each && i < fake_set_count; i++) each(fake_set_names[i], data);
 	return fake_set_count;
 }
 
-static int fakeIsFiltered(const char* path) {
+static __attribute__((unused)) int fakeIsFiltered(const char* path) {
 	(void)path;
 	return 0;
 }
 
 // set_has on a registered set, or -1 for none.
-static int fakeSetHas(const char* name, const char* path) {
+static __attribute__((unused)) int fakeSetHas(const char* name, const char* path) {
 	int i = fakeSetFind(name);
 	return i < 0 ? -1 : fake_set_has[i](name, path) != 0;
 }
 
-static void fakeSetAdd(const char* path, void* ctx) {
+static __attribute__((unused)) void fakeSetAdd(const char* path, void* ctx) {
 	char* out = ctx;
 	size_t len = strlen(out);
 	snprintf(out + len, 2048 - len, "%s\n", path);
 }
 
 // What a registered set lists, one path a line, or "none" for no set.
-static const char* fakeSetList(const char* name) {
+static __attribute__((unused)) const char* fakeSetList(const char* name) {
 	static char out[2048];
 	out[0] = '\0';
 	int i = fakeSetFind(name);

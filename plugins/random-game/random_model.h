@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 // Picking a random game: the games found on the card, which of them are
-// played or hidden, and a weighted pick. No SDL and no host here, so the
+// played or in the set picked from, and a weighted pick. No SDL and no host here, so the
 // host tests can check it on its own with a random source of their own.
 
 #define RG_PATH_LEN 512
@@ -62,17 +62,22 @@ typedef struct RGPathSet {
 void RG_setInit(RGPathSet* set);
 void RG_setClear(RGPathSet* set);
 
-// Replaces the set with a file's lines, read the way the hidden plugin
-// reads its hidden.txt: blank lines and lines starting with # are skipped,
-// and a trailing slash is dropped. A missing file is an empty set. Returns
-// 0, or -1 when memory ran out.
-int RG_setLoad(RGPathSet* set, const char* file);
 int RG_setAdd(RGPathSet* set, const char* path);
 int RG_setHas(const RGPathSet* set, const char* path);
 
-// True when the hidden plugin hides path: it, or the folder it's in, is in
-// the set.
-int RG_isHidden(const RGPathSet* hidden, const char* path);
+// True when set has the game at path: the path itself, or for a game
+// folder (type MOSAIC_ENTRY_DIR) the .m3u or .cue named after it inside,
+// as stock records one.
+int RG_inSet(const RGPathSet* set, const char* path, int type);
+
+// The "from" setting's sets: every one but hidden, whose games are never
+// picked. 1 when name can be picked from.
+int RG_pickable(const char* name);
+
+// What the pick from list shows for a set: fav for favorites, tag (a
+// printf format with one %s) with the name for tags:<name>, smart the same
+// for smart:<name>, and other names as they are.
+void RG_setLabel(const char* name, const char* fav, const char* tag, const char* smart, char* out, size_t size);
 
 // True when a game was played: one of recents (full paths, as the game
 // switcher keeps them) is it, or is inside it, as a game folder's .m3u or
@@ -80,9 +85,10 @@ int RG_isHidden(const RGPathSet* hidden, const char* path);
 int RG_isPlayed(const char* path, const char* const* recents, int count);
 
 // Fills weights (one per game) for a pick from system, or from every
-// system with -1: 0 for games outside it or hidden, unplayed_weight for
-// unplayed ones and 1 for played ones. Returns the total.
-unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* hidden,
+// system with -1, and from the games in only, or every game with NULL: 0
+// for games outside them, unplayed_weight for unplayed ones and 1 for
+// played ones. Returns the total.
+unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* only,
 	const char* const* recents, int recent_count, unsigned unplayed_weight, unsigned* weights);
 
 // A random source: returns a number from 0 to below - 1.
