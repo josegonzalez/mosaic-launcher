@@ -10,6 +10,12 @@
 //
 // Y on a collection dismisses it; the plugin remembers dismissed ones in
 // its .cfg. Y on the Smart Collections folder brings them all back.
+//
+// Other plugins read each collection as the entry set smart:<name> (see
+// set_register), by full path, registered for every franchise as the
+// launcher starts and holding the games its folder lists: none while it
+// has fewer than "min" games or is dismissed. Asking one scans the card if
+// it hasn't been yet.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -292,6 +298,46 @@ static MosaicList* virtualDir(const char* path) {
 	return list;
 }
 
+///////////////////////////////////////
+// the sets
+
+// The franchise a set's name names, smart:<name>, when its collection
+// shows, else -1.
+static int setCollection(const char* set) {
+	if (!set || strncmp(set, "smart:", 6) != 0) return -1;
+	scan();
+	int i = SM_find(&catalog, set + 6);
+	if (i < 0 || index_.member_count[i] < min_games || SM_setHas(&dismissed, catalog.items[i].name)) return -1;
+	return i;
+}
+
+static int setHas(const char* name, const char* path) {
+	int i = setCollection(name);
+	if (i < 0 || !path) return 0;
+	for (int k = 0; k < index_.member_count[i]; k++) {
+		if (!strcmp(index_.games[index_.members[i][k]].path, path)) return 1;
+	}
+	return 0;
+}
+
+static void setList(const char* name, void (*add)(const char* path, void* ctx), void* ctx) {
+	int i = setCollection(name);
+	for (int k = 0; i >= 0 && k < index_.member_count[i]; k++) add(index_.games[index_.members[i][k]].path, ctx);
+}
+
+static void registerSets(void) {
+	if (!MOSAIC_HOST_HAS(host, is_filtered)) return;
+	for (int i = 0; i < catalog.count; i++) {
+		char name[SM_NAME_LEN + 8];
+		snprintf(name, sizeof(name), "smart:%s", catalog.items[i].name);
+		if (host->set_register(name, setHas, setList) != 0) {
+			char message[sizeof(name) + 32];
+			snprintf(message, sizeof(message), "couldn't register the set %s", name);
+			say(message);
+		}
+	}
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
@@ -304,6 +350,7 @@ static int init(const MosaicHost* h) {
 	SM_setParse(&dismissed, host->cfg_get("dismissed", ""));
 	SM_indexInit(&index_);
 	scanned = 0;
+	registerSets();
 
 	if (host->register_action("smart-collections.dismiss", "DISMISS", canDismiss, dismiss, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.dismiss") != 0) {

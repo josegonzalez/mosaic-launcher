@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakesets.h"
 #include "../../plugins/smart-collections/smart_collections.c"
 
 struct MosaicEntry {
@@ -125,6 +126,9 @@ static const MosaicHost fake = {
 	.toast = fakeToast,
 	.confirm = fakeConfirm,
 	.reload_lists = fakeReload,
+	.set_register = fakeSetRegister,
+	.set_unregister = fakeSetUnregister,
+	.is_filtered = fakeIsFiltered,
 };
 
 static void touch(const char* path) {
@@ -346,6 +350,12 @@ static void testPlugin(void) {
 	CHECK(sf->count == 2);
 	if (sf->count == 2) CHECK_STR(sf->items[0]->name, "Street Fighter II");
 
+	// a set per franchise, holding what its folder lists
+	CHECK(fakeSetFind("smart:Mario") >= 0 && fakeSetFind("smart:Zelda") >= 0);
+	CHECK(fakeSetHas("smart:Mario", CARD "/Roms/Game Boy (GB)/Hacks/Super Mario Land DX.gb") == 1);
+	CHECK(fakeSetHas("smart:Mario", CARD "/Roms/Game Boy (GB)/Tetris (World) (Rev 1).gb") == 0);
+	CHECK_STR(fakeSetList("smart:Street Fighter"), CARD "/Roms/Arcade (FBN)/sf2.zip\n" CARD "/Roms/Arcade (FBN)/sf2ce.zip\n");
+
 	// an unknown collection is an empty folder, not the launcher's to list
 	MosaicList* none = p->virtual_dir(FOLDER "/Nothing");
 	CHECK(none && none->count == 0);
@@ -368,6 +378,9 @@ static void testPlugin(void) {
 	MosaicList* after = p->virtual_dir(FOLDER);
 	CHECK(after->count == 3);
 	CHECK(named(after, "Mario") == NULL);
+	// a dismissed collection's set is empty
+	CHECK_STR(fakeSetList("smart:Mario"), "");
+	CHECK(fakeSetHas("smart:Mario", CARD "/Roms/Game Boy (GB)/Hacks/Super Mario Land DX.gb") == 0);
 
 	// cancelling keeps it
 	selected = top->items[3];

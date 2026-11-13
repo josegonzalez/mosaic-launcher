@@ -27,6 +27,7 @@
 #include "capture.h"
 #include "hintmodel.h"
 #include "palettes.h"
+#include "entrysets.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -957,6 +958,128 @@ static void fnReleaseAll(const char* plugin_id) {
 }
 
 ///////////////////////////////////////
+// entry sets
+
+static EntrySets sets; // plugins' named sets, by owner; the owners answer for what's in them
+
+static int hostSetRegister(const char* name, int (*has)(const char* name, const char* path),
+		void (*list)(const char* name, void (*add)(const char* path, void* ctx), void* ctx)) {
+	LoadedPlugin* p = callingPlugin("set_register");
+	if (!p) return -1;
+	int rc = EntrySets_register(&sets, name, p->id, has, list);
+	if (rc == SET_OK) return 0;
+	const char* shown = name ? name : "(null)";
+	switch (rc) {
+		case SET_RESERVED:
+			LOG_info("plugins: %s can't register set %s: it may only register favorites, hidden, tags:<tag>, smart:<collection> or %s.<name>\n",
+				p->id, shown, p->id);
+			break;
+		case SET_TAKEN:
+			LOG_info("plugins: %s can't register set %s: %s registered it first\n", p->id, shown, EntrySets_find(&sets, name)->owner);
+			break;
+		case SET_FULL:
+			LOG_warn("plugins: %s can't register set %s: there are too many sets\n", p->id, shown);
+			break;
+		default:
+			LOG_warn("plugins: %s can't register set %s without both callbacks\n", p->id, shown);
+			break;
+	}
+	return -1;
+}
+
+static int hostSetUnregister(const char* name) {
+	LoadedPlugin* p = callingPlugin("set_unregister");
+	return p ? EntrySets_unregister(&sets, name, p->id) : -1;
+}
+
+// The set to ask, marked busy until setDone, with its name and owner
+// copied out, as a callback can register or unregister sets meanwhile.
+// NULL for none, or one already being asked.
+static EntrySet* setBegin(const char* name, const char* call, char* copy, LoadedPlugin** owner) {
+	EntrySet* set = EntrySets_find(&sets, name);
+	if (!set) return NULL;
+	if (set->busy) {
+		static int logged = 0;
+		if (!logged) LOG_warn("plugins: %s on set %s refused: it was asked from inside its own callback\n", call, set->name);
+		logged = 1;
+		return NULL;
+	}
+	*owner = loadedById(set->owner);
+	if (!*owner) return NULL;
+	snprintf(copy, SET_NAME_MAX, "%s", set->name);
+	set->busy = 1;
+	return set;
+}
+
+static void setDone(const char* name) {
+	EntrySet* set = EntrySets_find(&sets, name);
+	if (set) set->busy = 0;
+}
+
+static int hostSetHas(const char* name, const char* path) {
+	if (!callingPlugin("set_has") || !path) return 0;
+	char copy[SET_NAME_MAX];
+	LoadedPlugin* owner = NULL;
+	EntrySet* set = setBegin(name, "set_has", copy, &owner);
+	if (!set) return 0;
+	SetHasFn has = set->has;
+	int in = 0;
+	AS_CALLER(owner->id) in = has(copy, path) != 0;
+	setDone(copy);
+	return in;
+}
+
+// A set_list in progress: the reader's callback, run as the reader for
+// each path the owner adds. They nest, so add can tell a walk that's
+// still going from one that's over.
+typedef struct SetWalk {
+	const char* reader;
+	void (*each)(const char* path, void* data);
+	void* data;
+	int count;
+	struct SetWalk* outer;
+} SetWalk;
+static SetWalk* walks = NULL;
+
+static void setAdd(const char* path, void* ctx) {
+	SetWalk* walk = walks;
+	while (walk && walk != ctx) walk = walk->outer;
+	if (!walk) {
+		static int logged = 0;
+		if (!logged) LOG_warn("plugins: a set's add was called after its list returned, and ignored\n");
+		logged = 1;
+		return;
+	}
+	if (!path || !path[0]) return;
+	walk->count++;
+	if (walk->each) AS_CALLER(walk->reader) walk->each(path, walk->data);
+}
+
+static int hostSetList(const char* name, void (*each)(const char* path, void* data), void* data) {
+	LoadedPlugin* reader = callingPlugin("set_list");
+	if (!reader) return -1;
+	char copy[SET_NAME_MAX];
+	LoadedPlugin* owner = NULL;
+	EntrySet* set = setBegin(name, "set_list", copy, &owner);
+	if (!set) return -1;
+	SetListFn list = set->list;
+	SetWalk walk = { reader->id, each, data, 0, walks };
+	walks = &walk;
+	AS_CALLER(owner->id) list(copy, setAdd, &walk);
+	walks = walk.outer;
+	setDone(copy);
+	return walk.count;
+}
+
+// Unloading a plugin removes its sets.
+static void setsReleaseAll(const char* plugin_id) {
+	int released = EntrySets_releaseAll(&sets, plugin_id);
+	if (released > 0) LOG_info("plugins: %s's sets are released (%i)\n", plugin_id, released);
+}
+
+static int hostIsFiltered(const char* path);
+
+///////////////////////////////////////
 // screen captures
 
 // Only with plugins loaded, so with none a frame costs what stock's does.
@@ -1303,6 +1426,11 @@ static const MosaicHost host = {
 	.palettes_count = Palettes_count,
 	.palette_info = Palettes_info,
 	.palette_selected = Palettes_selected,
+	.set_register = hostSetRegister,
+	.set_unregister = hostSetUnregister,
+	.set_has = hostSetHas,
+	.set_list = hostSetList,
+	.is_filtered = hostIsFiltered,
 };
 
 ///////////////////////////////////////
@@ -1428,6 +1556,7 @@ static void load(const PluginManifest* m) {
 		// none can be open: open_screen refuses from init
 		ScreenSet_dropOwner(&screens, loaded_count - 1);
 		fnReleaseAll(m->id);
+		setsReleaseAll(m->id);
 		freeSurfaces(m->id);
 		Audio_closeFor(m->id, "as it declined to start");
 		PluginCfg_free(&p->cfg);
@@ -1761,12 +1890,14 @@ void Plugins_quit(void) {
 		// turning a plugin off, or a launch, gives the user's colour back
 		hostLedClear(p->id);
 		fnReleaseAll(p->id);
+		setsReleaseAll(p->id);
 		freeSurfaces(p->id);
 		PluginCfg_free(&p->cfg);
 		dlclose(p->handle);
 	}
 	loaded_count = 0;
 	listed = 0;
+	EntrySets_free(&sets);
 	Capture_quit();
 	PlayHistory_quit();
 	RAProgress_quit();
@@ -2021,6 +2152,36 @@ Array* Plugins_filter(Array* entries, const char* dir_path) {
 	}
 	Array_free(entries);
 	return kept;
+}
+
+// While is_filtered asks the filters, which can't ask it again.
+static int filtering_path = 0;
+
+static int hostIsFiltered(const char* path) {
+	if (!callingPlugin("is_filtered") || !path || !path[0]) return 0;
+	if (filtering_path) {
+		static int logged = 0;
+		if (!logged) LOG_warn("plugins: is_filtered refused: it was called from a filter\n");
+		logged = 1;
+		return 0;
+	}
+	struct stat st;
+	int type = ENTRY_ROM;
+	if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) type = suffixMatch(".pak", path) ? ENTRY_PAK : ENTRY_DIR;
+	char dir[MAX_PATH * 2];
+	snprintf(dir, sizeof(dir), "%s", path);
+	char* slash = strrchr(dir, '/');
+	if (slash && slash != dir) *slash = '\0';
+	else if (slash) slash[1] = '\0';
+	Entry* entry = Entry_new((char*)path, type);
+	int hidden = 0;
+	filtering_path = 1;
+	EACH_PLUGIN_WITH(filter) {
+		if (!hidden && !p->filter((const MosaicEntry*)entry, dir)) hidden = 1;
+	}
+	filtering_path = 0;
+	Entry_free(entry);
+	return hidden;
 }
 
 int Plugins_displayNames(Array* entries) {

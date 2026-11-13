@@ -21,6 +21,15 @@ static int isOn(void* data) {
 	return 1;
 }
 
+static int has(const char* name, const char* path) {
+	(void)name, (void)path;
+	return 1;
+}
+
+static void list(const char* name, void (*add)(const char* path, void* ctx), void* ctx) {
+	(void)name, (void)add, (void)ctx;
+}
+
 static int init(const MosaicHost* host) {
 	host->register_action(ID ".act", "DECLINED", available, run, NULL);
 	// takes over an action another plugin registered first
@@ -32,6 +41,8 @@ static int init(const MosaicHost* host) {
 	host->hide_quick_tile("Tools", 1);
 	host->rename_quick_tile("Games", "Declined");
 	host->inhibit_sleep(ID, 1);
+	// a set's name, which the next plugin to register it then gets
+	host->set_register("favorites", has, list);
 	host->power_off(0);
 	host->log(ID, "declining");
 	return 1;

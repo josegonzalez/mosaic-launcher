@@ -16,6 +16,10 @@
 //
 // The tags are in .userdata/<platform>/launcher/tags.txt, as tags_model.h
 // describes, with card-relative paths, and written atomically.
+//
+// Other plugins read each tag as the entry set tags:<name> (see
+// set_register), by the full paths it records; the sets follow the tags
+// as they're added, deleted or edited in the file.
 
 #include <stdint.h>
 #include <stdio.h>
@@ -48,6 +52,10 @@ static int showing = 0, changed = 0;
 static char deleting[TG_NAME_LEN]; // waiting on the confirm
 
 static char tiles[TILES_MAX][TG_NAME_LEN];
+
+static char set_names[TG_TAGS_MAX][TG_NAME_LEN + 8]; // the sets registered, tags:<name>
+static int set_count = 0;
+static void syncSets(void);
 
 static void say(const char* message) {
 	host->log(ID, message);
@@ -91,6 +99,7 @@ static void refresh(void) {
 	if (st.st_mtime == seen.st_mtime && st.st_size == seen.st_size && st.st_ino == seen.st_ino) return;
 	if (TG_load(&store, store_path) != 0) say("couldn't read the tags file");
 	seen = st;
+	syncSets();
 }
 
 // Saves, or reads the file back and says so when it can't.
@@ -100,15 +109,73 @@ static int save(void) {
 		say("couldn't save the tags file");
 		TG_load(&store, store_path);
 		remember();
+		syncSets();
 		toast(tr("Couldn't save tags"));
 		return -1;
 	}
 	remember();
+	syncSets();
 	return 0;
 }
 
 static void fullPath(const char* rel, char* out, size_t size) {
 	snprintf(out, size, "%s%s", host->sdcard_path, rel);
+}
+
+///////////////////////////////////////
+// the sets
+
+// The tag a set's name names, tags:<name> with the name exactly, or -1.
+static int setTag(const char* set) {
+	if (!set || strncmp(set, "tags:", 5) != 0) return -1;
+	for (int i = 0; i < store.count; i++) {
+		if (!strcmp(store.tags[i].name, set + 5)) return i;
+	}
+	return -1;
+}
+
+static int setHas(const char* name, const char* path) {
+	refresh();
+	int tag = setTag(name);
+	size_t len = strlen(host->sdcard_path);
+	if (tag < 0 || !path || strncmp(path, host->sdcard_path, len) != 0 || path[len] != '/') return 0;
+	return TG_has(&store, tag, path + len) == 1;
+}
+
+static void setList(const char* name, void (*add)(const char* path, void* ctx), void* ctx) {
+	refresh();
+	int tag = setTag(name);
+	if (tag < 0) return;
+	for (int i = 0; i < store.tags[tag].count; i++) {
+		char full[TG_PATH_LEN * 2];
+		fullPath(store.tags[tag].games[i], full, sizeof(full));
+		add(full, ctx);
+	}
+}
+
+// Registers a set for each tag, and unregisters those of tags that are gone.
+static void syncSets(void) {
+	if (!MOSAIC_HOST_HAS(host, is_filtered)) return;
+	for (int i = set_count - 1; i >= 0; i--) {
+		if (setTag(set_names[i]) >= 0) continue;
+		host->set_unregister(set_names[i]);
+		memmove(set_names[i], set_names[i + 1], (size_t)(set_count - i - 1) * sizeof(set_names[0]));
+		set_count--;
+	}
+	for (int t = 0; t < store.count; t++) {
+		char name[sizeof(set_names[0])];
+		snprintf(name, sizeof(name), "tags:%s", store.tags[t].name);
+		int known = 0;
+		for (int i = 0; i < set_count && !known; i++) known = !strcmp(set_names[i], name);
+		if (known || set_count >= TG_TAGS_MAX) continue;
+		if (host->set_register(name, setHas, setList) != 0) {
+			char message[sizeof(name) + 32];
+			snprintf(message, sizeof(message), "couldn't register the set %s", name);
+			say(message);
+			continue;
+		}
+		snprintf(set_names[set_count++], sizeof(set_names[0]), "%s", name);
+	}
 }
 
 static int gamesOnCard(int tag) {
@@ -525,6 +592,7 @@ static int init(const MosaicHost* h) {
 	snprintf(state_dir, sizeof(state_dir), "%s/launcher", host->userdata_path);
 	snprintf(store_path, sizeof(store_path), "%s/tags.txt", state_dir);
 	TG_free(&store);
+	set_count = 0;
 	memset(&seen, 0, sizeof(seen));
 	seen.st_size = -1; // so the first refresh reads the file
 	refresh();

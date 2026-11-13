@@ -12,6 +12,10 @@
 // opened. Hiding it, or one of its discs, hides the folder, and anything in
 // a hidden folder (its .m3u in Recently Played or a collection, say) is
 // hidden with it.
+//
+// Other plugins read the list as the "hidden" entry set (see set_register):
+// it lists the paths in the file, and has a path that's hidden or in a
+// hidden folder, as the filter does.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -242,6 +246,19 @@ static int filter(const MosaicEntry* entry, const char* dir_path) {
 	return !isHidden(host->entry_path(entry));
 }
 
+// The "hidden" set.
+static int setHas(const char* name, const char* path) {
+	(void)name;
+	refresh();
+	return isHidden(path);
+}
+
+static void setList(const char* name, void (*add)(const char* path, void* ctx), void* ctx) {
+	(void)name;
+	refresh();
+	for (int i = 0; i < hidden.count; i++) add(hidden.paths[i], ctx);
+}
+
 static void quit(void) {
 	HiddenSet_clear(&hidden);
 }
@@ -265,6 +282,9 @@ static int init(const MosaicHost* h) {
 	memset(&loaded, 0, sizeof(loaded));
 	loaded.st_size = -1; // so the first refresh reads the file
 	refresh();
+	if (MOSAIC_HOST_HAS(host, is_filtered) && host->set_register("hidden", setHas, setList) != 0) {
+		say("couldn't register the hidden set");
+	}
 
 	const char* name = host->cfg_get("button", "Y");
 	int button = MOSAIC_BUTTON_Y;

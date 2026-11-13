@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakesets.h"
 #include "../../plugins/hidden/hidden.c"
 
 struct MosaicEntry {
@@ -99,6 +100,9 @@ static const MosaicHost fake = {
 	.bind_button = fakeBind,
 	.toast = fakeToast,
 	.reload_lists = fakeReload,
+	.set_register = fakeSetRegister,
+	.set_unregister = fakeSetUnregister,
+	.is_filtered = fakeIsFiltered,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -231,6 +235,9 @@ int main(void) {
 	CHECK(root->count == 0);
 	CHECK(kept(p, GB "/Tetris.gb", GB));
 	CHECK(p->virtual_dir(CARD "/Roms") == NULL);
+	CHECK(fake_set_count == 1);
+	CHECK(fakeSetHas("hidden", GB "/Tetris.gb") == 0);
+	CHECK_STR(fakeSetList("hidden"), "");
 
 	// plain folders can't be hidden; games, paks and game folders can
 	snprintf(current, sizeof(current), "%s", GB);
@@ -281,6 +288,18 @@ int main(void) {
 	CHECK_STR(saved, GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
 	CHECK(!kept(p, CARD "/Roms/PS/Game", CARD "/Roms/PS"));
 	CHECK(!kept(p, CARD "/Roms/PS/Game/Game.m3u", CARD "/Collections/Mine.txt"));
+
+	// the hidden set lists the paths hidden, and has what the filter hides
+	CHECK_STR(fakeSetList("hidden"), GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
+	CHECK(fakeSetHas("hidden", GB "/Tetris.gb") == 1);
+	CHECK(fakeSetHas("hidden", CARD "/Roms/PS/Game/Game.m3u") == 1);
+	CHECK(fakeSetHas("hidden", GB "/Zelda.gb") == 0);
+	// a hand edit is seen
+	writeText(LIST, GB "/Zelda.gb\n");
+	CHECK(fakeSetHas("hidden", GB "/Zelda.gb") == 1);
+	CHECK(fakeSetHas("hidden", GB "/Tetris.gb") == 0);
+	writeText(LIST, GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
+	CHECK_STR(fakeSetList("hidden"), GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
 
 	// the Hidden folder lists them, with their types, and keeps them
 	MosaicList* list = p->virtual_dir(CARD "/Hidden");

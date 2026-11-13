@@ -36,7 +36,8 @@
 # supplies the theme and reads it back, one that supplies fallback fonts
 # and reads its text back, one that captures and saves the screen, one
 # that picks the hint style and draws single buttons, one that lists
-# stock's palettes and reads the theme colours back, and one that crashes
+# stock's palettes and reads the theme colours back, one that reads the
+# bundled favorites and hidden plugins' entry sets, and one that crashes
 # during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
 # time limit's protected settings and scrolls a long one, reads back those

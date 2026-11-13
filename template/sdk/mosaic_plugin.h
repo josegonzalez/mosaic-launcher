@@ -1363,6 +1363,46 @@ typedef struct MosaicHost {
 	int (*palettes_count)(void);
 	int (*palette_info)(int index, MosaicPalette* out);
 	int (*palette_selected)(void);
+
+	// Entry sets: named sets of entries, by full path as entry_path
+	// returns it, that one plugin owns and others read, in place of
+	// reading each other's files. The first plugin to register a name owns
+	// it, and others can only read it: favorites, hidden, tags:<tag>,
+	// smart:<collection>, or <its own id>.<anything>; any other name is
+	// refused. Names are matched exactly. set_register registers the
+	// calling plugin's set, which the launcher knows as for cfg_get, with
+	// two callbacks the launcher calls on its thread, as the owner, each
+	// time a plugin asks, so the set is always current and the launcher
+	// keeps no copy: has returns non-zero when path is in the set, and list
+	// calls add(path, ctx) for each path in it, only before it returns.
+	// Both get the set's name, so one pair can answer for several sets.
+	// Registering its own set again replaces the callbacks. set_register
+	// returns 0, or -1 for a name it may not have, one another plugin
+	// registered first, or a missing callback; the launcher logs each
+	// refusal. set_unregister removes the calling plugin's set, returning
+	// 0, or -1 when it has no set by that name; unloading a plugin removes
+	// all of its sets. set_has returns 1 when path is in the set, else 0,
+	// a set nobody registered too. set_list calls each(path, data), as the
+	// calling plugin, for each path in the set, before it returns, and
+	// returns how many there were, or -1 for a set nobody registered; each
+	// can be NULL, to count. A set whose callback is running isn't asked
+	// again until it returns: set_has returns 0 and set_list -1 then.
+	// is_filtered returns 1 when a loaded plugin's filter hides the entry
+	// at path from its folder right now, without saying which, else 0. Its
+	// type is worked out from the card (a folder, a .pak folder, or a
+	// file), and the folder is path's parent. Every filter is asked, the
+	// calling plugin's too; a filter that calls is_filtered while
+	// is_filtered is asking it gets 0. These work where cfg_get does, and
+	// are refused elsewhere (set_has and is_filtered return 0, the others
+	// -1), and the launcher logs it once. From init, plugins that load
+	// later haven't registered their sets yet. Check for them with
+	// MOSAIC_HOST_HAS(host, is_filtered).
+	int (*set_register)(const char* name, int (*has)(const char* name, const char* path),
+		void (*list)(const char* name, void (*add)(const char* path, void* ctx), void* ctx));
+	int (*set_unregister)(const char* name);
+	int (*set_has)(const char* name, const char* path);
+	int (*set_list)(const char* name, void (*each)(const char* path, void* data), void* data);
+	int (*is_filtered)(const char* path);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

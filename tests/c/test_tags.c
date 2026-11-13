@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakesets.h"
 #include "../../plugins/tags/tags.c"
 
 #ifndef TEST_SDCARD_PATH
@@ -401,6 +402,9 @@ static MosaicHost fake = {
 	.register_screen = fakeRegisterScreen,
 	.open_screen = fakeOpenScreen,
 	.draw_hints = fakeDrawHints,
+	.set_register = fakeSetRegister,
+	.set_unregister = fakeSetUnregister,
+	.is_filtered = fakeIsFiltered,
 };
 
 static int press(int button) {
@@ -434,6 +438,14 @@ static void testPlugin(void) {
 	start();
 	CHECK(strstr(logged, "3 tags, 1 with games, root on") != NULL);
 	CHECK(strstr(logged, "1 quick menu tiles") != NULL);
+	// a set per tag, by full path, with the games it records
+	CHECK(fakeSetFind("tags:Puzzle") >= 0 && fakeSetFind("tags:Unused") >= 0 && fakeSetFind("tags:Old") >= 0);
+	CHECK(fakeSetHas("tags:Puzzle", CARD "/Roms/GB/Tetris.gb") == 1);
+	CHECK(fakeSetHas("tags:Puzzle", CARD "/Roms/GB/Zelda.gb") == 0);
+	CHECK(fakeSetHas("tags:Puzzle", "/Roms/GB/Tetris.gb") == 0);
+	CHECK_STR(fakeSetList("tags:Puzzle"), CARD "/Roms/GB/Tetris.gb\n" CARD "/Roms/GB/Gone.gb\n");
+	CHECK_STR(fakeSetList("tags:Unused"), "");
+	CHECK_STR(fakeSetList("tags:puzzle"), "none");
 	CHECK(bound_button == MOSAIC_BUTTON_Y);
 	CHECK(tile_count == 1 && !strcmp(tile_ids[0], "tags.tile.0"));
 	int tile = findAction("tags.tile.0");
@@ -574,6 +586,12 @@ static void testPlugin(void) {
 	CHECK(list && list->count == 1);
 	listFree(list);
 	cfg_root = "on";
+	CHECK(fakeSetHas("tags:Hand", CARD "/Roms/GB/Zelda.gb") == 1);
+	// a tag edited out of the file loses its set, and a new one gets one
+	writeFile(STORE, "Fresh\nFresh\t/Roms/GB/Tetris.gb\n");
+	CHECK(fakeSetHas("tags:Hand", CARD "/Roms/GB/Zelda.gb") == 0);
+	CHECK(fakeSetFind("tags:Hand") < 0);
+	CHECK(fakeSetHas("tags:Fresh", CARD "/Roms/GB/Tetris.gb") == 1);
 
 	// an older launcher, without draw_hints, is declined
 	MosaicHost old = fake;

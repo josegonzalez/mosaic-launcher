@@ -17,6 +17,9 @@
 // With the "pin" setting on, favorites also sort first in whichever folder
 // they're in, keeping the launcher's order among them and among the rest.
 // Recently Played, collections and Favorites itself keep their own order.
+//
+// Other plugins read the favorites as the "favorites" entry set (see
+// set_register), by the full paths the collection records.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -41,6 +44,7 @@ static int count = 0;
 static int pin_on = 0;                      // the "pin" setting
 static PinSet pins;                         // favorites, for sort_compare
 static char sorted_dir[MAX_PATH_LEN];       // the folder sort_compare saw last
+static struct stat seen;                    // the collection as the set last read it
 
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
@@ -99,6 +103,16 @@ static void load(void) {
 	count = 0;
 	readList(list_path);
 	relist();
+}
+
+// Reads the collection again for the set when it changed on disk, so a
+// set asked every frame doesn't read it every time.
+static void fresh(void) {
+	struct stat st;
+	if (stat(list_path, &st) != 0) memset(&st, 0, sizeof(st));
+	if (st.st_mtime == seen.st_mtime && st.st_size == seen.st_size && st.st_ino == seen.st_ino) return;
+	load();
+	seen = st;
 }
 
 static int save(void) {
@@ -325,6 +339,25 @@ static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* d
 		Pin_isPinned(&pins, relative(host->entry_path(b)), host->entry_type(b)));
 }
 
+// The "favorites" set: the games and paks in the collection, full paths.
+static int setHas(const char* name, const char* path) {
+	(void)name;
+	const char* rel = relative(path);
+	if (!rel) return 0;
+	fresh();
+	return indexOf(rel) >= 0;
+}
+
+static void setList(const char* name, void (*add)(const char* path, void* ctx), void* ctx) {
+	(void)name;
+	fresh();
+	for (int i = 0; i < count; i++) {
+		char full[MAX_PATH_LEN * 2];
+		snprintf(full, sizeof(full), "%s%.511s", host->sdcard_path, favorites[i]);
+		add(full, ctx);
+	}
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	const char* collection = host->cfg_get("collection", "Favorites");
@@ -338,6 +371,11 @@ static int init(const MosaicHost* h) {
 	sorted_dir[0] = '\0';
 	migrate();
 	load();
+	memset(&seen, 0, sizeof(seen));
+	seen.st_size = -1; // so the set's first ask reads it
+	if (MOSAIC_HOST_HAS(host, is_filtered) && host->set_register("favorites", setHas, setList) != 0) {
+		say("couldn't register the favorites set");
+	}
 
 	if (host->register_action("favorites.toggle", "FAVORITE", canToggle, toggle, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "favorites.toggle") != 0) {

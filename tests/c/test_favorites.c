@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakesets.h"
 #include "../../plugins/favorites/favorites.c"
 
 struct MosaicEntry {
@@ -102,6 +103,9 @@ static const MosaicHost fake = {
 	.toast = fakeToast,
 	.confirm = fakeConfirm,
 	.reload_lists = fakeReload,
+	.set_register = fakeSetRegister,
+	.set_unregister = fakeSetUnregister,
+	.is_filtered = fakeIsFiltered,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -214,6 +218,13 @@ int main(void) {
 	CHECK(!exists(USERDATA "/launcher/favorites.txt"));
 	CHECK(exists(USERDATA "/launcher/favorites.txt.migrated"));
 
+	// the favorites set, by full path
+	CHECK(fake_set_count == 1);
+	CHECK(fakeSetHas("favorites", CARD "/Roms/GB/Zelda.gb") == 1);
+	CHECK(fakeSetHas("favorites", CARD "/Roms/GB/Tetris.gb") == 0);
+	CHECK(fakeSetHas("favorites", "/Roms/GB/Zelda.gb") == 0);
+	CHECK_STR(fakeSetList("favorites"), CARD "/Roms/GB/Zelda.gb\n");
+
 	// a Favorites folder on the root
 	MosaicList* root = fakeListNew();
 	p->root_entries(root);
@@ -241,6 +252,8 @@ int main(void) {
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
 	CHECK(redraws == 1);
 	CHECK_STR(toasted, "Added to Favorites");
+	CHECK(fakeSetHas("favorites", CARD "/Roms/GB/Tetris.gb") == 1);
+	CHECK_STR(fakeSetList("favorites"), CARD "/Roms/GB/Zelda.gb\n" CARD "/Roms/GB/Tetris.gb\n");
 
 	// a multi-disc game's folder, and a disc inside it, both mean its .m3u
 	selectEntry(CARD "/Roms/PS/Game", MOSAIC_ENTRY_DIR);
