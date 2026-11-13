@@ -25,6 +25,16 @@ A valid choice replaces the launch with the pak's `launch.sh` and the game's pat
 
 With another plugin that replaces launches, only the first of them in load order replaces a launch. When that's the other plugin, this plugin's `replace_launch` is refused and logged and the other's command runs. When it's `emulator-override`, the other's is refused.
 
+## Screenshots
+
+Y on a Game Boy game, with the default settings.
+
+![Y on a Game Boy game, with the default settings](docs/default.png)
+
+List every emulator pak on.
+
+![List every emulator pak on](docs/all.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

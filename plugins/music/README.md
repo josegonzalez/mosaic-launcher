@@ -45,6 +45,16 @@ The art is the track's embedded picture (an ID3v2 APIC or PIC frame, a FLAC PICT
 
 After a power-off, with Resume after power-off on (the default), the next start shows the last track paused where it was, on the pill and the player, without starting the player. The queue's tracks no longer on the card are dropped, and nothing is shown when the track itself is gone. **X** or `action:music.toggle` plays on from there, with the Shuffle and Repeat settings as they are then.
 
+## Screenshots
+
+The player's Music folder, with the default settings.
+
+![The player's Music folder, with the default settings](docs/default.png)
+
+A track playing.
+
+![A track playing](docs/playing.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

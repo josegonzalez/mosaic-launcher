@@ -26,6 +26,12 @@ A press past an end wraps around to the other end, and holding the direction sto
 
 The selected cover always stays in the middle. With Slide between games on, a move of no more games than show on one side slides the covers into place, and longer jumps don't.
 
+## Screenshots
+
+The Homebrew collection, with the default settings.
+
+![The Homebrew collection, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

@@ -25,6 +25,16 @@ Games are found as stock lists them, in every system with an emulator and up to 
 
 The card is scanned the first time a search needs it, and again only when a folder it read changes. The query is kept, so the folder lists the same results after the launcher restarts, and back from a game launched from them the results open again with it selected.
 
+## Screenshots
+
+Opening Search on the first screen, with the default settings.
+
+![Opening Search on the first screen, with the default settings](docs/default.png)
+
+Results for "tobu".
+
+![Results for "tobu"](docs/results.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

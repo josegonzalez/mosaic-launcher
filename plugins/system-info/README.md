@@ -24,6 +24,16 @@ A value the platform doesn't have, such as the battery or `/proc` on desktop, sh
 
 Under the values, a graph shows the battery over the last 64 games [`battery-logger`](../battery-logger/README.md) logged, from `battery-logger.csv` and the `.old.csv` before it, back to back by play time with the time between games left out, or says there's no history yet. When the graph doesn't fit under the values, even at the smaller font, it has a page of its own: **A** moves to it and back, and **B** there goes back to the values.
 
+## Screenshots
+
+The System info screen, with the default settings.
+
+![The System info screen, with the default settings](docs/default.png)
+
+The System info tile on the quick menu (on by default).
+
+![The System info tile on the quick menu (on by default)](docs/tile.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

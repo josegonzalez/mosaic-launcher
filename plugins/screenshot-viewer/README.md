@@ -27,6 +27,20 @@ Only regular files directly in the folder are listed or deleted, and links are n
 
 The `screenshot-viewer.capture` action saves what's on screen as `Screenshots/Launcher.<YYYY-MM-DD-HH-MM-SS>.png`, with stock's notification when its screenshot notification setting is on. Run from a menu or dialog, it saves what was on screen before the menu opened. It binds no button itself: put it on an FN button in Settings (`action:screenshot-viewer.capture`) or on another button through `button-remap`.
 
+## Screenshots
+
+The grid, with the default settings.
+
+![The grid, with the default settings](docs/default.png)
+
+A screenshot across the screen.
+
+![A screenshot across the screen](docs/full.png)
+
+The Screenshots tile on the quick menu (on by default).
+
+![The Screenshots tile on the quick menu (on by default)](docs/tile.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

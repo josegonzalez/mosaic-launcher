@@ -14,6 +14,12 @@ As a game or pak starts from the game list, the selection pill glides from its r
 
 Turn on **Launch animation** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)). It owns the `launch` [slot](../../docs/glossary.md#slot).
 
+## Screenshots
+
+Partway through starting a game, with the default settings.
+
+![Partway through starting a game, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

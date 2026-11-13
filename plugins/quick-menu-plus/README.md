@@ -16,6 +16,20 @@ Turn on **Quick menu plus** in Launcher > Plugins ([how](../../docs/plugins.md#t
 
 All of these tiles go in the top row.
 
+## Screenshots
+
+The quick menu's new tiles, with the default settings.
+
+![The quick menu's new tiles, with the default settings](docs/default.png)
+
+Tile labels set to `Recents=Played, Games=Library`.
+
+![Tile labels set to `Recents=Played, Games=Library`](docs/labels.png)
+
+Hidden tiles set to `Collections`.
+
+![Hidden tiles set to `Collections`](docs/hide.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

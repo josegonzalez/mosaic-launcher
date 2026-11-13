@@ -16,6 +16,24 @@ The details come from the game's `.info` sidecar file, `<folder>/.media/<name>.i
 
 Turn on **Metadata band** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
 
+## Screenshots
+
+Thwaite's band under its art, with the default settings.
+
+![Thwaite's band under its art, with the default settings](docs/default.png)
+
+Fields set to `genre,year`.
+
+![Fields set to `genre,year`](docs/fields.png)
+
+With layout-fancy: the band in its panel.
+
+![With layout-fancy: the band in its panel](docs/with-layout-fancy.png)
+
+With layout-carousel: the band under the selected cover's name.
+
+![With layout-carousel: the band under the selected cover's name](docs/with-layout-carousel.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

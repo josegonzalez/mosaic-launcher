@@ -19,6 +19,20 @@ Art shows only while Show game art is on. With it off the rows take the width. A
 
 Turn on **Fancy layout** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)). It owns the `layout` [slot](../../docs/glossary.md#slot), so only one layout is on at a time.
 
+## Screenshots
+
+The Homebrew collection, with the default settings.
+
+![The Homebrew collection, with the default settings](docs/default.png)
+
+A game with a save state: its preview in the panel (Prefer state preview on, the default).
+
+![A game with a save state: its preview in the panel (Prefer state preview on, the default)](docs/state-preview.png)
+
+Prefer state preview off: the box above the state preview.
+
+![Prefer state preview off: the box above the state preview](docs/prefer-preview-off.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

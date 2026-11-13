@@ -33,6 +33,24 @@ The Home mode setting picks the home.
 - **retroachievements:** the recent and pinned games with RetroAchievements progress on the card, as "12/40 · 150/400 points", from what minarch keeps there through the host's `achievements` call. Games with nothing cached are left out, and nothing is fetched.
 - **pico8:** the Pico-8 carts (`.p8` and `.p8.png`) in the `Roms` folders whose tag is one of the Pico-8 folder tags setting's, as a grid, with their art or else their first letter.
 
+## Screenshots
+
+The Home tab, with the default settings.
+
+![The Home tab, with the default settings](docs/default.png)
+
+The Stats tab.
+
+![The Stats tab](docs/stats.png)
+
+With favorites: the Pinned tab.
+
+![With favorites: the Pinned tab](docs/pinned-with-favorites.png)
+
+Home mode set to minui.
+
+![Home mode set to minui](docs/mode-minui.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

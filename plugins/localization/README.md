@@ -44,6 +44,16 @@ The launcher's fallback font draws the characters the UI font has no glyphs for,
 
 The launcher only uses a regular file on the card that opens as a font, and a theme's fallback font wins over this one. No font is bundled. Freely licensed ones that cover CJK are Noto Sans CJK and Source Han Sans (both SIL Open Font License), or a smaller subset of one, as casualducko's fork ships a subset of Noto Sans JP. To choose a CJK-capable font for the whole launcher, use the theme slot's `font`, which [`theme-plus`](../theme-plus/README.md) owns.
 
+## Screenshots
+
+Language set to es: the first screen in Spanish.
+
+![Language set to es: the first screen in Spanish](docs/spanish.png)
+
+Language set to es: the quick menu in Spanish.
+
+![Language set to es: the quick menu in Spanish](docs/spanish-quick-menu.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

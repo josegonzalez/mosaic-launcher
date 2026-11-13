@@ -27,6 +27,12 @@ Turn on **Collate subfolders** in Launcher > Plugins ([how](../../docs/plugins.m
 - [`numeric-prefix`](../numeric-prefix/README.md) and [`title-disambiguation`](../title-disambiguation/README.md): they work in merged folders as in any folder. Folders are matched by their names before `numeric-prefix` takes the number off, and same-name games from different folders are told apart.
 - [`all-games`](../all-games/README.md): its root is unchanged and the systems in its Systems folder are merged.
 
+## Screenshots
+
+Platformers folders from Game Boy Color (GBC) and Game Boy Color (SGB) shown as one, with the default settings.
+
+![Platformers folders from Game Boy Color (GBC) and Game Boy Color (SGB) shown as one, with the default settings](docs/default.png)
+
 ## For plugin authors
 
 - Has no slot, settings, services or files of its own.

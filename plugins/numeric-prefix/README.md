@@ -13,6 +13,12 @@ Names starting with `1) `, `01. ` or `[1] ` sort by that number, and the number 
 
 Turn on **Numeric prefix ordering** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
 
+## Screenshots
+
+Systems named `1)`, `2)` and `10)` in that order, with the default settings.
+
+![Systems named `1)`, `2)` and `10)` in that order, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

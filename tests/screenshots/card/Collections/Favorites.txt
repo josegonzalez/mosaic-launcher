@@ -1,0 +1,2 @@
+/Roms/Game Boy Color (GBC)/µCity.gbc
+/Roms/Game Boy (GB)/Libbet and the Magic Floor.gb

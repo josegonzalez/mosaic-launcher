@@ -17,6 +17,20 @@ The folders are read from the card each time a list opens.
 
 Turn on **Genre view** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
 
+## Screenshots
+
+The Genres folder on the first screen, with the default settings.
+
+![The Genres folder on the first screen, with the default settings](docs/default.png)
+
+A genre gathered from Game Boy and Game Boy Color.
+
+![A genre gathered from Game Boy and Game Boy Color](docs/genre.png)
+
+Show the system set to always.
+
+![Show the system set to always](docs/tags-always.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

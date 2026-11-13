@@ -22,7 +22,8 @@ Rules for agents working on mosaic-launcher.
   - its `plugin.txt` has a `category=` (one of the groups `scripts/plugin-table.sh` lists) and a one-sentence plain `summary=`; run `./scripts/plugin-table.sh` to regenerate the index in docs/plugins.md, which `make lint` checks;
   - its page is `plugins/<name>/README.md`, starting with a `# <name>` heading and written for someone new to CFW: what it does, how to turn it on and use it, a settings table that matches `plugin.txt` (name, choices, default, what it does), a "For plugin authors" section (provides, slots, services, files it reads or writes, requires and conflicts) and credits to the forks the idea came from. Link terms such as pak, slot and quick menu to docs/glossary.md rather than explaining them again;
   - its unit test is `tests/c/test_<name>.c`, found by the makefile's wildcard, with a `tests/c/<name>.mk` holding its rule when it needs more than its own source and the SDK header;
-  - its desktop cases go in `tests/plugins/cases/<number>-<name>.sh`, after the last case number and before `990-crash.sh`, with a `# shard: <1-3>` line picking the CI shard with the least time (each case prints its time in the CI log).
+  - its desktop cases go in `tests/plugins/cases/<number>-<name>.sh`, after the last case number and before `990-crash.sh`, with a `# shard: <1-3>` line picking the CI shard with the least time (each case prints its time in the CI log);
+  - a plugin with visible UI gets screenshots: its shots in `tests/screenshots/shots/<name>.sh`, taken with `make screenshots SHOTS=<name>` into `plugins/<name>/docs/`, each embedded in its README with a caption (see "Screenshots" in docs/DEVELOPMENT.md).
 - SDK changes:
   - fields are only ever added at the end of `MosaicHost` and `MosaicPlugin`;
   - `MOSAIC_API_VERSION` stays 1;

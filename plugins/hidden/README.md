@@ -11,6 +11,16 @@ Turn on **Hidden games** in Launcher > Plugins ([how](../../docs/plugins.md#turn
 - On the game list, press **Y** (the Hide button setting picks another) to hide the selected game or [pak](../../docs/glossary.md#pak).
 - A Hidden folder on the first screen, shown while something is hidden, lists them. In it the same button unhides the selected one.
 
+## Screenshots
+
+The Hidden folder on the first screen once a game is hidden, with the default settings.
+
+![The Hidden folder on the first screen once a game is hidden, with the default settings](docs/default.png)
+
+The Hidden folder.
+
+![The Hidden folder](docs/folder.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

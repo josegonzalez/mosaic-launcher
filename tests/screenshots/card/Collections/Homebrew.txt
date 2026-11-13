@@ -1,0 +1,6 @@
+/Roms/Game Boy (GB)/Libbet and the Magic Floor.gb
+/Roms/Game Boy (GB)/Tobu Tobu Girl.gb
+/Roms/Game Boy Color (GBC)/Tobu Tobu Girl Deluxe.gbc
+/Roms/Game Boy Color (GBC)/µCity.gbc
+/Roms/Nintendo Entertainment System (FC)/Concentration Room.nes
+/Roms/Nintendo Entertainment System (FC)/Thwaite.nes

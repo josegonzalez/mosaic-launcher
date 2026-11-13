@@ -17,6 +17,12 @@ Turn on **Smart Collections** in Launcher > Plugins ([how](../../docs/plugins.md
 | On a collection | **Y** | Dismisses it |
 | On the Smart Collections folder | **Y** | Brings dismissed ones back |
 
+## Screenshots
+
+More franchises set to `Tobu Tobu`: a collection of the two Tobu Tobu Girl games.
+
+![More franchises set to `Tobu Tobu`: a collection of the two Tobu Tobu Girl games](docs/extra.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

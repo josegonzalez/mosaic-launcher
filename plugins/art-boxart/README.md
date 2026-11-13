@@ -23,6 +23,24 @@ The `media` setting also gives the 3D box from `.media/boxart/`, the logo from `
 
 The built-in list shows the box when a game has no thumbnail. Folders named `Imgs` or `Images` are left out of the game list while their setting and the `hide` setting are both on.
 
+## Screenshots
+
+Thwaite's art from an Imgs folder, with the default settings.
+
+![Thwaite's art from an Imgs folder, with the default settings](docs/default.png)
+
+Hide art folders off, so the Imgs folder shows in the list.
+
+![Hide art folders off, so the Imgs folder shows in the list](docs/hide-off.png)
+
+With layout-grid: a folder's cover.png in Game Boy (Folder covers on, the default).
+
+![With layout-grid: a folder's cover.png in Game Boy (Folder covers on, the default)](docs/cover-with-layout-grid.png)
+
+With layout-grid and Hide covered folder names on: the cover stands in for the folder's name.
+
+![With layout-grid and Hide covered folder names on: the cover stands in for the folder's name](docs/cover-name-with-layout-grid.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

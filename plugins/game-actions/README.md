@@ -23,6 +23,16 @@ Press **Y** on a game (the Game actions button setting picks another). It shares
 
 A save or art name another game in the system shares is kept. Links are removed but never followed, and nothing outside the card is touched.
 
+## Screenshots
+
+Y on a game, with the default settings.
+
+![Y on a game, with the default settings](docs/default.png)
+
+Delete's confirm.
+
+![Delete's confirm](docs/delete.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

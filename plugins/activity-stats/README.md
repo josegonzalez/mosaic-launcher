@@ -28,6 +28,20 @@ There are four tabs:
 
 Games carried over from Onion are known only by their name, so they can't be opened. Launch counts are the tracker's sessions, and waking from sleep starts a new one. With no play history (no database yet, or no sqlite) every tab says "No play history".
 
+## Screenshots
+
+The Last 7 days tab, with the default settings.
+
+![The Last 7 days tab, with the default settings](docs/default.png)
+
+The Games tab.
+
+![The Games tab](docs/games.png)
+
+The Activity tile on the quick menu (Quick menu tile on, the default).
+
+![The Activity tile on the quick menu (Quick menu tile on, the default)](docs/tile.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

@@ -14,6 +14,16 @@ Turn on **Clear recents** in Launcher > Plugins ([how](../../docs/plugins.md#tur
 
 Outside Recently Played the button is left to other plugins.
 
+## Screenshots
+
+Y in Recently Played, with the default settings.
+
+![Y in Recently Played, with the default settings](docs/default.png)
+
+The Clear recents tile on the quick menu (on by default).
+
+![The Clear recents tile on the quick menu (on by default)](docs/tile.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

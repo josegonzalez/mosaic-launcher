@@ -48,6 +48,40 @@ For example, one per line: `name=Night`, `palette=Catppuccin Mocha`, `color7=0x1
 - Any other key with a `.` in it, such as `led-status.colour=0x88C0D0`, is another plugin's. It's passed on to the launcher as it is, for that plugin to read with `theme_value` (see [plugin-api.md](../../docs/plugin-api.md) for the keys the bundled plugins read and the launcher's limits on them), and the launcher logs one it refuses.
 - Other unknown keys and lines without `=` are logged and ignored. A bad value is logged and dropped, as is anything the launcher then refuses.
 
+## Screenshots
+
+The theme picker from the Theme tile, with the default settings.
+
+![The theme picker from the Theme tile, with the default settings](docs/default.png)
+
+Theme set to nord.
+
+![Theme set to nord](docs/theme-nord.png)
+
+Theme set to dracula.
+
+![Theme set to dracula](docs/theme-dracula.png)
+
+Theme set to solarized-dark.
+
+![Theme set to solarized-dark](docs/theme-solarized-dark.png)
+
+Theme set to pocket-green.
+
+![Theme set to pocket-green](docs/theme-pocket-green.png)
+
+Theme set to high-contrast.
+
+![Theme set to high-contrast](docs/theme-high-contrast.png)
+
+Text size set to larger.
+
+![Text size set to larger](docs/text-size-larger.png)
+
+UI size set to compact.
+
+![UI size set to compact](docs/ui-size-compact.png)
+
 ## Settings
 
 The settings other than Theme, the tile and the button override the theme's values, or stock's. `theme` keeps the theme's.

@@ -7,7 +7,9 @@
 //
 //   PRESSER_KEYS  buttons to press, one at a time, separated by spaces: a,
 //                 b, x, y, start, up, down, left, right, l1, r1, select,
-//                 menu, or wait (a press of nothing)
+//                 menu, or wait (a press of nothing). Buttons joined by +
+//                 are pressed together, and /<ms> after them holds them
+//                 that long (60 by default), eg. select+start/1500
 //   PRESSER_LOG   the file each drawn text is added to, one per line
 //   PRESSER_STEP  milliseconds between presses (300 by default); the first
 //                 comes a second after the first poll
@@ -15,6 +17,10 @@
 //                 "presser: done" replaces <path>.bmp (32 bits, top row
 //                 first) and <path>.txt (the texts drawn for it, one per
 //                 line as "rrggbb text"), so they end up as the last one
+//   PRESSER_SHOT  milliseconds: with PRESSER_FRAME, the first frame presented
+//                 this long after the last press is the last one saved, so
+//                 the files end up as the screen was then, such as partway
+//                 through an animation
 //
 // After the last press and another second, it prints "presser: done" on
 // stderr, which lands in the launcher's log.
@@ -68,13 +74,22 @@ static const struct {
 };
 
 #define PRESSES_MAX 256
-static int presses[PRESSES_MAX];
+#define CHORD_MAX 4
+typedef struct {
+	int codes[CHORD_MAX]; // the desktop build's keys, none for a wait
+	int count;
+	unsigned long hold; // milliseconds
+} Press;
+static Press presses[PRESSES_MAX];
 static int press_count = -1; // -1 until PRESSER_KEYS is read
 static int next_press = 0;
-static int key_down = 0; // the scancode held, or 0
+static const Press* held = NULL; // the press going on, or NULL
+static int downs = 0, ups = 0; // its keys sent down and up so far
 static unsigned long started = 0, down_at = 0, last_at = 0;
 static unsigned long step = 300;
 static int finished = 0;
+static unsigned long pressed_last = 0; // when the last press went down, or 0
+static int kept = 0; // PRESSER_SHOT's frame is saved
 
 static unsigned long nowMs(void) {
 	struct timespec ts;
@@ -90,13 +105,30 @@ static void readKeys(void) {
 	if (!list) return;
 	char copy[2048];
 	snprintf(copy, sizeof(copy), "%s", list);
-	for (char* word = strtok(copy, " \t\n"); word && press_count < PRESSES_MAX; word = strtok(NULL, " \t\n")) {
-		int found = -1;
-		for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
-			if (!strcmp(keys[i].name, word)) found = keys[i].scancode;
+	char* words = NULL;
+	for (char* word = strtok_r(copy, " \t\n", &words); word && press_count < PRESSES_MAX;
+			word = strtok_r(NULL, " \t\n", &words)) {
+		Press press = { .count = 0, .hold = 60 };
+		char* hold = strchr(word, '/');
+		if (hold) {
+			*hold++ = '\0';
+			if (atol(hold) > 0) press.hold = (unsigned long)atol(hold);
 		}
-		if (found < 0) fprintf(stderr, "presser: unknown key %s\n", word);
-		else presses[press_count++] = found;
+		int ok = 1;
+		char* names = NULL;
+		for (char* name = strtok_r(word, "+", &names); name; name = strtok_r(NULL, "+", &names)) {
+			int found = -1;
+			for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+				if (!strcmp(keys[i].name, name)) found = keys[i].scancode;
+			}
+			if (found < 0 || press.count >= CHORD_MAX) {
+				fprintf(stderr, "presser: unknown key %s\n", name);
+				ok = 0;
+			} else if (found) {
+				press.codes[press.count++] = found;
+			}
+		}
+		if (ok) presses[press_count++] = press;
 	}
 }
 
@@ -119,24 +151,28 @@ static int scripted(void* out) {
 		started = now;
 		last_at = now + 1000 - step; // the first press a second in
 	}
-	if (key_down && now - down_at >= 60) {
-		int code = key_down;
-		key_down = 0;
+	if (held && downs < held->count) return keyEvent(out, held->codes[downs++], 1);
+	if (held && now - down_at >= held->hold) {
+		int code = held->codes[ups++];
+		if (ups >= held->count) held = NULL;
 		return keyEvent(out, code, 0);
 	}
-	if (key_down || next_press >= press_count || now - last_at < step) {
-		if (!finished && !key_down && next_press >= press_count && now - last_at >= 1000) {
+	if (held || next_press >= press_count || now - last_at < step) {
+		if (!finished && !held && next_press >= press_count && now - last_at >= 1000) {
 			finished = 1;
 			fprintf(stderr, "presser: done\n");
 		}
 		return 0;
 	}
-	int code = presses[next_press++];
+	const Press* press = &presses[next_press++];
 	last_at = now;
-	if (!code) return 0; // wait
-	key_down = code;
+	if (next_press >= press_count) pressed_last = now;
+	if (!press->count) return 0; // wait
+	held = press;
+	downs = 1;
+	ups = 0;
 	down_at = now;
-	return keyEvent(out, code, 1);
+	return keyEvent(out, press->codes[0], 1);
 }
 
 // the texts drawn since the last frame was presented, for PRESSER_FRAME
@@ -176,7 +212,12 @@ static void saveFrame(Renderer* renderer) {
 	const char* prefix = getenv("PRESSER_FRAME");
 	size_t texts_len = frame_texts_len;
 	frame_texts_len = 0;
-	if (!prefix || !renderer || finished) return;
+	if (!prefix || !renderer || finished || kept) return;
+	const char* shot = getenv("PRESSER_SHOT");
+	// each frame replaces the last until one comes that long after the last press
+	if (shot && *shot && press_count >= 0 && next_press >= press_count && pressed_last
+			&& nowMs() - pressed_last >= (unsigned long)atol(shot))
+		kept = 1;
 	int w = 0, h = 0;
 	if (SDL_GetRendererOutputSize(renderer, &w, &h) != 0 || w <= 0 || h <= 0) return;
 	unsigned char* pixels = malloc((size_t)w * h * 4);

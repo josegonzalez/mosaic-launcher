@@ -28,6 +28,20 @@ A game is tagged as stock records it in recents: a game folder or a disc of a mu
 
 Names are trimmed, up to 63 bytes, and can't have a slash or start with a dot or `#`.
 
+## Screenshots
+
+A game's tag checklist, with the default settings.
+
+![A game's tag checklist, with the default settings](docs/default.png)
+
+The Tags folder on the first screen.
+
+![The Tags folder on the first screen](docs/folder.png)
+
+Each tag's tile on the quick menu.
+
+![Each tag's tile on the quick menu](docs/tiles.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

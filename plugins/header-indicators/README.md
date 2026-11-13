@@ -17,6 +17,20 @@ Turn on **Header indicators** in Launcher > Plugins ([how](../../docs/plugins.md
 
 The pill is redrawn only when what it shows changes. When they don't all fit, the FPS goes first, then the profile, then free storage.
 
+## Screenshots
+
+Free storage in the header, with the default settings.
+
+![Free storage in the header, with the default settings](docs/default.png)
+
+FPS on.
+
+![FPS on](docs/fps.png)
+
+A profile badge set.
+
+![A profile badge set](docs/profile.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

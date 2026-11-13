@@ -31,6 +31,20 @@ Resuming from a chosen slot is left out: the launcher only resumes from the slot
 
 Previews are scaled copies kept in two small pools, the least recently drawn going first, and freed when the screen closes.
 
+## Screenshots
+
+Tobu Tobu Girl's states, with the default settings.
+
+![Tobu Tobu Girl's states, with the default settings](docs/default.png)
+
+A state's preview across the screen.
+
+![A state's preview across the screen](docs/preview.png)
+
+Every game with states, from the quick menu tile.
+
+![Every game with states, from the quick menu tile](docs/all-games.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

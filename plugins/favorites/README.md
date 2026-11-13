@@ -12,6 +12,20 @@ On the game list, press **Y** to add or remove the selected game or [pak](../../
 
 With Pin to top on, favorites also sort first in whichever folder they're in, except Recently Played, [collections](../../docs/glossary.md#collection) and Favorites itself.
 
+## Screenshots
+
+The Favorites folder on the first screen, with the default settings.
+
+![The Favorites folder on the first screen, with the default settings](docs/default.png)
+
+The Favorites folder.
+
+![The Favorites folder](docs/folder.png)
+
+Pin to top on: µCity, a favorite, comes first in Game Boy Color.
+
+![Pin to top on: µCity, a favorite, comes first in Game Boy Color](docs/pin.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

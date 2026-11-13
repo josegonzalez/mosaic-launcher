@@ -80,6 +80,49 @@ With `SMOKE_STACKS` set, a run still going 5 seconds after SIGTERM also has its 
 
 In `tests/plugins/run.sh`, a start that logged every line it waited for but never drew its first frame (the loading marker is still there) is started once more, with a warning, its log kept as `<log>-stalled.log` and its main thread's stack printed. That stall was seen once in CI, on a job's first start under `xvfb-run`, and not in about 2,000 starts since, locally or in CI (#233); a second stall in a row fails the case.
 
+## Screenshots
+
+Each bundled plugin with something to see has screenshots in `plugins/<id>/docs/`, which its README embeds with a caption. `make screenshots` takes them all again; run it by hand whenever a plugin's UI changes, and commit the pictures. CI doesn't compare them, as macOS and Linux SDL draw differently, so `make lint` only checks that every image a README or doc embeds is there (`scripts/screenshots.sh --check`). It needs ImageMagick (`brew install imagemagick`, or `imagemagick` on Linux). `make screenshots SHOTS="favorites row-badges"` takes only those plugins' shots.
+
+It builds the launcher a second time, into `build/screenshots/desktop`, against a copy of NextUI's desktop platform that `scripts/screenshots.sh prepare` writes to `build/screenshots/workspace`: the h700's 640x480 screen, scale, rows and padding, `build/screenshots/sdcard` as its card, and stock's transient files (such as `last.txt`) in `build/screenshots/tmp` instead of `/tmp`. So it never touches the fake card at `/var/tmp/nextui/sdcard` the tests use. The launcher's own files in `/tmp` are still shared, and a shot that launches a game removes the markers it leaves there, so don't run it while the desktop tests run.
+
+Each shot starts from a fresh copy of the sample card: NextUI's skeleton for desktop, `tests/screenshots/card` over it, and `tests/screenshots/play-history.sql` as its play history, with times counted back from when it runs. Its `plugins.txt` turns the shot's plugins on and every other bundled plugin off, as a plugin it doesn't name loads. The launcher runs with `tests/plugins/presser` preloaded, which presses the shot's keys and keeps the frame shown 600 ms after the last one, before stock starts scrolling a long selected name. That frame is written as a 256-colour PNG without dithering, most of them 5 to 40 KB. Each shot's log and frame are in `build/screenshots/logs` and `build/screenshots/frames`.
+
+The sample card has six real homebrew games and their art, with each title's author, licence and source in [tests/screenshots/README.md](../tests/screenshots/README.md). Their roms are empty files, as no shot runs a game. Only add art whose licence clearly allows redistribution, and record it there.
+
+### Adding a plugin's shots
+
+`tests/screenshots/shots/<id>.sh` lists a plugin's shots, which are saved in that plugin's `docs/`. Each is a block like this:
+
+```sh
+# the Homebrew collection, in playtime-captions.sh
+begin
+on playtime-captions row-badges
+cfg row-badges unplayed=on
+press "down a down a"
+shot with-row-badges
+```
+
+| Helper | What it does |
+|---|---|
+| `begin` | Starts from a fresh copy of the sample card, with every plugin off |
+| `on <id>...` | Turns plugins on, in this order |
+| `slot <slot> <id>` | Gives an exclusive slot to a plugin |
+| `cfg <id> <key=value>...` | Adds the plugin's settings to its `<id>.cfg` |
+| `press "<keys>"` | presser's keys, 450 ms apart after a wait for the launcher to start: a, b, x, y, start, select, menu, l1, r1, up, down, left, right or wait, and keys joined by `+` are pressed together, held for `/<ms>`, such as `select+start/1500` |
+| `after <ms>` | Keeps the frame this long after the last press, such as partway through an animation |
+| `shot <name>` | Starts the launcher and saves `plugins/<id>/docs/<name>.png` |
+
+A block can also change the card under `$CARD`, or the launcher's state under `$STATE`, before its shot. On the first screen of the sample card the rows are Recently Played, Collections, Game Boy, Game Boy Color, Nintendo Entertainment System, then plugins' rows and Tools, and Collections has Favorites and Homebrew, which lists all six games. Under a layout plugin, right steps through the entries in order. A plugin's only quick menu tile is the last one, so `menu left` selects it.
+
+A plugin with visible UI gets one shot with its default settings, one for each setting that changes what's drawn, and one for each plugin it works with that changes what it draws, named `with-<id>`. A plugin with nothing on screen gets none. Run `make screenshots SHOTS=<id>`, look at each picture, and embed each in the plugin's README under a Screenshots heading, after a line saying what setting or pairing it shows:
+
+```markdown
+With Pin to top on, µCity, a favorite, comes first in Game Boy Color.
+
+![Game Boy Color with µCity first](docs/pin.png)
+```
+
 ## Updating NextUI
 
 The launcher in `launcher/` started as upstream's `nextui.c`, split into modules:
@@ -163,7 +206,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `scalemodel.c` | the SDL-free half of `smooth.c`: scaling ARGB pixels axis by axis, averaging the pixels covered when shrinking and bilinear when growing, with colours weighted by alpha, an exact copy at the same size |
 | `patches/api.c.patch` | the launcher's changes to stock's `api.c` (see below) |
 
-See [plugin-api.md](plugin-api.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. `MOSAIC_LAUNCHER_ART_CACHE_BYTES` replaces the art cache's 32 MiB cap, which the eviction case uses to fill a small one. `MOSAIC_LAUNCHER_SQLITE` names the sqlite library the play history loads in place of the system's, which the cases without one point at a file that isn't there. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log. The Launcher pak's Plugins page cases run `nextui.elf --settings plugins` with `tests/plugins/presser`, a library (not a plugin) that `desktop-smoke.sh` preloads when `SMOKE_PRELOAD` names it (`LD_PRELOAD`, or `DYLD_INSERT_LIBRARIES` on macOS): it presses the buttons in `PRESSER_KEYS` through `SDL_PollEvent` and adds each text SDL_ttf draws to `PRESSER_LOG`, so a case can check what the screen showed, such as a secret setting's value never being drawn. With `PRESSER_FRAME` set it also saves the last frame presented before it's done, as a BMP and the texts drawn for it with their colours, which the long Plugins page case reads to check which rows are on screen and that the selected one has its pill. NextUI's `MIN` and `MAX` have no outer parentheses, so use them only as a whole expression, never inside a comparison or sum. The audio cases run with `SDL_AUDIODRIVER=dummy`, SDL's driver that plays nothing but takes queued audio at the device's rate, so a queue falls as it would on a device. SDL2's own dummy driver (Linux) opens only one device at a time, while Homebrew's SDL2 is sdl2-compat over SDL3, whose dummy driver opens any number; so on Linux a plugin's reopen after a sleep is refused once stock has opened its own device, and a separate case with no sleep checks the closes before a launch and at quit. The two also blend differently: a translucent fill over an opaque pixel leaves alpha 254 with SDL2 and 255 with SDL3. Pass a call that changes state and a call that reads it back as separate statements, not as arguments to the same call: gcc evaluates arguments right to left, clang left to right.
+See [plugin-api.md](plugin-api.md) for writing plugins. `make test-plugins` loads test plugins (one that works, one with the wrong API version, one that crashes) into the desktop build. `MOSAIC_LAUNCHER_ART_CACHE_BYTES` replaces the art cache's 32 MiB cap, which the eviction case uses to fill a small one. `MOSAIC_LAUNCHER_SQLITE` names the sqlite library the play history loads in place of the system's, which the cases without one point at a file that isn't there. Each case waits up to `PLUGIN_TEST_SECONDS` (10 by default) for the log lines it checks and its first frame, and stops as soon as they're in. Before each case it clears the crash guard's state, so one slow or failed case can't start the later ones with plugins paused; only the crash checks at the end carry it from one start to the next. A failure names the case and its log. The Launcher pak's Plugins page cases run `nextui.elf --settings plugins` with `tests/plugins/presser`, a library (not a plugin) that `desktop-smoke.sh` preloads when `SMOKE_PRELOAD` names it (`LD_PRELOAD`, or `DYLD_INSERT_LIBRARIES` on macOS): it presses the buttons in `PRESSER_KEYS` through `SDL_PollEvent` and adds each text SDL_ttf draws to `PRESSER_LOG`, so a case can check what the screen showed, such as a secret setting's value never being drawn. With `PRESSER_FRAME` set it also saves the last frame presented before it's done, as a BMP and the texts drawn for it with their colours, which the long Plugins page case reads to check which rows are on screen and that the selected one has its pill. A word of `PRESSER_KEYS` can join buttons with `+` to press them together and end with `/<ms>` to hold them, such as `select+start/1500`. With `PRESSER_SHOT` set to a number of milliseconds as well, it keeps the first frame presented that long after the last press instead, which `make screenshots` uses. NextUI's `MIN` and `MAX` have no outer parentheses, so use them only as a whole expression, never inside a comparison or sum. The audio cases run with `SDL_AUDIODRIVER=dummy`, SDL's driver that plays nothing but takes queued audio at the device's rate, so a queue falls as it would on a device. SDL2's own dummy driver (Linux) opens only one device at a time, while Homebrew's SDL2 is sdl2-compat over SDL3, whose dummy driver opens any number; so on Linux a plugin's reopen after a sleep is refused once stock has opened its own device, and a separate case with no sleep checks the closes before a launch and at quit. The two also blend differently: a translucent fill over an opaque pixel leaves alpha 254 with SDL2 and 255 with SDL3. Pass a call that changes state and a call that reads it back as separate statements, not as arguments to the same call: gcc evaluates arguments right to left, clang left to right.
 
 FN buttons can be bound to a launcher action as well as a pak, with `action:<id>` (eg. `action:gamelist.back`) in place of `pak:<name>`. A plugin can bind one the user left unassigned with `fn_bind`; a press runs the user's binding from Settings when there is one and the plugin's otherwise, so with no plugins on it's stock's. Desktop has no FN buttons, so its tests name some with `MOSAIC_LAUNCHER_FN_FAKE`, such as `L3,,HOME` for FN1 and FN3; device builds never read it.
 

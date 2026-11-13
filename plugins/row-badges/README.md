@@ -27,6 +27,20 @@ A disc of a multi-disc game counts as played when its `.m3u` was. Folders, paks 
 
 These are read from the card at start, back from a game and each time the launcher builds a list, never while drawing.
 
+## Screenshots
+
+Unplayed dot on.
+
+![Unplayed dot on](docs/unplayed.png)
+
+Tier dots on, with tiers in the games' .info files.
+
+![Tier dots on, with tiers in the games' .info files](docs/tiers.png)
+
+With layout-grid: both on.
+
+![With layout-grid: both on](docs/with-layout-grid.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

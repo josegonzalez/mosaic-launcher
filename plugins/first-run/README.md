@@ -28,6 +28,20 @@ Plugins can't set the PIN or turn plugins on, so those two pages only show what'
 
 Finishing or skipping turns the Already shown setting on, so it doesn't open by itself again. Turn it off to see the wizard again at the next start. A First run tile on the [quick menu](../../docs/glossary.md#quick-menu) opens it again, as does the `first-run.open` action, which the First run button setting puts on Y, L2, R2 or SELECT on the game list.
 
+## Screenshots
+
+The first page, with the default settings.
+
+![The first page, with the default settings](docs/default.png)
+
+The Settings page.
+
+![The Settings page](docs/settings.png)
+
+The Plugins page.
+
+![The Plugins page](docs/plugins.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

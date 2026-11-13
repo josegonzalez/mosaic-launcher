@@ -17,6 +17,12 @@ Turn on **Focus mode** in Launcher > Plugins ([how](../../docs/plugins.md#turnin
 
 A Focus tile on the quick menu turns focus mode off and on, as does the Focus on favorites setting.
 
+## Screenshots
+
+With favorites, which it needs: the first screen listing the favorites and All systems, with the default settings.
+
+![With favorites, which it needs: the first screen listing the favorites and All systems, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

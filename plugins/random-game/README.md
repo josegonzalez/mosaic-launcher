@@ -13,6 +13,16 @@ Turn on **Random game** in Launcher > Plugins ([how](../../docs/plugins.md#turni
 
 Every game is as likely as any other, so bigger systems come up more often. With Prefer unplayed games on (the default), games not in Recently Played are four times as likely. Games the [`hidden`](../hidden/README.md) plugin hides are never picked.
 
+## Screenshots
+
+The Random game row on the first screen, with the default settings.
+
+![The Random game row on the first screen, with the default settings](docs/default.png)
+
+Random tile on the quick menu on.
+
+![Random tile on the quick menu on](docs/tile.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

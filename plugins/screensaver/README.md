@@ -28,6 +28,16 @@ PNG, JPEG and BMP files are shown in name order, fitted to the screen on black, 
 - With the [`charging-screen`](../charging-screen/README.md) plugin loaded and its idle setting on, charging-screen wins: while the device charges the screensaver doesn't open, so the charging screen opens instead, and neither opens over the other.
 - It holds at most two scaled images, the one showing and the next, and frees them when it closes, and redraws every frame only while an image changes.
 
+## Screenshots
+
+µCity's art, with Show after idle set to 15 seconds and the other settings at their defaults.
+
+![µCity's art, with Show after idle set to 15 seconds and the other settings at their defaults](docs/default.png)
+
+Clock set to 24h.
+
+![Clock set to 24h](docs/clock.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

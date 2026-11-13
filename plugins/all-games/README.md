@@ -16,6 +16,12 @@ The card is scanned once per start, and again only when a folder it read changes
 
 Turn on **All games** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)). It can't be on together with [`focus-mode`](../focus-mode/README.md), because both take the `root` [slot](../../docs/glossary.md#slot).
 
+## Screenshots
+
+The first screen listing every game, with the default settings.
+
+![The first screen listing every game, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

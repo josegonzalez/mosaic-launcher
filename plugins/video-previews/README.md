@@ -17,6 +17,12 @@ It plays on the built-in list in place of the thumbnail, or in a plugin layout's
 
 Turn on **Video previews** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)). On a build made without ffmpeg, as CI does, or on a desktop without ffmpeg's libraries, the plugin logs that it's unavailable and plays nothing.
 
+## Screenshots
+
+A clip playing in place of the thumbnail, with the default settings.
+
+![A clip playing in place of the thumbnail, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

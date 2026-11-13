@@ -27,6 +27,16 @@ Turn on **Cartridge shelf layout** in Launcher > Plugins ([how](../../docs/plugi
 
 The d-pad moves along and between the shelves: left and right step along them in order, on to the next shelf, and up and down keep the column. A press past an end wraps around as in [`layout-grid`](../layout-grid/README.md), and holding the direction stops there instead. The shelves in view follow the selection. **A**, **B**, **X**, the shoulders and the letter jumps stay the launcher's.
 
+## Screenshots
+
+The Homebrew collection, with the default settings.
+
+![The Homebrew collection, with the default settings](docs/default.png)
+
+Shelves set to 1.
+
+![Shelves set to 1](docs/shelves-1.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

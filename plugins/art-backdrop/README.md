@@ -12,6 +12,24 @@ Only art files count, so generated art such as [`art-placeholder`](../art-placeh
 
 Turn on **Art backdrop** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
 
+## Screenshots
+
+µCity's art behind Game Boy Color, with the default settings (gradient style).
+
+![µCity's art behind Game Boy Color, with the default settings (gradient style)](docs/default.png)
+
+Style set to full.
+
+![Style set to full](docs/style-full.png)
+
+Height set to half.
+
+![Height set to half](docs/height-half.png)
+
+Dim set to 0.
+
+![Dim set to 0](docs/dim-0.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

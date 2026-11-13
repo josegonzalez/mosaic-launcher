@@ -13,6 +13,12 @@ Unlike stock, which only marks neighbours with the same name, it finds collision
 
 Turn on **Title disambiguation** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
 
+## Screenshots
+
+Tobu Tobu Girl from Game Boy and Game Boy Color in Favorites, with the default settings.
+
+![Tobu Tobu Girl from Game Boy and Game Boy Color in Favorites, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

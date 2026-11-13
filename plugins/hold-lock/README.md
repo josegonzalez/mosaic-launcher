@@ -24,6 +24,12 @@ Hold the lock chord for the hold time (SELECT and START for 1 second by default)
 
 With Lock with the hold switch on, the hold switch on the side of the tg5040 and tg5050 locks while it's on, and the chord can't unlock it until it's switched off. It's stock's mute switch, so it still mutes as stock's Mute settings say. On the h700 and desktop, which have no switch, the plugin logs that once and only the chord locks.
 
+## Screenshots
+
+The padlock in the header while locked, with the default settings.
+
+![The padlock in the header while locked, with the default settings](docs/default.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

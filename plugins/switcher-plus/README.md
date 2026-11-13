@@ -38,6 +38,24 @@ With the Play time captions setting on, it adds [`playtime-captions`](../playtim
 
 Its parts and format are playtime-captions' settings (achievements included), read each time the switcher opens while that plugin is loaded, and its defaults (play time and last played, relative) when it isn't. With no play history, no recent gets a caption. The built-in switcher, with no switcher slot owner, has no captions.
 
+## Screenshots
+
+The game switcher, with the default settings (full style).
+
+![The game switcher, with the default settings (full style)](docs/default.png)
+
+Style set to strip.
+
+![Style set to strip](docs/style-strip.png)
+
+Style set to list.
+
+![Style set to list](docs/style-list.png)
+
+With playtime-captions and Play time captions on: the caption under the name.
+
+![With playtime-captions and Play time captions on: the caption under the name](docs/captions-with-playtime-captions.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

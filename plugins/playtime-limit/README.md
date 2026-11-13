@@ -23,6 +23,20 @@ The daily limit, warning, extra time and code are protected, and the code is sec
 
 Turn on **Play time limit** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)), then pick a limit.
 
+## Screenshots
+
+Daily limit set to 60 minutes: the time left in the header.
+
+![Daily limit set to 60 minutes: the time left in the header](docs/limit.png)
+
+Daily limit set to 30 minutes: the time left in the warning colour.
+
+![Daily limit set to 30 minutes: the time left in the warning colour](docs/warn.png)
+
+Daily limit set to 15 minutes: a launch refused once it's used up.
+
+![Daily limit set to 15 minutes: a launch refused once it's used up](docs/refused.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

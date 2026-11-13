@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop plugins-desktop plugins-device ffmpeg-device build-% devices pak test smoke test-plugins test-profiles lint pot drift clean
+.PHONY: all desktop run-desktop plugins-desktop screenshots plugins-device ffmpeg-device build-% devices pak test smoke test-plugins test-profiles lint pot drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -58,6 +58,19 @@ run-desktop: desktop plugins-desktop
 	bash $(NEXTUI)/workspace/desktop/prepare_fake_sd_root.sh
 	MOSAIC_LAUNCHER_PLUGIN_PATH=$(CURDIR)/build/desktop-plugins \
 		$(DESKTOP_LIBRARY_PATH)=$(DESKTOP_PREFIX_LOCAL)/lib ./build/desktop/nextui.elf
+
+# The plugins' doc screenshots (plugins/<id>/docs/*.png), from the shots in
+# tests/screenshots/shots on the sample card in tests/screenshots/card, with
+# a build of the launcher at the h700's 640x480 whose card is
+# build/screenshots/sdcard. Run by hand when a plugin's UI changes;
+# SHOTS="<id> ..." takes only those plugins' shots.
+SCREENSHOTS := $(CURDIR)/build/screenshots
+screenshots: desktop plugins-desktop
+	./scripts/screenshots.sh prepare
+	$(MAKE) -C launcher PLATFORM=desktop CROSS_COMPILE=$(HOST_BIN)/ \
+		PREFIX=$(DESKTOP_PREFIX) PREFIX_LOCAL=$(DESKTOP_PREFIX_LOCAL) \
+		NEXTUI=$(SCREENSHOTS)/workspace BUILD_DIR=$(SCREENSHOTS)/desktop
+	./scripts/screenshots.sh $(SHOTS)
 
 ###########################################################
 # devices
@@ -128,8 +141,11 @@ lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh
 	@# the cases set variables run.sh's helpers read, such as plugin and log, and read ones it sets
 	shellcheck -x -e SC2034,SC2153,SC2154 tests/plugins/cases/*.sh
+	shellcheck -x tests/screenshots/shots/*.sh
 	@# docs/plugins.md is made from the plugins' plugin.txt files
 	./scripts/plugin-table.sh --check
+	@# every image a README or doc embeds, such as a plugin's screenshots, is there
+	./scripts/screenshots.sh --check
 	@# the template ships its own copy of the SDK; it must match
 	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h
 	cmp sdk/LICENSE template/sdk/LICENSE

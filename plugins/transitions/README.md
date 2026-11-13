@@ -18,6 +18,20 @@ Turn on **Transition styles** in Launcher > Plugins ([how](../../docs/plugins.md
 | `stock` | Stock's transitions |
 | `off` | None |
 
+## Screenshots
+
+Partway through opening a folder, with the default slide style (speed set to slow).
+
+![Partway through opening a folder, with the default slide style (speed set to slow)](docs/style-slide.png)
+
+Style set to fade.
+
+![Style set to fade](docs/style-fade.png)
+
+Style set to slide_fade.
+
+![Style set to slide_fade](docs/style-slide-fade.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

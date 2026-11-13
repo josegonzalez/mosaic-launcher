@@ -42,6 +42,12 @@ A letter jump repeats only with `repeat:`. Other plugins list their actions in t
 
 Swaps A and X: A resumes the selected game from its save state, or opens it when there's nothing to resume, X opens it without resuming, and the hints follow. A button's own setting replaces what this puts on it.
 
+## Screenshots
+
+Resume with A on: the hints show A RESUME and X OPEN on a game with a save state.
+
+![Resume with A on: the hints show A RESUME and X OPEN on a game with a save state](docs/resume-with-a.png)
+
 ## Settings
 
 The keys are `a`, `b`, `x`, `y`, `l1`, `r1`, `l2`, `r2`, `start` and `select` in `.userdata/<platform>/launcher/button-remap.cfg`. The Plugins page shows only A, X, Y, L2, R2 and START.

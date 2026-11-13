@@ -22,6 +22,16 @@ The d-pad moves through the grid: left and right step through the entries in ord
 
 Holding the direction stops at the end instead. Down where the column has nothing below goes to the last entry. **A**, **B**, **X**, the shoulders and the letter jumps stay the launcher's.
 
+## Screenshots
+
+The Homebrew collection, with the default settings.
+
+![The Homebrew collection, with the default settings](docs/default.png)
+
+Columns set to 4.
+
+![Columns set to 4](docs/columns-4.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

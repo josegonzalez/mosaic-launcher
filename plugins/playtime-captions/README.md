@@ -17,6 +17,32 @@ The caption comes from stock's [play tracker](../../docs/glossary.md#play-tracke
 
 Turn on **Play time captions** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
 
+## Screenshots
+
+Captions in the Homebrew collection, with the default settings.
+
+![Captions in the Homebrew collection, with the default settings](docs/default.png)
+
+Format set to compact.
+
+![Format set to compact](docs/format-compact.png)
+
+Format set to date.
+
+![Format set to date](docs/format-date.png)
+
+Sessions on.
+
+![Sessions on](docs/sessions.png)
+
+Never played on.
+
+![Never played on](docs/never.png)
+
+With row-badges' unplayed dots on.
+
+![With row-badges' unplayed dots on](docs/with-row-badges.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

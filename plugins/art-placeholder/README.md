@@ -10,6 +10,20 @@ The launcher asks for placeholder art only when no file answers. A game with any
 
 Turn on **Placeholder art** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
 
+## Screenshots
+
+Games with no art in the Homebrew collection, with the default settings (title style).
+
+![Games with no art in the Homebrew collection, with the default settings (title style)](docs/default.png)
+
+Style set to pattern.
+
+![Style set to pattern](docs/style-pattern.png)
+
+With layout-grid: every tile gets a title card.
+
+![With layout-grid: every tile gets a title card](docs/with-layout-grid.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

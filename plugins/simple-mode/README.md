@@ -22,6 +22,16 @@ A Simple mode tile on the quick menu turns it on, and off again after a confirm,
 
 A forgotten PIN is cleared by deleting `.userdata/<platform>/launcher/pin.txt` on a computer. Simple mode can also be left by setting `on=off` in `simple-mode.cfg` or `simple-mode=off` in `plugins.txt`.
 
+## Screenshots
+
+The first screen without Tools, with the default settings.
+
+![The first screen without Tools, with the default settings](docs/default.png)
+
+The quick menu without Tools and the settings tiles.
+
+![The quick menu without Tools and the settings tiles](docs/quick-menu.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

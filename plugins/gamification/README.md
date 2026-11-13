@@ -32,6 +32,16 @@ Open the Quests screen from the Quests tile on the [quick menu](../../docs/gloss
 
 When a game's return completes a quest, or else extends the streak (once a day), a toast says so.
 
+## Screenshots
+
+The Quests screen, with the default settings.
+
+![The Quests screen, with the default settings](docs/default.png)
+
+The Quests tile on the quick menu (on by default).
+
+![The Quests tile on the quick menu (on by default)](docs/tile.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |

@@ -18,6 +18,16 @@ A collection is named by its file name without `.txt`, or by the name `Collectio
 
 When stock already puts collections on the root, as it does when there are no systems to show, they aren't added again, and keep stock's order. With [`focus-mode`](../focus-mode/README.md) or [`all-games`](../all-games/README.md) owning the root, they show only where the owner adds other plugins' root folders.
 
+## Screenshots
+
+The Collections folder, with the Homebrew collection's art (Collection art on, the default).
+
+![The Collections folder, with the Homebrew collection's art (Collection art on, the default)](docs/default.png)
+
+On the root set to `*`: the collections on the first screen after the consoles.
+
+![On the root set to `*`: the collections on the first screen after the consoles](docs/promote.png)
+
 ## Settings
 
 The settings are kept in `.userdata/<platform>/launcher/collections-plus.cfg`.

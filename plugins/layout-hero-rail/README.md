@@ -27,6 +27,20 @@ Turn on **Hero and card rail layout** in Launcher > Plugins ([how](../../docs/pl
 
 A press past an end wraps around to the other end, and holding the direction stops there instead.
 
+## Screenshots
+
+The Homebrew collection, with the default settings.
+
+![The Homebrew collection, with the default settings](docs/default.png)
+
+Card size set to large.
+
+![Card size set to large](docs/cards-large.png)
+
+Tint set to 0.
+
+![Tint set to 0](docs/tint-0.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
