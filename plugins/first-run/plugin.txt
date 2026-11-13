@@ -1,6 +1,8 @@
 id=first-run
 name=First run
 api=1
+category=Controls and setup
+summary=A short setup wizard the first time the launcher starts.
 # set once the wizard is finished or skipped; turn it off to see it again at the next start
 setting.seen=toggle|Already shown|off
 # a First run tile on the quick menu that opens the wizard

@@ -1,6 +1,8 @@
 id=header-indicators
 name=Header indicators
 api=1
+category=Looks
+summary=Shows free storage, an SSH dot, a profile badge and the FPS in the header.
 # free space on the card, such as 12.3G, looked at every 5 seconds
 setting.storage=toggle|Free storage|on
 # a dot while an SSH server listens on port 22; never on desktop

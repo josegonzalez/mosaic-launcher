@@ -1,6 +1,8 @@
 id=genre-view
 name=Genre view
 api=1
+category=Library
+summary=Gathers the same genre from every system into one Genres folder.
 # the fewest consoles a genre's folders need to come from
 setting.min=choice|Consoles a genre needs|1|1,2,3,4
 # folder names that aren't genres, comma-separated, eg. Hacks, Homebrew

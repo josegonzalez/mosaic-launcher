@@ -1,6 +1,8 @@
 id=switcher-plus
 name=Game switcher plus
 api=1
+category=Looks
+summary=Replaces the game switcher with your recent games in a choice of styles.
 slots=switcher
 # full is stock's preview across the screen, strip a row of previews, list the names beside a preview
 setting.style=choice|Style|full|full,strip,list

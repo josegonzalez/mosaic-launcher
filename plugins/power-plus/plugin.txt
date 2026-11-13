@@ -1,6 +1,8 @@
 id=power-plus
 name=Power plus
 api=1
+category=Power
+summary=Warns and powers off cleanly on a low battery, and after a long sleep.
 # warns, then powers off cleanly, when the battery runs low
 setting.guard=toggle|Low battery guard|on
 setting.warn_at=choice|Low battery warning at (%)|5|3,5,10,15

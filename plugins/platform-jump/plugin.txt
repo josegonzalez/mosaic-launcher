@@ -1,6 +1,8 @@
 id=platform-jump
 name=Platform jump
 api=1
+category=Controls and setup
+summary=Makes L1 and R1 jump between systems instead of letters.
 # on the root, L1 and R1 move between the system rows instead of letters
 setting.root=toggle|Jump between systems on the root|off
 # in Recently Played, collections and other lists with several systems, L1 and R1 move to the next system's games

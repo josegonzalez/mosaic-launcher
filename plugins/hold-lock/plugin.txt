@@ -1,6 +1,8 @@
 id=hold-lock
 name=Hold lock
 api=1
+category=Controls and setup
+summary=Locks every button so nothing changes by accident.
 # held for the hold setting's seconds, locks every button, and again unlocks them; off for none.
 # A long power press still powers off, and the volume and brightness keys can't be locked.
 setting.chord=choice|Lock chord|select+start|select+start,l1+r1,l2+r2,off

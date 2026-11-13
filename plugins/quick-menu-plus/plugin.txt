@@ -1,6 +1,8 @@
 id=quick-menu-plus
 name=Quick menu plus
 api=1
+category=Controls and setup
+summary=Renames or hides quick menu tiles and adds tiles that flip settings.
 # new labels for the top row's built-in tiles, as name=label pairs, eg. Recents=Played, Games=Library
 setting.labels=text|Tile labels (Recents=Played, ...)|
 # tiles to hide, by name or a plugin tile's action id, eg. Pak Store, Bluetooth

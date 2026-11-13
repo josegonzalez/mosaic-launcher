@@ -4,7 +4,7 @@ Rules for agents working on mosaic-launcher.
 
 ## Read first
 
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for building, tests and the launcher's modules, and [PLUGINS.md](PLUGINS.md) for the plugin API. Read the parts that touch your change before changing code.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for building, tests and the launcher's modules, and [docs/plugin-api.md](docs/plugin-api.md) for the plugin API. Read the parts that touch your change before changing code.
 - README.md is only a short summary. Keep it that way, and put build, test and internals notes in docs/DEVELOPMENT.md.
 - The launcher isn't released publicly: no Pak Store, no `pak.json`, no GitHub releases.
 - The project was renamed from nextui-launcher. Older issues use the old names: `NUI_X` is now `MOSAIC_X`, `NUIType` is `MosaicType`, `nextui_plugin_get` is `mosaic_plugin_get`, and `NEXTUI_LAUNCHER_X` environment variables are `MOSAIC_LAUNCHER_X`.
@@ -18,14 +18,15 @@ Rules for agents working on mosaic-launcher.
 - Plugins include only `sdk/mosaic_plugin.h`, plus libc. They never link launcher or NextUI code.
 - Plugins in `plugins/<name>/` and new SDK code are written fresh (MIT-style, no NextUI code). Don't port fork code; reimplement it from the described behavior.
 - Keep plugin model logic (filters, sort, pick, parse) in its own SDL-free file with host unit tests under `tests/c/`. See `tests/c/test_favorites.c` for how a plugin is tested.
-- Each new plugin gets a `plugin.txt` (with settings, `slots`, `requires` and `conflicts` as needed), a row in PLUGINS.md's "Bundled plugins" table crediting the forks the idea came from, and its tests. A new plugin only adds files, so parallel plugin PRs don't conflict:
-  - its row's text goes in `plugins/<name>/README.md` (a `# <name>` heading, a blank line, then the text); run `./scripts/plugin-table.sh` to regenerate the table, which `make lint` checks;
+- Each new plugin gets a `plugin.txt` (with settings, `slots`, `requires` and `conflicts` as needed), a page and an entry in [docs/plugins.md](docs/plugins.md), and its tests. A new plugin only adds files, so parallel plugin PRs don't conflict:
+  - its `plugin.txt` has a `category=` (one of the groups `scripts/plugin-table.sh` lists) and a one-sentence plain `summary=`; run `./scripts/plugin-table.sh` to regenerate the index in docs/plugins.md, which `make lint` checks;
+  - its page is `plugins/<name>/README.md`, starting with a `# <name>` heading and written for someone new to CFW: what it does, how to turn it on and use it, a settings table that matches `plugin.txt` (name, choices, default, what it does), a "For plugin authors" section (provides, slots, services, files it reads or writes, requires and conflicts) and credits to the forks the idea came from. Link terms such as pak, slot and quick menu to docs/glossary.md rather than explaining them again;
   - its unit test is `tests/c/test_<name>.c`, found by the makefile's wildcard, with a `tests/c/<name>.mk` holding its rule when it needs more than its own source and the SDK header;
   - its desktop cases go in `tests/plugins/cases/<number>-<name>.sh`, after the last case number and before `990-crash.sh`, with a `# shard: <1-3>` line picking the CI shard with the least time (each case prints its time in the CI log).
 - SDK changes:
   - fields are only ever added at the end of `MosaicHost` and `MosaicPlugin`;
   - `MOSAIC_API_VERSION` stays 1;
-  - new host fields are documented under "Features added since the first API" in PLUGINS.md;
+  - new host fields are documented under "Features added since the first API" in docs/plugin-api.md;
   - `template/sdk/mosaic_plugin.h` must stay an exact copy of `sdk/mosaic_plugin.h` (`make lint` checks it).
 
 ## Tests

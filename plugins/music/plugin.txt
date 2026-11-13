@@ -1,6 +1,8 @@
 id=music
 name=Music
 api=1
+category=Extras
+summary=A music player that keeps playing while you play a game.
 # the folder on the card the player lists, with its folders; MP3, FLAC and WAV files
 setting.folder=text|Music folder|Music
 # pause the music before a game or pak and play on after it, or keep it playing through it

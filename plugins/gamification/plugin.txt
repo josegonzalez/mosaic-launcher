@@ -1,6 +1,8 @@
 id=gamification
 name=Gamification
 api=1
+category=Play time
+summary=Adds daily and weekly quests and a play streak.
 # a Quests tile on the quick menu
 setting.tile=toggle|Quick menu tile|on
 # a game list button that opens the quests

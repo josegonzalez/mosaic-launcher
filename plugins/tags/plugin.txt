@@ -1,6 +1,8 @@
 id=tags
 name=Tags
 api=1
+category=Library
+summary=Lets you put your own tags on games, shown as folders.
 # the tags:<name> entry sets
 provides=sets.tags
 # the game list button that opens the selected game's tag checklist, shared with other plugins' actions on it

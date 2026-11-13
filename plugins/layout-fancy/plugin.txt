@@ -1,6 +1,8 @@
 id=layout-fancy
 name=Fancy layout
 api=1
+category=Looks
+summary=Shows the game list beside a panel with the selected game's art.
 slots=layout
 # shows the last save state's preview in place of the box art when there is one
 setting.prefer_preview=toggle|Prefer state preview|on

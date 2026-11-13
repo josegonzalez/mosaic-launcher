@@ -1,6 +1,8 @@
 id=save-state-manager
 name=Save state manager
 api=1
+category=Launching games
+summary=Browses, previews and deletes your save states.
 # the states.last service: a game's most recently saved state
 provides=states.last
 # a Save states tile on the quick menu listing every game with states, shown while there are any

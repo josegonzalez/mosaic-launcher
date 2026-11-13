@@ -1,3 +1,29 @@
 # title-disambiguation
 
-When titles collide in a list, adds what tells them apart, and only then. Games from different systems, as in Recently Played, collections and Favorites, get the system's tag, eg. "Tetris (GB)" and "Tetris (GBC)". Games from one system get the region tags or extension the name leaves out, eg. "Tetris (USA)" or "Tetris.gbc", then the folder they're in, and the whole file name when nothing else differs. Unlike stock, which only marks neighbours with the same name, it finds collisions anywhere in the list. Turn the `same_system` setting off to rename only games from different systems and leave the rest to stock. From Ru_UI and casualducko.
+When two titles in a list are the same, adds what tells them apart, and only then.
+
+## What it does
+
+- Games from different systems, as in Recently Played, [collections](../../docs/glossary.md#collection) and Favorites, get the system's tag, such as "Tetris (GB)" and "Tetris (GBC)".
+- Games from one system get the region tags or extension the name leaves out, such as "Tetris (USA)" or "Tetris.gbc", then the folder they're in, and the whole file name when nothing else differs.
+
+Unlike stock, which only marks neighbours with the same name, it finds collisions anywhere in the list.
+
+## Turn it on
+
+Turn on **Title disambiguation** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
+
+## Settings
+
+| Setting | Choices | Default | What it does |
+|---|---|---|---|
+| Same system too (`same_system`) | on, off | on | Also tells apart same-named games from one system (by tags or extension), not only games from different systems. Off renames only games from different systems and leaves the rest to stock |
+
+## For plugin authors
+
+- Renames entries with `entry_set_name` from the `list_ready` hook.
+- Has no slot, service or file of its own.
+
+## Credits
+
+Ru_UI and casualducko.

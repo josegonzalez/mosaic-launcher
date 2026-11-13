@@ -1,6 +1,8 @@
 id=activity-stats
 name=Activity stats
 api=1
+category=Play time
+summary=Shows how long you played each day and which games you played most.
 # an Activity tile on the quick menu
 setting.tile=toggle|Quick menu tile|on
 # a game list button that opens the stats

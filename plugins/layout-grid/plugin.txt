@@ -1,6 +1,8 @@
 id=layout-grid
 name=Grid layout
 api=1
+category=Looks
+summary=Shows the game list as a grid of tiles.
 slots=layout
 # tiles across the screen; auto fits the screen: 3 at 640 wide, 4 at 1024, 5 at 1280;
 # theme: the theme's layout-grid.columns, or auto without one

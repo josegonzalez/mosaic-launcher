@@ -1,6 +1,8 @@
 id=netplay
 name=Netplay (needs NextUI netplay)
 api=1
+category=Network
+summary=Hosts or joins a game over the network, once NextUI has netplay.
 # stock minarch has no netplay: this stays off until a NextUI release adds it
 requires=minarch-netplay
 # the port to host on, and to join on when the address doesn't give one

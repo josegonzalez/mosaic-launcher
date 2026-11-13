@@ -1,6 +1,8 @@
 id=game-actions
 name=Game actions
 api=1
+category=Library
+summary=Renames, deletes or adds a game to a collection from one button.
 # the game list button for rename, delete and add to collection, shared with other plugins' actions on it
 setting.button=choice|Game actions button|Y|Y,L2,R2|button:game-actions.rename,button:game-actions.collect,button:game-actions.delete
 setting.rename=toggle|Rename|on

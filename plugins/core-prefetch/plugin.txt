@@ -1,6 +1,8 @@
 id=core-prefetch
 name=Core prefetch (unsupported on desktop)
 api=1
+category=Launching games
+summary=Loads a game's emulator core ahead of time so it starts faster.
 # off warms only the core, not the game
 setting.rom=toggle|Warm the game too|on
 # the most read ahead per launch, across the core and the game

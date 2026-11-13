@@ -1,6 +1,8 @@
 id=random-game
 name=Random game
 api=1
+category=Launching games
+summary=Picks a game at random and launches it.
 # games not in Recently Played are four times as likely
 setting.unplayed=toggle|Prefer unplayed games|on
 # a Random game row on the root that picks from every system

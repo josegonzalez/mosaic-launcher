@@ -128,7 +128,7 @@ lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh
 	@# the cases set variables run.sh's helpers read, such as plugin and log, and read ones it sets
 	shellcheck -x -e SC2034,SC2153,SC2154 tests/plugins/cases/*.sh
-	@# PLUGINS.md's bundled plugins table is made from plugins/*/README.md
+	@# docs/plugins.md is made from the plugins' plugin.txt files
 	./scripts/plugin-table.sh --check
 	@# the template ships its own copy of the SDK; it must match
 	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h

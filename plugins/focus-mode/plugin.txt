@@ -1,6 +1,8 @@
 id=focus-mode
 name=Focus mode
 api=1
+category=Library
+summary=Makes the first screen list only your favorites.
 slots=root
 requires=favorites
 # the root lists only favorites and All systems; the Focus tile on the quick menu flips it too

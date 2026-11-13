@@ -10,7 +10,7 @@
 // launcher's fonts and theme, reads it back a few rows a tick, writes it
 // to a file and pokes the program through a socket that's its stdin. The
 // program shows the newest frame, and quits when the socket closes, as it
-// does when the launcher quits or is killed. It's started by PLUGINS.md's
+// does when the launcher quits or is killed. It's started by docs/plugin-api.md's
 // helper rules: by its path, with no preloaded libraries, none of the
 // launcher's other files open, and its output in .userdata/<platform>/
 // logs/second-screen.txt.

@@ -3,7 +3,7 @@
 #include "pluginorder.h"
 #include "tr.h"
 
-// The exclusive slots plugins.h names, in the order PLUGINS.md lists them,
+// The exclusive slots plugins.h names, in the order docs/plugin-api.md lists them,
 // with what the page calls them.
 static const char* const slots[PLUGIN_GROUP_COUNT] = {
 	"root", "layout", "transition", "launch", "background", "home", "switcher", "strings", "theme",

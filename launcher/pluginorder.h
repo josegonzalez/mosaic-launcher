@@ -2,7 +2,7 @@
 #define PLUGINORDER_H
 
 // The Launcher pak's Plugins page order. Plugins that claim an exclusive
-// slot are grouped under it, in the order PLUGINS.md lists the slots, and
+// slot are grouped under it, in the order docs/plugin-api.md lists the slots, and
 // the rest come last; each group is A-Z by name. Only the page's order:
 // the hook order plugins.txt sets is left alone. Pure, so it can be tested
 // on its own.

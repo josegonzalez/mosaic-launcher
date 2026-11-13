@@ -1,3 +1,47 @@
 # art-boxart
 
-Box art from the art folders other forks use, chained with other art providers. A game's art is named by its file name without its last extension, as stock names its `.media` thumbnail, and a folder's by its whole name. For the box, the first of these that exists wins: a Pico-8 cart (`*.p8.png`) is its own art (the `rom_art` setting), a folder's `cover.png` (the `cover` setting), then beside the game nx-redux's flat box in `.media/boxart2d/<name>` and its `.media/boxart/<name>`, the 3D box or the flat one when there's no 3D (both the `media` setting), `Imgs/<name>.png` (the `imgs` setting), `.res/<name>.png` (the `res` setting) and `Images/<name>.png` (the `images` setting). The `media` setting also gives the 3D box from `.media/boxart/`, the logo from `.media/wheel/` and the screenshot from `.media/screenshot/`. In nx-redux's folders a `.png` is looked for, then a `.jpg` and a `.jpeg`, as nx-redux reads them (its `.webp` art isn't, as the art cache can't decode it, and its `.media/mix/` composite isn't any one kind of art, so it's left out). All of these are on by default. The built-in list shows the box when a game has no thumbnail; the `thumbnail` setting (off by default) also uses it as the thumbnail, before stock's `.media/<name>.png`. Folders named `Imgs` or `Images` are left out of the game list while their setting and the `hide` setting (on by default) are on. The `cover_name` setting (off by default, so folders keep their names) hides the names of folders with a `cover.png` while `cover` is on, with `hide_name`, so the cover stands in for the folder. Only files that exist are answered, so a game without any falls through to the next provider and stock. Box art folders are from MyMinUI (`Imgs`), UnuOS (`.res`) and nx-redux (box, 3D box, wheel and screenshot), visible art folders from meszaroszoltan and MyMinUI, folder as cover from Ru_UI, and rom as art from LazaroFilm.
+Finds box art in the art folders other forks use, so games show it without you moving files.
+
+It works with other art providers: it only answers for files that exist, so a game without any falls through to the next provider and stock.
+
+## Turn it on
+
+Turn on **Box art** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)). Every source below is on by default except where noted.
+
+## Where it looks
+
+A game's art is named by its file name without its last extension, as stock names its `.media` thumbnail. A folder's art is named by its whole name. For the box, the first of these that exists wins:
+
+1. A Pico-8 cart (`*.p8.png`), which is its own art.
+2. A folder's `cover.png`.
+3. Beside the game, nx-redux's flat box in `.media/boxart2d/<name>`, then its `.media/boxart/<name>`: the 3D box, or the flat one when there's no 3D.
+4. `Imgs/<name>.png`.
+5. `.res/<name>.png`.
+6. `Images/<name>.png`.
+
+The `media` setting also gives the 3D box from `.media/boxart/`, the logo from `.media/wheel/` and the screenshot from `.media/screenshot/`. In nx-redux's folders a `.png` is looked for, then a `.jpg` and a `.jpeg`, as nx-redux reads them. Its `.webp` art isn't read, as the art cache can't decode it, and its `.media/mix/` composite is left out because it isn't any one kind of art.
+
+The built-in list shows the box when a game has no thumbnail. Folders named `Imgs` or `Images` are left out of the game list while their setting and the `hide` setting are both on.
+
+## Settings
+
+| Setting | Choices | Default | What it does |
+|---|---|---|---|
+| Use as the thumbnail (`thumbnail`) | on, off | off | Also uses the box as the thumbnail, before stock's `.media/<name>.png` |
+| Box, wheel and screenshot in .media (`media`) | on, off | on | nx-redux's `.media/boxart2d`, `boxart`, `wheel` and `screenshot` beside the games |
+| Imgs folders (`imgs`) | on, off | on | MyMinUI's `Imgs/<game>.png` beside the games |
+| .res folders (`res`) | on, off | on | UnuOS's `.res/<game>.png` beside the games |
+| Images folders (`images`) | on, off | on | Visible art folders, `Images/<game>.png` beside the games |
+| Hide art folders (`hide`) | on, off | on | Leaves the `Imgs` and `Images` folders out of the list |
+| Folder covers (`cover`) | on, off | on | Uses a folder's `cover.png` |
+| Hide covered folder names (`cover_name`) | on, off | off | Hides the names of folders with a `cover.png`, while Folder covers is on, so the cover stands in for the folder |
+| Pico-8 carts as art (`rom_art`) | on, off | on | Pico-8 `.p8.png` carts are their own art |
+
+## For plugin authors
+
+- Answers the launcher's art requests (the box, 3D box, logo and screenshot kinds) and chains with other art providers.
+- Reads art files only; it writes nothing.
+
+## Credits
+
+Box art folders are from MyMinUI (`Imgs`), UnuOS (`.res`) and nx-redux (box, 3D box, wheel and screenshot). Visible art folders are from meszaroszoltan and MyMinUI, folder as cover is from Ru_UI, and rom as art is from LazaroFilm.

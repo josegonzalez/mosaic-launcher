@@ -1,6 +1,8 @@
 id=smart-collections
 name=Smart Collections
 api=1
+category=Library
+summary=Sorts your games into franchise collections such as Mario and Zelda.
 # the smart:<name> entry sets
 provides=sets.smart
 # the franchises that ship with the plugin, such as Mario, Zelda and Sonic

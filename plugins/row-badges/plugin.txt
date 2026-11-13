@@ -1,6 +1,8 @@
 id=row-badges
 name=Row badges
 api=1
+category=Looks
+summary=Adds dots after a game's name for unplayed games and tiers.
 # the games.played service: whether a game was played, the one definition of it
 provides=games.played
 # a dot on games that weren't played: not in recents, with no save, state or resume slot, and no session in the play history

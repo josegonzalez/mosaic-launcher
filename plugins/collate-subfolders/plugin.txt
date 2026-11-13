@@ -1,3 +1,5 @@
 id=collate-subfolders
 name=Collate subfolders
 api=1
+category=Library
+summary=Merges same-named folders from a system's several folders into one.

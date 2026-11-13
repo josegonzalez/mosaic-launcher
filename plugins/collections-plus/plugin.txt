@@ -1,6 +1,8 @@
 id=collections-plus
 name=Collections plus
 api=1
+category=Library
+summary=Puts your collections on the first screen in your order, with their art.
 # collections to put on the root, comma-separated by name, eg. RPGs, Shooters, or * for all
 setting.promote=text|On the root|
 # the order collections go in, on the root and in Collections, comma-separated by name; the rest follow by name

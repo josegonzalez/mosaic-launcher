@@ -4,7 +4,7 @@ A replacement for the NextUI launcher with a plugin API, so features that today 
 
 This is an experiment. It isn't released or supported, and isn't meant for everyday use.
 
-Development notes are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), and the plugin API is in [PLUGINS.md](PLUGINS.md).
+The bundled plugins are listed in [docs/plugins.md](docs/plugins.md), with a [glossary](docs/glossary.md) for terms new to custom firmware. Development notes are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), and the plugin API is in [docs/plugin-api.md](docs/plugin-api.md).
 
 ## License
 

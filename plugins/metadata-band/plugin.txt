@@ -1,6 +1,8 @@
 id=metadata-band
 name=Metadata band
 api=1
+category=Looks
+summary=Shows a game's year, publisher and genre under its art.
 # the info.format service: a game's .info fields, tidied and joined as the band shows them
 provides=info.format
 # the .info keys shown under a game's art, in order and comma separated, from year, publisher, genre, developer and players; the last ones are left out when they don't fit

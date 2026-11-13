@@ -1,6 +1,8 @@
 id=charging-screen
 name=Charging screen (unsupported on desktop)
 api=1
+category=Power
+summary=Shows a full screen with the battery level while the device charges and sits idle.
 # how long the game list or home is left alone on a charger before the screen shows
 setting.idle=choice|Show after idle on a charger (seconds)|60|off,30,60,120,300|public
 # the clock above the battery

@@ -1,6 +1,8 @@
 id=theme-plus
 name=Theme plus
 api=1
+category=Looks
+summary=Changes colours, fonts, text size and wallpapers from a theme.
 slots=theme
 # the theme: a folder name in Themes, a bundled theme, a palette's name, or stock for no change
 setting.theme=text|Theme|stock

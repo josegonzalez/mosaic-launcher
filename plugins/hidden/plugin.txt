@@ -1,6 +1,8 @@
 id=hidden
 name=Hidden games
 api=1
+category=Library
+summary=Hides the games you pick from every list.
 # the hidden entry set
 provides=sets.hidden
 # the game list button that hides the selected game, and unhides it in the Hidden folder

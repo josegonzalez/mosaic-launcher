@@ -1,3 +1,35 @@
 # smart-collections
 
-A Smart Collections folder on the root with one collection per franchise (Mario, Zelda, Sonic and so on), matched by game name across every system. **Y** on a collection dismisses it, and **Y** on the folder brings dismissed ones back. Settings add franchises, turn off the built-in list, and set the fewest games a collection needs. Other plugins read each franchise as the entry set `smart:<name>`, holding the games its collection lists, and none while it has too few games or is dismissed, announced as changed (`launcher.set_changed`) as it's dismissed or brought back. From kUI.
+Sorts your games into franchise collections, such as Mario, Zelda and Sonic, without you building any lists.
+
+## What it does
+
+A Smart Collections folder on the first screen has one [collection](../../docs/glossary.md#collection) per franchise, matched by game name across every system.
+
+## Turn it on
+
+Turn on **Smart Collections** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plugins-on-and-off)).
+
+## How to use
+
+| Where | Button | What it does |
+|---|---|---|
+| On a collection | **Y** | Dismisses it |
+| On the Smart Collections folder | **Y** | Brings dismissed ones back |
+
+## Settings
+
+| Setting | Choices | Default | What it does |
+|---|---|---|---|
+| Built-in franchises (`builtin`) | on, off | on | The franchises that ship with the plugin, such as Mario, Zelda and Sonic |
+| More franchises (`extra`) | text | empty | More franchises, comma-separated, such as `Kirby, Bomberman` |
+| Smallest collection (`min`) | 1, 2, 3, 5, 10 | 2 | The fewest games a franchise needs to become a collection |
+
+## For plugin authors
+
+- Provides the `smart:<name>` entry sets (`provides=sets.smart`), one per franchise, holding the games its collection lists, and none while it has too few games or is dismissed. They're announced as changed (`launcher.set_changed`) as a franchise is dismissed or brought back.
+- Adds a root folder.
+
+## Credits
+
+kUI.

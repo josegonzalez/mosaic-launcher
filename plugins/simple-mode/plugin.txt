@@ -1,6 +1,8 @@
 id=simple-mode
 name=Simple mode
 api=1
+category=Controls and setup
+summary=Hides Tools and settings for kids or a shared device.
 # hides Tools and its tiles, and with settings on, Settings, Wifi, Bluetooth and Reboot; the Simple mode tile on the quick menu turns it off, after the launcher's PIN when one is set (the PIN row on the Plugins page)
 setting.on=toggle|Simple mode on|on
 setting.settings=toggle|Hide settings tiles|on

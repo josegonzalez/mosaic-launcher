@@ -1,6 +1,8 @@
 id=bt-reconnect
 name=Bluetooth reconnect (unsupported on desktop)
 api=1
+category=Network
+summary=Reconnects your last Bluetooth device at start and after sleep.
 setting.on_start=toggle|Reconnect at start|on
 setting.on_resume=toggle|Reconnect after sleep|on
 # the last device connected, saved whenever it changes; clear it to forget the device

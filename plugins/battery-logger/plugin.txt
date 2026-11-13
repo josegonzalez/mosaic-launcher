@@ -1,6 +1,8 @@
 id=battery-logger
 name=Battery logger (unsupported on desktop)
 api=1
+category=Power
+summary=Logs how much battery each game used.
 # the battery.history service: the sessions it logged
 provides=battery.history
 # sessions shorter than this aren't logged

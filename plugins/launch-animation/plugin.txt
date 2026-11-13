@@ -1,6 +1,8 @@
 id=launch-animation
 name=Launch animation
 api=1
+category=Looks
+summary=Animates a game starting from the game list.
 slots=launch
 # how long the selection pill takes to glide to the middle and fade, in ms
 setting.duration=choice|Duration|350|200,350,500

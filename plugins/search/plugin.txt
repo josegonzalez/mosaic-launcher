@@ -1,6 +1,8 @@
 id=search
 name=Search
 api=1
+category=Library
+summary=Finds games from every system by typing part of a name.
 # a Search row on the root that asks for a query when it's opened
 setting.root=toggle|Search on the root|on
 # a game list button that asks for a query from anywhere

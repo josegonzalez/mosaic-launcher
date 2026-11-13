@@ -1,6 +1,8 @@
 id=art-backdrop
 name=Art backdrop
 api=1
+category=Looks
+summary=Draws the selected game's art behind the game list.
 slots=background
 # full: the art over its whole height; gradient: fading out over its bottom half
 setting.style=choice|Style|gradient|gradient,full

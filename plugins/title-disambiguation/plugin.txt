@@ -1,5 +1,7 @@
 id=title-disambiguation
 name=Title disambiguation
 api=1
+category=Library
+summary=Adds what tells two same-named games apart, only when needed.
 # also tell apart same-named games from one system (by tags or extension), not only games from different systems
 setting.same_system=toggle|Same system too|on

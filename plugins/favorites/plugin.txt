@@ -1,6 +1,8 @@
 id=favorites
 name=Favorites
 api=1
+category=Library
+summary=Adds a Favorites folder and a button to add or remove favorites.
 # the favorites entry set
 provides=sets.favorites
 # the collection in Collections/ that holds favorites, and the folder's name on the root

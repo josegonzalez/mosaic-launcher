@@ -1,6 +1,8 @@
 id=layout-shelf
 name=Cartridge shelf layout
 api=1
+category=Looks
+summary=Shows the game list as cartridges standing on shelves.
 slots=layout
 # shelves in view; auto fits the screen: 2 at 640 wide, 1024 and 1280;
 # theme: the theme's layout-shelf.shelves, or auto without one

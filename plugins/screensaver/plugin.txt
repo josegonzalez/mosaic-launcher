@@ -1,6 +1,8 @@
 id=screensaver
 name=Screensaver
 api=1
+category=Extras
+summary=Cycles through images when the game list sits idle.
 # loads after favorites and charging-screen, which it asks about as it starts
 optional=favorites,charging-screen
 # how long the game list or home is left alone before the screensaver shows
