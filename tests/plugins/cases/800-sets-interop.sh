@@ -53,8 +53,9 @@ for i in 1 2 3; do
 	grep -qF "plugin random-game: picked $SI_ROMS/Charlie.gb" "$log" && fail "random-game picked the hidden favorite ($i)"
 done
 
-# and with favorites off, there's nothing to pick from
-printf 'hidden=on\nrandom-game=on\nseeker=on\n' >"$STATE/plugins.txt"
+# and with favorites off, there's nothing to pick from (named off, as a
+# plugin plugins.txt doesn't name loads)
+printf 'favorites=off\nhidden=on\nrandom-game=on\nseeker=on\n' >"$STATE/plugins.txt"
 log="$WORK/sets-interop-random-off.log"
 run_launcher "$log" "plugin seeker: done" || fail "the launcher exited early (random-game without favorites)"
 grep -qF "plugin random-game: picked" "$log" && fail "random-game picked a game from a set nobody registered"
