@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "check.h"
 #include "words.h"
+#include "fakeproviders.h"
 #include "../../plugins/save-state-manager/save_state_manager.c"
 
 #define CARD TEST_SDCARD_PATH
@@ -634,6 +635,9 @@ static void setupHost(void) {
 	fake_host.art_get = fakeArtGet;
 	fake_host.art_load = fakeArtLoad;
 	fake_host.draw_hints = fakeDrawHints;
+	fake_host.event_value = fakeEventValue;
+	fake_host.provide = fakeProvide;
+	fake_host.call = fakeCall;
 }
 
 static const MosaicPlugin* start(void) {
@@ -729,6 +733,45 @@ static void testActions(void) {
 	CHECK(system("rm -rf '" SHARED "'") == 0);
 	p->post_return();
 	CHECK(actions[all_action].available(NULL) == 0);
+}
+
+// states.last, from the model and through the plugin
+static void testLast(void) {
+	makeCard();
+	char out[MOSAIC_CALL_MAX];
+	CHECK(SM_reply(NULL, out, sizeof(out)) == 0);
+	CHECK_STR(out, "count=0");
+	SMGame game;
+	SM_cardInit(&card, CARD);
+	CHECK(SM_gameInit(&card, "GB", "Tetris.gb", NULL, GB_ROMS, &game) == 0);
+	CHECK(SM_reply(&game, out, sizeof(out)) == 0);
+	CHECK_STR(out, "count=0");
+	CHECK(SM_gameScan(&card, &game) == 3);
+	CHECK(SM_reply(&game, out, sizeof(out)) == 0);
+	CHECK_STR(out, "count=3\nslot=2\nlabel=Slot 3\nsaved=1762600250\npreview=" MINUI "/GB/Tetris.gb.2.bmp");
+	CHECK(SM_reply(&game, out, 20) == -1);
+	CHECK_STR(out, "");
+
+	fake_provider_count = 0;
+	start();
+	CHECK(fakeCall("states.last", "path=" GB_ROMS "/Tetris.gb", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=3\nslot=2\nlabel=Slot 3\nsaved=1762600250\npreview=" MINUI "/GB/Tetris.gb.2.bmp");
+	// the .srm format, a game folder and a disc by their .m3u, and the sleep state without a preview
+	CHECK(fakeCall("states.last", "path=" GB_ROMS "/Kirby.gb", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=1\nslot=3\nlabel=Slot 4\nsaved=1762600300\npreview=" MINUI "/GB/Kirby.gb.3.bmp");
+	CHECK(fakeCall("states.last", "path=" CARD "/Roms/PlayStation (PS)/FF7", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=1\nslot=0\nlabel=Slot 1\nsaved=1762600500\npreview=");
+	CHECK(fakeCall("states.last", "path=" CARD "/Roms/PlayStation (PS)/FF7/FF7 (Disc 1).cue", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=1\nslot=0\nlabel=Slot 1\nsaved=1762600500\npreview=");
+	put(SHARED "/GB-gambatte/Tetris.gb.st9", "state", T0 + 900);
+	CHECK(fakeCall("states.last", "path=" GB_ROMS "/Tetris.gb", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=3\nslot=9\nlabel=Auto\nsaved=1762600900\npreview=");
+	// none, not a game, no path
+	CHECK(fakeCall("states.last", "path=" GB_ROMS "/None.gb", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=0");
+	CHECK(fakeCall("states.last", "path=" CARD "/Tools/desktop/Files.pak", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=0");
+	CHECK(fakeCall("states.last", "", out, sizeof(out)) == MOSAIC_CALL_FAILED);
 }
 
 static void testGameScreen(void) {
@@ -913,6 +956,7 @@ int main(void) {
 	testCopies();
 	testInit();
 	testActions();
+	testLast();
 	testGameScreen();
 	testAllScreen();
 	testNoDelete();

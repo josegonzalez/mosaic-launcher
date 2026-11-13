@@ -21,6 +21,11 @@
 // .userdata/shared are ever deleted, looked at without following links.
 // It draws stock's hints with draw_hints.
 //
+// Other plugins get a game's most recently saved state from the
+// states.last service: path=<game or game folder> gives count=<slots with
+// a state> and, with any, slot=, label=, saved=<Unix time> and
+// preview=<its preview's path, or empty>.
+//
 // Resuming from a chosen slot is left out: the launcher only resumes from
 // the slot minarch last used, and this plugin doesn't write minarch's
 // files to change it.
@@ -483,6 +488,20 @@ static int fileExists(const char* path, void* ctx) {
 	return stat(path, &st) == 0;
 }
 
+// Sets out up for the game at path, a folder when is_dir, shown as
+// display (NULL for its file's name). Returns 0, or -1 when it isn't a
+// game in a system folder.
+static int gameAt(const char* path, int is_dir, const char* display, SMGame* out) {
+	char file[SM_PATH_MAX], tag[SM_NAME_MAX], dir[SM_PATH_MAX];
+	if (!path || !SM_gameFile(path, is_dir, fileExists, NULL, file, sizeof(file))) return -1;
+	if (!SM_tagOf(roms, file, tag, sizeof(tag))) return -1;
+	snprintf(dir, sizeof(dir), "%s", file);
+	char* slash = strrchr(dir, '/');
+	if (!slash) return -1;
+	*slash = '\0';
+	return SM_gameInit(&card, tag, slash + 1, display, dir, out);
+}
+
 // Sets out up for the selected game. Returns 0, or -1 when it isn't a game
 // in a system folder.
 static int selectedGame(SMGame* out) {
@@ -490,14 +509,21 @@ static int selectedGame(SMGame* out) {
 	if (!entry) return -1;
 	int type = host->entry_type(entry);
 	if (type != MOSAIC_ENTRY_ROM && type != MOSAIC_ENTRY_DIR) return -1;
-	char file[SM_PATH_MAX], tag[SM_NAME_MAX], dir[SM_PATH_MAX];
-	if (!SM_gameFile(host->entry_path(entry), type == MOSAIC_ENTRY_DIR, fileExists, NULL, file, sizeof(file))) return -1;
-	if (!SM_tagOf(roms, file, tag, sizeof(tag))) return -1;
-	snprintf(dir, sizeof(dir), "%s", file);
-	char* slash = strrchr(dir, '/');
-	if (!slash) return -1;
-	*slash = '\0';
-	return SM_gameInit(&card, tag, slash + 1, host->entry_name(entry), dir, out);
+	return gameAt(host->entry_path(entry), type == MOSAIC_ENTRY_DIR, host->entry_name(entry), out);
+}
+
+// states.last: path=<game or game folder>, its most recently saved state.
+static int provideLast(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[SM_PATH_MAX];
+	int len = host->event_value(args, "path", path, sizeof(path));
+	if (len <= 0 || len >= (int)sizeof(path)) return -1;
+	struct stat st;
+	int is_dir = stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+	static SMGame game;
+	if (gameAt(path, is_dir, NULL, &game) != 0) return SM_reply(NULL, out, size);
+	SM_gameScan(&card, &game);
+	return SM_reply(&game, out, size);
 }
 
 // The game list asks whether the action is available as it draws its
@@ -565,6 +591,7 @@ static int init(const MosaicHost* h) {
 		say("this launcher has no plugin screens or button hints");
 		return 1;
 	}
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("states.last", provideLast) != 0) say("couldn't provide states.last");
 	can_delete = strcmp(host->cfg_get("delete", "on"), "off") != 0 && MOSAIC_HOST_HAS(host, confirm);
 	static const MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),

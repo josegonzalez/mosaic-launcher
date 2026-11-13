@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakeproviders.h"
 
 #define BL_START_FILE TEST_DIR "/battery-logger.start"
 #include "../../plugins/battery-logger/battery_logger.c"
@@ -39,6 +40,9 @@ static MosaicHost fake = {
 	.cfg_get = fakeCfgGet,
 	.battery_level = fakeLevel,
 	.is_charging = fakeCharging,
+	.event_value = fakeEventValue,
+	.provide = fakeProvide,
+	.call = fakeCall,
 };
 
 static char* readAll(const char* path) {
@@ -335,6 +339,71 @@ static void testPlugin(void) {
 	CHECK(!exists(CSV));
 }
 
+static void testHistory(void) {
+	// rows as BL_formatRow writes them, in UTC
+	BLLogged row;
+	CHECK(BL_parseRow("2026-11-08 14:03:00,Tetris,Roms/Game Boy (GB)/Tetris.gb,2700,80,74,6,8.0,no\n", &row) == 0);
+	CHECK(row.start == 1794146580 && row.seconds == 2700 && row.start_level == 80 && row.end_level == 74 && !row.charged);
+	CHECK(BL_parseRow("2026-11-08 15:00:00,\"Mario, \"\"Bros\"\"\",\"Roms/NES/Mario, Bros.nes\",3600,80,90,,,yes", &row) == 0);
+	CHECK(row.start == 1794150000 && row.end_level == 90 && row.charged);
+	CHECK(BL_parseRow(BL_HEADER, &row) == -1);
+	CHECK(BL_parseRow("2026-11-08 14:03:00,Tetris,x,2700,80,74,6,8.0\n", &row) == -1);
+	CHECK(BL_parseRow("2026-11-08 14:03:00,Tetris,x,2700,180,74,6,8.0,no\n", &row) == -1);
+	CHECK(BL_parseRow("2026-11-08,Tetris,x,2700,80,74,6,8.0,no\n", &row) == -1);
+	CHECK(BL_parseRow("", &row) == -1);
+
+	// kept in start order, the last BL_HISTORY_MAX
+	BLHistory h;
+	BL_historyInit(&h);
+	CHECK(BL_historyAdd(&h, BL_HEADER "2026-11-08 15:00:00,B,b,60,50,40,10,600.0,no\n"
+		"2026-11-08 14:00:00,A,a,120,90,80,10,300.0,no\nbroken\n") == 2);
+	CHECK(h.count == 2 && h.sessions[0].seconds == 120 && h.sessions[1].seconds == 60);
+	char out[MOSAIC_CALL_MAX];
+	CHECK(BL_reply(&h, 0, out, sizeof(out)) == 0);
+	CHECK_STR(out, "count=2\nseconds=180\nsession.0=1794146400,120,90,80,0\nsession.1=1794150000,60,50,40,0");
+	CHECK(BL_reply(&h, 1, out, sizeof(out)) == 0);
+	CHECK_STR(out, "count=1\nseconds=60\nsession.0=1794150000,60,50,40,0");
+	CHECK(BL_reply(&h, 5, out, sizeof(out)) == 0);
+	CHECK(!strncmp(out, "count=2\n", 8));
+	CHECK(BL_reply(&h, 0, out, 40) == -1);
+	CHECK_STR(out, "");
+	BL_historyInit(&h);
+	CHECK(BL_reply(&h, 0, out, sizeof(out)) == 0);
+	CHECK_STR(out, "count=0\nseconds=0");
+	// every one of the most, which fits a call's reply
+	char text[BL_HISTORY_MAX * 2 * 80];
+	size_t used = 0;
+	for (int i = 0; i < BL_HISTORY_MAX * 2; i++) {
+		used += (size_t)snprintf(text + used, sizeof(text) - used, "2026-11-%02d %02d:00:00,G,g,%i,100,100,0,0.0,no\n",
+			1 + i / 24, i % 24, 100000 + i);
+	}
+	CHECK(BL_historyAdd(&h, text) == BL_HISTORY_MAX * 2);
+	CHECK(h.count == BL_HISTORY_MAX && h.sessions[0].seconds == 100000 + BL_HISTORY_MAX);
+	CHECK(BL_reply(&h, 0, out, sizeof(out)) == 0);
+
+	// through the plugin, from both logs, read again when one changes
+	reset();
+	CHECK(fakeCall("battery.history", NULL, out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=0\nseconds=0");
+	const char* old_log = BL_HEADER "2026-11-08 14:00:00,A,a,120,90,80,10,300.0,no\n";
+	const char* new_log = BL_HEADER "2026-11-08 15:00:00,B,b,60,50,40,10,600.0,no\n";
+	writeAll_(OLD, old_log, strlen(old_log));
+	writeAll_(CSV, new_log, strlen(new_log));
+	CHECK(fakeCall("battery.history", "", out, sizeof(out)) > 0);
+	CHECK_STR(out, "count=2\nseconds=180\nsession.0=1794146400,120,90,80,0\nsession.1=1794150000,60,50,40,0");
+	play(TETRIS, MOSAIC_ENTRY_ROM, 74, 0, 45 * 60);
+	CHECK(fakeCall("battery.history", "count=1", out, sizeof(out)) > 0);
+	CHECK(!strncmp(out, "count=1\nseconds=2700\nsession.0=", 31));
+	CHECK(fakeCall("battery.history", "count=0", out, sizeof(out)) == MOSAIC_CALL_FAILED);
+	CHECK(fakeCall("battery.history", "count=many", out, sizeof(out)) == MOSAIC_CALL_FAILED);
+	// unsupported platforms still give what was logged
+	level = -1;
+	CHECK(plugin.init(&fake) == 0);
+	CHECK(fakeCall("battery.history", NULL, out, sizeof(out)) > 0);
+	CHECK(!strncmp(out, "count=3\n", 8));
+	level = 80;
+}
+
 int main(void) {
 	setenv("TZ", "UTC0", 1);
 	tzset();
@@ -346,6 +415,7 @@ int main(void) {
 	testRow();
 	testAppend();
 	testPlugin();
+	testHistory();
 	CHECK(mosaic_plugin_get(&fake) == &plugin);
 	CHECK_DONE();
 }

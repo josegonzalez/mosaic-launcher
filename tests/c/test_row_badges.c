@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "../../plugins/row-badges/row_badges.c"
 
 struct MosaicEntry {
@@ -44,6 +45,9 @@ static int fakeEntryInfo(const MosaicEntry* e, const char* key, char* out, size_
 	return 1;
 }
 static int fakeScale(void) { return 2; }
+// the play history has a session of anything with "Tracked" in its path
+static long long fakePlayTime(const char* path) { return strstr(path, "Tracked") ? 60 : 0; }
+static int fakePlayCount(const char* path) { return strstr(path, "Tracked") ? 1 : 0; }
 static int fakeThemeColor(int index) {
 	return index == MOSAIC_COLOR_ACCENT ? 0xAA0000 : index == MOSAIC_COLOR_LIST_TEXT ? 0xFFFFFF
 		: index == MOSAIC_COLOR_BACKGROUND ? 0x123456 : -1;
@@ -90,7 +94,30 @@ static MosaicHost fake = {
 	.fill_round_rect = fakeFillRound,
 	.decorate_cell = fakeDecorateCell,
 	.entry_info = fakeEntryInfo,
+	.play_time = fakePlayTime,
+	.play_count = fakePlayCount,
+	.event_value = fakeEventValue,
+	.provide = fakeProvide,
+	.call = fakeCall,
 };
+
+// what games.played says about path
+static int askPlayed(const char* path) {
+	char args[600], reply[64];
+	snprintf(args, sizeof(args), "path=%s", path);
+	if (fakeCall("games.played", args, reply, sizeof(reply)) < 0) return -9;
+	if (!strcmp(reply, "played=1")) return 1;
+	if (!strcmp(reply, "played=0")) return 0;
+	return -8;
+}
+
+// the history the model is asked about, by the files it's given
+static char asked_history[1024];
+static int history(const char* path, void* ctx) {
+	size_t n = strlen(asked_history);
+	snprintf(asked_history + n, sizeof(asked_history) - n, "%s;", path);
+	return ctx && strstr(path, (const char*)ctx) != NULL;
+}
 
 static void touch(const char* path) {
 	FILE* f = fopen(path, "w");
@@ -157,6 +184,43 @@ int main(void) {
 	CHECK(RB_played(&set, "/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/Final Fantasy VIII/FF8 (Disc 1).cue") == 0);
 	CHECK(RB_played(&set, "/sd/Roms", "/sd/Roms/Game Boy (GB)") == -1);
 	CHECK(RB_played(&set, "/sd/Roms", "/sd/Tools/desktop/Files.pak") == -1);
+	// the files a game goes by
+	char files[RB_GAME_FILES][RB_PATH_MAX];
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Roms/Game Boy (GB)/Tetris.gb", 0, files, RB_GAME_FILES) == 1);
+	CHECK_STR(files[0], "/sd/Roms/Game Boy (GB)/Tetris.gb");
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/FF7/FF7 (Disc 2).cue", 0, files, RB_GAME_FILES) == 2);
+	CHECK_STR(files[0], "/sd/Roms/Sony PlayStation (PS)/FF7/FF7 (Disc 2).cue");
+	CHECK_STR(files[1], "/sd/Roms/Sony PlayStation (PS)/FF7/FF7.m3u");
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/FF7/FF7.m3u", 0, files, RB_GAME_FILES) == 1);
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/FF7", 1, files, RB_GAME_FILES) == 2);
+	CHECK_STR(files[0], "/sd/Roms/Sony PlayStation (PS)/FF7/FF7.m3u");
+	CHECK_STR(files[1], "/sd/Roms/Sony PlayStation (PS)/FF7/FF7.cue");
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/FF7/", 1, files, RB_GAME_FILES) == 2);
+	CHECK_STR(files[1], "/sd/Roms/Sony PlayStation (PS)/FF7/FF7.cue");
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/FF7/FF7 (Disc 2).cue", 0, files, 1) == 1);
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Roms/Game Boy (GB)", 1, files, RB_GAME_FILES) == 0);
+	CHECK(RB_gameFiles("/sd/Roms", "/sd/Tools/desktop/Files.pak", 1, files, RB_GAME_FILES) == 0);
+	// played by the set, or by the history, for any of them
+	CHECK(RB_isPlayed(&set, "/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/Final Fantasy VII", 1, NULL, NULL) == 1);
+	CHECK(RB_isPlayed(&set, "/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/Final Fantasy VIII", 1, NULL, NULL) == 0);
+	asked_history[0] = '\0';
+	CHECK(RB_isPlayed(&set, "/sd/Roms", "/sd/Roms/Sony PlayStation (PS)/FF8/FF8 (Disc 1).cue", 0, history, "FF8.m3u") == 1);
+	CHECK_STR(asked_history, "/sd/Roms/Sony PlayStation (PS)/FF8/FF8 (Disc 1).cue;/sd/Roms/Sony PlayStation (PS)/FF8/FF8.m3u;");
+	CHECK(RB_isPlayed(&set, "/sd/Roms", "/sd/Roms/Game Boy (GB)/Dr. Mario.gb", 0, history, "Mario") == 1);
+	CHECK(RB_isPlayed(&set, "/sd/Roms", "/sd/Roms/Game Boy (GB)/Dr. Mario.gb", 0, history, "Zelda") == 0);
+	CHECK(RB_isPlayed(NULL, "/sd/Roms", "/sd/Roms/Game Boy (GB)/Dr. Mario.gb", 0, history, "Mario") == 1);
+	asked_history[0] = '\0';
+	CHECK(RB_isPlayed(&set, "/sd/Roms", "/sd/Tools/desktop/Files.pak", 0, history, "Files") == -1);
+	CHECK_STR(asked_history, "");
+	// and the reply
+	CHECK(RB_reply(1, out, sizeof(out)) == 0);
+	CHECK_STR(out, "played=1");
+	CHECK(RB_reply(0, out, sizeof(out)) == 0);
+	CHECK_STR(out, "played=0");
+	CHECK(RB_reply(-1, out, sizeof(out)) == 0);
+	CHECK_STR(out, "played=0");
+	CHECK(RB_reply(1, out, 8) == -1);
+	CHECK_STR(out, "");
 	RB_setFree(&set);
 	CHECK(set.count == 0 && !RB_setHas(&set, "GB", "Tetris.gb"));
 	CHECK(RB_played(&set, "/sd/Roms", "/sd/Roms/Game Boy (GB)/Tetris.gb") == 0);
@@ -325,6 +389,36 @@ int main(void) {
 	CHECK(played.count == 0);
 	CHECK(dots(GB "/Fresh.gb", MOSAIC_ENTRY_ROM, "1", 1) == 1);
 	CHECK(drawn_rgb[0] == 0xFFFFFF);
+	quit();
+
+	// games.played, with the dot off: the card is read on the first call
+	fake_provider_count = 0;
+	strcpy(cfg_unplayed, "off");
+	strcpy(cfg_tiers, "off");
+	CHECK(init(&fake) == 0);
+	CHECK(played.count == 0);
+	CHECK(askPlayed(GB "/Saved.gb") == 1);
+	CHECK(played.count > 0);
+	CHECK(askPlayed(GB "/Fresh.gb") == 0);
+	CHECK(askPlayed(GB "/Tracked.gb") == 1);
+	CHECK(askPlayed(CARD "/Tools/test/Other.pak") == 0);
+	// read again after a list is built
+	touch(CARD "/Saves/GB/Fresh.gb.sav");
+	CHECK(askPlayed(GB "/Fresh.gb") == 0);
+	listReady(NULL, GB);
+	CHECK(askPlayed(GB "/Fresh.gb") == 1);
+	unlink(CARD "/Saves/GB/Fresh.gb.sav");
+	// a game folder goes by its .m3u
+	CHECK(system("mkdir -p '" PS "/Final Fantasy VII'") == 0);
+	CHECK(askPlayed(PS "/Final Fantasy VII") == 1);
+	CHECK(fakeCall("games.played", "", out, sizeof(out)) == MOSAIC_CALL_FAILED);
+	CHECK(fakeCall("games.played", "path=", out, sizeof(out)) == MOSAIC_CALL_FAILED);
+	quit();
+	// with the dot on, the history counts for it too
+	strcpy(cfg_unplayed, "on");
+	CHECK(init(&fake) == 0);
+	CHECK(dots(GB "/Tracked.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);
+	CHECK(dots(GB "/Fresh.gb", MOSAIC_ENTRY_ROM, "", 1) == 1);
 	quit();
 
 	// a launcher without .info sidecars keeps the unplayed dot only

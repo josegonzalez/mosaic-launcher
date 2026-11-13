@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "launchcmd.h"
 #include "../../plugins/emulator-override/emulator_override.c"
 
@@ -337,6 +338,9 @@ static MosaicHost fake = {
 	.toast = fakeToast,
 	.choose = fakeChoose,
 	.replace_launch = fakeReplaceLaunch,
+	.event_value = fakeEventValue,
+	.provide = fakeProvide,
+	.call = fakeCall,
 };
 
 static void select_(const char* path, int type) {
@@ -489,6 +493,44 @@ static void testPlugin(void) {
 	on_pick(-1, NULL);
 	p->quit();
 	cfg_all[0] = '\0';
+
+	// emulator.choice: the model's reply
+	char reply[MOSAIC_CALL_MAX];
+	CHECK(EO_reply("MGBA", "/sd/Emus/MGBA.pak/launch.sh", reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "pak=MGBA\nlaunch=/sd/Emus/MGBA.pak/launch.sh");
+	CHECK(EO_reply("LINK", NULL, reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "pak=LINK\nlaunch=");
+	CHECK(EO_reply(NULL, "/x", reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "pak=\nlaunch=");
+	CHECK(EO_reply("MGBA", "/x", reply, 10) == -1);
+	CHECK_STR(reply, "");
+	// and through the plugin, from the choices file, a game folder and its discs sharing one
+	writeChoices("/Roms/Game Boy (GB)/Tetris.gb\tGBC\n/Roms/Game Boy (GB)/Multi/Multi.m3u\tMGBA\n"
+		"/Roms/Game Boy (GB)/Cued/Cued.cue\tLINK\n");
+	fake_provider_count = 0;
+	p = start();
+	CHECK(fakeCall("emulator.choice", "path=" GB "/Tetris.gb", reply, sizeof(reply)) > 0);
+	snprintf(want, sizeof(want), "pak=GBC\nlaunch=%s/Emus/desktop/GBC.pak/launch.sh", card);
+	CHECK_STR(reply, want);
+	snprintf(want, sizeof(want), "pak=MGBA\nlaunch=%s/Emus/desktop/MGBA.pak/launch.sh", card);
+	CHECK(fakeCall("emulator.choice", "path=" GB "/Multi", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, want);
+	CHECK(fakeCall("emulator.choice", "path=" GB "/Multi/Multi (Disc 1).gb", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, want);
+	// a choice that leads off the card launches with the default
+	CHECK(fakeCall("emulator.choice", "path=" GB "/Cued", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "pak=LINK\nlaunch=");
+	CHECK(fakeCall("emulator.choice", "path=" GB "/Link's Awakening.gb", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "pak=\nlaunch=");
+	CHECK(fakeCall("emulator.choice", "path=" CARD "/Tools/desktop/Thing.pak", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "pak=\nlaunch=");
+	CHECK(fakeCall("emulator.choice", "path=", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
+	// a hand edit of the file is seen
+	writeChoices("/Roms/Game Boy (GB)/Link's Awakening.gb\tGBC\n");
+	CHECK(fakeCall("emulator.choice", "path=" GB "/Link's Awakening.gb", reply, sizeof(reply)) > 0);
+	snprintf(want, sizeof(want), "pak=GBC\nlaunch=%s/Emus/desktop/GBC.pak/launch.sh", card);
+	CHECK_STR(reply, want);
+	p->quit();
 
 	// a launcher without replace_launch doesn't load it
 	fake.replace_launch = NULL;

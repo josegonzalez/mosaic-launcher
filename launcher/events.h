@@ -68,6 +68,9 @@ int Events_mayPublish(const char* name, const char* publisher);
 // control characters, and one \n after the last line allowed.
 int Events_payloadValid(const char* payload);
 
+// The same for text under max bytes, as providers' calls take and give.
+int Events_textValid(const char* text, size_t max);
+
 // The value of key in payload, the first line with it, copied into out
 // (cut to fit, and terminated when size is above 0). Returns the value's
 // whole length, or -1 when payload has no such key.

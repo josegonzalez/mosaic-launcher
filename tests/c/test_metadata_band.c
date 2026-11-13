@@ -108,5 +108,58 @@ int main(void) {
 	CHECK(MB_join(all, 3, " - ", 10, measure, NULL, small, 0) == -1);
 	CHECK(MB_join(all, -1, " - ", 10, measure, NULL, small, sizeof(small)) == -1);
 
+	// the info.format service: where the sidecar is
+	char path[256];
+	MB_infoPath("/sd/Roms/GB/Tetris.gb", path, sizeof(path));
+	CHECK_STR(path, "/sd/Roms/GB/.media/Tetris.info");
+	MB_infoPath("/sd/Roms/PS/Final Fantasy VII", path, sizeof(path));
+	CHECK_STR(path, "/sd/Roms/PS/.media/Final Fantasy VII.info");
+	MB_infoPath("/sd/Roms/GB/Game.v1.1.gb", path, sizeof(path));
+	CHECK_STR(path, "/sd/Roms/GB/.media/Game.v1.1.info");
+	// its values, read as the launcher reads them
+	const char* info = "# a comment\r\n  Year = 1994-11-21 \r\nbad key=x\n=y\nno equals\npublisher=Nin\ttendo\n"
+		"genre=Puzzle\nGENRE=Platformer\n";
+	char value[MB_VALUE_SIZE];
+	CHECK(MB_infoValue(info, strlen(info), "year", value, sizeof(value)) == 1);
+	CHECK_STR(value, "1994-11-21");
+	CHECK(MB_infoValue(info, strlen(info), "publisher", value, sizeof(value)) == 1);
+	CHECK_STR(value, "Nin tendo");
+	CHECK(MB_infoValue(info, strlen(info), "genre", value, sizeof(value)) == 1);
+	CHECK_STR(value, "Platformer");
+	CHECK(MB_infoValue(info, strlen(info), "developer", value, sizeof(value)) == 0);
+	CHECK_STR(value, "");
+	CHECK(MB_infoValue(info, strlen(info), "bad key", value, sizeof(value)) == 0);
+	CHECK(MB_infoValue(info, 12, "year", value, sizeof(value)) == 0);
+	CHECK(MB_infoValue("year=1994\0x", 11, "year", value, sizeof(value)) == 0);
+	CHECK(MB_infoValue("genre=\xC3\xA9t\xC3\xA9", 11, "genre", value, 5) == 1);
+	CHECK_STR(value, "\xC3\xA9t");
+	static char big[MB_INFO_FILE_MAX + 2];
+	memset(big, ' ', sizeof(big) - 1);
+	memcpy(big, "year=1994\n", 10);
+	CHECK(MB_infoValue(big, MB_INFO_FILE_MAX, "year", value, sizeof(value)) == 1);
+	CHECK(MB_infoValue(big, MB_INFO_FILE_MAX + 1, "year", value, sizeof(value)) == 0);
+
+	// its reply
+	char reply[512];
+	int asked[MB_FIELD_COUNT];
+	int asked_count = MB_fields("year,publisher,genre,developer", asked);
+	const char* raw[] = { "1994-11-21", " Nintendo ", "Platformer", "" };
+	CHECK(MB_reply(asked, asked_count, raw, " - ", -1, NULL, NULL, reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "count=3\nyear=1994\npublisher=Nintendo\ngenre=Platformer\nline=1994 - Nintendo - Platformer");
+	// fitted: "1994 - Nintendo" is 150 wide
+	CHECK(MB_reply(asked, asked_count, raw, " - ", 150, measure, NULL, reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "count=3\nyear=1994\npublisher=Nintendo\ngenre=Platformer\nline=1994 - Nintendo");
+	CHECK(MB_reply(asked, asked_count, raw, " - ", 10, measure, NULL, reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "count=3\nyear=1994\npublisher=Nintendo\ngenre=Platformer\nline=1994");
+	const char* blank[] = { "", " ", "", "" };
+	CHECK(MB_reply(asked, asked_count, blank, " - ", -1, NULL, NULL, reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "count=0\nline=");
+	CHECK(MB_reply(asked, 0, raw, " - ", -1, NULL, NULL, reply, sizeof(reply)) == 0);
+	CHECK_STR(reply, "count=0\nline=");
+	CHECK(MB_reply(asked, asked_count, raw, " - ", -1, NULL, NULL, reply, 30) == -1);
+	CHECK_STR(reply, "");
+	CHECK(MB_reply(asked, asked_count, raw, " - ", 10, NULL, NULL, reply, sizeof(reply)) == -1);
+	CHECK(MB_reply(NULL, asked_count, raw, " - ", -1, NULL, NULL, reply, sizeof(reply)) == -1);
+
 	CHECK_DONE();
 }

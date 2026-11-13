@@ -28,8 +28,12 @@ static int keyChar(char c) {
 }
 
 int Events_payloadValid(const char* payload) {
+	return Events_textValid(payload, EVENT_PAYLOAD_MAX);
+}
+
+int Events_textValid(const char* payload, size_t max) {
 	if (!payload || !payload[0]) return 1;
-	if (strlen(payload) >= EVENT_PAYLOAD_MAX) return 0;
+	if (strlen(payload) >= max) return 0;
 	const char* line = payload;
 	while (*line) {
 		size_t key = 0;

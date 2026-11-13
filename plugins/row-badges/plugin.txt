@@ -1,7 +1,9 @@
 id=row-badges
 name=Row badges
 api=1
-# a dot on games that weren't played: not in recents, with no save, state or resume slot
+# the games.played service: whether a game was played, the one definition of it
+provides=games.played
+# a dot on games that weren't played: not in recents, with no save, state or resume slot, and no session in the play history
 setting.unplayed=toggle|Unplayed dot|off||public
 # dots for the tier= value, 1 to 5, in a game's or system's .info sidecar
 setting.tiers=toggle|Tier dots|off||public

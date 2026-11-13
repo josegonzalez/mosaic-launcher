@@ -141,6 +141,13 @@ int SM_stateFiles(const SMCard* card, const SMGame* game, int slot, char out[][S
 // none could (game is left as it was).
 int SM_remove(const SMCard* card, SMGame* game, int index);
 
+// The states.last service's reply for a scanned game: count=<slots with
+// a state>, and with one or more, the most recently saved slot as
+// slot=<0 to 9>, label=<SM_slotLabel's>, saved=<Unix time> and
+// preview=<its preview's path, or empty>. A NULL game is one with none.
+// Returns 0, or -1 when it doesn't fit size.
+int SM_reply(const SMGame* game, char* out, size_t size);
+
 ///////////////////////////////////////
 // every game with states
 

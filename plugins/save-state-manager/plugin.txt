@@ -1,6 +1,8 @@
 id=save-state-manager
 name=Save state manager
 api=1
+# the states.last service: a game's most recently saved state
+provides=states.last
 # a Save states tile on the quick menu listing every game with states, shown while there are any
 setting.tile=toggle|Quick menu tile|on
 # the game list button that opens the selected game's states, shared with other plugins' actions on it

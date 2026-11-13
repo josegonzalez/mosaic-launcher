@@ -343,3 +343,13 @@ int EO_mapSave(const EOMap* map, const char* file) {
 	}
 	return 0;
 }
+
+int EO_reply(const char* pak, const char* launch, char* out, size_t size) {
+	if (!out || !size) return -1;
+	int n = snprintf(out, size, "pak=%s\nlaunch=%s", pak ? pak : "", pak && launch ? launch : "");
+	if (n < 0 || (size_t)n >= size) {
+		out[0] = '\0';
+		return -1;
+	}
+	return 0;
+}

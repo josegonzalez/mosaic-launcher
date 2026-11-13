@@ -83,6 +83,14 @@ int PC_build(const PCStats* stats, long long now, int parts, int format, int nev
 int PC_fit(const PCStats* stats, long long now, const PCOptions* options, int max_width,
 	int (*measure)(const char* text, void* ctx), void* ctx, char* out, size_t size);
 
+// The captions.text service's reply for a game: "text=<caption>\nwidth=<w>",
+// the caption as PC_fit fits it into max_width, or with max_width below 0
+// every part picked, in the picked format, and its width by measure (0
+// for none). Returns 0, or -1 when it doesn't fit size or there's no
+// measure.
+int PC_reply(const PCStats* stats, long long now, const PCOptions* options, int max_width,
+	int (*measure)(const char* text, void* ctx), void* ctx, char* out, size_t size);
+
 // Where a caption text_h tall may go in a row: right-aligned in the box
 // it writes to out, which ends margin short of rect's right. With a name,
 // it's on the name's line, starting reserve after the name's end, which

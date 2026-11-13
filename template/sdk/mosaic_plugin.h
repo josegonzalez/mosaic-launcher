@@ -1464,6 +1464,41 @@ typedef struct MosaicHost {
 	// Check for them with MOSAIC_HOST_HAS(host, has_capability).
 	int (*plugin_loaded)(const char* id);
 	int (*has_capability)(const char* name);
+
+	// Providers: services one plugin answers for and others call, in place
+	// of copying each other's logic, such as captions.text for a game's
+	// play time caption. A service's name is <kind>.<name>, the kind
+	// letters, digits, '_' or '-', 1 to 63 bytes with no spaces or control
+	// characters, matched exactly; it's the capability the provider lists
+	// in its plugin.txt's provides=, so has_capability answers for it, and
+	// sets. and events. names aren't services. provide makes the calling
+	// plugin, which the launcher knows as for cfg_get, the provider of
+	// name, with fn the launcher calls on its thread, as the provider (as
+	// for cfg_get), each time a plugin calls the name. The first plugin to
+	// provide a name keeps it, and can provide it again to replace fn;
+	// unloading it, or its init declining, releases all of its names.
+	// provide returns 0, or -1 for a name its provides= doesn't list, a
+	// sets. or events. name, a name another plugin provided first, a bad
+	// name or no fn; the launcher logs each refusal. call calls name with
+	// args, NULL or key=value lines as for publish's payload, but under
+	// MOSAIC_CALL_MAX bytes, and copies the reply, key=value lines too, into
+	// out, which a value is read from with event_value. Each service
+	// documents its keys. fn gets the name and args ("" for none) and an
+	// empty out MOSAIC_CALL_MAX bytes long, writes its reply there, and
+	// returns 0, or non-zero when it can't answer. call returns the reply's
+	// length, or MOSAIC_CALL_UNKNOWN when nobody provides name,
+	// MOSAIC_CALL_TOO_SMALL when the reply doesn't fit size,
+	// MOSAIC_CALL_REFUSED for bad args, a NULL out or a size of 0, a name
+	// whose fn is running (called from inside it, directly or through
+	// other services), calls nested MOSAIC_CALL_DEPTH deep, or where cfg_get
+	// is refused, and MOSAIC_CALL_FAILED when fn returned non-zero or its
+	// reply isn't key=value lines; out is "" for all of those. A call from
+	// inside another service's fn is allowed. From init, plugins that load
+	// later haven't provided their names yet, so list a provider in
+	// optional= to load after it. Check for them with
+	// MOSAIC_HOST_HAS(host, call).
+	int (*provide)(const char* name, int (*fn)(const char* name, const char* args, char* out, size_t size));
+	int (*call)(const char* name, const char* args, char* out, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1479,6 +1514,16 @@ typedef struct MosaicHost {
 
 // What the RetroAchievements calls return until a game's hash is worked out.
 #define MOSAIC_ACHIEVEMENTS_UNKNOWN -1
+
+// What call returns when it has no reply, the most a call's args or reply
+// holds, its terminator included, so an out this big always fits, and how
+// deep calls from inside providers' fn nest at most.
+#define MOSAIC_CALL_UNKNOWN -1
+#define MOSAIC_CALL_TOO_SMALL -2
+#define MOSAIC_CALL_REFUSED -3
+#define MOSAIC_CALL_FAILED -4
+#define MOSAIC_CALL_MAX 4096
+#define MOSAIC_CALL_DEPTH 8
 
 // True when the launcher's host table has this field, so a plugin can use
 // newer features when they're there and do without on older launchers.

@@ -1,6 +1,8 @@
 id=playtime-captions
 name=Play time captions
 api=1
+# the captions.text service: a game's caption as the rows show it
+provides=captions.text
 # the parts of the caption at the right of a game's row, from stock's play tracker
 setting.time=toggle|Play time|on||public
 setting.last=toggle|Last played|on||public

@@ -16,11 +16,20 @@
 //
 // Rows go to .userdata/<platform>/launcher/battery-logger.csv. On a
 // platform without a battery, such as desktop, the plugin loads but logs
-// that it's unsupported and does nothing.
+// that it's unsupported and logs nothing.
+//
+// Other plugins read the log with the battery.history service, on any
+// platform: the last 64 sessions from battery-logger.old.csv and
+// battery-logger.csv, oldest first, or the last count=<n> of them, as
+// count=<n>, seconds=<their play time> and
+// session.<i>=<start>,<seconds>,<start_percent>,<end_percent>,<charged>
+// with the start a Unix time and charged 1 or 0. Both files are read
+// again when either changed.
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #include "mosaic_plugin.h"
@@ -83,16 +92,74 @@ static int takeStart(BLStart* out) {
 	return got && BL_parseStart(line, out) == 0 ? 0 : -1;
 }
 
+///////////////////////////////////////
+// the battery.history service
+
+static BLHistory history;
+static struct stat seen[2]; // the old and current logs as last read, st_size -1 for not yet
+
+static int changed(const char* path, struct stat* was) {
+	struct stat st;
+	if (stat(path, &st) != 0) memset(&st, 0, sizeof(st));
+	int differs = st.st_size != was->st_size || st.st_mtime != was->st_mtime || st.st_ino != was->st_ino;
+	*was = st;
+	return differs;
+}
+
+// Up to max bytes of the file at path, NUL-terminated, or NULL.
+static char* readLog(const char* path, long max) {
+	FILE* f = fopen(path, "rb");
+	if (!f) return NULL;
+	char* text = malloc((size_t)max + 1);
+	size_t got = text ? fread(text, 1, (size_t)max, f) : 0;
+	fclose(f);
+	if (text) text[got] = '\0';
+	return text;
+}
+
+// Reads both logs again when either changed since the last call.
+static void readHistory(void) {
+	const char* paths[2] = { old_path, csv_path };
+	int stale = changed(paths[0], &seen[0]);
+	stale |= changed(paths[1], &seen[1]);
+	if (!stale) return;
+	BL_historyInit(&history);
+	for (int i = 0; i < 2; i++) {
+		// a log grows past max_kb's largest, 1024 KB, by at most a row
+		char* text = readLog(paths[i], 1024 * 1024 + BL_ROW_LEN);
+		if (text) BL_historyAdd(&history, text);
+		free(text);
+	}
+}
+
+// battery.history: count=<sessions> (optional) gives the last that many
+// sessions logged, every one of the last BL_HISTORY_MAX without it.
+static int provideHistory(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char text[16];
+	int count = 0;
+	if (host->event_value(args, "count", text, sizeof(text)) >= 0) {
+		char* end;
+		long n = strtol(text, &end, 10);
+		if (end == text || *end || n < 1) return -1;
+		count = n > BL_HISTORY_MAX ? BL_HISTORY_MAX : (int)n;
+	}
+	readHistory();
+	return BL_reply(&history, count, out, size);
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
-	supported = MOSAIC_HOST_HAS(host, battery_level) && MOSAIC_HOST_HAS(host, is_charging)
-		&& host->battery_level() != -1;
-	if (!supported) {
-		say("unsupported on this platform: there's no battery to read, so nothing is logged");
-		return 0;
-	}
 	snprintf(csv_path, sizeof(csv_path), "%s/launcher/" ID ".csv", host->userdata_path);
 	snprintf(old_path, sizeof(old_path), "%s/launcher/" ID ".old.csv", host->userdata_path);
+	BL_historyInit(&history);
+	memset(seen, 0, sizeof(seen));
+	seen[0].st_size = seen[1].st_size = -1;
+	// what it logged before, on any platform
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("battery.history", provideHistory) != 0) say("couldn't provide battery.history");
+	supported = MOSAIC_HOST_HAS(host, battery_level) && MOSAIC_HOST_HAS(host, is_charging)
+		&& host->battery_level() != -1;
+	if (!supported) say("unsupported on this platform: there's no battery to read, so nothing is logged");
 	return 0;
 }
 

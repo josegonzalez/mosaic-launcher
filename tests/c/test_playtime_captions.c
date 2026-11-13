@@ -5,6 +5,7 @@
 #include <time.h>
 #include "check.h"
 #include "words.h"
+#include "fakeproviders.h"
 #include "../../plugins/playtime-captions/playtime_captions.c"
 
 struct MosaicEntry {
@@ -126,6 +127,9 @@ static MosaicHost fake = {
 	.play_time = fakePlayTime,
 	.last_played = fakeLastPlayed,
 	.play_count = fakePlayCount,
+	.event_value = fakeEventValue,
+	.provide = fakeProvide,
+	.call = fakeCall,
 };
 
 static void restart(void) {
@@ -477,6 +481,44 @@ int main(void) {
 	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
 	CHECK(drawn_x == 150 + 28 + 8);
 	CHECK_STR(drawn, "2h 15m \xC2\xB7 3 days ago");
+
+	// captions.text: the caption in full, fitted to a width, or none
+	cfg_count = 0;
+	badges_loaded = 0;
+	restart();
+	char reply[MOSAIC_CALL_MAX];
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Tetris.gb", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "text=2h 15m \xC2\xB7 3 days ago\nwidth=120");
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Tetris.gb\nwidth=60", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "text=2h \xC2\xB7 3d\nwidth=48");
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Tetris.gb\nwidth=10", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "text=\nwidth=0");
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Unplayed.gb", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "text=\nwidth=0");
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Unknown.gb", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "text=\nwidth=0");
+	// in the picked parts and format, Never played too
+	setCfg("sessions", "on");
+	setCfg("format", "compact");
+	setCfg("never", "on");
+	restart();
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Tetris.gb", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "text=2h \xC2\xB7 3d \xC2\xB7 4x\nwidth=84");
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Unplayed.gb", reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "text=Never played\nwidth=72");
+	// no path, or a width that isn't a number
+	CHECK(fakeCall("captions.text", "", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
+	CHECK(fakeCall("captions.text", "path=", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Tetris.gb\nwidth=wide", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
+	CHECK(fakeCall("captions.text", "path=/sd/Roms/GB/Tetris.gb\nwidth=-1", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
+	// the reply has to fit
+	PCStats played = { 2 * 3600 + 15 * 60, play_now - 3 * 86400, 4, 0, 0 };
+	PCOptions every = { PC_PART_TIME | PC_PART_LAST, PC_FORMAT_RELATIVE, 0 };
+	CHECK(PC_reply(&played, play_now, &every, -1, bytes, NULL, reply, 20) == -1);
+	CHECK_STR(reply, "");
+	CHECK(PC_reply(&played, play_now, &every, -1, NULL, NULL, reply, sizeof(reply)) == -1);
+	CHECK(PC_reply(&played, play_now, &every, -1, bytes, NULL, reply, sizeof(reply)) == 0);
+	cfg_count = 0;
 
 	// a launcher without the play history declines
 	MosaicHost old = fake;

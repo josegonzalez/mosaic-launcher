@@ -859,3 +859,25 @@ SMCopy* SM_copyPick(SMCopy* copies, int count) {
 	}
 	return pick;
 }
+
+int SM_reply(const SMGame* game, char* out, size_t size) {
+	if (!out || !size) return -1;
+	int n;
+	const SMSlot* last = NULL;
+	for (int i = 0; game && i < game->count; i++) {
+		if (!last || game->slots[i].saved > last->saved) last = &game->slots[i];
+	}
+	if (!last) {
+		n = snprintf(out, size, "count=0");
+	} else {
+		char label[64];
+		SM_slotLabel(last->slot, label, sizeof(label));
+		n = snprintf(out, size, "count=%i\nslot=%i\nlabel=%s\nsaved=%lld\npreview=%s", game->count, last->slot, label,
+			(long long)last->saved, last->has_preview ? last->preview : "");
+	}
+	if (n < 0 || (size_t)n >= size) {
+		out[0] = '\0';
+		return -1;
+	}
+	return 0;
+}

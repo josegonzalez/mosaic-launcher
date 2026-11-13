@@ -76,4 +76,40 @@ int BL_formatRow(const BLSession* session, const char* sdcard, char* out, size_t
 // returning. Returns 0, or -1 on an error.
 int BL_append(const char* path, const char* old_path, const char* row, long max_bytes);
 
+///////////////////////////////////////
+// the battery.history service
+
+#define BL_HISTORY_MAX 64 // the most recent sessions it gives
+
+// One logged session, as a row of the CSV has it.
+typedef struct BLLogged {
+	long long start; // the row's local date as a Unix time, as mktime reads it
+	long long seconds;
+	int start_level, end_level;
+	int charged;
+} BLLogged;
+
+// The last BL_HISTORY_MAX sessions logged, oldest first.
+typedef struct BLHistory {
+	int count;
+	BLLogged sessions[BL_HISTORY_MAX];
+} BLHistory;
+
+void BL_historyInit(BLHistory* h);
+
+// One row as BL_formatRow writes it (quoted fields too). Returns 0, or -1
+// for the header or anything else.
+int BL_parseRow(const char* line, BLLogged* out);
+
+// Adds every row in text, in start order, keeping the last
+// BL_HISTORY_MAX. Returns how many were added.
+int BL_historyAdd(BLHistory* h, const char* text);
+
+// The service's reply for the last count sessions (every one for count
+// below 1): count=<n>, seconds=<their play time in all>, then
+// session.<i>=<start>,<seconds>,<start_percent>,<end_percent>,<charged 1
+// or 0> for each, oldest first from 0. Returns 0, or -1 when it doesn't
+// fit size.
+int BL_reply(const BLHistory* h, int count, char* out, size_t size);
+
 #endif

@@ -31,6 +31,7 @@
 #include "entrysets.h"
 #include "events.h"
 #include "callsite.h"
+#include "providers.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -1302,6 +1303,86 @@ static int hostSetNames(void (*each)(const char* name, void* data), void* data) 
 	return count;
 }
 
+///////////////////////////////////////
+// providers
+
+static Providers providers; // plugins' services, by owner; only touched on the launcher's thread
+_Static_assert(CALL_TEXT_MAX == MOSAIC_CALL_MAX && CALL_DEPTH_MAX == MOSAIC_CALL_DEPTH, "calls' sizes differ from the SDK's");
+_Static_assert(CALL_UNKNOWN == MOSAIC_CALL_UNKNOWN && CALL_TOO_SMALL == MOSAIC_CALL_TOO_SMALL
+	&& CALL_REFUSED == MOSAIC_CALL_REFUSED && CALL_FAILED == MOSAIC_CALL_FAILED, "calls' results differ from the SDK's");
+
+static int hostProvide(const char* name, int (*fn)(const char* name, const char* args, char* out, size_t size)) {
+	LoadedPlugin* p = callingPlugin("provide");
+	if (!p) return -1;
+	int rc = Providers_add(&providers, name, p->id, p->manifest->provides, fn);
+	if (rc == PROVIDE_OK) return 0;
+	const char* shown = name ? name : "(null)";
+	switch (rc) {
+		case PROVIDE_RESERVED:
+			LOG_info("plugins: %s can't provide %s: sets. and events. names are entry sets' and events'\n", p->id, shown);
+			break;
+		case PROVIDE_UNDECLARED:
+			LOG_info("plugins: %s can't provide %s: its plugin.txt's provides= doesn't list it\n", p->id, shown);
+			break;
+		case PROVIDE_TAKEN:
+			LOG_info("plugins: %s can't provide %s: %s provided it first\n", p->id, shown, Providers_find(&providers, name)->owner);
+			break;
+		case PROVIDE_FULL:
+			LOG_warn("plugins: %s can't provide %s: there are %i services\n", p->id, shown, PROVIDERS_MAX);
+			break;
+		default:
+			LOG_info("plugins: %s can't provide %s: no callback, or a name that isn't <kind>.<name>\n", p->id, shown);
+			break;
+	}
+	return -1;
+}
+
+// Runs a provider's callback as its owner.
+static int providerRun(const Provider* provider, const char* args, char* reply, size_t size, void* ctx) {
+	(void)ctx;
+	LoadedPlugin* owner = loadedById(provider->owner);
+	if (!owner) return -1;
+	int rc = -1;
+	AS_CALLER(owner->id) rc = provider->fn(provider->name, args, reply, size);
+	return rc;
+}
+
+static int hostCall(const char* name, const char* args, char* out, size_t size) {
+	LoadedPlugin* p = callingPlugin("call");
+	if (!p) {
+		if (out && size) out[0] = '\0';
+		return CALL_REFUSED;
+	}
+	int rc = Providers_call(&providers, name, args, out, size, providerRun, NULL);
+	// once each, as a plugin could call every frame
+	static int logged[5];
+	int reason = -rc;
+	if (rc >= CALL_UNKNOWN || reason > 4 || logged[reason]) return rc;
+	logged[reason] = 1;
+	const char* shown = name ? name : "(null)";
+	const Provider* provider = Providers_find(&providers, name);
+	const char* owner = provider ? provider->owner : "?";
+	switch (rc) {
+		case CALL_TOO_SMALL:
+			LOG_info("plugins: %s's call to %s got a reply bigger than its %zu bytes\n", p->id, shown, size);
+			break;
+		case CALL_FAILED:
+			LOG_info("plugins: %s's call to %s failed: %s didn't answer, or its reply isn't key=value lines\n", p->id, shown, owner);
+			break;
+		default:
+			LOG_info("plugins: %s's call to %s was refused: bad arguments, %s's callback for it is still running, or calls nested %i deep\n",
+				p->id, shown, owner, CALL_DEPTH_MAX);
+			break;
+	}
+	return rc;
+}
+
+// Unloading a plugin releases its services.
+static void providersReleaseAll(const char* plugin_id) {
+	int released = Providers_releaseAll(&providers, plugin_id);
+	if (released > 0) LOG_info("plugins: %s's services are released (%i)\n", plugin_id, released);
+}
+
 
 ///////////////////////////////////////
 // screen captures
@@ -1663,6 +1744,8 @@ static const MosaicHost host = {
 	.set_names = hostSetNames,
 	.plugin_loaded = hostPluginLoaded,
 	.has_capability = hostHasCapability,
+	.provide = hostProvide,
+	.call = hostCall,
 };
 
 ///////////////////////////////////////
@@ -1792,6 +1875,7 @@ static void load(const PluginManifest* m) {
 		fnReleaseAll(m->id);
 		setsReleaseAll(m->id);
 		eventsReleaseAll(m->id);
+		providersReleaseAll(m->id);
 		freeSurfaces(m->id);
 		Audio_closeFor(m->id, "as it declined to start");
 		PluginCfg_free(&p->cfg);
@@ -2149,6 +2233,7 @@ void Plugins_quit(void) {
 		fnReleaseAll(p->id);
 		setsReleaseAll(p->id);
 		eventsReleaseAll(p->id);
+		providersReleaseAll(p->id);
 		freeSurfaces(p->id);
 		PluginCfg_free(&p->cfg);
 		dlclose(p->handle);
@@ -2156,6 +2241,7 @@ void Plugins_quit(void) {
 	loaded_count = 0;
 	listed = 0;
 	EntrySets_free(&sets);
+	Providers_init(&providers);
 	// what quit hooks published goes with them
 	EventQueue_init(&event_queue);
 	Capture_quit();

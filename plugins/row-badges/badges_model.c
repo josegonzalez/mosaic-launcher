@@ -93,19 +93,64 @@ int RB_tagOf(const char* roms, const char* path, char* out, size_t size) {
 	return 1;
 }
 
-int RB_played(const RBSet* set, const char* roms, const char* path) {
-	char tag[256], folder[512];
-	if (!RB_tagOf(roms, path, tag, sizeof(tag))) return -1;
+int RB_gameFiles(const char* roms, const char* path, int is_dir, char out[][RB_PATH_MAX], int max) {
+	char folder[512];
+	if (!roms || !path || !out || max < 1) return 0;
 	const char* rest = systemFolder(roms, path, folder, sizeof(folder));
-	const char* file = strrchr(rest, '/');
-	if (RB_setHas(set, tag, file ? file + 1 : rest)) return 1;
-	if (!file) return 0;
-	// a disc of a multi-disc game, played by its .m3u
-	const char* parent = file;
+	if (!rest) return 0;
+	size_t len = strlen(path);
+	while (len && path[len - 1] == '/') len--;
+	const char* name = path + len;
+	while (name > rest && name[-1] != '/') name--;
+	int name_len = (int)(path + len - name);
+	if (!name_len) return 0;
+	int count = 0;
+	if (is_dir) {
+		static const char* const kinds[] = { "m3u", "cue" };
+		for (int i = 0; i < 2 && count < max; i++) {
+			if (snprintf(out[count], RB_PATH_MAX, "%.*s/%.*s.%s", (int)len, path, name_len, name, kinds[i]) < RB_PATH_MAX) count++;
+		}
+		return count;
+	}
+	if (len >= RB_PATH_MAX) return 0;
+	snprintf(out[count++], RB_PATH_MAX, "%.*s", (int)len, path);
+	// a disc of a multi-disc game, by its folder's .m3u
+	if (name == rest || count >= max) return count;
+	const char* parent = name - 1;
 	while (parent > rest && parent[-1] != '/') parent--;
-	char m3u[512];
-	if (snprintf(m3u, sizeof(m3u), "%.*s.m3u", (int)(file - parent), parent) >= (int)sizeof(m3u)) return 0;
-	return RB_setHas(set, tag, m3u);
+	int parent_len = (int)(name - 1 - parent);
+	char m3u[RB_PATH_MAX];
+	if (snprintf(m3u, sizeof(m3u), "%.*s%.*s.m3u", (int)(name - path), path, parent_len, parent) >= (int)sizeof(m3u)) return count;
+	if (strcmp(m3u, out[0]) != 0) snprintf(out[count++], RB_PATH_MAX, "%s", m3u);
+	return count;
+}
+
+int RB_isPlayed(const RBSet* set, const char* roms, const char* path, int is_dir,
+		int (*history)(const char* path, void* ctx), void* ctx) {
+	char files[RB_GAME_FILES][RB_PATH_MAX];
+	int count = RB_gameFiles(roms, path, is_dir, files, RB_GAME_FILES);
+	if (!count) return -1;
+	for (int i = 0; i < count; i++) {
+		char tag[256];
+		const char* file = strrchr(files[i], '/');
+		if (set && RB_tagOf(roms, files[i], tag, sizeof(tag)) && RB_setHas(set, tag, file + 1)) return 1;
+		if (history && history(files[i], ctx)) return 1;
+	}
+	return 0;
+}
+
+int RB_played(const RBSet* set, const char* roms, const char* path) {
+	return RB_isPlayed(set, roms, path, 0, NULL, NULL);
+}
+
+int RB_reply(int played, char* out, size_t size) {
+	if (!out || !size) return -1;
+	int n = snprintf(out, size, "played=%i", played == 1);
+	if (n < 0 || (size_t)n >= size) {
+		out[0] = '\0';
+		return -1;
+	}
+	return 0;
 }
 
 // Copies name less its last len bytes to out, when that leaves something.

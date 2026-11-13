@@ -39,11 +39,33 @@ int RB_setHas(const RBSet* set, const char* tag, const char* file);
 // for a path that isn't a file inside a system folder (writing "").
 int RB_tagOf(const char* roms, const char* path, char* out, size_t size);
 
-// 1 when the game at path was played: its tag and file name are in set, or
-// for a game inside a folder below the system folder, the folder's .m3u
-// is, as stock resumes a disc of a multi-disc game by its .m3u. 0 when
-// neither is, and -1 for a path that isn't a file inside a system folder.
+#define RB_PATH_MAX 1024
+#define RB_GAME_FILES 3 // the most files RB_gameFiles gives
+
+// The files a game goes by, the paths stock records it under: path itself,
+// and for a file inside a folder below the system folder, that folder's
+// .m3u (<folder>/<folder name>.m3u), as stock resumes a disc of a
+// multi-disc game by its .m3u; for a folder (is_dir 1), its
+// <folder>/<folder name>.m3u and .cue instead, as stock opens a game
+// folder. Writes up to max and returns how many, or 0 for a path that
+// isn't inside a system folder.
+int RB_gameFiles(const char* roms, const char* path, int is_dir, char out[][RB_PATH_MAX], int max);
+
+// Whether a game was played, the one definition the games.played service
+// gives every plugin: 1 when one of its files (RB_gameFiles) has its tag
+// and file name in set (in recents, or with a save, state or resume slot
+// on the card), or history(file, ctx), when given, returns non-zero for
+// one (the play history has a session of it). 0 when none does, and -1
+// for a path that isn't inside a system folder.
+int RB_isPlayed(const RBSet* set, const char* roms, const char* path, int is_dir,
+	int (*history)(const char* path, void* ctx), void* ctx);
+
+// RB_isPlayed for a file, by set alone.
 int RB_played(const RBSet* set, const char* roms, const char* path);
+
+// The games.played service's reply, "played=1" or "played=0" (for a
+// path RB_isPlayed gives -1 too). Returns 0, or -1 when it doesn't fit.
+int RB_reply(int played, char* out, size_t size);
 
 // The game a file names, for each place played games leave a file. Each
 // writes the game's file name and returns 1, or returns 0 for a file that

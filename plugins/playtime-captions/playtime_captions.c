@@ -20,6 +20,11 @@
 // is too narrow it tries the compact format, then drops parts from the
 // end, and shows nothing when even one doesn't fit.
 //
+// Other plugins get the same caption from the captions.text service,
+// with path=<game> and, to fit it, width=<pixels in the small font>: its
+// reply is text=<caption> (empty for none) and width=<its width>, in these
+// settings' parts and format.
+//
 // The game switcher's captions are switcher-plus's, with its captions
 // setting: it reads these settings, which are public, with cfg_read while
 // this plugin is loaded, and writes the caption with a copy of
@@ -27,6 +32,7 @@
 // built-in switcher gets none.
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "captions_model.h"
@@ -80,10 +86,8 @@ static int measure(const char* text, void* ctx) {
 	return host->text_width(MOSAIC_FONT_SMALL, text);
 }
 
-static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row) {
-	if (host->entry_type(entry) != MOSAIC_ENTRY_ROM) return 0;
-	const char* path = host->entry_path(entry);
-	if (!path) return 0;
+// What the play history and RetroAchievements say about the game at path.
+static PCStats statsOf(const char* path) {
 	PCStats stats = { host->play_time(path), host->last_played(path), host->play_count(path), 0, 0 };
 	if (options.parts & PC_PART_ACHIEVEMENTS) {
 		MosaicAchievements progress = { .size = sizeof(MosaicAchievements) };
@@ -92,6 +96,14 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 			stats.cheevos_total = progress.total;
 		}
 	}
+	return stats;
+}
+
+static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row) {
+	if (host->entry_type(entry) != MOSAIC_ENTRY_ROM) return 0;
+	const char* path = host->entry_path(entry);
+	if (!path) return 0;
+	PCStats stats = statsOf(path);
 	int known = stats.time >= 0 && stats.last >= 0 && stats.count >= 0;
 	int unseen = known && !stats.count && !stats.time && !stats.last;
 	if (!stats.cheevos_total && (!known || (unseen && !options.never))) return 0;
@@ -113,6 +125,24 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	int rgb = PC_mute(hint, background, MUTE_PERCENT);
 	host->draw_text(screen, MOSAIC_FONT_SMALL, caption, room.x + room.w - w, room.y, mosaic_color((unsigned int)rgb, 255), 0);
 	return 0;
+}
+
+// captions.text: path=<game> and, to fit it, width=<pixels in the small
+// font>, as a row's caption reads.
+static int provideCaption(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[1024], width[16];
+	int len = host->event_value(args, "path", path, sizeof(path));
+	if (len <= 0 || len >= (int)sizeof(path)) return -1;
+	int max_width = -1;
+	if (host->event_value(args, "width", width, sizeof(width)) >= 0) {
+		char* end;
+		long w = strtol(width, &end, 10);
+		if (end == width || *end || w < 0 || w > 100000) return -1;
+		max_width = (int)w;
+	}
+	PCStats stats = statsOf(path);
+	return PC_reply(&stats, (long long)time(NULL), &options, max_width, measure, NULL, out, size);
 }
 
 static int init(const MosaicHost* h) {
@@ -142,6 +172,7 @@ static int init(const MosaicHost* h) {
 		options.parts & PC_PART_SESSIONS ? "on" : "off", names[options.format], options.never ? "on" : "off",
 		options.parts & PC_PART_ACHIEVEMENTS ? "on" : "off");
 	host->log(ID, message);
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("captions.text", provideCaption) != 0) host->log(ID, "couldn't provide captions.text");
 	return 0;
 }
 

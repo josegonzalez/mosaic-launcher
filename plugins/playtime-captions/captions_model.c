@@ -203,6 +203,27 @@ int PC_fit(const PCStats* stats, long long now, const PCOptions* options, int ma
 	return 0;
 }
 
+int PC_reply(const PCStats* stats, long long now, const PCOptions* options, int max_width,
+	int (*measure)(const char* text, void* ctx), void* ctx, char* out, size_t size) {
+	if (!out || !size) return -1;
+	out[0] = '\0';
+	if (!stats || !options || !measure) return -1;
+	char text[CAPTION_MAX];
+	int w = 0;
+	if (max_width >= 0) {
+		w = PC_fit(stats, now, options, max_width, measure, ctx, text, sizeof(text));
+	} else if (PC_build(stats, now, options->parts, options->format, options->never, 4, text, sizeof(text)) > 0) {
+		w = measure(text, ctx);
+		if (w < 0) w = 0;
+	}
+	int n = snprintf(out, size, "text=%s\nwidth=%i", text, w);
+	if (n < 0 || (size_t)n >= size) {
+		out[0] = '\0';
+		return -1;
+	}
+	return 0;
+}
+
 int PC_room(const MosaicRect* rect, const MosaicRect* name, int reserve, int corner, int margin, int text_h,
 	MosaicRect* out) {
 	if (!rect || !out || text_h <= 0) return 0;

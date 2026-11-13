@@ -77,4 +77,13 @@ const char* EO_mapGet(const EOMap* map, const char* key);
 // EO_validName refuses, or no memory.
 int EO_mapSet(EOMap* map, const char* key, const char* pak);
 
+///////////////////////////////////////
+// the emulator.choice service
+
+// Its reply: pak=<the chosen pak's name>, empty for none, and
+// launch=<its launch.sh, as EO_pakLaunch finds it>, empty when there's
+// no choice or the pak isn't usable on the card, so the game launches with
+// its system's own. Returns 0, or -1 when it doesn't fit size.
+int EO_reply(const char* pak, const char* launch, char* out, size_t size);
+
 #endif

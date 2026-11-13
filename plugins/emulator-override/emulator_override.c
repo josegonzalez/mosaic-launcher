@@ -17,6 +17,11 @@
 // which the launcher quotes and gives the game's path, as it does stock's
 // own pak. A choice that fails the check is logged and the game launches
 // as usual.
+//
+// Other plugins ask for a game's choice with the emulator.choice service:
+// path=<game or game folder> gives pak=<the chosen pak, empty for none>
+// and launch=<its launch.sh, empty when there's none or it fails that
+// check>.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -207,6 +212,27 @@ static int preLaunch(const MosaicLaunch* launch) {
 }
 
 ///////////////////////////////////////
+// the emulator.choice service
+
+// path=<game or game folder>: its choice, and the launch.sh it launches
+// with, as pre_launch would check it now.
+static int provideChoice(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[EO_PATH_LEN];
+	int len = host->event_value(args, "path", path, sizeof(path));
+	if (len <= 0 || len >= (int)sizeof(path)) return -1;
+	struct stat st;
+	int is_dir = stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+	char game[EO_PATH_LEN], sys_tag[EO_NAME_LEN];
+	if (!EO_gameKey(host->sdcard_path, path, is_dir, game, sizeof(game), sys_tag, sizeof(sys_tag))) return EO_reply(NULL, NULL, out, size);
+	refreshMap();
+	const char* pak = EO_mapGet(&map, game);
+	char program[EO_PATH_LEN];
+	int usable = pak && EO_pakLaunch(host->sdcard_path, host->platform, pak, program, sizeof(program));
+	return EO_reply(pak, usable ? program : NULL, out, size);
+}
+
+///////////////////////////////////////
 // hooks
 
 static void postReturn(void) {
@@ -249,6 +275,7 @@ static int init(const MosaicHost* h) {
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("emulator.choice", provideChoice) != 0) say("couldn't provide emulator.choice");
 	if (host->register_action(ID ".choose", "EMULATOR", canChoose, choose, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, ID ".choose") != 0) {
 		say("couldn't bind " ID ".choose");

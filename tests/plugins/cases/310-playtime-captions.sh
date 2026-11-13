@@ -58,7 +58,7 @@ expect "row Unplayed caption at right 1, clear of name 1, as wide as \"Never pla
 expect "row Extras caption none"
 
 # with row-badges' dots after the names, both show, apart (row-badges
-# goes by saves and recents, so Tetris is unplayed to it)
+# counts the play history too, so only Unplayed gets its unplayed dot)
 printf 'tier=3\n' >"$CAPTION_DIR/.media/Tetris.info"
 printf 'unplayed=on\ntiers=on\n' >"$STATE/row-badges.cfg"
 printf 'folder=Roms/Play Captions (PCT)\n' >"$STATE/dotter.cfg"
@@ -70,7 +70,7 @@ printf 'row-badges=on\nplaytime-captions=on\ndotter=on\nsubtitler=on\n' >"$STATE
 run_launcher "$WORK/playtime-captions-badges.log" "plugin subtitler: row Unplayed" "plugin subtitler: row Tetris" "plugin dotter: row Unplayed" || fail "the launcher exited early with playtime-captions and row-badges"
 log="$WORK/playtime-captions-badges.log"
 plugin=dotter
-expect "row Tetris unplayed 1 tiers 3"
+expect "row Tetris unplayed 0 tiers 3"
 expect "row Unplayed unplayed 1 tiers 0"
 plugin=subtitler
 expect "row Tetris caption at right 1, clear of name 1, as wide as \"2h 15m · 3 days ago\" 1"

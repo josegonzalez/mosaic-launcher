@@ -2,9 +2,21 @@
 // the fields setting names) from its .info sidecar, in a pill under its
 // art. The built-in list asks for it under the selected game's thumbnail;
 // a layout gets it where it calls host->decorate_art.
+//
+// Other plugins format a game's .info fields the same way with the
+// info.format service: path=<game>, optionally fields=<keys> in place of
+// the fields setting's, and width=<pixels> in font=<small, tiny or micro>
+// to fit the line, give count=<fields with a value>, <key>=<tidied value>
+// for each of those, and line=<them joined with " · ">, the last left out
+// until it fits the width. The sidecar is read from the card as the
+// launcher reads it for entry_info.
 
+#include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "mosaic_plugin.h"
 #include "band_model.h"
 
@@ -99,6 +111,62 @@ static int decorateArt(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	return 0;
 }
 
+// A sidecar's text, read as the launcher reads them: a regular file of up
+// to MB_INFO_FILE_MAX bytes, opened without blocking. Returns its length,
+// or -1 for none.
+static int readSidecar(const char* path, char* text, size_t size) {
+	char file[1100];
+	MB_infoPath(path, file, sizeof(file));
+	int fd = open(file, O_RDONLY | O_NONBLOCK);
+	if (fd < 0) return -1;
+	struct stat st;
+	size_t got = 0;
+	if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode)) {
+		while (got < size) {
+			ssize_t n = read(fd, text + got, size - got);
+			if (n <= 0) break;
+			got += (size_t)n;
+		}
+	}
+	close(fd);
+	return got > MB_INFO_FILE_MAX ? -1 : (int)got;
+}
+
+// info.format: path=<game>, and optionally fields=<keys, as the fields
+// setting lists them> in place of the setting's, and width=<pixels> in
+// font=<small, tiny or micro> to fit the line.
+static int provideInfo(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[1024], list[128], number[16], font_name[16];
+	int len = host->event_value(args, "path", path, sizeof(path));
+	if (len <= 0 || len >= (int)sizeof(path)) return -1;
+	int asked[MB_FIELD_COUNT];
+	int count = field_count;
+	memcpy(asked, fields, sizeof(asked));
+	if (host->event_value(args, "fields", list, sizeof(list)) >= 0) count = MB_fields(list, asked);
+	int max_width = -1, font = MOSAIC_FONT_SMALL;
+	if (host->event_value(args, "width", number, sizeof(number)) >= 0) {
+		char* end;
+		long w = strtol(number, &end, 10);
+		if (end == number || *end || w < 0 || w > 100000) return -1;
+		max_width = (int)w;
+	}
+	if (host->event_value(args, "font", font_name, sizeof(font_name)) >= 0) {
+		if (!strcmp(font_name, "tiny")) font = MOSAIC_FONT_TINY;
+		else if (!strcmp(font_name, "micro")) font = MOSAIC_FONT_MICRO;
+		else if (strcmp(font_name, "small") != 0) return -1;
+	}
+	static char text[MB_INFO_FILE_MAX + 1];
+	int got = readSidecar(path, text, sizeof(text));
+	char raw[MB_FIELD_COUNT][MB_VALUE_SIZE];
+	const char* values[MB_FIELD_COUNT];
+	for (int i = 0; i < count; i++) {
+		if (got < 0 || !MB_infoValue(text, (size_t)got, MB_key(asked[i]), raw[i], sizeof(raw[i]))) raw[i][0] = '\0';
+		values[i] = raw[i];
+	}
+	return MB_reply(asked, count, values, SEP, max_width, measure, &font, out, size);
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, decorate_art) || !MOSAIC_HOST_HAS(host, entry_info) || !MOSAIC_HOST_HAS(host, draw_text)
@@ -117,6 +185,7 @@ static int init(const MosaicHost* h) {
 	char message[160];
 	snprintf(message, sizeof(message), "fields %s", field_count ? keys : "none");
 	host->log(ID, message);
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("info.format", provideInfo) != 0) host->log(ID, "couldn't provide info.format");
 	return 0;
 }
 

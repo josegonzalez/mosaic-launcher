@@ -6,17 +6,24 @@
 // "tiers" setting), each ringed in its background colour. Both are off by
 // default.
 //
-// A game counts as played when it's in recents, or when stock or minarch
+// A game counts as played when it's in recents, when stock or minarch
 // left a file for it: a save in Saves/<tag>/, a state in
 // .userdata/shared/<tag>-<core>/, or a resume slot, state name or preview
-// in .userdata/shared/.minui/<tag>/. Those are read from the card at start,
-// back from a game, and each time the launcher builds a list, never while
-// drawing. Folders, paks and anything outside Roms/ get no unplayed dot.
+// in .userdata/shared/.minui/<tag>/, or when the play history has a
+// session of it. Those files are read from the card at start, back from a
+// game, and each time the launcher builds a list, never while drawing.
+// Folders, paks and anything outside Roms/ get no unplayed dot.
+//
+// Other plugins ask the same question with the games.played service, the
+// one definition of played, whether or not the dot is on: path=<game or
+// game folder> gives played=1 or played=0. With the dot off, the card is
+// read for it on the first call after each of those times instead.
 
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "badges_model.h"
 #include "mosaic_plugin.h"
 
@@ -65,8 +72,10 @@ static void scanTags(const char* dir, int state_dirs, int (*parse)(const char*, 
 	closedir(dh);
 }
 
-static void refresh(void) {
-	if (!show_unplayed) return;
+static int stale = 1; // the card has to be read again before played is asked
+
+static void scan(void) {
+	stale = 0;
 	RB_setFree(&played);
 	char dir[MAX_PATH_LEN];
 	snprintf(dir, sizeof(dir), "%s/Saves", host->sdcard_path);
@@ -86,6 +95,31 @@ static void refresh(void) {
 	RB_setFinish(&played);
 }
 
+// Reads the card now while the dot is on, and otherwise the next time a
+// plugin asks.
+static void refresh(void) {
+	stale = 1;
+	if (show_unplayed) scan();
+}
+
+// The play history has a session of the game at path.
+static int inHistory(const char* path, void* ctx) {
+	(void)ctx;
+	return MOSAIC_HOST_HAS(host, play_time) && host->play_count(path) > 0;
+}
+
+// games.played: path=<game or game folder>, played=1 or played=0.
+static int providePlayed(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[MAX_PATH_LEN];
+	int len = host->event_value(args, "path", path, sizeof(path));
+	if (len <= 0 || len >= (int)sizeof(path)) return -1;
+	if (stale) scan();
+	struct stat st;
+	int is_dir = stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+	return RB_reply(RB_isPlayed(&played, roms, path, is_dir, inHistory, NULL), out, size);
+}
+
 static void listReady(const MosaicList* list, const char* dir_path) {
 	(void)list;
 	(void)dir_path;
@@ -99,7 +133,7 @@ static void postReturn(void) {
 static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row) {
 	int unplayed = 0, tier = 0;
 	if (show_unplayed && host->entry_type(entry) == MOSAIC_ENTRY_ROM) {
-		unplayed = RB_played(&played, roms, host->entry_path(entry)) == 0;
+		unplayed = RB_isPlayed(&played, roms, host->entry_path(entry), 0, inHistory, NULL) == 0;
 	}
 	if (show_tiers) {
 		char value[16];
@@ -129,6 +163,7 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 
 static void quit(void) {
 	RB_setFree(&played);
+	stale = 1;
 }
 
 static int init(const MosaicHost* h) {
@@ -146,6 +181,7 @@ static int init(const MosaicHost* h) {
 	}
 	RB_setInit(&played);
 	refresh();
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("games.played", providePlayed) != 0) host->log(ID, "couldn't provide games.played");
 	char message[96];
 	snprintf(message, sizeof(message), "unplayed %s, tiers %s", show_unplayed ? "on" : "off", show_tiers ? "on" : "off");
 	host->log(ID, message);

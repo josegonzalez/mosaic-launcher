@@ -38,7 +38,9 @@
 # that picks the hint style and draws single buttons, one that lists
 # stock's palettes and reads the theme colours back, one that reads the
 # bundled favorites and hidden plugins' entry sets, two that publish and
-# subscribe to events, and one that crashes
+# subscribe to events, one that calls the bundled providers' services and
+# two that provide their own,
+# and one that crashes
 # during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
 # time limit's protected settings and scrolls a long one, reads back those
