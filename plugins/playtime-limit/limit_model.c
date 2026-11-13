@@ -74,6 +74,31 @@ void PL_formatIn(long long left, const char* const words[PL_WORDS_COUNT], char* 
 	else snprintf(out, size, words[PL_WORDS_HOURS], minutes / 60, minutes % 60);
 }
 
+const char* PL_stateName(int state) {
+	switch (state) {
+	case PL_UNKNOWN: return "unknown";
+	case PL_OK: return "ok";
+	case PL_WARN: return "warn";
+	case PL_UP: return "up";
+	default: return "off";
+	}
+}
+
+int PL_reply(int state, int limit, int granted, long long left, const char* text, char* out, size_t size) {
+	if (!out || !size) return -1;
+	int known = state != PL_OFF && state != PL_UNKNOWN;
+	if (state == PL_OFF) limit = 0;
+	if (state == PL_OFF || limit < 0) granted = 0;
+	if (granted < 0) granted = 0;
+	int n = snprintf(out, size, "state=%s\nlimit=%i\ngranted=%i\nleft=%lld\ntext=%s", PL_stateName(state), limit,
+		granted, known && left >= 0 ? left : -1, known && text ? text : "");
+	if (n < 0 || (size_t)n >= size) {
+		out[0] = '\0';
+		return -1;
+	}
+	return 0;
+}
+
 static void trim(const char* in, char out[PL_CODE_LEN]) {
 	out[0] = '\0';
 	if (!in) return;

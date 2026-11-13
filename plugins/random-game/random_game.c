@@ -6,10 +6,13 @@
 // "tile" setting) pick from every system too.
 //
 // Every game is as likely as any other, so a system with more games is
-// picked more often, except that games not in Recently Played are
-// RG_UNPLAYED_WEIGHT times as likely while the "unplayed" setting is on.
-// Games any plugin's filter hides, such as the hidden plugin's, are never
-// picked (is_filtered).
+// picked more often, except that unplayed games are RG_UNPLAYED_WEIGHT
+// times as likely while the "unplayed" setting is on, and only unplayed
+// games are picked while the "unplayed_only" setting is on. A game is
+// played as row-badges' games.played service says, the one definition of
+// it; without that service, as when row-badges is off, a game is played
+// when it's in Recently Played. Games any plugin's filter hides, such as
+// the hidden plugin's, are never picked (is_filtered).
 //
 // The "from" setting limits every pick to the games in one entry set:
 // all (the default) for every game, or a set's name, such as favorites,
@@ -205,6 +208,52 @@ static int filtered(const char* path) {
 	return MOSAIC_HOST_HAS(host, is_filtered) && host->is_filtered(path);
 }
 
+// what a pick asks about played games: games.played while it answers,
+// else recents
+static int use_service = 0;
+static char recent_copies[MAX_RECENTS][RG_PATH_LEN]; // recent_path's string only lasts until the next call
+static const char* recent_paths[MAX_RECENTS];
+static int recents_read = 0;
+
+static void readRecents(void) {
+	recents_read = 0;
+	if (!MOSAIC_HOST_HAS(host, recents_count) || !MOSAIC_HOST_HAS(host, recent_path)) return;
+	int count = host->recents_count();
+	for (int i = 0; i < count && recents_read < MAX_RECENTS; i++) {
+		const char* path = host->recent_path(i);
+		if (!path) break;
+		snprintf(recent_copies[recents_read], RG_PATH_LEN, "%s", path);
+		recent_paths[recents_read] = recent_copies[recents_read];
+		recents_read++;
+	}
+}
+
+// A game is played as games.played says, or by recents when nobody
+// provides it or it can't answer.
+static int gamePlayed(const RGGame* game, void* data) {
+	(void)data;
+	if (use_service) {
+		char args[RG_PATH_LEN + 8], reply[64], played[8];
+		snprintf(args, sizeof(args), "path=%s", game->path);
+		int got = host->call("games.played", args, reply, sizeof(reply));
+		if (got >= 0 && host->event_value(reply, "played", played, sizeof(played)) > 0) return !strcmp(played, "1");
+		if (got == MOSAIC_CALL_UNKNOWN) {
+			use_service = 0;
+			say("nobody provides games.played, so played games are the recents");
+		}
+	}
+	return RG_isPlayed(game->path, recent_paths, recents_read);
+}
+
+static int unplayedOnly(void) {
+	return isOn("unplayed_only", "off");
+}
+
+// The toast when a pick finds nothing.
+static const char* nothingToPick(void) {
+	return unplayedOnly() ? tr("No unplayed games to pick from") : tr("No games to pick from");
+}
+
 // Picks a game from system, or from every system with -1. Returns 1 and
 // writes its path and type, or returns 0 when there's nothing to pick.
 static int pick(int system, char* out, size_t size, int* type) {
@@ -216,25 +265,13 @@ static int pick(int system, char* out, size_t size, int* type) {
 	RG_setClear(&only);
 	if (!all && MOSAIC_HOST_HAS(host, is_filtered)) host->set_list(from, addMember, NULL);
 
-	// recent_path's string only lasts until the next call
-	static char recent_copies[MAX_RECENTS][RG_PATH_LEN];
-	const char* recents[MAX_RECENTS];
-	int recent_count = 0;
-	if (MOSAIC_HOST_HAS(host, recents_count) && MOSAIC_HOST_HAS(host, recent_path)) {
-		int count = host->recents_count();
-		for (int i = 0; i < count && recent_count < MAX_RECENTS; i++) {
-			const char* path = host->recent_path(i);
-			if (!path) break;
-			snprintf(recent_copies[recent_count], RG_PATH_LEN, "%s", path);
-			recents[recent_count] = recent_copies[recent_count];
-			recent_count++;
-		}
-	}
-
+	readRecents();
+	use_service = MOSAIC_HOST_HAS(host, call);
 	unsigned* weights = malloc((size_t)library.count * sizeof(unsigned));
 	if (!weights) return 0;
 	unsigned unplayed = isOn("unplayed", "on") ? RG_UNPLAYED_WEIGHT : 1;
-	unsigned long total = RG_weights(&library, system, all ? NULL : &only, recents, recent_count, unplayed, weights);
+	unsigned long total = RG_weights(&library, system, all ? NULL : &only, gamePlayed, NULL, unplayed, unplayedOnly(),
+		weights);
 
 	int found = 0;
 	while (total) {
@@ -264,7 +301,7 @@ static void launch(int system) {
 	char path[RG_PATH_LEN];
 	int type;
 	if (!pick(system, path, sizeof(path), &type)) {
-		toast(tr("No games to pick from"));
+		toast(nothingToPick());
 		return;
 	}
 	host->open_path(path, type);
@@ -407,7 +444,7 @@ static void tick(unsigned long now) {
 	if (!pending) return;
 	pending = 0;
 	if (!shown_path[0]) {
-		toast(tr("No games to pick from"));
+		toast(nothingToPick());
 		return;
 	}
 	host->open_path(shown_path, shown_type);

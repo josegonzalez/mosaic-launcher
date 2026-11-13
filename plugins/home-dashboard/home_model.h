@@ -1,5 +1,5 @@
 // Home dashboard, without the host: the home modes and their tabs, moving
-// through a tab, the text the dashboard shows (play time, last played,
+// through a tab, the text the dashboard shows (play time, time left,
 // RetroAchievements progress), which games are most played, which
 // folders hold Pico-8 carts, and where things go on the screen. No SDL and no file access, so it's tested on
 // the host.
@@ -75,15 +75,16 @@ int HD_window(int selected, int count, int rows, int first);
 // Play time as text: "2h 15m", "45m", "<1m" under a minute, "" for 0 or
 // less.
 void HD_duration(long long seconds, char* out, size_t size);
-// When something was last played, by local days from now: "today",
-// "yesterday", "3 days ago", "" for 0 or less (never or unknown).
-void HD_lastPlayed(long long when, long long now, char* out, size_t size);
-// Local calendar days from when to now: 0 the same day, 0 when when is
-// after now.
-int HD_daysBetween(long long when, long long now);
-// The continue card's detail line from what the play history says: "2h
-// 15m played · yesterday", either half alone, or "" when it says nothing.
-void HD_playLine(long long time, long long last, long long now, char* out, size_t size);
+// The continue card's detail line without playtime-captions: "2h 15m
+// played", or "" for 0 or less.
+void HD_playedLine(long long seconds, char* out, size_t size);
+// The Stats tab's time left row from playtime-limit's limit.left: its
+// state, limit and granted minutes and seconds left. Writes "35m of 1h
+// 0m", the time left in whole minutes rounded up (as playtime-limit
+// shows it) of today's limit with the time granted, and returns 1 while a
+// limit is set and the history is known (state ok, warn or up), or
+// returns 0 (writing "").
+int HD_timeLeft(const char* state, int limit, int granted, long long left, char* out, size_t size);
 // RetroAchievements progress: "12/40 · 150/400 points", or "12/40" when
 // there are no points. "" with no total.
 void HD_achievementLine(int unlocked, int total, int points_unlocked, int points, char* out, size_t size);

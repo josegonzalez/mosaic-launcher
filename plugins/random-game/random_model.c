@@ -197,15 +197,17 @@ int RG_isPlayed(const char* path, const char* const* recents, int count) {
 	return 0;
 }
 
-unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* only,
-		const char* const* recents, int recent_count, unsigned unplayed_weight, unsigned* weights) {
+unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* only, RGPlayedFn played, void* data,
+		unsigned unplayed_weight, int unplayed_only, unsigned* weights) {
 	unsigned long total = 0;
 	if (unplayed_weight < 1) unplayed_weight = 1;
+	int ask = played && (unplayed_weight > 1 || unplayed_only);
 	for (int i = 0; i < lib->count; i++) {
 		const RGGame* game = &lib->games[i];
 		unsigned weight = 0;
 		if ((system < 0 || game->system == system) && (!only || RG_inSet(only, game->path, game->type))) {
-			weight = RG_isPlayed(game->path, recents, recent_count) ? 1 : unplayed_weight;
+			if (!ask || !played(game, data)) weight = unplayed_weight;
+			else weight = unplayed_only ? 0 : 1;
 		}
 		weights[i] = weight;
 		total += weight;

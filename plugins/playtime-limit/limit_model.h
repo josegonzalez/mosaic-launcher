@@ -61,6 +61,16 @@ void PL_format(long long left, char* out, size_t size);
 enum { PL_WORDS_UP, PL_WORDS_MINUTES, PL_WORDS_HOURS, PL_WORDS_COUNT };
 void PL_formatIn(long long left, const char* const words[PL_WORDS_COUNT], char* out, size_t size);
 
+// The state's name in the limit.left service's reply: "off", "unknown",
+// "ok", "warn" or "up".
+const char* PL_stateName(int state);
+
+// The limit.left service's reply: "state=<name>\nlimit=<minutes>\n
+// granted=<minutes>\nleft=<seconds>\ntext=<text>", with limit 0, left -1
+// and no text while the limit is off, and left -1 and no text while the
+// history is unknown. Returns 0, or -1 when it doesn't fit size.
+int PL_reply(int state, int limit, int granted, long long left, const char* text, char* out, size_t size);
+
 // 1 when typed is the code, both with spaces, tabs and line breaks
 // trimmed. An empty code never matches, and neither does a NULL typed
 // (the keyboard was cancelled).

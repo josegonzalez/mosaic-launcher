@@ -25,6 +25,14 @@
 // favorites entry set (set_list), and anything a plugin's filter hides,
 // such as the hidden plugin's games, is left out everywhere (is_filtered).
 // Favorites get nothing else of their own.
+//
+// The continue card's detail line is playtime-captions' caption for the
+// game, from its captions.text service, in that plugin's parts and
+// format; without it, as when playtime-captions is off, it's the game's
+// play time ("2h 15m played"). While playtime-limit has a daily limit
+// set, its limit.left service gives the Stats tab a Time left today row,
+// with the time left of today's limit; with no limit, or without
+// playtime-limit, there's no row.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -438,6 +446,54 @@ static int historyKnown(void) {
 	return host->play_time_today() >= 0;
 }
 
+// A service's reply, or 0 when nobody provides it or it can't answer.
+static int ask(const char* name, const char* args, char* reply, size_t size) {
+	reply[0] = '\0';
+	return MOSAIC_HOST_HAS(host, call) && host->call(name, args, reply, size) >= 0;
+}
+
+static long long replyNumber(const char* reply, const char* key, long long fallback) {
+	char text[32];
+	if (host->event_value(reply, key, text, sizeof(text)) <= 0) return fallback;
+	char* end;
+	long long v = strtoll(text, &end, 10);
+	return end == text || *end ? fallback : v;
+}
+
+// playtime-captions' caption for the game at path, fitted to width in the
+// small font, from its captions.text service. 1 when it answered (out may
+// be "" for no caption), 0 without it.
+static int captionOf(const char* path, int width, char* out, size_t size) {
+	char args[MAX_PATH_LEN + 32], reply[512];
+	snprintf(args, sizeof(args), "path=%s\nwidth=%i", path, width > 0 ? width : 0);
+	out[0] = '\0';
+	if (!ask("captions.text", args, reply, sizeof(reply))) return 0;
+	host->event_value(reply, "text", out, size);
+	return 1;
+}
+
+// what the caption and time left row last showed, logged when it changes
+static char shown_caption[160];
+static char shown_left[96];
+
+static void logShown(char* shown, size_t size, const char* what, const char* text) {
+	if (!strcmp(shown, text)) return;
+	snprintf(shown, size, "%s", text);
+	char message[300];
+	snprintf(message, sizeof(message), "%s: %s", what, text[0] ? text : "none");
+	say(message);
+}
+
+// The Stats tab's time left row's text, from playtime-limit's limit.left
+// while a limit is set. 1 for a row.
+static int timeLeftOf(char* out, size_t size) {
+	char reply[256], state[16];
+	out[0] = '\0';
+	if (!ask("limit.left", NULL, reply, sizeof(reply)) || host->event_value(reply, "state", state, sizeof(state)) <= 0) return 0;
+	return HD_timeLeft(state, (int)replyNumber(reply, "limit", 0), (int)replyNumber(reply, "granted", 0),
+		replyNumber(reply, "left", -1), out, size);
+}
+
 // The home tab: the continue card and the top shelf.
 static void drawHome(MosaicSurface* screen, const HDLayout* layout) {
 	int scale = host->screen_scale();
@@ -463,10 +519,11 @@ static void drawHome(MosaicSurface* screen, const HDLayout* layout) {
 		y += large_h + 4 * scale;
 		char line[128] = "";
 		if (!item->available) snprintf(line, sizeof(line), "%s", tr("Its emulator isn't installed"));
-		else if (historyKnown()) {
-			HD_playLine(host->play_time(item->path), host->last_played(item->path), (long long)time(NULL), line, sizeof(line));
+		else if (!captionOf(item->path, t->w, line, sizeof(line)) && historyKnown()) {
+			HD_playedLine(host->play_time(item->path), line, sizeof(line));
 		}
 		if (line[0]) host->draw_text(screen, MOSAIC_FONT_SMALL, line, t->x, y, muted, t->w);
+		logShown(shown_caption, sizeof(shown_caption), "continue line", line);
 	}
 
 	shelf_cells = layout->cells;
@@ -512,6 +569,12 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 	Row* row = addRow(tr("Played today"), NULL);
 	HD_duration(today, row->right, sizeof(row->right));
 	if (!row->right[0]) snprintf(row->right, sizeof(row->right), "%s", "0m");
+	char left[sizeof(row->right)];
+	if (timeLeftOf(left, sizeof(left))) {
+		row = addRow(tr("Time left today"), NULL);
+		snprintf(row->right, sizeof(row->right), "%s", left);
+	}
+	logShown(shown_left, sizeof(shown_left), "time left today", left);
 
 	Item* known[RECENTS_MAX + PINNED_MAX];
 	long long times[RECENTS_MAX + PINNED_MAX];
@@ -823,6 +886,8 @@ static int enter(void* data) {
 	if (home_focus >= recent_count - 1) home_focus = HD_FOCUS_CONTINUE;
 	if (cart_selected >= cart_count) cart_selected = 0;
 	showing = 1;
+	shown_caption[0] = '\x01'; // logged again on the first frame
+	shown_left[0] = '\x01';
 	char message[256];
 	snprintf(message, sizeof(message), "home: mode %s, tab %s of %i, recents %i, pinned %i, carts %i, history %s",
 		HD_modeName(mode), HD_tabLabel(tab), tab_count, recent_count, pinned_count, cart_count,

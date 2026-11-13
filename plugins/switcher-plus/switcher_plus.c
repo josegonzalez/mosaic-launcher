@@ -33,17 +33,16 @@
 // and header widgets, which stay clear.
 //
 // The captions setting (off by default) adds playtime-captions' caption,
-// such as "2h 15m · 3 days ago", for the selected recent from the play
-// history calls with its path: on a smaller pill under the title in full,
-// under the name pill in strip, and under the preview in list. Its parts
-// and format are playtime-captions' settings, public ones read with cfg_read
-// each time the switcher opens, which only answer while that plugin is
-// loaded, so they're its defaults otherwise. The text is the same as that
-// plugin's, from a copy of its formatter (see SP_captionFit).
+// such as "2h 15m · 3 days ago", for the selected recent: on a smaller
+// pill under the title in full, under the name pill in strip, and under
+// the preview in list. The text is that plugin's, from its captions.text
+// service with the recent's path and the room there is, in its parts and
+// format. Without the service, as when playtime-captions is off, there
+// are no captions.
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include "switcher_model.h"
 #include "mosaic_plugin.h"
 
@@ -54,10 +53,6 @@
 
 static const MosaicHost* host;
 
-// Another plugin's setting, when it marks it public, else fallback.
-static const char* publicSetting(const char* id, const char* key, const char* fallback) {
-	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
-}
 static int style = SP_STYLE_FULL;
 static SPRecents recents;
 static int selected = 0;
@@ -68,10 +63,8 @@ static unsigned long now_ms = 0, select_at = 0;
 static int ticking = 0;
 static char shown[SP_PATH_MAX + 512]; // what was last logged as showing
 static int captions_on = 0;
-static SPCaptions captions;          // playtime-captions' parts and format, read on each open
 static char shown_caption[160];      // the selected recent's caption this frame
 static int caption_drawn = 0;
-static char captions_logged[200];    // the parts and format last logged
 
 static const char* styleName(int s) {
 	return s == SP_STYLE_STRIP ? "strip" : s == SP_STYLE_LIST ? "list" : "full";
@@ -80,11 +73,6 @@ static const char* styleName(int s) {
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
-}
-
-static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
-	if (MOSAIC_HOST_HAS(host, tr_plural)) return host->tr_plural(ID, NULL, singular, plural, n);
-	return n == 1 ? singular : plural;
 }
 
 static void say(const char* message) {
@@ -245,45 +233,30 @@ static void pill(MosaicSurface* screen, const MosaicRect* rect, const char* text
 ///////////////////////////////////////
 // play time captions
 
-#define CAPTIONS_ID "playtime-captions"
 #define MUTE_PERCENT 40 // as playtime-captions' caption
-
-// playtime-captions' settings, its defaults while it isn't loaded
-static void readCaptions(void) {
-	captions = SP_captions(publicSetting(CAPTIONS_ID, "time", "on"), publicSetting(CAPTIONS_ID, "last", "on"),
-		publicSetting(CAPTIONS_ID, "sessions", "off"), publicSetting(CAPTIONS_ID, "format", "relative"),
-		publicSetting(CAPTIONS_ID, "never", "off"), publicSetting(CAPTIONS_ID, "achievements", "off"));
-	static const char* names[] = { "relative", "compact", "date" };
-	char message[sizeof(captions_logged)];
-	snprintf(message, sizeof(message), "captions time %s, last %s, sessions %s, format %s, never %s, achievements %s",
-		captions.parts & SP_PART_TIME ? "on" : "off", captions.parts & SP_PART_LAST ? "on" : "off",
-		captions.parts & SP_PART_SESSIONS ? "on" : "off", names[captions.format], captions.never ? "on" : "off",
-		captions.parts & SP_PART_ACHIEVEMENTS ? "on" : "off");
-	if (strcmp(message, captions_logged) == 0) return;
-	snprintf(captions_logged, sizeof(captions_logged), "%s", message);
-	say(message);
-}
 
 static int measureSmall(const char* text, void* ctx) {
 	(void)ctx;
 	return host->text_width(MOSAIC_FONT_SMALL, text);
 }
 
-// The recent at index's caption that fits max_w, written to out. Returns
-// its width, or 0 for none.
+// The recent at index's caption that fits max_w in the small font,
+// written to out, from playtime-captions' captions.text. Returns its
+// width, or 0 for none.
 static int captionOf(int index, int max_w, char* out, size_t size) {
 	out[0] = '\0';
-	if (!captions_on || index < 0 || index >= recents.count || !recents.path[index][0]) return 0;
-	const char* path = recents.path[index];
-	SPPlay play = { host->play_time(path), host->last_played(path), host->play_count(path), 0, 0 };
-	if (captions.parts & SP_PART_ACHIEVEMENTS) {
-		MosaicAchievements progress = { .size = sizeof(MosaicAchievements) };
-		if (host->achievements(path, &progress) == 1 && progress.total > 0) {
-			play.cheevos = progress.unlocked;
-			play.cheevos_total = progress.total;
-		}
+	if (!captions_on || index < 0 || index >= recents.count || !recents.path[index][0] || !MOSAIC_HOST_HAS(host, call)) {
+		return 0;
 	}
-	int w = SP_captionFit(&play, (long long)time(NULL), &captions, max_w, measureSmall, NULL, out, size);
+	char args[SP_PATH_MAX + 32], reply[512], width[16];
+	snprintf(args, sizeof(args), "path=%s\nwidth=%i", recents.path[index], max_w > 0 ? max_w : 0);
+	if (host->call("captions.text", args, reply, sizeof(reply)) < 0 || host->event_value(reply, "text", out, size) <= 0) {
+		out[0] = '\0';
+		return 0;
+	}
+	int w = host->event_value(reply, "width", width, sizeof(width)) > 0 ? atoi(width) : 0;
+	if (w <= 0) w = measureSmall(out, NULL);
+	if (w > max_w) w = max_w;
 	if (w > 0 && index == selected) {
 		snprintf(shown_caption, sizeof(shown_caption), "%s", out);
 		caption_drawn = 1;
@@ -471,7 +444,9 @@ static int enter(void* data) {
 	first = 0;
 	pressed_here = 0;
 	shown[0] = '\0';
-	if (captions_on) readCaptions();
+	if (captions_on && !(MOSAIC_HOST_HAS(host, has_capability) && host->has_capability("captions.text"))) {
+		say("captions on, but nobody provides captions.text, so there are none");
+	}
 	return 0;
 }
 
@@ -579,17 +554,12 @@ static void tick(unsigned long now) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	static const SPWords words = { tr, trPlural };
-	SP_setWords(&words);
 	if (!MOSAIC_HOST_HAS(host, draw_hints) || !MOSAIC_HOST_HAS(host, recent_open) || !MOSAIC_HOST_HAS(host, art_get)) {
 		say("this launcher has no switcher slot or button hints");
 		return 1;
 	}
 	style = SP_style(host->cfg_get("style", "full"));
-	// the play history and achievements calls came before draw_hints, so
-	// every launcher that gets here has them
 	captions_on = strcmp(host->cfg_get("captions", "off"), "on") == 0;
-	captions_logged[0] = '\0';
 	static const MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),
 		.flags = MOSAIC_SCREEN_GAME_SWITCHER,

@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "fakesets.h"
 #include "../../plugins/random-game/random_game.c"
 
@@ -21,7 +22,7 @@ struct MosaicList {
 #define MGB CARD "/Roms/Game Boy (MGB)"
 #define NES CARD "/Roms/NES (FC)"
 
-static char cfg_root[8] = "", cfg_tile[8] = "", cfg_unplayed[8] = "";
+static char cfg_root[8] = "", cfg_tile[8] = "", cfg_unplayed[8] = "", cfg_unplayed_only[8] = "";
 static char cfg_from[80] = "", cfg_from_tile[8] = "", cfg_from_button[8] = "";
 static const char* filtered_paths = ""; // what is_filtered hides, and what's in them, one a line
 static char current[1024] = CARD;
@@ -48,6 +49,7 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "root") && cfg_root[0]) return cfg_root;
 	if (!strcmp(key, "tile") && cfg_tile[0]) return cfg_tile;
 	if (!strcmp(key, "unplayed") && cfg_unplayed[0]) return cfg_unplayed;
+	if (!strcmp(key, "unplayed_only") && cfg_unplayed_only[0]) return cfg_unplayed_only;
 	if (!strcmp(key, "from") && cfg_from[0]) return cfg_from;
 	if (!strcmp(key, "from_tile") && cfg_from_tile[0]) return cfg_from_tile;
 	if (!strcmp(key, "from_button") && cfg_from_button[0]) return cfg_from_button;
@@ -299,6 +301,19 @@ static void testPlayed(void) {
 	CHECK(!RG_isPlayed("/r/GB/Tetris.gb", list, 0));
 }
 
+// RG_weights' played from a list of recents.
+typedef struct Played {
+	const char* const* list;
+	int count;
+	int asked;
+} Played;
+
+static int byList(const RGGame* game, void* data) {
+	Played* p = data;
+	p->asked++;
+	return RG_isPlayed(game->path, p->list, p->count);
+}
+
 static void testWeights(void) {
 	RGLibrary lib;
 	RG_init(&lib);
@@ -312,25 +327,43 @@ static void testWeights(void) {
 	RG_setAdd(&only, "/r/GB (GB)/Tetris.gb");
 	RG_setAdd(&only, "/r/GB (GB)/Kirby.gb");
 	RG_setAdd(&only, "/r/NES (FC)/Mario.nes");
-	const char* played[] = { "/r/GB (GB)/Tetris.gb" };
+	const char* list[] = { "/r/GB (GB)/Tetris.gb" };
+	Played played = { list, 1, 0 };
 
 	unsigned w[4];
-	CHECK(RG_weights(&lib, -1, &only, played, 1, 4, w) == 9);
+	CHECK(RG_weights(&lib, -1, &only, byList, &played, 4, 0, w) == 9);
 	CHECK(w[0] == 1 && w[1] == 4 && w[2] == 0 && w[3] == 4);
+	CHECK(played.asked == 3); // only the games in the pick
 
 	// one system
 	int gb = lib.games[0].system;
-	CHECK(RG_weights(&lib, gb, &only, played, 1, 4, w) == 5);
+	CHECK(RG_weights(&lib, gb, &only, byList, &played, 4, 0, w) == 5);
 	CHECK(w[0] == 1 && w[1] == 4 && w[2] == 0 && w[3] == 0);
 
-	// no unplayed preference: every game alike
-	CHECK(RG_weights(&lib, -1, &only, played, 1, 1, w) == 3);
+	// no unplayed preference: every game alike, and nothing asked
+	played.asked = 0;
+	CHECK(RG_weights(&lib, -1, &only, byList, &played, 1, 0, w) == 3);
 	CHECK(w[0] == 1 && w[1] == 1 && w[2] == 0 && w[3] == 1);
-	CHECK(RG_weights(&lib, -1, NULL, NULL, 0, 0, w) == 4);
+	CHECK(played.asked == 0);
+	CHECK(RG_weights(&lib, -1, NULL, NULL, NULL, 0, 0, w) == 4);
+
+	// unplayed only: played games drop out, with or without the preference
+	CHECK(RG_weights(&lib, -1, &only, byList, &played, 4, 1, w) == 8);
+	CHECK(w[0] == 0 && w[1] == 4 && w[2] == 0 && w[3] == 4);
+	CHECK(RG_weights(&lib, -1, &only, byList, &played, 1, 1, w) == 2);
+	CHECK(w[0] == 0 && w[1] == 1 && w[2] == 0 && w[3] == 1);
+	CHECK(RG_weights(&lib, gb, NULL, byList, &played, 1, 1, w) == 2);
+	CHECK(w[0] == 0 && w[1] == 1 && w[2] == 1 && w[3] == 0);
+	// every game played leaves nothing
+	const char* every[] = { "/r/GB (GB)/Tetris.gb", "/r/GB (GB)/Kirby.gb", "/r/NES (FC)/Mario.nes" };
+	Played all = { every, 3, 0 };
+	CHECK(RG_weights(&lib, -1, &only, byList, &all, 4, 1, w) == 0);
+	// no played at all: every game unplayed
+	CHECK(RG_weights(&lib, -1, &only, NULL, NULL, 4, 1, w) == 12);
 
 	// an empty set picks nothing
 	RG_setClear(&only);
-	CHECK(RG_weights(&lib, -1, &only, played, 1, 4, w) == 0);
+	CHECK(RG_weights(&lib, -1, &only, byList, &played, 4, 0, w) == 0);
 	RG_free(&lib);
 }
 
@@ -353,7 +386,7 @@ static void testPick(void) {
 	RG_add(&lib, "/r/NES (FC)/C.nes", MOSAIC_ENTRY_ROM, "NES (FC)");
 	RG_add(&lib, "/r/GB (GB)/D.gb", MOSAIC_ENTRY_ROM, "GB (GB)");
 	unsigned weights[4];
-	unsigned long total = RG_weights(&lib, -1, NULL, NULL, 0, RG_UNPLAYED_WEIGHT, weights);
+	unsigned long total = RG_weights(&lib, -1, NULL, NULL, NULL, RG_UNPLAYED_WEIGHT, 0, weights);
 	CHECK(total == 16);
 	int per_system[2] = { 0, 0 };
 	unsigned long every[16];
@@ -368,8 +401,9 @@ static void testPick(void) {
 	CHECK(per_system[lib.games[2].system] == 4);
 
 	// an unplayed game is RG_UNPLAYED_WEIGHT times as likely as a played one
-	const char* played[] = { "/r/GB (GB)/A.gb" };
-	total = RG_weights(&lib, -1, NULL, played, 1, RG_UNPLAYED_WEIGHT, weights);
+	const char* list[] = { "/r/GB (GB)/A.gb" };
+	Played played = { list, 1, 0 };
+	total = RG_weights(&lib, -1, NULL, byList, &played, RG_UNPLAYED_WEIGHT, 0, weights);
 	CHECK(total == 13);
 	int a = 0, b = 0;
 	all.next = 0;
@@ -700,6 +734,101 @@ static void testOldLauncher(void) {
 	fake.size = sizeof(MosaicHost);
 }
 
+// games.played as row-badges would answer: played=1 for the paths in
+// played_paths, one a line
+static const char* played_paths = "";
+static int played_asks = 0;
+static int fakePlayed(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[1024];
+	if (fakeEventValue(args, "path", path, sizeof(path)) <= 0) return -1;
+	played_asks++;
+	int played = 0;
+	size_t len = strlen(path);
+	for (const char* p = played_paths; *p && !played;) {
+		size_t n = strcspn(p, "\n");
+		played = n == len && !strncmp(p, path, n);
+		p += n;
+		if (*p) p++;
+	}
+	snprintf(out, size, "played=%i", played);
+	return 0;
+}
+
+static void testUnplayedOnly(void) {
+	fake_set_count = 0;
+	fake_provider_count = 0;
+	fakeProvide("games.played", fakePlayed);
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	int pick = -1;
+
+	// off by default: played games still come up, though less often
+	played_paths = GB "/Tetris.gb\n";
+	start();
+	pick = findAction("random-game.pick");
+	CHECK(pick >= 0);
+	if (pick < 0) return;
+	snprintf(current, sizeof(current), "%s", GB);
+	int tetris = 0;
+	played_asks = 0;
+	for (int i = 0; i < 300; i++) {
+		seed = (unsigned long long)i * 15485863 + 5;
+		actions[pick].run(NULL, NULL);
+		if (!strcmp(opened, GB "/Tetris.gb")) tetris++;
+	}
+	CHECK(tetris > 0 && tetris < 100); // 1 in 9 expected
+	CHECK(played_asks > 0);
+
+	// on: games.played's played games never, though recents say nothing
+	snprintf(cfg_unplayed_only, sizeof(cfg_unplayed_only), "on");
+	played_paths = GB "/Tetris.gb\n" GB "/Kirby.gb\n";
+	for (int i = 0; i < 40; i++) {
+		seed = (unsigned long long)i * 7919 + 3;
+		actions[pick].run(NULL, NULL);
+		CHECK_STR(opened, MGB "/Pokemon.gb");
+	}
+	// with the preference off too
+	snprintf(cfg_unplayed, sizeof(cfg_unplayed), "off");
+	actions[pick].run(NULL, NULL);
+	CHECK_STR(opened, MGB "/Pokemon.gb");
+	cfg_unplayed[0] = '\0';
+
+	// combined with the from set: its unplayed games only
+	fakeSetRegister("favorites", noHas, favList);
+	snprintf(cfg_from, sizeof(cfg_from), "favorites");
+	snprintf(current, sizeof(current), "%s", CARD);
+	for (int i = 0; i < 20; i++) {
+		seed = (unsigned long long)i * 31 + 7;
+		actions[pick].run(NULL, NULL);
+		CHECK_STR(opened, NES "/Disc Game");
+	}
+	// a game folder played by its folder's path
+	played_paths = GB "/Kirby.gb\n" NES "/Disc Game\n";
+	opened[0] = '\0';
+	actions[pick].run(NULL, NULL);
+	CHECK_STR(opened, "");
+	CHECK_STR(toasted, "No unplayed games to pick from");
+
+	// without games.played, as with row-badges off: the recents decide
+	fake_provider_count = 0;
+	const char* gb_played[] = { GB "/Kirby.gb" };
+	recents[0] = gb_played[0];
+	recent_count = 1;
+	for (int i = 0; i < 20; i++) {
+		seed = (unsigned long long)i * 131 + 1;
+		actions[pick].run(NULL, NULL);
+		CHECK_STR(opened, NES "/Disc Game");
+	}
+	recent_count = 0;
+
+	cfg_unplayed_only[0] = cfg_from[0] = '\0';
+	played_paths = "";
+	fake.call = NULL;
+	fake.event_value = NULL;
+	fake_set_count = 0;
+}
+
 int main(void) {
 	makeCard();
 	testSystems();
@@ -714,6 +843,7 @@ int main(void) {
 	testRootRow();
 	testTile();
 	testFrom();
+	testUnplayedOnly();
 	testOldLauncher();
 	quit();
 	CHECK_DONE();

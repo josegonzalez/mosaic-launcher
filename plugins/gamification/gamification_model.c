@@ -97,11 +97,19 @@ int GM_weekly(int quest) {
 	return quest == GM_Q_WEEK_DAYS || quest == GM_Q_WEEK_HOURS;
 }
 
+int GM_timed(int quest) {
+	return quest == GM_Q_PLAY || quest == GM_Q_WEEK_HOURS;
+}
+
+int GM_period(int quest, int day) {
+	return GM_weekly(quest) ? GM_weekOf(day) : day;
+}
+
 void GM_init(GMState* state) {
 	memset(state, 0, sizeof(*state));
 	state->games_day = -1;
 	state->cheered = -1;
-	for (int i = 0; i < GM_QUESTS; i++) state->done[i] = -1;
+	for (int i = 0; i < GM_QUESTS; i++) state->done[i] = state->picked[i] = state->left_out[i] = -1;
 }
 
 const GMDay* GM_day(const GMState* state, int day) {
@@ -188,6 +196,10 @@ int GM_format(const GMState* state, char* out, size_t size) {
 	for (int i = 0; i < GM_QUESTS; i++) {
 		if (state->done[i] >= 0) PUT("done=%s %i\n", quest_ids[i], state->done[i]);
 	}
+	for (int i = 0; i < GM_QUESTS; i++) {
+		if (state->picked[i] >= 0) PUT("picked=%s %i\n", quest_ids[i], state->picked[i]);
+		if (state->left_out[i] >= 0) PUT("left_out=%s %i\n", quest_ids[i], state->left_out[i]);
+	}
 	for (int i = 0; i < state->day_count; i++) {
 		const GMDay* d = &state->days[i];
 		PUT("day=%i %lld %i %i %i %i\n", d->day, d->seconds, d->launches, d->games, d->fresh, d->revisits);
@@ -222,6 +234,14 @@ int GM_parse(GMState* state, const char* text) {
 			} else if (sscanf(buf, "done=%31s %i", id, &a) == 2) {
 				for (int i = 0; i < GM_QUESTS; i++) {
 					if (strcmp(id, quest_ids[i]) == 0) state->done[i] = a;
+				}
+			} else if (sscanf(buf, "picked=%31s %i", id, &a) == 2) {
+				for (int i = 0; i < GM_QUESTS; i++) {
+					if (strcmp(id, quest_ids[i]) == 0) state->picked[i] = a;
+				}
+			} else if (sscanf(buf, "left_out=%31s %i", id, &a) == 2) {
+				for (int i = 0; i < GM_QUESTS; i++) {
+					if (strcmp(id, quest_ids[i]) == 0) state->left_out[i] = a;
 				}
 			} else if (sscanf(buf, "day=%i %lld %i %i %i %i", &a, &s, &b, &c, &d, &e) == 6) {
 				GMDay* day = dayFor(state, a);
@@ -338,11 +358,40 @@ void GM_progress(const GMState* state, int today, const long long* played, int d
 	}
 }
 
+long long GM_weekLeft(int today, long long left_today, int limit_minutes) {
+	if (left_today < 0) return -1;
+	int days_after = 6 - GM_weekday(today);
+	return left_today + (limit_minutes > 0 ? (long long)limit_minutes * 60 * days_after : 0);
+}
+
+int GM_pick(GMState* state, int today, const GMProgress* progress, long long left_today, long long left_week,
+	int left[GM_QUESTS], int* left_count) {
+	int picked = 0;
+	*left_count = 0;
+	for (int i = 0; i < GM_QUESTS; i++) {
+		int period = GM_period(i, today);
+		if (state->picked[i] == period) continue;
+		state->picked[i] = period;
+		picked++;
+		long long time_left = GM_weekly(i) ? left_week : left_today;
+		if (!GM_timed(i) || time_left < 0 || progress[i].done) continue;
+		long long need = (progress[i].target - progress[i].value) * 60; // minutes
+		if (need <= time_left) continue;
+		state->left_out[i] = period;
+		left[(*left_count)++] = i;
+	}
+	return picked;
+}
+
+int GM_running(const GMState* state, int today, int quest) {
+	return quest >= 0 && quest < GM_QUESTS && state->left_out[quest] != GM_period(quest, today);
+}
+
 int GM_settle(GMState* state, int today, const GMProgress* progress, int streak, int newly[GM_QUESTS]) {
 	int n = 0;
 	for (int i = 0; i < GM_QUESTS; i++) {
-		int period = GM_weekly(i) ? GM_weekOf(today) : today;
-		if (!progress[i].done || state->done[i] == period) continue;
+		int period = GM_period(i, today);
+		if (!progress[i].done || state->done[i] == period || !GM_running(state, today, i)) continue;
 		state->done[i] = period;
 		state->completed++;
 		newly[n++] = i;
@@ -438,8 +487,8 @@ void GM_toast(const int* newly, int count, const GMTargets* targets, int streak,
 ///////////////////////////////////////
 // layout
 
-int GM_scroll(int first, int by, int fit) {
-	int last = GM_QUESTS - (fit > 0 ? fit : 1);
+int GM_scroll(int first, int by, int fit, int count) {
+	int last = count - (fit > 0 ? fit : 1);
 	if (last < 0) last = 0;
 	first += by;
 	if (first > last) first = last;

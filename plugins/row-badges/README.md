@@ -64,7 +64,7 @@ The unplayed dot and tier dots are `public` settings, so other plugins can read 
 
 ## For plugin authors
 
-- Provides the `games.played` service (`provides=games.played`), the one definition of played. Ask for a game or game folder's `path`, whether or not the dot is on. With the dot off, the card is read for it on the first call after the start, a game's return or a list being built instead (see [plugin-api.md](../../docs/plugin-api.md)).
+- Provides the `games.played` service (`provides=games.played`), the one definition of played. Ask for a game or game folder's `path`, whether or not the dot is on. With the dot off, the card is read for it on the first call after the start, a game's return or a list being built instead (see [plugin-api.md](../../docs/plugin-api.md)). [`search`](../search/README.md)'s `unplayed` filter, [`random-game`](../random-game/README.md) and [`gamification`](../gamification/README.md)'s never played quest ask it.
 - Reads the `favorites` entry set and every `tags:<name>` set (from `set_names`) for the marks while they're on, when a list is built, back from a game and on `launcher.set_changed` for one of them. A set nobody registered has nothing in it.
 - Draws through the row decorators.
 

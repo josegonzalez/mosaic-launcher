@@ -10,12 +10,6 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #, c-format
-msgid "%i day ago"
-msgid_plural "%i days ago"
-msgstr[0] "hace %i día"
-msgstr[1] "hace %i días"
-
-#, c-format
 msgid "%i game"
 msgid_plural "%i games"
 msgstr[0] "%i juego"
@@ -128,8 +122,9 @@ msgstr "pico8"
 msgid "retroachievements"
 msgstr "retroachievements"
 
-msgid "today"
-msgstr "hoy"
+#, c-format
+msgid "%s of %s"
+msgstr "%s de %s"
 
-msgid "yesterday"
-msgstr "ayer"
+msgid "Time left today"
+msgstr "Tiempo restante hoy"

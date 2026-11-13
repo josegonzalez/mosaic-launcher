@@ -34,9 +34,9 @@ Only presses made while it shows count. The hints are stock's: B BACK, with Y RE
 
 ### Captions
 
-With the Play time captions setting on, it adds [`playtime-captions`](../playtime-captions/README.md)' caption for the selected recent, such as "2h 15m · 3 days ago", from the play history with the recent's path. It sits on a smaller pill under the name in `full`, centred under the name pill in `strip`, and centred under the preview in `list`, fitted the same way, compact first and then dropping parts.
+With the Play time captions setting on, it adds [`playtime-captions`](../playtime-captions/README.md)' caption for the selected recent, such as "2h 15m · 3 days ago". It sits on a smaller pill under the name in `full`, centred under the name pill in `strip`, and centred under the preview in `list`, fitted the same way as a row's, compact first and then dropping parts.
 
-Its parts and format are playtime-captions' settings (achievements included), read each time the switcher opens while that plugin is loaded, and its defaults (play time and last played, relative) when it isn't. With no play history, no recent gets a caption. The built-in switcher, with no switcher slot owner, has no captions.
+The caption is playtime-captions' own, in its settings' parts and format (achievements included), so it needs that plugin on: while it's off there are no captions. With no play history, no recent gets a caption. The built-in switcher, with no switcher slot owner, has no captions.
 
 ## Screenshots
 
@@ -61,12 +61,12 @@ With playtime-captions and Play time captions on: the caption under the name.
 | Setting | Choices | Default | What it does |
 |---|---|---|---|
 | Style (`style`) | full, strip, list | full | `full` is stock's preview across the screen, `strip` a row of previews, `list` the names beside a preview |
-| Play time captions (`captions`) | on, off | off | Each recent's play time captions, in the parts and format playtime-captions' settings pick while it's loaded |
+| Play time captions (`captions`) | on, off | off | Each recent's play time captions, in the parts and format playtime-captions' settings pick, while it's loaded |
 
 ## For plugin authors
 
 - Owns the `switcher` slot (`slots=switcher`).
-- Asks the `captions.text` service of `playtime-captions` for captions.
+- Asks `playtime-captions`' `captions.text` service for each caption, with the recent's path and the room there is. Without the service there are none.
 - Leaves out recents `is_filtered` says a plugin's filter hides, and asks again on `launcher.set_changed`.
 
 ## Credits

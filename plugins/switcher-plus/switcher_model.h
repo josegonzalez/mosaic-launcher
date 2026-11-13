@@ -1,25 +1,14 @@
 // Game switcher plus, without the host: its style setting, where the
 // d-pad and a removal leave the selection, the button hints, the recents
 // it keeps until they change, where each style puts the title, the
-// previews and the rows, and the play time captions and where they go. No
-// SDL and no file access, so it's tested on the host.
+// previews and the rows, and where the play time captions go. No SDL and
+// no file access, so it's tested on the host.
 
 #ifndef SWITCHER_MODEL_H
 #define SWITCHER_MODEL_H
 
 #include <stddef.h>
 #include "mosaic_plugin.h"
-
-// Where the text the model builds gets its words: tr(text) for fixed
-// English and tr_plural(singular, plural, n) for a count's form, each
-// keeping the English's printf conversions (the plugin's helpers over
-// host->tr and host->tr_plural). Until SP_setWords is called, or after
-// it's called with NULL, the text is English.
-typedef struct SPWords {
-	const char* (*tr)(const char* text);
-	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
-} SPWords;
-void SP_setWords(const SPWords* words);
 
 // recents kept, at most; stock keeps 24
 #define SP_MAX_RECENTS 64
@@ -162,63 +151,8 @@ int SP_list(const MosaicRect* area, const MosaicRect* hole, int scale, SPList* o
 
 
 ///////////////////////////////////////
-// play time captions, written as playtime-captions writes them: a copy of
-// its formatter, as plugins can't share code
-
-// How the parts read, as playtime-captions' format setting picks.
-enum SPFormat {
-	SP_FORMAT_RELATIVE, // "2h 15m · 3 days ago · 4 sessions"
-	SP_FORMAT_COMPACT,  // "2h · 3d · 4x"
-	SP_FORMAT_DATE,     // "2h 15m · Nov 5 · 4 sessions"
-};
-
-// The parts a caption can have, as bits, shown in this order.
-enum SPPart {
-	SP_PART_TIME = 1,
-	SP_PART_LAST = 2,
-	SP_PART_SESSIONS = 4,
-	SP_PART_ACHIEVEMENTS = 8,
-};
-
-// What the play history says about a recent, as the host's play_time,
-// last_played and play_count return it, and its RetroAchievements
-// progress (cheevos_total 0 for none).
-typedef struct SPPlay {
-	long long time;
-	long long last;
-	int count;
-	int cheevos;
-	int cheevos_total;
-} SPPlay;
-
-// The parts (SP_PART_* bits), the format (an enum SPFormat) and whether
-// games the history hasn't seen say "Never played".
-typedef struct SPCaptions {
-	int parts;
-	int format;
-	int never;
-} SPCaptions;
-
-// playtime-captions' settings, as its cfg has them: "on" or anything else
-// for each part and never, and the format's name ("relative", "compact"
-// or "date", relative for anything else).
-SPCaptions SP_captions(const char* time, const char* last, const char* sessions, const char* format,
-	const char* never, const char* achievements);
-
-// The first max_parts of parts, in format, joined with " · ", as
-// playtime-captions' PC_build: a recent with unknown history gets no play
-// parts, and one the history hasn't seen "Never played" in their place
-// when never is set, or none; the achievements part follows either way
-// when it's picked and the game has a total. Returns how many parts it
-// wrote, 0 (writing "") for nothing.
-int SP_captionBuild(const SPPlay* play, long long now, int parts, int format, int never, int max_parts, char* out,
-	size_t size);
-
-// The caption that fits max_width, as playtime-captions' PC_fit: every
-// part in the picked format, then compact, then fewer parts, dropping them
-// from the end. Returns its width, or 0 (writing "") when nothing fits.
-int SP_captionFit(const SPPlay* play, long long now, const SPCaptions* captions, int max_width,
-	int (*measure)(const char* text, void* ctx), void* ctx, char* out, size_t size);
+// where play time captions go: the text is playtime-captions' own, from
+// its captions.text service
 
 // fg moved toward bg by percent, from 0 (fg) to 100 (bg), as 0xRRGGBB.
 int SP_mute(int fg, int bg, int percent);

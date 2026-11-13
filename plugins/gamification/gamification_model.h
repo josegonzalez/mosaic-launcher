@@ -82,6 +82,8 @@ typedef struct GMState {
 	int completed;       // quests completed in all
 	int done[GM_QUESTS]; // the day or week each quest was last completed in, -1 for never
 	int cheered;         // the day the streak was last cheered, -1 for never
+	int picked[GM_QUESTS];   // the day or week each quest was last picked for, -1 for never
+	int left_out[GM_QUESTS]; // the day or week each quest was left out of, -1 for never
 } GMState;
 
 void GM_init(GMState* state);
@@ -102,6 +104,14 @@ const char* GM_questId(int quest);
 
 // 1 for the quests that run for a week, 0 for the daily ones.
 int GM_weekly(int quest);
+
+// 1 for the quests whose target is play time: GM_Q_PLAY and
+// GM_Q_WEEK_HOURS.
+int GM_timed(int quest);
+
+// The period a quest runs in on day: the day, or its week for the weekly
+// ones.
+int GM_period(int quest, int day);
 
 // Writes the state as text into out. Returns its length, or -1 when it
 // doesn't fit.
@@ -165,8 +175,26 @@ typedef struct GMProgress {
 void GM_progress(const GMState* state, int today, const long long* played, int days, const GMTargets* targets,
 	GMProgress out[GM_QUESTS]);
 
+// The seconds a daily play time limit leaves from today to the end of
+// the week: left_today, then limit_minutes for each day after today up to
+// Sunday. -1 when left_today is (no limit, or it's unknown).
+long long GM_weekLeft(int today, long long left_today, int limit_minutes);
+
+// Picks the quests for their day or week the first time it's asked in
+// it: each one runs, except that a timed quest is left out when the play
+// it still needs (its target less its progress) is more than the time
+// left, left_today for the daily one and left_week for the weekly one
+// (-1 for no limit). A quest picked already for its day or week keeps
+// running or stays left out, whatever the time left is now. Writes the
+// ones left out now to left and returns how many quests it picked.
+int GM_pick(GMState* state, int today, const GMProgress* progress, long long left_today, long long left_week,
+	int left[GM_QUESTS], int* left_count);
+
+// 1 when quest runs on today: it wasn't left out of its day or week.
+int GM_running(const GMState* state, int today, int quest);
+
 // Marks quests that are done and weren't yet for their day or week as
-// completed, counting them, and keeps the best streak at least streak.
+// completed, leaving out the ones not running, counting them, and keeps the best streak at least streak.
 // Writes the ones just completed to newly and returns how many.
 int GM_settle(GMState* state, int today, const GMProgress* progress, int streak, int newly[GM_QUESTS]);
 
@@ -197,9 +225,10 @@ void GM_toast(const int* newly, int count, const GMTargets* targets, int streak,
 ///////////////////////////////////////
 // layout
 
-// The first quest in view after scrolling by (-1 or 1) from first, with
-// fit rows in view: never before the first quest or past the last page.
-int GM_scroll(int first, int by, int fit);
+// The first of count quests in view after scrolling by (-1 or 1) from
+// first, with fit rows in view: never before the first quest or past the
+// last page.
+int GM_scroll(int first, int by, int fit, int count);
 
 // The parts of r outside hole: up to four, or r itself when they don't
 // meet. 0 for an empty r.

@@ -26,9 +26,9 @@ Turn on **Home dashboard** in Launcher > Plugins ([how](../../docs/plugins.md#tu
 The Home mode setting picks the home.
 
 - **dashboard** (the default) has tabs, switched with **L1** and **R1** and kept when the home screen opens again:
-  - Home: a continue card for the last game played, with its save state's preview (or its thumbnail or box), its play time and when it was last played, which **A** resumes. Under it is a top shelf of the games played before it (the Top shelf setting).
+  - Home: a continue card for the last game played, with its save state's preview (or its thumbnail or box) and its [`playtime-captions`](../playtime-captions/README.md) caption, such as "1h 25m · today", in that plugin's parts and format, which **A** resumes. While playtime-captions is off, the card shows the game's play time instead, such as "1h 25m played". Under it is a top shelf of the games played before it (the Top shelf setting).
   - Pinned: favorites' games in the favorites collection's order, shown while the [`favorites`](../favorites/README.md) plugin is loaded (the Pinned tab setting).
-  - Stats: today's play time, the recently played games' total and the five most played of the recent and pinned games (the Stats tab setting). The launcher has no call for the whole play history, so Stats covers only the games the dashboard knows about. With no play history (no database yet, or no sqlite) it says so rather than showing numbers.
+  - Stats: today's play time, the time left today while [`playtime-limit`](../playtime-limit/README.md) has a daily limit set (such as "35m of 1h 0m", of today's limit with any extra time), the recently played games' total and the five most played of the recent and pinned games (the Stats tab setting). The launcher has no call for the whole play history, so Stats covers only the games the dashboard knows about. With no play history (no database yet, or no sqlite) it says so rather than showing numbers.
 - **minui:** a plain list of the recently played games, then Games, which goes on to the game list.
 - **retroachievements:** the recent and pinned games with RetroAchievements progress on the card, as "12/40 · 150/400 points", from what minarch keeps there through the host's `achievements` call. Games with nothing cached are left out, and nothing is fetched.
 - **pico8:** the Pico-8 carts (`.p8` and `.p8.png`) in the `Roms` folders whose tag is one of the Pico-8 folder tags setting's, as a grid, with their art or else their first letter.
@@ -51,6 +51,14 @@ Home mode set to minui.
 
 ![Home mode set to minui](docs/mode-minui.png)
 
+With playtime-captions: its caption on the continue card.
+
+![With playtime-captions: its caption on the continue card](docs/with-playtime-captions.png)
+
+With playtime-limit's daily limit set to 60 minutes: the time left on the Stats tab.
+
+![With playtime-limit's daily limit set to 60 minutes: the time left on the Stats tab](docs/with-playtime-limit.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
@@ -67,6 +75,7 @@ Home mode set to minui.
 - Lists `favorites` as `optional`, so it loads after it, since it asks as it starts whether favorites is loaded. The Pinned tab is the `favorites` entry set, read with `set_list` each time the screen opens.
 - Leaves out of every tab what `is_filtered` says a plugin's filter hides, such as the [`hidden`](../hidden/README.md) plugin's games.
 - Reads stock's play tracker, the switcher's recents, and the host's `achievements` call.
+- Asks `playtime-captions`' `captions.text` service for the continue card's caption, and `playtime-limit`'s `limit.left` service for the Stats tab's time left. Without them it shows the play time on the card and no time left.
 
 ## Credits
 

@@ -18,14 +18,9 @@ void HD_setWords(const HDWords* set) {
 	else memset(&words, 0, sizeof(words));
 }
 
-// Fixed text and a count's form in the caller's words, for make pot
+// Fixed text in the caller's words, for make pot
 static const char* tr(const char* text) {
 	return words.tr ? words.tr(text) : text;
-}
-
-static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
-	if (words.tr_plural) return words.tr_plural(singular, plural, n);
-	return n == 1 ? singular : plural;
 }
 
 static const char* const mode_names[] = { "dashboard", "minui", "retroachievements", "pico8" };
@@ -117,45 +112,22 @@ void HD_duration(long long seconds, char* out, size_t size) {
 	else snprintf(out, size, tr("%lldh %lldm"), seconds / 3600, seconds / 60 % 60);
 }
 
-// Midnight before t, in local time.
-static long long midnight(long long t) {
-	time_t at = (time_t)t;
-	struct tm local;
-	localtime_r(&at, &local);
-	local.tm_hour = 0;
-	local.tm_min = 0;
-	local.tm_sec = 0;
-	local.tm_isdst = -1;
-	return (long long)mktime(&local);
+void HD_playedLine(long long seconds, char* out, size_t size) {
+	char played[64];
+	HD_duration(seconds, played, sizeof(played));
+	if (played[0]) snprintf(out, size, tr("%s played"), played);
+	else snprintf(out, size, "%s", "");
 }
 
-int HD_daysBetween(long long when, long long now) {
-	if (when >= now) return 0;
-	long long a = midnight(when), b = midnight(now);
-	// rounded, so a day that's 23 or 25 hours long still counts as one
-	long long days = (b - a + 43200) / 86400;
-	return days < 0 ? 0 : (int)days;
-}
-
-void HD_lastPlayed(long long when, long long now, char* out, size_t size) {
-	if (when <= 0) {
-		snprintf(out, size, "%s", "");
-		return;
-	}
-	int days = HD_daysBetween(when, now);
-	if (days == 0) snprintf(out, size, "%s", tr("today"));
-	else if (days == 1) snprintf(out, size, "%s", tr("yesterday"));
-	else snprintf(out, size, trPlural("%i day ago", "%i days ago", (unsigned long)days), days);
-}
-
-void HD_playLine(long long time, long long last, long long now, char* out, size_t size) {
-	char played[64], ago[64], line[128] = "";
-	HD_duration(time, played, sizeof(played));
-	HD_lastPlayed(last, now, ago, sizeof(ago));
-	if (played[0]) snprintf(line, sizeof(line), tr("%s played"), played);
-	if (line[0] && ago[0]) snprintf(out, size, "%s \xc2\xb7 %s", line, ago);
-	else if (line[0]) snprintf(out, size, "%s", line);
-	else snprintf(out, size, "%s", ago);
+int HD_timeLeft(const char* state, int limit, int granted, long long left, char* out, size_t size) {
+	snprintf(out, size, "%s", "");
+	if (!state || (strcmp(state, "ok") && strcmp(state, "warn") && strcmp(state, "up")) || limit <= 0 || left < 0) return 0;
+	char shown[64], of[64];
+	HD_duration((left + 59) / 60 * 60, shown, sizeof(shown));
+	if (!shown[0]) snprintf(shown, sizeof(shown), tr("%lldm"), 0LL);
+	HD_duration(((long long)limit + (granted > 0 ? granted : 0)) * 60, of, sizeof(of));
+	snprintf(out, size, tr("%s of %s"), shown, of);
+	return 1;
 }
 
 void HD_achievementLine(int unlocked, int total, int points_unlocked, int points, char* out, size_t size) {

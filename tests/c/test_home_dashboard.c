@@ -6,6 +6,7 @@
 #include <time.h>
 #include "check.h"
 #include "fakeloaded.h"
+#include "fakeproviders.h"
 #include "fakesets.h"
 #include "words.h"
 #include "../../plugins/home-dashboard/home_dashboard.c"
@@ -13,18 +14,6 @@
 #ifndef TEST_SDCARD_PATH
 #define TEST_SDCARD_PATH "/tmp/home-dashboard-card"
 #endif
-
-// a local time, in whatever TZ is set
-static long long at(int year, int month, int day, int hour, int minute) {
-	struct tm t = { 0 };
-	t.tm_year = year - 1900;
-	t.tm_mon = month - 1;
-	t.tm_mday = day;
-	t.tm_hour = hour;
-	t.tm_min = minute;
-	t.tm_isdst = -1;
-	return (long long)mktime(&t);
-}
 
 static void testModes(void) {
 	CHECK(HD_modeOf("dashboard") == HD_MODE_DASHBOARD);
@@ -118,36 +107,26 @@ static void testText(void) {
 	HD_duration(3600, out, sizeof(out));
 	CHECK_STR(out, "1h 0m");
 
-	setenv("TZ", "UTC", 1);
-	tzset();
-	long long now = at(2026, 11, 8, 12, 0);
-	HD_lastPlayed(at(2026, 11, 8, 1, 0), now, out, sizeof(out));
-	CHECK_STR(out, "today");
-	HD_lastPlayed(at(2026, 11, 7, 23, 59), now, out, sizeof(out));
-	CHECK_STR(out, "yesterday");
-	HD_lastPlayed(at(2026, 11, 5, 13, 0), now, out, sizeof(out));
-	CHECK_STR(out, "3 days ago");
-	HD_lastPlayed(0, now, out, sizeof(out));
+	HD_playedLine(2 * 3600 + 15 * 60, out, sizeof(out));
+	CHECK_STR(out, "2h 15m played");
+	HD_playedLine(0, out, sizeof(out));
 	CHECK_STR(out, "");
-	HD_lastPlayed(MOSAIC_PLAY_UNKNOWN, now, out, sizeof(out));
+	HD_playedLine(MOSAIC_PLAY_UNKNOWN, out, sizeof(out));
 	CHECK_STR(out, "");
-	CHECK(HD_daysBetween(now + 100, now) == 0);
-	// across a daylight saving change, a day is still a day
-	setenv("TZ", "America/New_York", 1);
-	tzset();
-	CHECK(HD_daysBetween(at(2026, 11, 1, 0, 30), at(2026, 11, 2, 0, 30)) == 1);
-	CHECK(HD_daysBetween(at(2026, 3, 7, 23, 0), at(2026, 3, 9, 1, 0)) == 2);
-	setenv("TZ", "UTC", 1);
-	tzset();
 
-	HD_playLine(2 * 3600 + 15 * 60, at(2026, 11, 7, 20, 0), now, out, sizeof(out));
-	CHECK_STR(out, "2h 15m played \xc2\xb7 yesterday");
-	HD_playLine(600, 0, now, out, sizeof(out));
-	CHECK_STR(out, "10m played");
-	HD_playLine(0, at(2026, 11, 8, 9, 0), now, out, sizeof(out));
-	CHECK_STR(out, "today");
-	HD_playLine(0, 0, now, out, sizeof(out));
+	// time left, rounded up to the minute, of the limit and today's grant
+	CHECK(HD_timeLeft("ok", 60, 0, 35 * 60 - 20, out, sizeof(out)) == 1);
+	CHECK_STR(out, "35m of 1h 0m");
+	CHECK(HD_timeLeft("warn", 60, 30, 61, out, sizeof(out)) == 1);
+	CHECK_STR(out, "2m of 1h 30m");
+	CHECK(HD_timeLeft("up", 45, 0, 0, out, sizeof(out)) == 1);
+	CHECK_STR(out, "0m of 45m");
+	// no limit, or an unknown history: no row
+	CHECK(HD_timeLeft("off", 0, 0, -1, out, sizeof(out)) == 0);
 	CHECK_STR(out, "");
+	CHECK(HD_timeLeft("unknown", 60, 0, -1, out, sizeof(out)) == 0);
+	CHECK(HD_timeLeft("ok", 0, 0, 600, out, sizeof(out)) == 0);
+	CHECK(HD_timeLeft(NULL, 60, 0, 600, out, sizeof(out)) == 0);
 
 	HD_achievementLine(12, 40, 150, 400, out, sizeof(out));
 	CHECK_STR(out, "12/40 \xc2\xb7 150/400 points");
@@ -163,28 +142,23 @@ static void testText(void) {
 
 // the text in the words it's given, then English again
 static void testWords(void) {
-	static const char* const words[] = { "%lldh %lldm", "%lld h %lld min", "yesterday", "ayer", "%s played", "%s jugado",
+	static const char* const words[] = { "%lldh %lldm", "%lld h %lld min", "%s played", "%s jugado", "%s of %s", "%s de %s",
 		"%i/%i points", "%i/%i puntos", NULL };
-	static const char* const plurals[] = { "%i day ago", "hace %i d\xc3\xad" "a", "hace %i d\xc3\xad" "as", NULL };
+	static const char* const plurals[] = { NULL };
 	fake_words = words;
 	fake_plurals = plurals;
 	HDWords set = { fakeTr, fakePlural };
 	HD_setWords(&set);
-	setenv("TZ", "UTC", 1);
-	tzset();
-	long long now = at(2026, 11, 8, 12, 0);
 	char out[128];
-	HD_playLine(2 * 3600 + 15 * 60, at(2026, 11, 7, 20, 0), now, out, sizeof(out));
-	CHECK_STR(out, "2 h 15 min jugado \xc2\xb7 ayer");
-	HD_lastPlayed(at(2026, 11, 5, 13, 0), now, out, sizeof(out));
-	CHECK_STR(out, "hace 3 d\xc3\xad" "as");
+	HD_playedLine(2 * 3600 + 15 * 60, out, sizeof(out));
+	CHECK_STR(out, "2 h 15 min jugado");
+	HD_timeLeft("ok", 120, 15, 2 * 3600 + 15 * 60, out, sizeof(out));
+	CHECK_STR(out, "2 h 15 min de 2 h 15 min");
 	HD_achievementLine(12, 40, 150, 400, out, sizeof(out));
 	CHECK_STR(out, "12/40 \xc2\xb7 150/400 puntos");
 	HD_setWords(NULL);
-	HD_playLine(2 * 3600 + 15 * 60, at(2026, 11, 7, 20, 0), now, out, sizeof(out));
-	CHECK_STR(out, "2h 15m played \xc2\xb7 yesterday");
-	HD_lastPlayed(at(2026, 11, 5, 13, 0), now, out, sizeof(out));
-	CHECK_STR(out, "3 days ago");
+	HD_playedLine(2 * 3600 + 15 * 60, out, sizeof(out));
+	CHECK_STR(out, "2h 15m played");
 }
 
 static void testMostPlayed(void) {
@@ -577,6 +551,62 @@ static void testPlugin(void) {
 	CHECK(init(&old) != 0);
 }
 
+// playtime-captions' captions.text and playtime-limit's limit.left
+static char limit_reply[256] = "state=ok\nlimit=60\ngranted=15\nleft=1190\ntext=20m left";
+static int fakeCaption(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[512], width[16];
+	CHECK(fakeEventValue(args, "path", path, sizeof(path)) > 0);
+	CHECK(fakeEventValue(args, "width", width, sizeof(width)) > 0);
+	if (strstr(path, "Metroid")) snprintf(out, size, "text=\nwidth=0");
+	else snprintf(out, size, "text=5m \xc2\xb7 today (%s)\nwidth=80", width);
+	return 0;
+}
+static int fakeLimit(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	snprintf(out, size, "%s", limit_reply);
+	return 0;
+}
+
+static void testServices(void) {
+	char out[160];
+	reset("dashboard");
+	// without the providers: no caption, so the play time stands in, and no row
+	fake.call = NULL;
+	CHECK(captionOf(recent_paths[0], 300, out, sizeof(out)) == 0 && !out[0]);
+	CHECK(timeLeftOf(out, sizeof(out)) == 0 && !out[0]);
+	fake_provider_count = 0;
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	CHECK(captionOf(recent_paths[0], 300, out, sizeof(out)) == 0);
+	CHECK(timeLeftOf(out, sizeof(out)) == 0);
+
+	fakeProvide("captions.text", fakeCaption);
+	fakeProvide("limit.left", fakeLimit);
+	CHECK(captionOf(recent_paths[0], 300, out, sizeof(out)) == 1);
+	CHECK_STR(out, "5m \xc2\xb7 today (300)");
+	// a game with no caption gets none, not the play time
+	CHECK(captionOf(recent_paths[1], 300, out, sizeof(out)) == 1);
+	CHECK_STR(out, "");
+
+	// time left of today's limit and its grant
+	CHECK(timeLeftOf(out, sizeof(out)) == 1);
+	CHECK_STR(out, "20m of 1h 15m");
+	snprintf(limit_reply, sizeof(limit_reply), "state=up\nlimit=30\ngranted=0\nleft=0\ntext=Time's up");
+	CHECK(timeLeftOf(out, sizeof(out)) == 1);
+	CHECK_STR(out, "0m of 30m");
+	// only while a limit is set and the history is known
+	snprintf(limit_reply, sizeof(limit_reply), "state=off\nlimit=0\ngranted=0\nleft=-1\ntext=");
+	CHECK(timeLeftOf(out, sizeof(out)) == 0 && !out[0]);
+	snprintf(limit_reply, sizeof(limit_reply), "state=unknown\nlimit=60\ngranted=0\nleft=-1\ntext=");
+	CHECK(timeLeftOf(out, sizeof(out)) == 0);
+
+	fake_provider_count = 0;
+	fake.call = NULL;
+	fake.event_value = NULL;
+}
+
 int main(void) {
 	CHECK(system("rm -rf '" TEST_SDCARD_PATH "'") == 0);
 	testModes();
@@ -590,5 +620,6 @@ int main(void) {
 	testFavorites();
 	testLayout();
 	testPlugin();
+	testServices();
 	CHECK_DONE();
 }

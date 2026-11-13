@@ -10,7 +10,7 @@ The caption comes from stock's [play tracker](../../docs/glossary.md#play-tracke
 - Games the tracker hasn't seen get nothing, or "Never played" with the Never played setting. With no play history (no database yet, or no sqlite) no game gets a caption.
 - The caption sits on the name's line, right-aligned, never over the name. It leaves room after the name for [`row-badges`](../row-badges/README.md)' dots while row-badges is loaded with them on. In a cell with no name it goes along the bottom, under row-badges' corner dots.
 - When the row is too narrow it tries the compact format, then drops parts from the end, and shows nothing when even one doesn't fit.
-- In the game switcher, [`switcher-plus`](../switcher-plus/README.md) shows the same captions with its `captions` setting, in the parts and format these settings pick while this plugin is loaded. The built-in switcher shows none.
+- In the game switcher, [`switcher-plus`](../switcher-plus/README.md) shows the same caption with its `captions` setting, and [`home-dashboard`](../home-dashboard/README.md) shows it on its continue card, both in the parts and format these settings pick, while this plugin is loaded. The built-in switcher shows none.
 - With Achievements on, it adds the game's local RetroAchievements progress last, as "3/12 achievements" ("3/12" compact), from what minarch keeps on the card. It shows once the launcher has worked out the game's hash, also on games the tracker hasn't seen or with no play history, and not on games with no achievements cached.
 
 ## Turn it on
@@ -56,7 +56,7 @@ With row-badges' unplayed dots on.
 
 ## For plugin authors
 
-- Provides the `captions.text` service (`provides=captions.text`): a game's caption as the rows show it. Ask with the game's `path` and optionally a `width` in the small font, and get `text` and its `width` (see [plugin-api.md](../../docs/plugin-api.md)).
+- Provides the `captions.text` service (`provides=captions.text`): a game's caption as the rows show it. Ask with the game's `path` and optionally a `width` in the small font, and get `text` and its `width` (see [plugin-api.md](../../docs/plugin-api.md)). `switcher-plus` and `home-dashboard` ask it.
 - All six settings are `public`, so other plugins can read them with `cfg_read`.
 - Reads stock's play tracker, and the host's `achievements` call.
 

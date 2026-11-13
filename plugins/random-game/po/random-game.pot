@@ -35,6 +35,10 @@ msgstr ""
 msgid "No games to pick from"
 msgstr ""
 
+#: random_game.c
+msgid "No unplayed games to pick from"
+msgstr ""
+
 #: plugin.txt random_game.c
 msgid "Pick from"
 msgstr ""
@@ -87,6 +91,10 @@ msgstr ""
 #: random_game.c
 #, c-format
 msgid "Tag: %s"
+msgstr ""
+
+#: plugin.txt
+msgid "Unplayed games only"
 msgstr ""
 
 #: plugin.txt

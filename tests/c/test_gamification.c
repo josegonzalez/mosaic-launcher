@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "words.h"
 #include "../../plugins/gamification/gamification.c"
 
@@ -264,6 +265,79 @@ static void testProgress(void) {
 	CHECK(s.completed == 8);
 }
 
+// Picking the quests against a play time limit.
+static void testPickQuests(void) {
+	GMState s;
+	GM_init(&s);
+	CHECK(s.picked[GM_Q_PLAY] == -1 && s.left_out[GM_Q_WEEK_HOURS] == -1);
+	CHECK(GM_timed(GM_Q_PLAY) && GM_timed(GM_Q_WEEK_HOURS) && !GM_timed(GM_Q_GAMES) && !GM_timed(GM_Q_WEEK_DAYS));
+	CHECK(GM_period(GM_Q_PLAY, 8) == 8 && GM_period(GM_Q_WEEK_DAYS, 8) == GM_weekOf(8));
+
+	// day 6 is a Wednesday: four more days in the week
+	CHECK(GM_weekday(6) == 2);
+	CHECK(GM_weekLeft(6, 900, 60) == 900 + 4 * 3600);
+	CHECK(GM_weekLeft(10, 900, 60) == 900); // a Sunday
+	CHECK(GM_weekLeft(6, 900, 0) == 900);
+	CHECK(GM_weekLeft(6, -1, 60) == -1);
+
+	GMProgress p[GM_QUESTS];
+	for (int i = 0; i < GM_QUESTS; i++) p[i] = (GMProgress){ 0, 1, 0 };
+	p[GM_Q_PLAY] = (GMProgress){ 10, 30, 0 };
+	p[GM_Q_WEEK_HOURS] = (GMProgress){ 60, 300, 0 };
+	int left[GM_QUESTS], count = -1;
+
+	// 15 minutes left today and an hour a day: the daily play quest's 20
+	// minutes to go don't fit, the weekly one's 4 hours do
+	CHECK(GM_pick(&s, 6, p, 900, GM_weekLeft(6, 900, 60), left, &count) == GM_QUESTS);
+	CHECK(count == 1 && left[0] == GM_Q_PLAY);
+	CHECK(!GM_running(&s, 6, GM_Q_PLAY));
+	for (int i = 1; i < GM_QUESTS; i++) CHECK(GM_running(&s, 6, i));
+	// later that day, once picked: left out still, with no limit too
+	CHECK(GM_pick(&s, 6, p, -1, -1, left, &count) == 0 && count == 0);
+	CHECK(!GM_running(&s, 6, GM_Q_PLAY));
+	// done, it isn't completed
+	p[GM_Q_PLAY].done = 1;
+	int newly[GM_QUESTS];
+	CHECK(GM_settle(&s, 6, p, 0, newly) == 0);
+	CHECK(s.done[GM_Q_PLAY] == -1);
+	p[GM_Q_PLAY] = (GMProgress){ 0, 30, 0 };
+
+	// the next day the daily quests are picked again, and with no time
+	// left the weekly ones, picked this week, keep running
+	CHECK(GM_pick(&s, 7, p, 0, GM_weekLeft(7, 0, 60), left, &count) == 4);
+	CHECK(count == 1 && left[0] == GM_Q_PLAY);
+	CHECK(GM_running(&s, 7, GM_Q_WEEK_HOURS));
+	// the day after, with no limit: every daily one runs
+	CHECK(GM_pick(&s, 8, p, -1, -1, left, &count) == 4 && count == 0);
+	CHECK(GM_running(&s, 8, GM_Q_PLAY));
+
+	// a new week with no time: the weekly play quest is left out, a done
+	// quest and the other quests aren't
+	p[GM_Q_PLAY].done = 1;
+	CHECK(GM_pick(&s, 11, p, 0, GM_weekLeft(11, 0, 0), left, &count) == GM_QUESTS);
+	CHECK(count == 1 && left[0] == GM_Q_WEEK_HOURS);
+	CHECK(GM_running(&s, 11, GM_Q_PLAY) && GM_running(&s, 11, GM_Q_WEEK_DAYS) && !GM_running(&s, 11, GM_Q_WEEK_HOURS));
+	// exactly enough left fits
+	GM_init(&s);
+	p[GM_Q_PLAY] = (GMProgress){ 10, 30, 0 };
+	CHECK(GM_pick(&s, 6, p, 1200, -1, left, &count) == GM_QUESTS && count == 0);
+
+	// kept in the state file
+	GM_init(&s);
+	GM_pick(&s, 6, p, 60, 60, left, &count);
+	CHECK(count == 2);
+	char text[1024];
+	CHECK(GM_format(&s, text, sizeof(text)) > 0);
+	CHECK(strstr(text, "picked=play 6\n") && strstr(text, "left_out=play 6\n"));
+	CHECK(strstr(text, "picked=week_hours 1\n") && strstr(text, "left_out=week_hours 1\n"));
+	CHECK(!strstr(text, "left_out=games"));
+	GMState back;
+	GM_init(&back);
+	GM_parse(&back, text);
+	for (int i = 0; i < GM_QUESTS; i++) CHECK(back.picked[i] == s.picked[i] && back.left_out[i] == s.left_out[i]);
+	CHECK(!GM_running(&back, 6, GM_Q_PLAY) && GM_running(&back, 7, GM_Q_PLAY));
+}
+
 static void testText(void) {
 	char out[128];
 	GM_duration(0, out, sizeof(out));
@@ -391,13 +465,13 @@ static void testWords(void) {
 }
 
 static void testLayout(void) {
-	CHECK(GM_scroll(0, -1, 3) == 0);
-	CHECK(GM_scroll(0, 1, 3) == 1);
-	CHECK(GM_scroll(3, 1, 3) == 3); // the last page
-	CHECK(GM_scroll(7, 0, 3) == 3);
-	CHECK(GM_scroll(2, 1, GM_QUESTS) == 0); // all fit
-	CHECK(GM_scroll(2, 1, 0) == 3);
-	CHECK(GM_scroll(5, 1, 0) == 5);
+	CHECK(GM_scroll(0, -1, 3, GM_QUESTS) == 0);
+	CHECK(GM_scroll(0, 1, 3, GM_QUESTS) == 1);
+	CHECK(GM_scroll(3, 1, 3, GM_QUESTS) == 3); // the last page
+	CHECK(GM_scroll(7, 0, 3, GM_QUESTS) == 3);
+	CHECK(GM_scroll(2, 1, GM_QUESTS, GM_QUESTS) == 0); // all fit
+	CHECK(GM_scroll(2, 1, 0, GM_QUESTS) == 3);
+	CHECK(GM_scroll(5, 1, 0, GM_QUESTS) == 5);
 
 	CHECK(GM_barWidth(0, 30, 100) == 0);
 	CHECK(GM_barWidth(15, 30, 100) == 50);
@@ -836,6 +910,87 @@ static void testNoTracker(void) {
 		"week_days 1/5, week_hours 6/300"));
 }
 
+// playtime-limit's limit.left, as it answers with a limit set
+static long long limit_left = 600;
+static int fakeLimitLeft(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	snprintf(out, size, "state=ok\nlimit=90\ngranted=0\nleft=%lld\ntext=10m left", limit_left);
+	return 0;
+}
+
+// row-badges' games.played
+static int played_answer = 1;
+static int fakePlayed(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[512];
+	CHECK(fakeEventValue(args, "path", path, sizeof(path)) > 0);
+	snprintf(out, size, "played=%i", played_answer);
+	return 0;
+}
+
+static void testServices(void) {
+	reset();
+	// Wednesday 10 January 2024, 10:00 UTC, with 10 minutes left of a
+	// 90 minute limit: the daily 20 minutes don't fit, and the week's 5
+	// hours do (10 minutes and 90 on each of four more days)
+	fake_wall = 1704880800;
+	fake_provider_count = 0;
+	fakeProvide("limit.left", fakeLimitLeft);
+	fakeProvide("games.played", fakePlayed);
+	const MosaicPlugin* p = start();
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
+	CHECK(registered.enter(NULL) == 0);
+	CHECK(logged("left out play: it needs 20 minutes, and the limit leaves 10"));
+	CHECK(!logged("left out week_hours"));
+	draw();
+	CHECK(logged("showing No streak, Best 0 days \xc2\xb7 0 quests done; play 0/20 left out, games 0/3, fresh 0/1, revisit 0/1, "
+		"week_days 0/5, week_hours 0/300"));
+	CHECK(running_count == GM_QUESTS - 1 && running[0] == GM_Q_GAMES);
+
+	// kept for the day, though there's more time now
+	limit_left = 7200;
+	logs[0] = '\0';
+	p = start();
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(logged("play 0/20 left out"));
+	CHECK(!logged("left out play"));
+
+	// a game the history hasn't seen, but games.played calls played
+	fake_count = 0;
+	MosaicLaunch rom = { "/card/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM };
+	CHECK(p->pre_launch(&rom) == MOSAIC_LAUNCH_CONTINUE);
+	CHECK(logged("launch /card/Roms/GB/Tetris.gb: fresh 0, revisit 0"));
+	// and one the history has, that games.played doesn't
+	played_answer = 0;
+	fake_count = 2;
+	CHECK(p->pre_launch(&rom) == MOSAIC_LAUNCH_CONTINUE);
+	CHECK(logged("launch /card/Roms/GB/Tetris.gb: fresh 1, revisit 0"));
+	unlink(GM_LAUNCH_FILE);
+
+	// the next day, without playtime-limit: every quest runs
+	fake_provider_count = 0;
+	fakeProvide("games.played", fakePlayed);
+	fake_wall += DAY;
+	logs[0] = '\0';
+	p = start();
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(logged("play 0/20, games"));
+	CHECK(running_count == GM_QUESTS);
+
+	fake_provider_count = 0;
+	played_answer = 1;
+	limit_left = 600;
+	fake_count = 0;
+}
+
 static void testScroll(void) {
 	reset();
 	fake_wall = 1704880800;
@@ -869,12 +1024,14 @@ int main(void) {
 	testLaunchLine();
 	testStreak();
 	testProgress();
+	testPickQuests();
 	testText();
 	testWords();
 	testLayout();
 	testInit();
 	testLaunches();
 	testNoTracker();
+	testServices();
 	testScroll();
 	CHECK_DONE();
 }

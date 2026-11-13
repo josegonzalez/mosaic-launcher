@@ -2,14 +2,17 @@
 // return events and stock's play tracker.
 //
 // The launcher exits while a game runs, so pre_launch keeps the launch in
-// a file in /tmp: the wall clock, the monotonic clock, the game, and
-// whether it was never played before or not for GM_REVISIT_DAYS, as the
-// play history says just before it starts. post_return, as the launcher
-// starts again after it, counts the launch on its day and the time
-// between the two monotonic readings as play, which leaves out time the
-// device spent asleep. A launch another plugin cancels leaves the file
-// behind until the next launch replaces it; a pak's launch removes it, and
-// a reboot clears /tmp, so neither is counted.
+// a file in /tmp: the wall clock, the monotonic clock, the game, whether
+// it was never played before, as row-badges' games.played service says
+// just before it starts (the one definition of played; without it, as
+// when row-badges is off, when the play history has no session of it),
+// and whether it wasn't played for GM_REVISIT_DAYS, as the play history
+// says. post_return, as the launcher starts again after it, counts the
+// launch on its day and the time between the two monotonic readings as
+// play, which leaves out time the device spent asleep. A launch another
+// plugin cancels leaves the file behind until the next launch replaces
+// it; a pak's launch removes it, and a reboot clears /tmp, so neither is
+// counted.
 //
 // Each day's play is the most of the plugin's own count and the play
 // history's (play_time_on), so it works without the tracker and isn't
@@ -19,6 +22,15 @@
 // Monday. A quest done for the first time in its day or week counts
 // towards the total, and post_return toasts it (the toasts setting), or
 // else the streak, once a day.
+//
+// The quests are picked for their day or week the first time the plugin
+// works out progress in it. While playtime-limit has a daily limit set,
+// its limit.left service gives the time left today, and a play time quest
+// that still needs more than that is left out until the next day or week:
+// the daily one against today's time left, the weekly one against today's
+// and the daily limit for each day left in the week. Picked quests keep
+// running, whatever the time left is later. Without playtime-limit, or
+// with no limit, every quest runs.
 //
 // The state is in .userdata/<platform>/launcher/gamification/state.txt.
 // The gamification.open action opens the screen, from a Quests tile on
@@ -69,7 +81,9 @@ static int today = 0;
 static long long played[GM_HISTORY_DAYS];
 static int streak = 0, longest = 0;
 static GMProgress progress[GM_QUESTS];
-static int first = 0;             // the first quest in view
+static int running[GM_QUESTS];    // the quests that run today, in order
+static int running_count = GM_QUESTS;
+static int first = 0;             // the first of them in view
 static int fit_rows = GM_QUESTS;  // the rows the last render fit
 static char shown[1024];
 
@@ -177,6 +191,54 @@ static int takeLaunch(GMLaunch* out) {
 ///////////////////////////////////////
 // progress
 
+// A service's reply, or "" when nobody provides it or it can't answer.
+static int ask(const char* name, const char* args, char* reply, size_t size) {
+	reply[0] = '\0';
+	return MOSAIC_HOST_HAS(host, call) && host->call(name, args, reply, size) >= 0;
+}
+
+// The number at key in a reply, or fallback.
+static long long replyNumber(const char* reply, const char* key, long long fallback) {
+	char text[32];
+	if (host->event_value(reply, key, text, sizeof(text)) <= 0) return fallback;
+	char* end;
+	long long v = strtoll(text, &end, 10);
+	return end == text || *end ? fallback : v;
+}
+
+// The seconds playtime-limit's limit.left says are left today, and its
+// daily limit in minutes, or -1 with no limit, an unknown history, or
+// without the service.
+static long long timeLeft(int* limit_minutes) {
+	char reply[256];
+	*limit_minutes = 0;
+	if (!ask("limit.left", NULL, reply, sizeof(reply))) return -1;
+	*limit_minutes = (int)replyNumber(reply, "limit", 0);
+	return replyNumber(reply, "left", -1);
+}
+
+// Picks the quests for a new day or week, leaving out the play time ones
+// the limit leaves no time for, and lists the ones that run.
+static void pickQuests(void) {
+	int limit_minutes;
+	long long left = timeLeft(&limit_minutes);
+	int left_now[GM_QUESTS], left_count = 0;
+	if (GM_pick(&state, today, progress, left, GM_weekLeft(today, left, limit_minutes), left_now, &left_count) > 0) {
+		for (int i = 0; i < left_count; i++) {
+			char message[160];
+			snprintf(message, sizeof(message), "left out %s: it needs %lld minutes, and the limit leaves %lld",
+				GM_questId(left_now[i]), progress[left_now[i]].target - progress[left_now[i]].value,
+				(GM_weekly(left_now[i]) ? GM_weekLeft(today, left, limit_minutes) : left) / 60);
+			say(message);
+		}
+		save();
+	}
+	running_count = 0;
+	for (int i = 0; i < GM_QUESTS; i++) {
+		if (GM_running(&state, today, i)) running[running_count++] = i;
+	}
+}
+
 // Works out the streak and the quests' progress for now.
 static void refresh(void) {
 	today = GM_dayOf(wall_now());
@@ -187,6 +249,21 @@ static void refresh(void) {
 	streak = GM_streak(played, GM_HISTORY_DAYS, targets.streak_seconds);
 	longest = GM_longest(played, GM_HISTORY_DAYS, targets.streak_seconds);
 	GM_progress(&state, today, played, GM_HISTORY_DAYS, &targets, progress);
+	pickQuests();
+}
+
+// 1 when the game at path was played before, as games.played says, or
+// else the play history; -1 when neither can say.
+static int playedBefore(const char* path) {
+	char args[GM_PATH_MAX + 8], reply[64];
+	snprintf(args, sizeof(args), "path=%s", path);
+	if (ask("games.played", args, reply, sizeof(reply))) {
+		long long played = replyNumber(reply, "played", -1);
+		if (played == 0 || played == 1) return (int)played;
+	}
+	if (!MOSAIC_HOST_HAS(host, play_time)) return -1;
+	int count = host->play_count(path);
+	return count < 0 ? -1 : count > 0;
 }
 
 // Marks quests done since the last look and keeps the best streak, saving
@@ -216,9 +293,9 @@ static int preLaunch(const MosaicLaunch* launch) {
 	memset(&pending, 0, sizeof(pending));
 	pending.started = (long long)wall_now();
 	pending.mono = mono_now();
+	pending.fresh = playedBefore(launch->path) == 0;
 	if (MOSAIC_HOST_HAS(host, play_time)) {
 		long long last = host->last_played(launch->path);
-		pending.fresh = host->play_count(launch->path) == 0;
 		pending.revisit = last > 0 && pending.started - last >= (long long)GM_REVISIT_DAYS * 24 * 60 * 60;
 	}
 	snprintf(pending.path, sizeof(pending.path), "%s", launch->path);
@@ -346,10 +423,10 @@ static void drawQuests(MosaicSurface* screen, const MosaicRect* room) {
 	int fit = room->h / row_h;
 	fit_rows = fit;
 	if (fit < 1) return;
-	first = GM_scroll(first, 0, fit);
-	for (int i = first; i < GM_QUESTS && i < first + fit; i++) {
+	first = GM_scroll(first, 0, fit, running_count);
+	for (int i = first; i < running_count && i < first + fit; i++) {
 		MosaicRect r = { room->x, room->y + (i - first) * row_h, room->w, row_h };
-		drawQuest(screen, &r, i);
+		drawQuest(screen, &r, running[i]);
 	}
 }
 
@@ -366,7 +443,7 @@ static void describe(char* out, size_t size) {
 	size_t used = (size_t)snprintf(out, size, "%s, %s;", text, summary);
 	for (int i = 0; i < GM_QUESTS && used < size; i++) {
 		used += (size_t)snprintf(out + used, size - used, "%s %s %lld/%lld%s", i ? "," : "", GM_questId(i), progress[i].value,
-			progress[i].target, progress[i].done ? " done" : "");
+			progress[i].target, !GM_running(&state, today, i) ? " left out" : progress[i].done ? " done" : "");
 	}
 }
 
@@ -388,8 +465,8 @@ static int input(const MosaicInput* in, void* data) {
 	(void)data;
 	if (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B)) return MOSAIC_SCREEN_CLOSE;
 	int before = first;
-	if (in->repeated & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_UP)) first = GM_scroll(first, -1, fit_rows);
-	if (in->repeated & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN)) first = GM_scroll(first, 1, fit_rows);
+	if (in->repeated & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_UP)) first = GM_scroll(first, -1, fit_rows, running_count);
+	if (in->repeated & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN)) first = GM_scroll(first, 1, fit_rows, running_count);
 	if (first != before) host->request_redraw();
 	return MOSAIC_SCREEN_STAY;
 }

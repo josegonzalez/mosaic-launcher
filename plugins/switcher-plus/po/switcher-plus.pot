@@ -13,164 +13,17 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
-
-#: switcher_model.c
-#, c-format
-msgid "%i day ago"
-msgid_plural "%i days ago"
-msgstr[0] ""
-msgstr[1] ""
-
-#: switcher_model.c
-#, c-format
-msgid "%i month ago"
-msgid_plural "%i months ago"
-msgstr[0] ""
-msgstr[1] ""
-
-#: switcher_model.c
-#, c-format
-msgid "%i session"
-msgid_plural "%i sessions"
-msgstr[0] ""
-msgstr[1] ""
-
-#: switcher_model.c
-#, c-format
-msgid "%i week ago"
-msgid_plural "%i weeks ago"
-msgstr[0] ""
-msgstr[1] ""
-
-#: switcher_model.c
-#, c-format
-msgid "%i year ago"
-msgid_plural "%i years ago"
-msgstr[0] ""
-msgstr[1] ""
-
-#: switcher_model.c
-#, c-format
-msgid "%i/%i achievements"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%id"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%imo"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%iw"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%ix"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%iy"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%lldh"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%lldh %lldm"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%lldm"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%s %i"
-msgstr ""
-
-#: switcher_model.c
-#, c-format
-msgid "%s %i, %i"
-msgstr ""
-
-#: switcher_model.c
-msgid "<1m"
-msgstr ""
-
-#: switcher_model.c
-msgid "Apr"
-msgstr ""
-
-#: switcher_model.c
-msgid "Aug"
-msgstr ""
-
-#: switcher_model.c
-msgid "Dec"
-msgstr ""
-
-#: switcher_model.c
-msgid "Feb"
-msgstr ""
 
 #: plugin.txt
 msgid "Game switcher plus"
-msgstr ""
-
-#: switcher_model.c
-msgid "Jan"
-msgstr ""
-
-#: switcher_model.c
-msgid "Jul"
-msgstr ""
-
-#: switcher_model.c
-msgid "Jun"
-msgstr ""
-
-#: switcher_model.c
-msgid "Mar"
-msgstr ""
-
-#: switcher_model.c
-msgid "May"
-msgstr ""
-
-#: switcher_model.c
-msgid "Never played"
 msgstr ""
 
 #: switcher_plus.c
 msgid "No Preview"
 msgstr ""
 
-#: switcher_model.c
-msgid "Nov"
-msgstr ""
-
-#: switcher_model.c
-msgid "Oct"
-msgstr ""
-
 #: plugin.txt
 msgid "Play time captions"
-msgstr ""
-
-#: switcher_model.c
-msgid "Sep"
 msgstr ""
 
 #: plugin.txt
@@ -187,12 +40,4 @@ msgstr ""
 
 #: plugin.txt
 msgid "strip"
-msgstr ""
-
-#: switcher_model.c
-msgid "today"
-msgstr ""
-
-#: switcher_model.c
-msgid "yesterday"
 msgstr ""

@@ -65,3 +65,9 @@ msgstr "Mosaico de elegir de en el menú rápido"
 
 msgid "Picking from %s"
 msgstr "Eligiendo de %s"
+
+msgid "No unplayed games to pick from"
+msgstr "No hay juegos sin jugar entre los que elegir"
+
+msgid "Unplayed games only"
+msgstr "Solo juegos sin jugar"

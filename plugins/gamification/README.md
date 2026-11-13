@@ -19,7 +19,13 @@ Turn on **Gamification** in Launcher > Plugins ([how](../../docs/plugins.md#turn
 
 The streak is the days in a row with at least the streak-day minutes (5 by default) of play. Today joins it once it has them, and until then the streak runs to yesterday.
 
-Each day's play is the most of the plugin's own count (the time between a launch and its return, leaving out sleep) and the tracker's, so it works without the [play tracker](../../docs/glossary.md#play-tracker). The never-played and not-played-for-30-days quests need it.
+Each day's play is the most of the plugin's own count (the time between a launch and its return, leaving out sleep) and the tracker's, so it works without the [play tracker](../../docs/glossary.md#play-tracker). The not-played-for-30-days quest needs it.
+
+A game counts as never played as [`row-badges`](../row-badges/README.md#what-counts-as-played) says, the same as its unplayed dot: not in recents, with no save, state or resume slot, and no session in the play history, however short. While row-badges is off, a game counts as never played when the play tracker has no session of it, so that quest needs the tracker then.
+
+### With a play time limit
+
+While [`playtime-limit`](../playtime-limit/README.md) has a daily limit set, the quests are picked for their day or week with the time left in mind. The first time the plugin looks in a new day or week, a play time quest that still needs more play than is left is left out until the next day or week, and doesn't show on the Quests screen: Daily play against today's time left, and Weekly play against today's time left and the daily limit for each day left in the week. Quests already picked keep running, whatever the time left is later. Without playtime-limit, or with no limit set, every quest runs.
 
 ## How to use
 
@@ -42,6 +48,10 @@ The Quests tile on the quick menu (on by default).
 
 ![The Quests tile on the quick menu (on by default)](docs/tile.png)
 
+With playtime-limit's daily limit set to 45 minutes and Daily play set to 60, on a Friday: both play time quests left out, as the limit leaves less time than they need.
+
+![With playtime-limit's daily limit set to 45 minutes and Daily play set to 60, on a Friday: both play time quests left out](docs/with-playtime-limit.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
@@ -59,6 +69,7 @@ The Quests tile on the quick menu (on by default).
 
 - Registers the `gamification.open` action, which the `button` setting follows, and a quick menu tile.
 - Works from the launch and return hooks, and reads stock's play tracker.
+- Asks `row-badges`' `games.played` service whether a launch is of a game never played, falling back to the play tracker without it, and `playtime-limit`'s `limit.left` service for the time left when it picks the quests. Without `limit.left` every quest runs.
 - Keeps its state in `.userdata/<platform>/launcher/gamification/state.txt`.
 
 ## Credits

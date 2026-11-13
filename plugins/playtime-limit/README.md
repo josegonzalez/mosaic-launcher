@@ -9,6 +9,7 @@ Once today's play across every game reaches the Daily limit, launching a game is
 - The limit is off by default, so turning the plugin on changes nothing until one is set.
 - A header widget beside the status pill shows the time left, such as `45m left`, in the theme's accent, and in a warning colour at or under the Warn at setting. Coming back from a game with little or no time left says so too. The widget is redrawn only when the minute it shows changes, or the day does.
 - A game already running isn't stopped when the time runs out. That needs minarch to save and quit on a signal, which stock minarch doesn't do, so that part is left out.
+- While a limit is set, [`home-dashboard`](../home-dashboard/README.md)'s Stats tab shows the time left of today's limit, and [`gamification`](../gamification/README.md) leaves out play time quests that need more time than is left.
 - When the play history can't be read (no `game_logs.sqlite` before the first game, or no sqlite library), games launch as usual, the widget stays hidden, and the plugin logs why once.
 
 ### Extra time
@@ -51,6 +52,7 @@ All four are protected, and `code` is also secret.
 ## For plugin authors
 
 - Refuses launches in `pre_launch` and draws a header widget.
+- Provides the `limit.left` service (`provides=limit.left`): where today stands, as `state` (`off`, `unknown`, `ok`, `warn` or `up`), the daily `limit` and the minutes `granted` today, the seconds `left` and the widget's `text` (see [plugin-api.md](../../docs/plugin-api.md)). It answers with `state=off` while no limit is set.
 - Reads stock's play tracker.
 - Writes the day's grant and the code to its `playtime-limit.cfg`.
 - `limit`, `warn`, `extra` and `code` carry the `protected` flag, and `code` the `secret` flag in `plugin.txt` (see [plugin-api.md](../../docs/plugin-api.md#plugintxt)).

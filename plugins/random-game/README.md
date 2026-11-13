@@ -11,11 +11,13 @@ Turn on **Random game** in Launcher > Plugins ([how](../../docs/plugins.md#turni
 - On the game list, press **Y** to pick from the system you're in, or from every system on the first screen.
 - A Random game row on the first screen and a Random tile on the [quick menu](../../docs/glossary.md#quick-menu) pick from every system.
 
-Every game is as likely as any other, so bigger systems come up more often. With Prefer unplayed games on (the default), games not in Recently Played are four times as likely. Games the [`hidden`](../hidden/README.md) plugin hides, or any other plugin's filter, are never picked.
+Every game is as likely as any other, so bigger systems come up more often. With Prefer unplayed games on (the default), unplayed games are four times as likely, and with Unplayed games only on, only unplayed games are picked. Games the [`hidden`](../hidden/README.md) plugin hides, or any other plugin's filter, are never picked.
+
+A game counts as played as [`row-badges`](../row-badges/README.md#what-counts-as-played) says, the same as its unplayed dot, whether or not the dot is on: once it's in recents, has a save, state or resume slot, or has any session in the play history, however short. While row-badges is off, a game counts as played only when it's in Recently Played.
 
 ### Picking from favorites, a tag or a collection
 
-Every pick can come from one set of games instead of all of them: your [favorites](../favorites/README.md), a [tag](../tags/README.md) or a [smart collection](../smart-collections/README.md). Run Pick from, from the Pick from tile on the quick menu or the Pick from button (both off by default) or an [FN button](../../docs/glossary.md#fn-button) set to `action:random-game.from`, and choose All games or a set. Y in a system then picks from the set's games in that system. While the plugin a set comes from is off, there's nothing to pick from it.
+Every pick can come from one set of games instead of all of them: your [favorites](../favorites/README.md), a [tag](../tags/README.md) or a [smart collection](../smart-collections/README.md). Run Pick from, from the Pick from tile on the quick menu or the Pick from button (both off by default) or an [FN button](../../docs/glossary.md#fn-button) set to `action:random-game.from`, and choose All games or a set. Y in a system then picks from the set's games in that system, and with Unplayed games only on, from the set's unplayed games. While the plugin a set comes from is off, there's nothing to pick from it.
 
 ## Screenshots
 
@@ -39,7 +41,8 @@ With favorites and tags: the Pick from list.
 
 | Setting | Choices | Default | What it does |
 |---|---|---|---|
-| Prefer unplayed games (`unplayed`) | on, off | on | Games not in Recently Played are four times as likely |
+| Prefer unplayed games (`unplayed`) | on, off | on | Unplayed games are four times as likely: games row-badges' `games.played` calls unplayed, or without it games not in Recently Played |
+| Unplayed games only (`unplayed_only`) | on, off | off | Pick only unplayed games, from the games every pick comes from |
 | Random game on the root (`root`) | on, off | on | A Random game row on the first screen that picks from every system |
 | Random tile on the quick menu (`tile`) | on, off | off | A Random tile on the quick menu that picks from every system |
 | Pick from (`from`) | text | all | The games every pick comes from: `all`, or a set's name, such as `favorites`, `tags:RPG` or `smart:Mario` |
@@ -51,6 +54,7 @@ With favorites and tags: the Pick from list.
 - Registers the `random-game.pick` action, the `random-game.tile` quick menu tile and the `random-game.from` action, which the `from_tile` and `from_button` settings follow.
 - Lists the sets with `set_names` and reads the one `from` names with `set_list`. A set nobody registered has no games.
 - Skips what `is_filtered` says is hidden.
+- Asks `row-badges`' `games.played` service whether each game it might pick was played, while Prefer unplayed games or Unplayed games only is on. Without it, as when row-badges is off, it counts the games in recents as played.
 
 ## Credits
 

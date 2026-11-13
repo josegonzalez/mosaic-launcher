@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "../../plugins/playtime-limit/playtime_limit.c"
 
 ///////////////////////////////////////
@@ -404,6 +405,71 @@ static void testUnknownHistory(void) {
 	CHECK(plugin.header_width(500, 30) > 0);
 }
 
+static void testReply(void) {
+	char out[256];
+	CHECK(PL_reply(PL_OK, 60, 15, 1500, "25m left", out, sizeof(out)) == 0);
+	CHECK_STR(out, "state=ok\nlimit=60\ngranted=15\nleft=1500\ntext=25m left");
+	CHECK(PL_reply(PL_OFF, 60, 15, 1500, "x", out, sizeof(out)) == 0);
+	CHECK_STR(out, "state=off\nlimit=0\ngranted=0\nleft=-1\ntext=");
+	CHECK(PL_reply(PL_UNKNOWN, 60, 0, -1, "x", out, sizeof(out)) == 0);
+	CHECK_STR(out, "state=unknown\nlimit=60\ngranted=0\nleft=-1\ntext=");
+	CHECK(PL_reply(PL_UP, 30, 0, 0, "Time's up", out, sizeof(out)) == 0);
+	CHECK_STR(out, "state=up\nlimit=30\ngranted=0\nleft=0\ntext=Time's up");
+	CHECK_STR(PL_stateName(PL_WARN), "warn");
+	CHECK(PL_reply(PL_OK, 60, 0, 1, "", out, 8) == -1 && out[0] == '\0');
+}
+
+// limit.left, called as another plugin would
+static void callLeft(char* out, size_t size) {
+	CHECK(fakeCall("limit.left", NULL, out, size) >= 0);
+}
+
+static void testService(void) {
+	reset();
+	fake_provider_count = 0;
+	fake.provide = fakeProvide;
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	char out[MOSAIC_CALL_MAX];
+	// with no limit set it still answers
+	CHECK(plugin.init(&fake) == 0);
+	callLeft(out, sizeof(out));
+	CHECK_STR(out, "state=off\nlimit=0\ngranted=0\nleft=-1\ntext=");
+
+	reset();
+	fake_provider_count = 0;
+	fake.provide = fakeProvide;
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	setCfg("limit", "60");
+	today_played = 25 * 60;
+	CHECK(plugin.init(&fake) == 0);
+	callLeft(out, sizeof(out));
+	CHECK_STR(out, "state=ok\nlimit=60\ngranted=0\nleft=2100\ntext=35m left");
+	today_played = 55 * 60;
+	callLeft(out, sizeof(out));
+	CHECK_STR(out, "state=warn\nlimit=60\ngranted=0\nleft=300\ntext=5m left");
+	// today's grant, apart from the limit
+	char day[PL_DAY_LEN];
+	today(day);
+	setCfg("grant_day", day);
+	setCfg("grant_minutes", "30");
+	callLeft(out, sizeof(out));
+	CHECK_STR(out, "state=ok\nlimit=60\ngranted=30\nleft=2100\ntext=35m left");
+	today_played = 2 * 3600;
+	callLeft(out, sizeof(out));
+	CHECK_STR(out, "state=up\nlimit=60\ngranted=30\nleft=0\ntext=Time's up");
+	today_played = MOSAIC_PLAY_UNKNOWN;
+	callLeft(out, sizeof(out));
+	CHECK_STR(out, "state=unknown\nlimit=60\ngranted=30\nleft=-1\ntext=");
+
+	// an older launcher, without providers: nothing provided
+	reset();
+	fake_provider_count = 0;
+	CHECK(plugin.init(&fake) == 0);
+	CHECK(fake_provider_count == 0);
+}
+
 int main(void) {
 	testParseMinutes();
 	testDayKey();
@@ -418,5 +484,7 @@ int main(void) {
 	testGrantExpires();
 	testNoCode();
 	testUnknownHistory();
+	testReply();
+	testService();
 	CHECK_DONE();
 }

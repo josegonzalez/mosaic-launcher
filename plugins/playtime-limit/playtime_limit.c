@@ -14,6 +14,14 @@
 // A game already running isn't stopped when the time runs out: that needs
 // minarch to save and quit on a signal, which stock minarch doesn't do.
 //
+// Other plugins ask where today stands with the limit.left service,
+// which takes no arguments: its reply is state=<off, unknown, ok, warn or
+// up>, limit=<the daily limit in minutes, 0 while it's off>,
+// granted=<extra minutes granted today>, left=<seconds left today, -1
+// while the limit is off or the history unknown> and text=<the widget's
+// text>. home-dashboard shows it, and gamification leaves out quests that
+// need more time than is left.
+//
 // The code lives only in this plugin's cfg, set from the Launcher pak's
 // settings, and is never logged. A grant is kept as grant_day and
 // grant_minutes in the same cfg, and counts only on that day.
@@ -102,6 +110,12 @@ static int look(char day[PL_DAY_LEN], long long* left, long long* played) {
 	return state;
 }
 
+// The widget's text for seconds left, translated.
+static void formatLeft(long long left, char* out, size_t size) {
+	const char* words[PL_WORDS_COUNT] = { tr("Time's up"), tr("%lldm left"), tr("%lldh %02lldm left") };
+	PL_formatIn(left, words, out, size);
+}
+
 // Looks again, and redraws when what the widget shows has changed: the
 // minute, the state, or the day, as at midnight.
 static void refresh(void) {
@@ -109,8 +123,7 @@ static void refresh(void) {
 	long long left, played;
 	int state = look(day, &left, &played);
 	char text[sizeof(shown_text)] = "";
-	const char* words[PL_WORDS_COUNT] = { tr("Time's up"), tr("%lldm left"), tr("%lldh %02lldm left") };
-	if (state != PL_OFF && state != PL_UNKNOWN) PL_formatIn(left, words, text, sizeof(text));
+	if (state != PL_OFF && state != PL_UNKNOWN) formatLeft(left, text, sizeof(text));
 	int changed = !looked || state != shown_state || PL_shownMinutes(left) != PL_shownMinutes(shown_left)
 		|| strcmp(day, shown_day) != 0 || strcmp(text, shown_text) != 0;
 	shown_state = state;
@@ -126,6 +139,18 @@ static void tick(unsigned long now) {
 	if (looked && now < next_look) return;
 	next_look = now + LOOK_MS;
 	refresh();
+}
+
+// limit.left: where today stands, with no arguments.
+static int provideLeft(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	char day[PL_DAY_LEN];
+	long long left = -1, played = 0;
+	int state = limit > 0 ? look(day, &left, &played) : PL_OFF;
+	char text[sizeof(shown_text)] = "";
+	if (state != PL_OFF && state != PL_UNKNOWN) formatLeft(left, text, sizeof(text));
+	return PL_reply(state, limit, state == PL_OFF ? 0 : grantToday(day), left, text, out, size);
 }
 
 static void typedCode(const char* text, void* data) {
@@ -255,6 +280,7 @@ static int init(const MosaicHost* h) {
 	shown_day[0] = shown_text[0] = logged_text[0] = '\0';
 	memset(&logged_rect, 0, sizeof(logged_rect));
 
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("limit.left", provideLeft) != 0) say("couldn't provide limit.left");
 	if (limit <= 0) say("no daily limit set, so nothing is limited");
 	else say("daily limit %i minutes, warning at %i, %i more behind the code%s", limit, warn, extra,
 		host->cfg_get("code", "")[0] ? "" : " (no code set)");

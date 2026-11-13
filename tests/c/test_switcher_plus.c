@@ -1,11 +1,12 @@
 // The game switcher plus plugin: its model on its own, then the plugin
 // against a fake host, for its screen, the buttons, the recents it keeps,
-// the hints, what each style draws and the play time captions, which are
-// checked against playtime-captions' own model.
+// the hints, what each style draws and the play time captions, from a
+// captions.text service that answers with playtime-captions' own model.
 
 #include <stdlib.h>
+#include <time.h>
 #include "check.h"
-#include "words.h"
+#include "fakeproviders.h"
 #include "../../plugins/switcher-plus/switcher_plus.c"
 #include "../../plugins/playtime-captions/captions_model.h"
 
@@ -283,125 +284,6 @@ static void testList(void) {
 	CHECK(SP_list(&tiny, &NONE, 3, &l) == -1);
 }
 
-// 6 pixels a byte, as playtime-captions' tests measure
-static int bytes(const char* text, void* ctx) {
-	(void)ctx;
-	return 6 * (int)strlen(text);
-}
-
-// The copy of playtime-captions' formatter writes what it writes, for
-// every part, format and never setting over a spread of histories.
-static void testCaptionsCopy(void) {
-	SPCaptions c = SP_captions("on", "on", "off", "relative", "off", "off");
-	CHECK(c.parts == (SP_PART_TIME | SP_PART_LAST) && c.format == SP_FORMAT_RELATIVE && c.never == 0);
-	c = SP_captions("off", "off", "on", "compact", "on", "on");
-	CHECK(c.parts == (SP_PART_SESSIONS | SP_PART_ACHIEVEMENTS) && c.format == SP_FORMAT_COMPACT && c.never == 1);
-	CHECK(SP_captions(NULL, NULL, NULL, "date", NULL, NULL).format == SP_FORMAT_DATE);
-	CHECK(SP_captions(NULL, NULL, NULL, "fancy", NULL, NULL).format == SP_FORMAT_RELATIVE);
-	CHECK(SP_captions("yes", NULL, NULL, NULL, NULL, NULL).parts == 0);
-	CHECK((int)SP_PART_TIME == (int)PC_PART_TIME && (int)SP_PART_LAST == (int)PC_PART_LAST &&
-		(int)SP_PART_SESSIONS == (int)PC_PART_SESSIONS && (int)SP_PART_ACHIEVEMENTS == (int)PC_PART_ACHIEVEMENTS);
-	CHECK((int)SP_FORMAT_RELATIVE == (int)PC_FORMAT_RELATIVE && (int)SP_FORMAT_COMPACT == (int)PC_FORMAT_COMPACT &&
-		(int)SP_FORMAT_DATE == (int)PC_FORMAT_DATE);
-	CHECK(SP_mute(0xFFFFFF, 0x000000, 40) == PC_mute(0xFFFFFF, 0x000000, 40));
-	CHECK(SP_mute(0x123456, 0xABCDEF, 75) == PC_mute(0x123456, 0xABCDEF, 75));
-	CHECK(SP_mute(0x123456, 0xABCDEF, 150) == 0xABCDEF && SP_mute(0x123456, 0xABCDEF, -5) == 0x123456);
-
-	static const char* zones[] = { "UTC0", "TST-11" };
-	static const long long times[] = { -1, 0, 30, 60, 3600, 8100, 360000 };
-	static const long long agos[] = { -2, -1, 0, 3600, 86400, 3 * 86400, 10 * 86400, 40 * 86400, 400 * 86400 };
-	static const int counts[] = { -1, 0, 1, 2 };
-	static const int cheevos[][2] = { { 0, 0 }, { 1, 3 }, { -1, 3 } };
-	static const int widths[] = { 0, 30, 100, 1000 };
-	int builds = 0, wrong = 0;
-	for (size_t z = 0; z < sizeof(zones) / sizeof(zones[0]); z++) {
-		setenv("TZ", zones[z], 1);
-		tzset();
-		long long now = 1762344000; // 2025-11-05 12:00 UTC
-		for (size_t t = 0; t < sizeof(times) / sizeof(times[0]); t++)
-		for (size_t a = 0; a < sizeof(agos) / sizeof(agos[0]); a++)
-		for (size_t n = 0; n < sizeof(counts) / sizeof(counts[0]); n++)
-		for (size_t r = 0; r < sizeof(cheevos) / sizeof(cheevos[0]); r++) {
-			// -2 for a never-set last played (0), -1 for unknown
-			long long last = agos[a] == -2 ? 0 : agos[a] == -1 ? -1 : now - agos[a];
-			SPPlay play = { times[t], last, counts[n], cheevos[r][0], cheevos[r][1] };
-			PCStats stats = { times[t], last, counts[n], cheevos[r][0], cheevos[r][1] };
-			for (int parts = 0; parts < 16; parts++)
-			for (int format = 0; format < 3; format++)
-			for (int never = 0; never < 2; never++) {
-				char mine[160], theirs[160];
-				for (int max = 1; max <= 4; max += 3) {
-					int got = SP_captionBuild(&play, now, parts, format, never, max, mine, sizeof(mine));
-					int want = PC_build(&stats, now, parts, format, never, max, theirs, sizeof(theirs));
-					builds++;
-					if (got != want || strcmp(mine, theirs) != 0) {
-						if (!wrong) fprintf(stderr, "build: got %i \"%s\", want %i \"%s\"\n", got, mine, want, theirs);
-						wrong++;
-					}
-				}
-				SPCaptions mine_c = { parts, format, never };
-				PCOptions theirs_c = { parts, format, never };
-				for (size_t w = 0; w < sizeof(widths) / sizeof(widths[0]); w++) {
-					int got = SP_captionFit(&play, now, &mine_c, widths[w], bytes, NULL, mine, sizeof(mine));
-					int want = PC_fit(&stats, now, &theirs_c, widths[w], bytes, NULL, theirs, sizeof(theirs));
-					if (got != want || strcmp(mine, theirs) != 0) {
-						if (!wrong) fprintf(stderr, "fit: got %i \"%s\", want %i \"%s\"\n", got, mine, want, theirs);
-						wrong++;
-					}
-				}
-			}
-		}
-	}
-	unsetenv("TZ");
-	tzset();
-	CHECK(builds > 100000);
-	CHECK(wrong == 0);
-
-	// a few by hand, so a change to both shows here too
-	setenv("TZ", "UTC0", 1);
-	tzset();
-	long long now = 1762344000;
-	SPPlay tetris = { 8100, now - 3 * 86400, 2, 0, 0 };
-	SPCaptions both = SP_captions("on", "on", "off", "relative", "off", "off");
-	char out[160];
-	CHECK(SP_captionFit(&tetris, now, &both, 1000, bytes, NULL, out, sizeof(out)) == 120);
-	CHECK_STR(out, "2h 15m \xC2\xB7 3 days ago");
-	CHECK(SP_captionFit(&tetris, now, &both, 60, bytes, NULL, out, sizeof(out)) == 48);
-	CHECK_STR(out, "2h \xC2\xB7 3d");
-
-	// both copies take the same words
-	static const char* const words[] = { "%lldh %lldm", "%lld h %lld min", "Nov", "nov", NULL };
-	static const char* const plurals[] = { "%i day ago", "hace %i d\xc3\xad" "a", "hace %i d\xc3\xad" "as",
-		"%i session", "%i sesi\xc3\xb3n", "%i sesiones", NULL };
-	fake_words = words;
-	fake_plurals = plurals;
-	SPWords sp_words = { fakeTr, fakePlural };
-	PCWords pc_words = { fakeTr, fakePlural };
-	SP_setWords(&sp_words);
-	PC_setWords(&pc_words);
-	PCStats tetris_pc = { 8100, now - 3 * 86400, 2, 0, 0 };
-	char theirs[256];
-	for (int format = 0; format < 3; format++) {
-		SP_captionBuild(&tetris, now, 7, format, 0, 3, out, sizeof(out));
-		PC_build(&tetris_pc, now, 7, format, 0, 3, theirs, sizeof(theirs));
-		CHECK_STR(out, theirs);
-	}
-	SP_captionBuild(&tetris, now, 7, SP_FORMAT_RELATIVE, 0, 3, out, sizeof(out));
-	CHECK_STR(out, "2 h 15 min \xC2\xB7 hace 3 d\xc3\xad" "as \xC2\xB7 2 sesiones");
-	SP_setWords(NULL);
-	PC_setWords(NULL);
-	SP_captionBuild(&tetris, now, 7, SP_FORMAT_RELATIVE, 0, 3, out, sizeof(out));
-	CHECK_STR(out, "2h 15m \xC2\xB7 3 days ago \xC2\xB7 2 sessions");
-	CHECK(SP_captionFit(&tetris, now, &both, 10, bytes, NULL, out, sizeof(out)) == 0);
-	CHECK_STR(out, "");
-	SPPlay unseen = { 0, 0, 0, 0, 0 };
-	SPCaptions never = SP_captions("on", "on", "off", "relative", "on", "off");
-	CHECK(SP_captionFit(&unseen, now, &never, 1000, bytes, NULL, out, sizeof(out)) > 0);
-	CHECK_STR(out, "Never played");
-	unsetenv("TZ");
-	tzset();
-}
-
 static void testCaptionPlaces(void) {
 	// under the title pill, below the status pill: the whole width
 	MosaicRect title = SP_title(&AREA, &STATUS, 3, 100);
@@ -551,6 +433,46 @@ static int fakeAchievements(const char* path, MosaicAchievements* out) {
 	out->unlocked = i == 0 ? 1 : 2;
 	out->total = i == 0 ? 3 : 5;
 	return 1;
+}
+
+static int fakeTextWidth(int font, const char* text);
+
+static int measureFake(const char* text, void* ctx) {
+	(void)ctx;
+	return fakeTextWidth(MOSAIC_FONT_SMALL, text);
+}
+
+static int isOnCfg(const char* key, const char* fallback) {
+	return !strcmp(fakeCfgRead("playtime-captions", key, fallback), "on");
+}
+
+// captions.text as playtime-captions answers it, with its settings from
+// its cfg, while it's loaded
+static int fakeCaptionsText(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[512], width[16];
+	CHECK(fakeEventValue(args, "path", path, sizeof(path)) > 0);
+	int max = fakeEventValue(args, "width", width, sizeof(width)) > 0 ? atoi(width) : -1;
+	PCOptions o = { (isOnCfg("time", "on") ? PC_PART_TIME : 0) | (isOnCfg("last", "on") ? PC_PART_LAST : 0) |
+		(isOnCfg("sessions", "off") ? PC_PART_SESSIONS : 0) | (isOnCfg("achievements", "off") ? PC_PART_ACHIEVEMENTS : 0),
+		PC_formatOf(fakeCfgRead("playtime-captions", "format", "relative")), isOnCfg("never", "off") };
+	PCStats st = { fakePlayTime(path), fakeLastPlayed(path), fakePlayCount(path), 0, 0 };
+	MosaicAchievements progress = { .size = sizeof(progress) };
+	if ((o.parts & PC_PART_ACHIEVEMENTS) && fakeAchievements(path, &progress) == 1) {
+		st.cheevos = progress.unlocked;
+		st.cheevos_total = progress.total;
+	}
+	return PC_reply(&st, play_now, &o, max, measureFake, NULL, out, size);
+}
+
+static int fakeHasCapability(const char* name) {
+	return captions_loaded && !strcmp(name, "captions.text");
+}
+
+static void loadCaptions(int on) {
+	captions_loaded = on;
+	fake_provider_count = 0;
+	if (on) fakeProvide("captions.text", fakeCaptionsText);
 }
 
 static void fakeRedraw(void) {
@@ -763,6 +685,9 @@ static void setupHost(void) {
 	fake_host.is_filtered = fakeFiltered;
 	fake_host.set_names = fakeNoSets;
 	fake_host.subscribe = fakeSubscribe;
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
+	fake_host.has_capability = fakeHasCapability;
 }
 
 static const MosaicPlugin* start(const char* setting) {
@@ -1102,6 +1027,7 @@ static void testCaptions(void) {
 
 	// off by default: nothing asked, nothing drawn
 	captions_setting = "off";
+	loadCaptions(1);
 	start("full");
 	threeRecents();
 	registered.enter(registered.data);
@@ -1111,15 +1037,25 @@ static void testCaptions(void) {
 	CHECK(findText(caption) < 0);
 	registered.exit(registered.data);
 
-	// full: on a pill under the title, in playtime-captions' defaults while
-	// it isn't loaded
+	// on, without playtime-captions: none
 	captions_setting = "on";
+	loadCaptions(0);
 	logged_count = 0;
 	start("full");
 	CHECK_STR(last_log, "style full, captions on");
 	threeRecents();
 	registered.enter(registered.data);
-	CHECK(wasLogged("captions time on, last on, sessions off, format relative, never off, achievements off"));
+	CHECK(wasLogged("captions on, but nobody provides captions.text, so there are none"));
+	CHECK(draw() == 0);
+	CHECK(findText(caption) < 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, preview drawn, resume, style full, no caption");
+	registered.exit(registered.data);
+
+	// full: on a pill under the title, in playtime-captions' defaults
+	loadCaptions(1);
+	logged_count = 0;
+	registered.enter(registered.data);
+	CHECK(!wasLogged("captions on, but nobody provides captions.text, so there are none"));
 	fills_into_hole = blits_into_hole = 0;
 	CHECK(draw() == 0);
 	int i = findText(caption);
@@ -1135,25 +1071,17 @@ static void testCaptions(void) {
 	CHECK_STR(last_log, "showing 2 of 3: Cherry, preview drawn, resume, style full, no caption");
 	registered.exit(registered.data);
 
-	// playtime-captions' settings while it's loaded, read when it opens
-	captions_loaded = 1;
+	// playtime-captions' settings: its own caption, in its parts and format
 	captions_cfg_count = 0;
 	captionsCfg("format", "compact");
 	captionsCfg("sessions", "on");
 	captionsCfg("never", "on");
-	logged_count = 0;
 	registered.enter(registered.data);
-	CHECK(wasLogged("captions time on, last on, sessions on, format compact, never on, achievements off"));
 	CHECK(draw() == 0);
 	CHECK_STR(last_log, "showing 0 of 3: Apple, preview drawn, resume, style full, caption 2h \xC2\xB7 3d \xC2\xB7 2x");
 	press(MOSAIC_BUTTON_RIGHT);
 	CHECK(draw() == 0);
 	CHECK_STR(last_log, "showing 1 of 3: Banana, preview none, open, style full, caption Never played");
-	registered.exit(registered.data);
-	// the same settings aren't logged again
-	logged_count = 0;
-	registered.enter(registered.data);
-	CHECK(!wasLogged("captions time on, last on, sessions on, format compact, never on, achievements off"));
 	registered.exit(registered.data);
 
 	// achievements last, also for a game with unknown history
@@ -1168,7 +1096,6 @@ static void testCaptions(void) {
 	CHECK_STR(last_log, "showing 2 of 3: Cherry, preview drawn, resume, style full, caption 2/5 achievements");
 	registered.exit(registered.data);
 	captions_cfg_count = 0;
-	captions_loaded = 0;
 
 	// strip: centred under the name pill
 	start("strip");
@@ -1200,6 +1127,7 @@ static void testCaptions(void) {
 	registered.exit(registered.data);
 
 	captions_setting = "off";
+	loadCaptions(0);
 	fake_count = 0;
 	unsetenv("TZ");
 	tzset();
@@ -1213,7 +1141,6 @@ int main(void) {
 	testGeometry();
 	testStrip();
 	testList();
-	testCaptionsCopy();
 	testCaptionPlaces();
 	testInit();
 	testButtons();

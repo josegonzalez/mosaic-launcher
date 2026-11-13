@@ -4,7 +4,8 @@
 #include <stddef.h>
 
 // Picking a random game: the games found on the card, which of them are
-// played or in the set picked from, and a weighted pick. No SDL and no host here, so the
+// in the set picked from, the weights from which are played, and a
+// weighted pick. No SDL and no host here, so the
 // host tests can check it on its own with a random source of their own.
 
 #define RG_PATH_LEN 512
@@ -79,17 +80,24 @@ int RG_pickable(const char* name);
 // for smart:<name>, and other names as they are.
 void RG_setLabel(const char* name, const char* fav, const char* tag, const char* smart, char* out, size_t size);
 
-// True when a game was played: one of recents (full paths, as the game
+// True when a game was played by recents alone, the fallback without
+// row-badges' games.played: one of recents (full paths, as the game
 // switcher keeps them) is it, or is inside it, as a game folder's .m3u or
 // .cue is.
 int RG_isPlayed(const char* path, const char* const* recents, int count);
 
+// Whether a game was played: 1 or 0.
+typedef int (*RGPlayedFn)(const RGGame* game, void* data);
+
 // Fills weights (one per game) for a pick from system, or from every
 // system with -1, and from the games in only, or every game with NULL: 0
 // for games outside them, unplayed_weight for unplayed ones and 1 for
-// played ones. Returns the total.
-unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* only,
-	const char* const* recents, int recent_count, unsigned unplayed_weight, unsigned* weights);
+// played ones, or 0 for played ones with unplayed_only. played is asked
+// only about games in the pick, and only when the weights or
+// unplayed_only need it; with a NULL played every game counts as
+// unplayed. Returns the total.
+unsigned long RG_weights(const RGLibrary* lib, int system, const RGPathSet* only, RGPlayedFn played, void* data,
+	unsigned unplayed_weight, int unplayed_only, unsigned* weights);
 
 // A random source: returns a number from 0 to below - 1.
 typedef unsigned long (*RGRandom)(unsigned long below, void* data);

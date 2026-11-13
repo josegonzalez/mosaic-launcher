@@ -23,12 +23,8 @@
 // Other plugins get the same caption from the captions.text service,
 // with path=<game> and, to fit it, width=<pixels in the small font>: its
 // reply is text=<caption> (empty for none) and width=<its width>, in these
-// settings' parts and format.
-//
-// The game switcher's captions are switcher-plus's, with its captions
-// setting: it reads these settings, which are public, with cfg_read while
-// this plugin is loaded, and writes the caption with a copy of
-// captions_model.c's formatter, so a change here goes there too. The
+// settings' parts and format. switcher-plus shows it in the game switcher
+// (its captions setting), and home-dashboard on its continue card. The
 // built-in switcher gets none.
 
 #include <stdio.h>
