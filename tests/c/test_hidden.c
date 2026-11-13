@@ -102,6 +102,8 @@ static const MosaicHost fake = {
 	.reload_lists = fakeReload,
 	.set_register = fakeSetRegister,
 	.set_unregister = fakeSetUnregister,
+	.set_changed = fakeSetChanged,
+	.set_names = fakeSetNames,
 	.is_filtered = fakeIsFiltered,
 };
 
@@ -288,6 +290,9 @@ int main(void) {
 	CHECK_STR(saved, GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");
 	CHECK(!kept(p, CARD "/Roms/PS/Game", CARD "/Roms/PS"));
 	CHECK(!kept(p, CARD "/Roms/PS/Game/Game.m3u", CARD "/Collections/Mine.txt"));
+
+	// each hide announced the set
+	CHECK(strstr(fake_set_changed, "hidden\n") == fake_set_changed);
 
 	// the hidden set lists the paths hidden, and has what the filter hides
 	CHECK_STR(fakeSetList("hidden"), GB "/Tetris.gb\n" CARD "/Roms/PS/Game\n" CARD "/Tools/test/Clock.pak\n");

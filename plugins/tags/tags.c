@@ -178,6 +178,14 @@ static void syncSets(void) {
 	}
 }
 
+// Tells other plugins tag's set changed, a deleted one's too.
+static void announce(const char* tag) {
+	if (!MOSAIC_HOST_HAS(host, set_names)) return;
+	char name[sizeof(set_names[0])];
+	snprintf(name, sizeof(name), "tags:%s", tag);
+	host->set_changed(name);
+}
+
 static int gamesOnCard(int tag) {
 	int n = 0;
 	for (int i = 0; i < store.tags[tag].count; i++) {
@@ -281,6 +289,7 @@ static void toggle(int row) {
 	}
 	on_card[row] += on ? 1 : -1;
 	changed = 1;
+	announce(name);
 	char message[TG_PATH_LEN + TG_NAME_LEN + 32];
 	snprintf(message, sizeof(message), on ? "tagged %s with %s" : "untagged %s from %s", game, name);
 	say(message);
@@ -308,6 +317,7 @@ static void named(const char* text, void* data) {
 	selected = TG_find(&store, name);
 	if (selected < 0) selected = 0;
 	changed = 1;
+	announce(name);
 	char message[TG_PATH_LEN + TG_NAME_LEN + 32];
 	if (added) {
 		snprintf(message, sizeof(message), "added tag %s", name);
@@ -332,6 +342,7 @@ static void deleteConfirmed(void* data) {
 		snprintf(message, sizeof(message), "deleted tag %s", deleting);
 		say(message);
 		changed = 1;
+		announce(deleting);
 	}
 	countAll();
 	selected = TG_move(selected, rowCount(), 0, 0);

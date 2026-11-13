@@ -30,6 +30,10 @@ static void list(const char* name, void (*add)(const char* path, void* ctx), voi
 	(void)name, (void)add, (void)ctx;
 }
 
+static void heard(const char* name, const char* payload, void* data) {
+	(void)name, (void)payload, (void)data;
+}
+
 static int init(const MosaicHost* host) {
 	host->register_action(ID ".act", "DECLINED", available, run, NULL);
 	// takes over an action another plugin registered first
@@ -43,6 +47,8 @@ static int init(const MosaicHost* host) {
 	host->inhibit_sleep(ID, 1);
 	// a set's name, which the next plugin to register it then gets
 	host->set_register("favorites", has, list);
+	// a subscription, which would be called in unloaded code if it stayed
+	host->subscribe("launcher.set_changed", heard, NULL);
 	host->power_off(0);
 	host->log(ID, "declining");
 	return 1;

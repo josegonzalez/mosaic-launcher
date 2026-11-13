@@ -89,6 +89,13 @@ static int fakeBind(int screen, int button, int trigger, const char* id) {
 }
 
 // Y on the game list: the first available binding runs, as the host does.
+// How many lines text has.
+static int countLines(const char* text) {
+	int n = 0;
+	for (; *text; text++) n += *text == '\n';
+	return n;
+}
+
 static int pressY(void) {
 	for (int i = 0; i < actions; i++) {
 		if (available[i](NULL)) {
@@ -128,6 +135,8 @@ static const MosaicHost fake = {
 	.reload_lists = fakeReload,
 	.set_register = fakeSetRegister,
 	.set_unregister = fakeSetUnregister,
+	.set_changed = fakeSetChanged,
+	.set_names = fakeSetNames,
 	.is_filtered = fakeIsFiltered,
 };
 
@@ -371,7 +380,9 @@ static void testPlugin(void) {
 	CHECK(pressY());
 	CHECK_STR(asked, "Dismiss Mario?");
 	CHECK(p->virtual_dir(FOLDER)->count == 4); // not until answered
+	fake_set_changed[0] = '\0';
 	sayYes();
+	CHECK_STR(fake_set_changed, "smart:Mario\n");
 	CHECK_STR(toasted, "Dismissed Mario");
 	CHECK(reloads == 1);
 	CHECK_STR(fakeCfgGet("dismissed", ""), "Mario");
@@ -403,7 +414,10 @@ static void testPlugin(void) {
 	selected = root->items[0];
 	CHECK(pressY());
 	CHECK_STR(asked, "Bring back 4 dismissed collections?");
+	fake_set_changed[0] = '\0';
 	sayYes();
+	// each brought back is announced
+	CHECK(countLines(fake_set_changed) == 4);
 	CHECK_STR(fakeCfgGet("dismissed", "x"), "");
 	CHECK(p->virtual_dir(FOLDER)->count == 4);
 	CHECK(!pressY()); // nothing left to bring back

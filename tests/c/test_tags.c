@@ -404,6 +404,8 @@ static MosaicHost fake = {
 	.draw_hints = fakeDrawHints,
 	.set_register = fakeSetRegister,
 	.set_unregister = fakeSetUnregister,
+	.set_changed = fakeSetChanged,
+	.set_names = fakeSetNames,
 	.is_filtered = fakeIsFiltered,
 };
 
@@ -491,6 +493,7 @@ static void testPlugin(void) {
 
 	// rows: Old, Puzzle, Unused, New tag. A on Puzzle tags Zelda, and the file has it
 	CHECK(on_card[0] == 0 && on_card[1] == 1 && on_card[2] == 0);
+	fake_set_changed[0] = '\0';
 	press(MOSAIC_BUTTON_DOWN);
 	CHECK(selected == 1);
 	press(MOSAIC_BUTTON_A);
@@ -501,6 +504,9 @@ static void testPlugin(void) {
 	CHECK(strstr(logged, "untagged /Roms/GB/Zelda.gb from Puzzle") != NULL);
 	CHECK(strstr(readText(STORE), "Zelda") == NULL);
 	press(MOSAIC_BUTTON_A);
+	// each change announces the tag's set
+	CHECK_STR(fake_set_changed, "tags:Puzzle\ntags:Puzzle\ntags:Puzzle\n");
+	fake_set_changed[0] = '\0';
 
 	// X on a tag with a game on the card says so; on an unused one it asks, then deletes
 	confirm_yes = NULL;
@@ -515,6 +521,9 @@ static void testPlugin(void) {
 	CHECK(strstr(logged, "deleted tag Old") != NULL);
 	CHECK(strstr(readText(STORE), "Old") == NULL);
 	CHECK(store.count == 2);
+	// a deleted tag's set is announced too
+	CHECK_STR(fake_set_changed, "tags:Old\n");
+	fake_set_changed[0] = '\0';
 
 	// New tag: up from the top wraps to it; the keyboard's name goes on the game
 	press(MOSAIC_BUTTON_UP);
@@ -530,6 +539,7 @@ static void testPlugin(void) {
 	CHECK(strstr(logged, "added tag Action") != NULL);
 	CHECK(strstr(logged, "tagged /Roms/GB/Zelda.gb with Action") != NULL);
 	CHECK(store.count == 3 && selected == 0 && on_card[0] == 1);
+	CHECK_STR(fake_set_changed, "tags:Action\n");
 	// typing an existing tag, in another case, just tags the game with it
 	if (keyboard_done) keyboard_done("unused", NULL);
 	CHECK(store.count == 3 && TG_has(&store, 2, "/Roms/GB/Zelda.gb"));

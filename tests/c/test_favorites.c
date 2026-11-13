@@ -105,6 +105,8 @@ static const MosaicHost fake = {
 	.reload_lists = fakeReload,
 	.set_register = fakeSetRegister,
 	.set_unregister = fakeSetUnregister,
+	.set_changed = fakeSetChanged,
+	.set_names = fakeSetNames,
 	.is_filtered = fakeIsFiltered,
 };
 
@@ -244,10 +246,12 @@ int main(void) {
 	selectEntry("/elsewhere/Tetris.gb", MOSAIC_ENTRY_ROM);
 	CHECK(!action_available(NULL));
 
-	// adding goes at the end of the collection
+	// adding goes at the end of the collection, and announces the set
 	selectEntry(CARD "/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM);
 	CHECK(action_available(NULL));
+	CHECK_STR(fake_set_changed, "");
 	action_run(NULL);
+	CHECK_STR(fake_set_changed, "favorites\n");
 	readText(COLLECTION, saved, sizeof(saved));
 	CHECK_STR(saved, "/Roms/GB/Zelda.gb\n/Roms/GB/Tetris.gb\n");
 	CHECK(redraws == 1);

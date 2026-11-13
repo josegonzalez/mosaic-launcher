@@ -80,6 +80,11 @@ static void toast(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 }
 
+// Tells other plugins the "hidden" set changed.
+static void announce(void) {
+	if (MOSAIC_HOST_HAS(host, set_names)) host->set_changed("hidden");
+}
+
 // Lists change on disk, so have the launcher list them again.
 static void reload(void) {
 	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
@@ -178,6 +183,7 @@ static void hide(void* data) {
 	char message[MAX_PATH_LEN * 2 + 8];
 	snprintf(message, sizeof(message), "hid %s", path);
 	say(message);
+	announce();
 	toast(tr("Hidden"));
 	reload();
 }
@@ -205,6 +211,7 @@ static void unhide(void* data) {
 	char message[MAX_PATH_LEN * 2 + 16];
 	snprintf(message, sizeof(message), "unhid %s", path);
 	say(message);
+	announce();
 	toast(tr("Unhidden"));
 	reload();
 }

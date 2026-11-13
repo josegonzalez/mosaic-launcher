@@ -222,7 +222,10 @@ static void change(const char* rel) {
 		return;
 	}
 	relist();
-	if (save() == 0) say(message);
+	if (save() == 0) {
+		say(message);
+		if (MOSAIC_HOST_HAS(host, set_names)) host->set_changed("favorites");
+	}
 	else snprintf(shown, sizeof(shown), tr("Couldn't save %s"), folder_name);
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(shown);
 	// list the folder again so the game moves to or from the top

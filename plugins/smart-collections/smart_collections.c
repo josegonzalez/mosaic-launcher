@@ -188,6 +188,14 @@ static void saveDismissed(void) {
 	host->cfg_set("dismissed", list);
 }
 
+// Tells other plugins the set for collection changed.
+static void announce(const char* collection) {
+	if (!MOSAIC_HOST_HAS(host, set_names)) return;
+	char name[SM_NAME_LEN + 8];
+	snprintf(name, sizeof(name), "smart:%s", collection);
+	host->set_changed(name);
+}
+
 static void changed(const char* message) {
 	if (MOSAIC_HOST_HAS(host, toast)) host->toast(message);
 	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
@@ -204,6 +212,7 @@ static void dismissConfirmed(void* data) {
 	char message[SM_NAME_LEN + 256];
 	snprintf(message, sizeof(message), "dismissed %s", pending);
 	say(message);
+	announce(pending);
 	snprintf(message, sizeof(message), tr("Dismissed %s"), pending);
 	pending[0] = '\0';
 	changed(message);
@@ -233,6 +242,10 @@ static void dismiss(void* data) {
 static void restoreConfirmed(void* data) {
 	(void)data;
 	if (!dismissed.count) return;
+	for (int i = 0; i < dismissed.count; i++) {
+		int c = SM_find(&catalog, dismissed.names[i]); // its set's name is the catalog's
+		announce(c >= 0 ? catalog.items[c].name : dismissed.names[i]);
+	}
 	dismissed.count = 0;
 	saveDismissed();
 	say("brought back dismissed collections");

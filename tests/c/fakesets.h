@@ -2,7 +2,8 @@
 #define FAKESETS_H
 
 // A fake host's entry sets, for testing a plugin that registers them: the
-// sets it registered and unregistered, and what each holds when asked.
+// sets it registered and unregistered, what each holds when asked, and
+// the ones it announced as changed.
 
 #include <stdio.h>
 #include <string.h>
@@ -44,6 +45,20 @@ static int fakeSetUnregister(const char* name) {
 	}
 	fake_set_count--;
 	return 0;
+}
+
+// The sets announced with set_changed, one name a line, until cleared.
+static char fake_set_changed[2048];
+
+static int fakeSetChanged(const char* name) {
+	size_t len = strlen(fake_set_changed);
+	snprintf(fake_set_changed + len, sizeof(fake_set_changed) - len, "%s\n", name);
+	return 0;
+}
+
+static int fakeSetNames(void (*each)(const char* name, void* data), void* data) {
+	for (int i = 0; each && i < fake_set_count; i++) each(fake_set_names[i], data);
+	return fake_set_count;
 }
 
 static int fakeIsFiltered(const char* path) {

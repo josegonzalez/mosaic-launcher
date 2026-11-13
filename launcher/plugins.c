@@ -1,4 +1,5 @@
 #include <dlfcn.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include "launcher.h"
 #include "pluginset.h"
@@ -28,6 +29,8 @@
 #include "hintmodel.h"
 #include "palettes.h"
 #include "entrysets.h"
+#include "events.h"
+#include "callsite.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -1080,6 +1083,209 @@ static void setsReleaseAll(const char* plugin_id) {
 static int hostIsFiltered(const char* path);
 
 ///////////////////////////////////////
+// events
+
+static EventQueue event_queue; // published, waiting for the launcher's thread; under event_lock
+static EventSubs event_subs;   // only touched on the launcher's thread
+static pthread_mutex_t event_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// Each loaded plugin's library, so publish knows who called from a
+// plugin's own thread; under event_lock.
+typedef struct Publisher {
+	void* base;
+	char id[EVENT_OWNER_MAX];
+} Publisher;
+static Publisher publishers[PLUGIN_MAX];
+static int publisher_count = 0;
+
+static void publisherAdd(void* base, const char* id) {
+	if (!base) return;
+	pthread_mutex_lock(&event_lock);
+	if (publisher_count < PLUGIN_MAX) {
+		publishers[publisher_count].base = base;
+		snprintf(publishers[publisher_count].id, EVENT_OWNER_MAX, "%s", id);
+		publisher_count++;
+	}
+	pthread_mutex_unlock(&event_lock);
+}
+
+static void publisherRemove(const char* id) {
+	pthread_mutex_lock(&event_lock);
+	for (int i = publisher_count - 1; i >= 0; i--) {
+		if (strcmp(publishers[i].id, id) != 0) continue;
+		memmove(&publishers[i], &publishers[i + 1], (size_t)(publisher_count - i - 1) * sizeof(Publisher));
+		publisher_count--;
+	}
+	pthread_mutex_unlock(&event_lock);
+}
+
+// The plugin calling, into id: the one running on this thread, else the
+// one whose library the call came from. 0 for none.
+static int publisherOf(const void* from, char* id) {
+	const char* current = Caller_current();
+	if (current) {
+		snprintf(id, EVENT_OWNER_MAX, "%s", current);
+		return 1;
+	}
+	void* base = Callsite_base(from);
+	int found = 0;
+	pthread_mutex_lock(&event_lock);
+	for (int i = 0; i < publisher_count && !found && base; i++) {
+		if (publishers[i].base != base) continue;
+		snprintf(id, EVENT_OWNER_MAX, "%s", publishers[i].id);
+		found = 1;
+	}
+	pthread_mutex_unlock(&event_lock);
+	return found;
+}
+
+// Logs a refused event, once for each reason, as a plugin's thread could
+// publish one every frame.
+static void eventRefused(int rc, const char* name, const char* publisher) {
+	static int logged[5];
+	int reason = -rc;
+	if (reason < 1 || reason > 4 || logged[reason]) return;
+	logged[reason] = 1;
+	const char* shown = name ? name : "(null)";
+	const char* who = publisher ? publisher : "the launcher";
+	switch (rc) {
+		case EVENT_NOT_YOURS:
+			LOG_info("plugins: %s can't publish %s: it may only publish %s.<name>\n", who, shown, who);
+			break;
+		case EVENT_BAD_PAYLOAD:
+			LOG_info("plugins: %s's event %s was refused: its payload isn't key=value lines under %i bytes\n", who, shown, EVENT_PAYLOAD_MAX);
+			break;
+		case EVENT_FULL:
+			LOG_warn("plugins: %s's event %s was dropped: %i events are already waiting\n", who, shown, EVENT_QUEUE_MAX);
+			break;
+		default:
+			LOG_info("plugins: %s's event %s was refused: its name is empty, too long or has spaces\n", who, shown);
+			break;
+	}
+}
+
+// Queues an event, publisher's or (NULL) the launcher's. 0, or -1 when it
+// was refused.
+static int eventPost(const char* name, const char* payload, const char* publisher, int reserve) {
+	int rc;
+	pthread_mutex_lock(&event_lock);
+	if (publisher && !Events_mayPublish(name, publisher)) rc = Events_nameValid(name) ? EVENT_NOT_YOURS : EVENT_BAD_NAME;
+	else rc = EventQueue_add(&event_queue, name, payload, reserve);
+	pthread_mutex_unlock(&event_lock);
+	if (rc == EVENT_OK) return 0;
+	eventRefused(rc, name, publisher);
+	return -1;
+}
+
+// The launcher's own events, launcher.<name>; none without plugins.
+static void hostEvent(const char* name, const char* payload) {
+	if (loaded_count > 0) eventPost(name, payload, NULL, 1);
+}
+
+__attribute__((noinline))
+static int hostPublish(const char* name, const char* payload) {
+	char id[EVENT_OWNER_MAX];
+	if (!publisherOf(__builtin_return_address(0), id)) {
+		static int logged = 0;
+		if (!logged) LOG_warn("plugins: publish refused: it didn't come from a loaded plugin\n");
+		logged = 1;
+		return -1;
+	}
+	return eventPost(name, payload, id, 0);
+}
+
+static int hostSubscribe(const char* name, void (*on_event)(const char* name, const char* payload, void* data), void* data) {
+	LoadedPlugin* p = callingPlugin("subscribe");
+	if (!p) return -1;
+	int rc = EventSubs_add(&event_subs, name, p->id, on_event, data);
+	if (rc == EVENT_OK) return 0;
+	if (rc == EVENT_FULL) LOG_warn("plugins: %s can't subscribe to %s: there are %i subscriptions\n", p->id, name, EVENT_SUBS_MAX);
+	else LOG_info("plugins: %s can't subscribe to %s: no callback, or a name that's empty, too long or has spaces\n",
+		p->id, name ? name : "(null)");
+	return -1;
+}
+
+static int hostUnsubscribe(const char* name) {
+	LoadedPlugin* p = callingPlugin("unsubscribe");
+	return p ? EventSubs_remove(&event_subs, name, p->id) : -1;
+}
+
+static int hostEventValue(const char* payload, const char* key, char* out, size_t size) {
+	return Events_value(payload, key, out, size);
+}
+
+// Delivers the events waiting now, oldest first, each to its subscribers
+// in the order they subscribed, as the subscriber. Events published
+// meanwhile wait for the next time, so two plugins answering each other
+// can't keep it going.
+static int delivering = 0;
+
+static void eventsDeliver(void) {
+	if (delivering || !loaded_count) return;
+	pthread_mutex_lock(&event_lock);
+	int waiting = event_queue.count;
+	pthread_mutex_unlock(&event_lock);
+	if (!waiting) return;
+	delivering = 1;
+	static Event event; // only on this thread, and too big for every stack
+	for (int n = 0; n < waiting; n++) {
+		pthread_mutex_lock(&event_lock);
+		int took = EventQueue_take(&event_queue, &event);
+		pthread_mutex_unlock(&event_lock);
+		if (!took) break;
+		EventSub matched[PLUGIN_MAX];
+		int count = EventSubs_match(&event_subs, event.name, matched, PLUGIN_MAX);
+		for (int k = 0; k < count; k++) {
+			// one that unsubscribed, or changed its callback, in an earlier callback
+			const EventSub* still = EventSubs_find(&event_subs, event.name, matched[k].owner);
+			if (!still || still->fn != matched[k].fn || still->data != matched[k].data) continue;
+			LoadedPlugin* p = loadedById(matched[k].owner);
+			if (!p) continue;
+			AS_CALLER(p->id) matched[k].fn(event.name, event.payload, matched[k].data);
+		}
+	}
+	delivering = 0;
+}
+
+// Unloading a plugin removes its subscriptions; what it published stays
+// queued.
+static void eventsReleaseAll(const char* plugin_id) {
+	int released = EventSubs_releaseAll(&event_subs, plugin_id);
+	if (released > 0) LOG_info("plugins: %s's subscriptions are released (%i)\n", plugin_id, released);
+	publisherRemove(plugin_id);
+}
+
+// An owner's set changed: launcher.set_changed, with name=<set>. A set
+// the caller owns, or one it may register that nobody has, so a set it
+// just unregistered can be announced too.
+static int hostSetChanged(const char* name) {
+	LoadedPlugin* p = callingPlugin("set_changed");
+	if (!p || !name) return -1;
+	EntrySet* set = EntrySets_find(&sets, name);
+	if (set ? strcmp(set->owner, p->id) != 0 : !EntrySets_nameAllowed(name, p->id)) {
+		LOG_info("plugins: %s can't announce set %s: it isn't its set\n", p->id, name);
+		return -1;
+	}
+	char payload[SET_NAME_MAX + 8];
+	snprintf(payload, sizeof(payload), "name=%s", name);
+	return eventPost(EVENT_HOST_PREFIX "set_changed", payload, NULL, 0);
+}
+
+static int hostSetNames(void (*each)(const char* name, void* data), void* data) {
+	if (!callingPlugin("set_names")) return -1;
+	int count = sets.count;
+	if (!each || !count) return count;
+	// a copy, as each can register or unregister sets
+	char (*names)[SET_NAME_MAX] = malloc((size_t)count * SET_NAME_MAX);
+	if (!names) return -1;
+	for (int i = 0; i < count; i++) memcpy(names[i], sets.items[i].name, SET_NAME_MAX);
+	for (int i = 0; i < count; i++) each(names[i], data);
+	free(names);
+	return count;
+}
+
+
+///////////////////////////////////////
 // screen captures
 
 // Only with plugins loaded, so with none a frame costs what stock's does.
@@ -1431,6 +1637,12 @@ static const MosaicHost host = {
 	.set_has = hostSetHas,
 	.set_list = hostSetList,
 	.is_filtered = hostIsFiltered,
+	.subscribe = hostSubscribe,
+	.unsubscribe = hostUnsubscribe,
+	.publish = hostPublish,
+	.event_value = hostEventValue,
+	.set_changed = hostSetChanged,
+	.set_names = hostSetNames,
 };
 
 ///////////////////////////////////////
@@ -1465,6 +1677,8 @@ static void load(const PluginManifest* m) {
 
 	LoadedPlugin* p = &loaded[loaded_count++];
 	memset(p, 0, sizeof(*p));
+	// so publish from a thread its init starts knows it
+	publisherAdd(Callsite_base((const void*)get), m->id);
 	p->handle = handle;
 	p->plugin = plugin;
 	p->manifest = m;
@@ -1557,6 +1771,7 @@ static void load(const PluginManifest* m) {
 		ScreenSet_dropOwner(&screens, loaded_count - 1);
 		fnReleaseAll(m->id);
 		setsReleaseAll(m->id);
+		eventsReleaseAll(m->id);
 		freeSurfaces(m->id);
 		Audio_closeFor(m->id, "as it declined to start");
 		PluginCfg_free(&p->cfg);
@@ -1656,12 +1871,15 @@ static void claimStrings(void) {
 // The theme slot's owner, or -1, and whether it has failed for the run.
 static int theme_owner = -1;
 static int theme_failed = 0;
+static MosaicTheme theme_last; // the owner's theme as last put in place, for launcher.theme_changed
+static int theme_known = 0;
 
 // The theme slot's owner, once every plugin has loaded and before the
 // first list is built.
 static void claimTheme(void) {
 	theme_owner = -1;
 	theme_failed = 0;
+	theme_known = 0;
 	for (int i = 0; i < loaded_count; i++) {
 		if (!loaded[i].owns_theme) continue;
 		const MosaicPlugin* p = loaded[i].plugin;
@@ -1701,6 +1919,7 @@ int Plugins_themeRefresh(void) {
 	}
 	LoadedPlugin* owner = &loaded[theme_owner];
 	MosaicTheme theme;
+	memset(&theme, 0, sizeof(theme)); // so two asks compare alike
 	Theme_blank(&theme);
 	int result = 0;
 	AS_CALLER(owner->id) result = owner->plugin->theme(&theme);
@@ -1708,8 +1927,15 @@ int Plugins_themeRefresh(void) {
 		LOG_warn("plugins: %s's theme failed (%d), using stock's until the launcher restarts\n", owner->id, result);
 		theme_failed = 1;
 		Theme_clear();
+		if (theme_known) hostEvent(EVENT_HOST_PREFIX "theme_changed", "");
 	}
-	else Theme_set(owner->id, &theme);
+	else {
+		Theme_set(owner->id, &theme);
+		// the first, as the launcher starts, isn't a change
+		if (theme_known && memcmp(&theme, &theme_last, sizeof(theme)) != 0) hostEvent(EVENT_HOST_PREFIX "theme_changed", "");
+		theme_last = theme;
+		theme_known = 1;
+	}
 	fallbackRefresh();
 	state.dirty = 1;
 	return 1;
@@ -1850,6 +2076,7 @@ static void start(void) {
 
 	// post_return is the launcher's, when it starts after the pak
 	if (!settings_only && exists(LAUNCHED_MARKER)) {
+		char* launched = readText(LAUNCHED_MARKER);
 		unlink(LAUNCHED_MARKER);
 		// a game or pak ran, so the play history may have moved on
 		PlayHistory_invalidate();
@@ -1857,6 +2084,9 @@ static void start(void) {
 			const MosaicPlugin* p = loaded[i].plugin;
 			if (Plugin_has(p, post_return) && p->post_return) AS_PLUGIN(i) p->post_return();
 		}
+		// the launch's own payload, or none from an older or hand-made marker
+		hostEvent(EVENT_HOST_PREFIX "return", launched && Events_payloadValid(launched) ? launched : "");
+		free(launched);
 	}
 }
 
@@ -1876,6 +2106,8 @@ void Plugins_started(void) {
 void Plugins_quit(void) {
 	// open screens close first, as a launch leaves them
 	Plugins_screensClose();
+	// what's still waiting, launcher.launch too, before plugins' quit hooks
+	eventsDeliver();
 	ScreenSet_clear(&screens);
 	LayoutSlot_clear(&layout);
 	TransitionSlots_clear(&transitions);
@@ -1891,6 +2123,7 @@ void Plugins_quit(void) {
 		hostLedClear(p->id);
 		fnReleaseAll(p->id);
 		setsReleaseAll(p->id);
+		eventsReleaseAll(p->id);
 		freeSurfaces(p->id);
 		PluginCfg_free(&p->cfg);
 		dlclose(p->handle);
@@ -1898,6 +2131,8 @@ void Plugins_quit(void) {
 	loaded_count = 0;
 	listed = 0;
 	EntrySets_free(&sets);
+	// what quit hooks published goes with them
+	EventQueue_init(&event_queue);
 	Capture_quit();
 	PlayHistory_quit();
 	RAProgress_quit();
@@ -2316,7 +2551,15 @@ int Plugins_preLaunch(const char* path, int type) {
 		LOG_info("plugins: %s replaced the launch of %s with %s\n", loaded[i].id, path, replacement.program);
 	}
 	pending_set = 0;
-	if (loaded_count > 0) putFile(LAUNCHED_MARKER, "");
+	if (loaded_count > 0) {
+		// launcher.launch's payload, kept for launcher.return when the launcher starts again
+		char payload[EVENT_PAYLOAD_MAX];
+		snprintf(payload, sizeof(payload), "path=%s\ntype=%s", path, type == ENTRY_PAK ? "pak" : "rom");
+		putFile(LAUNCHED_MARKER, payload);
+		// queued like any other: the launcher delivers it before its next frame,
+		// or as it quits for the launch, before plugins' quit hooks
+		hostEvent(EVENT_HOST_PREFIX "launch", payload);
+	}
 	Plugins_homeLeaving();
 	return 1;
 }
@@ -2397,6 +2640,8 @@ void Plugins_tick(unsigned long now) {
 	if (loaded_count && wifiSupported()) Wifi_setEnabled(wifiOn());
 	// RetroAchievements answers came in, for the rows that asked
 	if (RAProgress_news()) state.dirty = 1;
+	// what was published since the last frame, before plugins' ticks
+	eventsDeliver();
 	EACH_PLUGIN_WITH(tick) p->tick(now);
 }
 

@@ -1403,6 +1403,53 @@ typedef struct MosaicHost {
 	int (*set_has)(const char* name, const char* path);
 	int (*set_list)(const char* name, void (*each)(const char* path, void* data), void* data);
 	int (*is_filtered)(const char* path);
+
+	// Events: a plugin subscribes to a name and the launcher calls it back
+	// each time that event is published, in place of reading each other's
+	// files. Published events wait in a queue and are delivered on the
+	// launcher's thread before its next frame, oldest first, to each
+	// subscriber in the order it subscribed, as that subscriber (as for
+	// cfg_get), so publishing from a plugin's own thread is allowed and no
+	// callback runs inside another; an event published from a callback
+	// waits for the next frame. Everything still waiting is delivered as
+	// the launcher quits, before plugins' quit hooks, which is how
+	// launcher.launch reaches subscribers before a game or pak starts.
+	// A plugin publishes only <its own id>.<name>, such as music.track; the
+	// launcher's own events are launcher.launch (path=<path>, type=rom or
+	// pak, once a launch goes ahead past every pre_launch), launcher.return
+	// (the same payload, as the launcher starts again after it, after
+	// post_return), launcher.set_changed (name=<set>, from set_changed) and
+	// launcher.theme_changed (no payload, when the theme slot's owner
+	// puts a different theme in place, or its theme fails and stock's is
+	// back). A name is 1 to 63 bytes with no spaces or control
+	// characters, matched exactly. A payload is NULL, or key=value lines
+	// separated by \n, under 1024 bytes: keys of 1 to 31 letters, digits,
+	// '_', '-' or '.', values with no control characters. publish returns
+	// 0, or -1 for a name that isn't the plugin's, a bad payload, or a full
+	// queue (64 events waiting, 8 of them kept for the launcher's own), and
+	// the event is dropped; the launcher logs the first of each. subscribe
+	// returns 0, or -1 for a bad name, no callback or 256 subscriptions in
+	// all; subscribing to the same name again replaces the callback and
+	// data. unsubscribe removes the calling plugin's subscription to name,
+	// returning 0, or -1 for none; unloading a plugin, or its init
+	// declining, removes all of them. event_value copies the value of key
+	// in a payload into out, cut to fit, and returns its whole length, or
+	// -1 when the payload has no such key; the first line with it wins.
+	// set_changed(name) is for a set's owner: it publishes
+	// launcher.set_changed with name=<name> for a set the plugin owns, or
+	// one it may register that no other plugin has (so one it just
+	// unregistered too), returning 0, or -1. set_names calls each(name,
+	// data) for each registered set's name, in the order they were
+	// registered, and returns how many there were; each can be NULL, to
+	// count. subscribe, unsubscribe, set_changed and set_names work where
+	// cfg_get does and return -1 elsewhere; publish and event_value work
+	// from any thread. Check for them with MOSAIC_HOST_HAS(host, set_names).
+	int (*subscribe)(const char* name, void (*on_event)(const char* name, const char* payload, void* data), void* data);
+	int (*unsubscribe)(const char* name);
+	int (*publish)(const char* name, const char* payload);
+	int (*event_value)(const char* payload, const char* key, char* out, size_t size);
+	int (*set_changed)(const char* name);
+	int (*set_names)(void (*each)(const char* name, void* data), void* data);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
