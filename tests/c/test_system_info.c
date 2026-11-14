@@ -7,7 +7,7 @@
 #include "check.h"
 #include "words.h"
 #include "../../plugins/system-info/system_info.c"
-#include "../../plugins/battery-logger/battery_model.h" // its header row
+#include "fakeproviders.h"
 
 #define CARD TEST_SDCARD_PATH
 #define USERDATA CARD "/.userdata/desktop"
@@ -160,39 +160,24 @@ static void testAddrs(void) {
 	CHECK(strlen(tiny) == sizeof(tiny) - 1);
 }
 
-static long long localTime(int y, int mo, int d, int h, int mi, int s) {
-	struct tm tm = { 0 };
-	tm.tm_year = y - 1900;
-	tm.tm_mon = mo - 1;
-	tm.tm_mday = d;
-	tm.tm_hour = h;
-	tm.tm_min = mi;
-	tm.tm_sec = s;
-	tm.tm_isdst = -1;
-	return (long long)mktime(&tm);
-}
-
 static void testRows(void) {
 	SiSession s;
-	CHECK(Si_parseRow("2026-11-08 14:03:05,Tetris,Roms/GB/Tetris.gb,3600,90,80,10,10.0,no\n", &s) == 0);
-	CHECK(s.start == localTime(2026, 11, 8, 14, 3, 5));
-	CHECK(s.seconds == 3600 && s.start_level == 90 && s.end_level == 80);
-	// quoted fields with commas and doubled quotes
-	CHECK(Si_parseRow("2026-11-08 14:03:05,\"Mario, \"\"Dr.\"\"\",\"Roms/NES/Mario, Dr.nes\",60,50,55,,,yes", &s) == 0);
+	CHECK(Si_parseRow("1762610585,3600,90,80,0\n", &s) == 0);
+	CHECK(s.start == 1762610585 && s.seconds == 3600 && s.start_level == 90 && s.end_level == 80);
+	CHECK(Si_parseRow("1762610585,60,50,55,1", &s) == 0);
 	CHECK(s.seconds == 60 && s.start_level == 50 && s.end_level == 55);
-	CHECK(Si_parseRow("2026-11-08 14:03:05,A,B,60,50,49,1,60.0,no\r\n", &s) == 0);
-	// not rows
-	CHECK(Si_parseRow(BL_HEADER, &s) == -1);
+	CHECK(Si_parseRow("0,60,50,49,0\r\n", &s) == 0);
+	// not sessions
 	CHECK(Si_parseRow("", &s) == -1);
 	CHECK(Si_parseRow(NULL, &s) == -1);
-	CHECK(Si_parseRow("2026-11-08,A,B,60,50,49,1,60.0,no", &s) == -1);
-	CHECK(Si_parseRow("2026-13-08 14:03:05,A,B,60,50,49,1,60.0,no", &s) == -1);
-	CHECK(Si_parseRow("2026-11-08 14:03:05,A,B,0,50,49,1,60.0,no", &s) == -1);
-	CHECK(Si_parseRow("2026-11-08 14:03:05,A,B,60,101,49,1,60.0,no", &s) == -1);
-	CHECK(Si_parseRow("2026-11-08 14:03:05,A,B,60,50,x,1,60.0,no", &s) == -1);
-	CHECK(Si_parseRow("2026-11-08 14:03:05,A,B,60,50", &s) == -1);
-	CHECK(Si_parseRow("2026-11-08 14:03:05,\"A,B,60,50,49", &s) == -1);
-	CHECK(Si_parseRow("2026-11-08 14:03:05,\"A\"x,B,60,50,49,1,60.0,no", &s) == -1);
+	CHECK(Si_parseRow("1762610585,0,50,49,0", &s) == -1);
+	CHECK(Si_parseRow("1762610585,60,101,49,0", &s) == -1);
+	CHECK(Si_parseRow("1762610585,60,50,x,0", &s) == -1);
+	CHECK(Si_parseRow("1762610585,60,50,49,2", &s) == -1);
+	CHECK(Si_parseRow("1762610585,60,50", &s) == -1);
+	CHECK(Si_parseRow("1762610585,60,50,49,0,7", &s) == -1);
+	CHECK(Si_parseRow("-5,60,50,49,0", &s) == -1);
+	CHECK(Si_parseRow("2026-11-08 14:03:05,A,B,60,50,49,1,60.0,no", &s) == -1);
 }
 
 // the values in the words they're given, then English again
@@ -225,8 +210,7 @@ static void testWords(void) {
 	CHECK_STR(out, "Home Net, sin direcci\xc3\xb3n a\xc3\xban, 2 de 3 barras");
 	SiHistory h;
 	Si_historyInit(&h);
-	Si_historyAdd(&h, BL_HEADER "2026-11-08 10:00:00,A,a,300,100,70,30,360.0,no\n"
-		"2026-11-08 12:00:00,B,b,100,50,40,10,360.0,no\n");
+	Si_historyAdd(&h, "1000,300,100,70,0\n2000,100,50,40,0\n");
 	Si_graphCaption(&h, out, sizeof(out));
 	CHECK_STR(out, "Bater\xc3\xad" "a en las \xc3\xbaltimas 2 partidas, 6 min de juego");
 	Si_setWords(NULL);
@@ -246,11 +230,8 @@ static void testHistory(void) {
 	CHECK(Si_graph(&h, 8, levels) == 0);
 
 	// out of order and with a bad row: sorted by start
-	const char* csv = BL_HEADER
-		"2026-11-08 12:00:00,B,b,100,50,40,10,360.0,no\n"
-		"garbage\n"
-		"2026-11-08 10:00:00,A,a,300,100,70,30,360.0,no\n";
-	CHECK(Si_historyAdd(&h, csv) == 2);
+	const char* sessions = "2000,100,50,40,0\ngarbage\n1000,300,100,70,0\n";
+	CHECK(Si_historyAdd(&h, sessions) == 2);
 	CHECK(h.count == 2);
 	CHECK(h.sessions[0].start_level == 100 && h.sessions[1].start_level == 50);
 	CHECK(Si_historySeconds(&h) == 400);
@@ -267,7 +248,7 @@ static void testHistory(void) {
 
 	// a charged session goes up
 	Si_historyInit(&h);
-	Si_historyAdd(&h, "2026-11-08 10:00:00,A,a,100,20,40,,,yes\n");
+	Si_historyAdd(&h, "1000,100,20,40,1\n");
 	CHECK(Si_graph(&h, 2, levels) == 2);
 	CHECK(levels[0] == 25 && levels[1] == 35);
 	Si_graphCaption(&h, out, sizeof(out));
@@ -277,7 +258,7 @@ static void testHistory(void) {
 	Si_historyInit(&h);
 	char row[128];
 	for (int i = SI_SESSIONS_MAX + 9; i >= 0; i--) {
-		snprintf(row, sizeof(row), "2026-11-%02d %02d:00:00,G,g,60,%d,1,,,no\n", 1 + i / 24, i % 24, 1 + i % 100);
+		snprintf(row, sizeof(row), "%d,60,%d,1,0\n", 1000000 + i * 3600, 1 + i % 100);
 		Si_historyAdd(&h, row);
 	}
 	CHECK(h.count == SI_SESSIONS_MAX);
@@ -388,6 +369,14 @@ static const char* tile_setting = "on";
 static const char* button_setting = "none";
 static int level = 85, charging = 0;
 static MosaicRect hole_now;
+
+// battery-logger's battery.history, with two sessions
+static int fakeHistory(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	snprintf(out, size, "count=2\nseconds=1200\nsession.0=1761991200,600,100,90,0\nsession.1=1762077600,600,80,70,0");
+	return 0;
+}
 
 static void fakeLog(const char* id, const char* message) {
 	snprintf(last_log, sizeof(last_log), "%s", message);
@@ -644,9 +633,10 @@ static void testPlugin(void) {
 	tick(20000);
 	CHECK(redraws == 0);
 
-	// with battery-logger's rows, old file first
-	writeFile(USERDATA "/launcher/battery-logger.old.csv", BL_HEADER "2026-11-01 10:00:00,A,a,600,100,90,10,60.0,no\n");
-	writeFile(USERDATA "/launcher/battery-logger.csv", BL_HEADER "2026-11-02 10:00:00,B,b,600,80,70,10,60.0,no\n");
+	// with battery-logger's sessions, from battery.history
+	fakeProvide("battery.history", fakeHistory);
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
 	all_log[0] = '\0';
 	action_run(NULL, NULL);
 	CHECK(logged("opened, 2 games of battery history"));

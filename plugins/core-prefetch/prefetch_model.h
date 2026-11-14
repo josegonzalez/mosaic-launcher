@@ -43,23 +43,6 @@ int CP_pakLaunch(const char* sdcard, const char* platform, const char* name, cha
 int CP_scriptCore(const char* script, const char* pak_dir, const char* sdcard, const char* platform, char* out, size_t size);
 
 ///////////////////////////////////////
-// emulator-override
-
-// 1 when emulator-override is loaded, as host->plugin_loaded says, or 0 on
-// a launcher without it.
-int CP_overrideOn(const MosaicHost* host);
-
-// The card-relative key emulator-override keeps a game's choice under: the
-// .m3u named after the game's folder when there's one, or the game's own
-// path. Returns 1, or 0 for a path that isn't on the card.
-int CP_overrideKey(const char* sdcard, const char* path, char* key, size_t size);
-
-// The pak emulator-override.txt chooses for key, from at most max_bytes of
-// the file: the last line with key, a tab, and a name CP_validName takes.
-// Returns 1 with the name, or 0.
-int CP_overridePak(const char* file, const char* key, long max_bytes, char* out, size_t size);
-
-///////////////////////////////////////
 // files
 
 // Reads at most size - 1 bytes of a file as text. Returns the length, or

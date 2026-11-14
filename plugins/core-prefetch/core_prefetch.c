@@ -2,7 +2,9 @@
 // faster.
 //
 // In pre_launch it finds the emulator pak the game launches with, as stock
-// does (or the one emulator-override chose for it, when that plugin is on),
+// does, or the one emulator-override's emulator.choice service gives for
+// it when that plugin is on (without it, the system's own, as the game
+// then launches with),
 // reads the pak's launch.sh for the core it runs, and asks the kernel to
 // read that core, then the game, into the page cache with
 // posix_fadvise(POSIX_FADV_WILLNEED). The reads go on in the background
@@ -27,7 +29,6 @@
 
 #define ID "core-prefetch"
 #define CHUNK (1024 * 1024)          // bytes per posix_fadvise call
-#define OVERRIDE_MAX (1024 * 1024)   // the most of emulator-override.txt read, as it reads it
 
 static const MosaicHost* host;
 static int supported = 0;
@@ -61,15 +62,15 @@ static int (*advise)(int fd, long long offset, long long len) = NULL;
 #endif
 static long long (*now_ms)(void) = nowMs;
 
-// The pak emulator-override launches path with, when it's on and has a
-// valid choice for it.
+// The pak emulator-override launches path with, from its emulator.choice
+// service: 1 when it's on and its choice is a pak that launches, else 0.
 static int overridePak(const char* path, char* out, size_t size) {
-	char file[CP_PATH_LEN];
-	char key[CP_PATH_LEN];
-	if (!CP_overrideOn(host)) return 0;
-	if (!CP_overrideKey(host->sdcard_path, path, key, sizeof(key))) return 0;
-	snprintf(file, sizeof(file), "%s/launcher/emulator-override.txt", host->userdata_path);
-	return CP_overridePak(file, key, OVERRIDE_MAX, out, size);
+	if (!MOSAIC_HOST_HAS(host, call)) return 0;
+	char args[CP_PATH_LEN + 8], reply[MOSAIC_CALL_MAX], launch[CP_PATH_LEN];
+	if (snprintf(args, sizeof(args), "path=%s", path) >= (int)sizeof(args)) return 0;
+	if (host->call("emulator.choice", args, reply, sizeof(reply)) < 0) return 0;
+	int got = host->event_value(reply, "pak", out, size);
+	return got > 0 && got < (int)size && host->event_value(reply, "launch", launch, sizeof(launch)) > 0;
 }
 
 static int preLaunch(const MosaicLaunch* launch) {

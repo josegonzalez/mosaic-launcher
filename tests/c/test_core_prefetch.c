@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "check.h"
-#include "fakeloaded.h"
+#include "fakeproviders.h"
 
 #include "../../plugins/core-prefetch/core_prefetch.c"
 
@@ -136,8 +136,20 @@ static MosaicHost fake = {
 	.userdata_path = USERDATA,
 	.log = fakeLog,
 	.cfg_get = fakeCfgGet,
-	.plugin_loaded = fakePluginLoaded,
+	.call = fakeCall,
+	.event_value = fakeEventValue,
 };
+
+// emulator-override's emulator.choice: choice_pak for every game, with
+// choice_launch as its launch.sh, as it answers.
+static const char* choice_pak = "";
+static const char* choice_launch = "";
+static int fakeChoice(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	snprintf(out, size, "pak=%s\nlaunch=%s", choice_pak, choice_launch);
+	return 0;
+}
 
 ///////////////////////////////////////
 // the model
@@ -187,42 +199,6 @@ static void testScriptCore(void) {
 	CHECK(!CP_scriptCore("EMU_EXE=gpsp\nCORES_PATH=/tmp\n$CORES_PATH/${EMU_EXE}_libretro.so\n", "/p", "/c", "t", out, sizeof(out)));
 	CHECK(!CP_scriptCore("EMU_EXE=gpsp\nretroarch -L gpsp.so\n", "/p", "/c", "t", out, sizeof(out)));
 	CHECK(!CP_scriptCore("EMU_EXE=../x\n$CORES_PATH/${EMU_EXE}_libretro.so\n", "/p", "/c", "t", out, sizeof(out)));
-}
-
-static void testOverride(void) {
-	MosaicHost h = { .size = sizeof(MosaicHost), .plugin_loaded = fakePluginLoaded };
-	CHECK(!CP_overrideOn(NULL));
-	fake_loaded = "favorites,emulator-override-x";
-	CHECK(!CP_overrideOn(&h));
-	fake_loaded = "favorites,emulator-override";
-	CHECK(CP_overrideOn(&h));
-	// an older launcher's table, without plugin_loaded
-	h.size = FAKE_HOST_BEFORE_LOADED;
-	CHECK(!CP_overrideOn(&h));
-	fake_loaded = "";
-
-	char key[CP_PATH_LEN];
-	CHECK(CP_overrideKey(CARD, CARD "/Roms/Game Boy Advance (GBA)/Metroid.gba", key, sizeof(key)));
-	CHECK_STR(key, "/Roms/Game Boy Advance (GBA)/Metroid.gba");
-	CHECK(CP_overrideKey(CARD, CARD "/Roms/Game Boy Advance (GBA)/Golden Sun/Golden Sun.gba", key, sizeof(key)));
-	CHECK_STR(key, "/Roms/Game Boy Advance (GBA)/Golden Sun/Golden Sun.m3u");
-	CHECK(!CP_overrideKey(CARD, CARD "/Roms/GBA/../x.gba", key, sizeof(key)));
-	CHECK(!CP_overrideKey(CARD, "/elsewhere/Roms/GBA/x.gba", key, sizeof(key)));
-
-	const char* file = USERDATA "/launcher/emulator-override.txt";
-	writeFile(file, "/Roms/A/x.gba\tMGBA\nno tab here\n/Roms/A/x.gba\t../bad\n/Roms/A/y.gba\tGBA\n/Roms/A/x.gba\tSGB\r\n");
-	char pak[CP_NAME_LEN];
-	CHECK(CP_overridePak(file, "/Roms/A/x.gba", 1 << 20, pak, sizeof(pak)));
-	CHECK_STR(pak, "SGB");
-	CHECK(CP_overridePak(file, "/Roms/A/y.gba", 1 << 20, pak, sizeof(pak)));
-	CHECK_STR(pak, "GBA");
-	CHECK(!CP_overridePak(file, "/Roms/A/z.gba", 1 << 20, pak, sizeof(pak)));
-	CHECK(!CP_overridePak(file, "/Roms/A/x.gb", 1 << 20, pak, sizeof(pak)));
-	// only as far as max_bytes
-	CHECK(CP_overridePak(file, "/Roms/A/x.gba", 20, pak, sizeof(pak)));
-	CHECK_STR(pak, "MGBA");
-	CHECK(!CP_overridePak(USERDATA "/missing.txt", "/Roms/A/x.gba", 1 << 20, pak, sizeof(pak)));
-	unlink(file);
 }
 
 static void testRomFiles(void) {
@@ -358,22 +334,28 @@ static void testPlugin(void) {
 	CHECK(advisedFor(OUTSIDE "/secret.gba", &in_order) == 0);
 	CHECK(advisedFor(gpsp, &in_order) == 3000);
 
-	// emulator-override's choice, only while it's loaded: not while it's
-	// only on in plugins.txt, as when its init declined
-	writeFile(USERDATA "/launcher/emulator-override.txt", "/Roms/Game Boy Advance (GBA)/Metroid.gba\tMGBA\n");
-	writeFile(USERDATA "/launcher/plugins.txt", "emulator-override=on\n");
+	// emulator-override's choice, from emulator.choice: none without the
+	// service, as when the plugin is off, and the game launches with its
+	// system's own
+	fake_provider_count = 0;
 	CHECK(launchGame(metroid, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(advisedFor(gpsp, &in_order) == 3000 && advisedFor(mgba, &in_order) == 0);
-	fake_loaded = "emulator-override";
+	fakeProvide("emulator.choice", fakeChoice);
+	choice_pak = "MGBA";
+	choice_launch = CARD "/Emus/test/MGBA.pak/launch.sh";
 	CHECK(launchGame(metroid, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(advisedFor(gpsp, &in_order) == 0 && advisedFor(mgba, &in_order) == 4000);
 	CHECK(strstr(logged, "the core from MGBA.pak") != NULL);
-	// a choice that isn't a pak on the card falls back to the default, as the override does
-	writeFile(USERDATA "/launcher/emulator-override.txt", "/Roms/Game Boy Advance (GBA)/Metroid.gba\tGONE\n");
+	// a choice that doesn't launch falls back to the default, as the override does
+	choice_pak = "GONE";
+	choice_launch = "";
 	CHECK(launchGame(metroid, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
 	CHECK(advisedFor(gpsp, &in_order) == 3000);
-	unlink(USERDATA "/launcher/plugins.txt");
-	fake_loaded = "";
+	// and so does no choice
+	choice_pak = "";
+	CHECK(launchGame(metroid, MOSAIC_ENTRY_ROM) == MOSAIC_LAUNCH_CONTINUE);
+	CHECK(advisedFor(gpsp, &in_order) == 3000);
+	fake_provider_count = 0;
 
 	// the time and byte settings
 	strcpy(cfg_mb, "1");
@@ -408,7 +390,6 @@ int main(void) {
 	testEmuTag();
 	testPakLaunch();
 	testScriptCore();
-	testOverride();
 	testRomFiles();
 	testCardFile();
 	testWarm();

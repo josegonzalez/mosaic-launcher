@@ -21,9 +21,10 @@
 // network, its address and signal, or off, not connected, or checking
 // until the host has first looked.
 //
-// The graph reads battery-logger.csv (and the .old.csv before it) when the
-// screen opens: the last games' levels back to back by play time, the
-// time between games left out. Without rows it says so.
+// The graph asks battery-logger's battery.history service for its
+// sessions when the screen opens: the last games' levels back to back by
+// play time, the time between games left out. Without sessions, as with
+// battery-logger off, it says there's no history.
 
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -201,14 +202,15 @@ static void logValues(void) {
 
 static void readHistory(void) {
 	Si_historyInit(&history);
-	static const char* names[] = { "battery-logger.old.csv", "battery-logger.csv" };
-	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-		char path[1024];
-		snprintf(path, sizeof(path), "%s/launcher/%s", host->userdata_path, names[i]);
-		// battery-logger's largest log is 1024 KB
-		char* text = readAll(path, 1024 * 1024 + 4096);
-		if (text) Si_historyAdd(&history, text);
-		free(text);
+	if (!MOSAIC_HOST_HAS(host, call)) return;
+	static char reply[MOSAIC_CALL_MAX];
+	if (host->call("battery.history", NULL, reply, sizeof(reply)) < 0) return;
+	char value[32];
+	int count = host->event_value(reply, "count", value, sizeof(value)) > 0 ? atoi(value) : 0;
+	for (int i = 0; i < count && i < SI_SESSIONS_MAX; i++) {
+		char key[32], session[128];
+		snprintf(key, sizeof(key), "session.%d", i);
+		if (host->event_value(reply, key, session, sizeof(session)) > 0) Si_historyAdd(&history, session);
 	}
 }
 

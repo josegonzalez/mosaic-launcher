@@ -3,7 +3,7 @@
 
 // What system info works out apart from the host and SDL: reading
 // /proc/meminfo and /proc/uptime, stock's version.txt and battery-logger's
-// CSV, formatting the values, the battery graph's columns and the screen's
+// sessions, formatting the values, the battery graph's columns and the screen's
 // layout, so the host tests can check it on its own.
 
 #include <stddef.h>
@@ -107,7 +107,7 @@ void Si_formatAddrs(const SiAddrs* a, char* out, size_t size);
 // One battery-logger session: when it started, how long it ran and the
 // level at either end.
 typedef struct SiSession {
-	long long start; // local time from the row's date, as mktime gives it
+	long long start; // a Unix time
 	long long seconds;
 	int start_level, end_level;
 } SiSession;
@@ -120,13 +120,14 @@ typedef struct SiHistory {
 
 void Si_historyInit(SiHistory* h);
 
-// One CSV row of battery-logger's (date,game,path,seconds,start_percent,
-// end_percent,...), with quoted fields. Returns 0, or -1 for the header or
-// a row that isn't one.
+// One session as battery-logger's battery.history service gives it,
+// <start>,<seconds>,<start_percent>,<end_percent>,<charged>, the start a
+// Unix time and charged 1 or 0. Returns 0, or -1 for anything else.
 int Si_parseRow(const char* line, SiSession* out);
 
-// Adds every row in text, keeping the last SI_SESSIONS_MAX by start
-// time. Returns how many were added.
+// Adds every session in text, one a line as Si_parseRow takes them,
+// keeping the last SI_SESSIONS_MAX by start time. Returns how many were
+// added.
 int Si_historyAdd(SiHistory* h, const char* text);
 
 // Total play time over the sessions.

@@ -4,9 +4,10 @@
 # the bundled system-info: screener runs its action, presses A (the
 # graph's own page where it doesn't fit under the rows) and backs out. Desktop
 # has no battery, so that row is unavailable, as is Wi-Fi; the version
-# comes from the card's version.txt and the graph from a battery-logger
-# CSV, then a second run without the CSV says there's no history, and a
-# third with a fake Wi-Fi shows the network
+# comes from the card's version.txt and the graph from battery-logger's
+# battery.history over its CSV, then a run with battery-logger off and one
+# without the CSV say there's no history, and one with a fake Wi-Fi shows
+# the network
 SI_VERSION="$CARD/.system/version.txt"
 SI_CSV="$STATE/battery-logger.csv"
 [ -e "$SI_VERSION" ] && mv "$SI_VERSION" "$WORK/version.saved"
@@ -16,7 +17,8 @@ printf 'NextUI-20261013-0\n39a06de\n' >"$SI_VERSION"
 printf '%s\n' 'date,game,path,seconds,start_percent,end_percent,drain_percent,percent_per_hour,charged' \
 	'2026-11-01 10:00:00,Tetris,Roms/GB/Tetris.gb,1800,100,85,15,30.0,no' \
 	'2026-11-02 10:00:00,"Mario, Dr.",Roms/NES/Dr. Mario.nes,1800,80,60,20,40.0,no' >"$SI_CSV"
-make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" system-info >/dev/null || fail "building system-info"
+make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" system-info battery-logger >/dev/null \
+	|| fail "building system-info and battery-logger"
 build_plugin screener 'id=screener\nname=Screener\napi=1\nslots=transition\n'
 printf 'steps=action:system-info.open,a,b,b\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/system-info.log" "plugin screener: done" || fail "the launcher exited early with system-info"
@@ -32,6 +34,14 @@ grep -qE "plugin system-info: graph of 2 games over [0-9]+ columns, from (99|100
 expect "closed"
 [ "$(seen)" = "gamelist system-info.main gamelist " ] || fail "system-info didn't open and close: $(seen)"
 grep -qF "plugins: system-info's screen system-info.main's" "$log" && fail "system-info's screen was turned off"
+
+# battery-logger off: its CSV is still there, but nobody gives the history
+printf 'battery-logger=off\n' >"$STATE/plugins.txt"
+run_launcher "$WORK/system-info-off.log" "plugin screener: done" || fail "the launcher exited early with battery-logger off"
+log="$WORK/system-info-off.log"
+expect "opened, 0 games of battery history"
+expect "no battery history"
+rm -f "$STATE/plugins.txt"
 
 rm -f "$SI_CSV"
 run_launcher "$WORK/system-info-empty.log" "plugin screener: done" || fail "the launcher exited early with system-info"
@@ -55,5 +65,6 @@ rm -f "$SI_WIFI"
 rm -f "$SI_VERSION"
 [ -e "$WORK/version.saved" ] && mv "$WORK/version.saved" "$SI_VERSION"
 [ -e "$WORK/battery-logger.saved" ] && mv "$WORK/battery-logger.saved" "$SI_CSV"
-rm -rf "$WORK/plugins/system-info.plugin" "$WORK/plugins/screener.plugin" "$STATE/screener.cfg"
+rm -rf "$WORK/plugins/system-info.plugin" "$WORK/plugins/battery-logger.plugin" "$WORK/plugins/screener.plugin" \
+	"$STATE/screener.cfg" "$STATE/plugins.txt"
 case_log=""

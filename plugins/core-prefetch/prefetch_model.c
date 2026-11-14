@@ -25,34 +25,12 @@ static int fmt(char* out, size_t size, const char* format, ...) {
 	return n >= 0 && (size_t)n < size;
 }
 
-static const char* baseName(const char* path) {
-	const char* slash = strrchr(path, '/');
-	return slash ? slash + 1 : path;
-}
-
 // The folder a path is in. Returns 0 when it has none.
 static int dirName(const char* path, char* out, size_t size) {
 	const char* slash = strrchr(path, '/');
 	if (!slash || slash == path || (size_t)(slash - path) >= size) return 0;
 	memcpy(out, path, (size_t)(slash - path));
 	out[slash - path] = '\0';
-	return 1;
-}
-
-// True for an absolute path with no empty, "." or ".." parts and no
-// trailing slash.
-static int cleanPath(const char* path) {
-	if (path[0] != '/' || !path[1]) return 0;
-	const char* p = path;
-	while (*p) {
-		p++; // past a slash
-		const char* end = strchr(p, '/');
-		size_t len = end ? (size_t)(end - p) : strlen(p);
-		if (len == 0) return 0;
-		if (len == 1 && p[0] == '.') return 0;
-		if (len == 2 && p[0] == '.' && p[1] == '.') return 0;
-		p += len;
-	}
 	return 1;
 }
 
@@ -201,52 +179,6 @@ int CP_scriptCore(const char* script, const char* pak_dir, const char* sdcard, c
 	if (!strstr(script, "$CORES_PATH/${EMU_EXE}_libretro.so") && !strstr(script, "${CORES_PATH}/${EMU_EXE}_libretro.so")) return 0;
 	if (cores_here) return fmt(out, size, "%s/%s_libretro.so", pak_dir, exe);
 	return fmt(out, size, "%s/.system/%s/cores/%s_libretro.so", sdcard, platform, exe);
-}
-
-///////////////////////////////////////
-// emulator-override
-
-int CP_overrideOn(const MosaicHost* host) {
-	return host && MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded("emulator-override");
-}
-
-int CP_overrideKey(const char* sdcard, const char* path, char* key, size_t size) {
-	if (!sdcard || !path || !key || !size) return 0;
-	char tag[CP_NAME_LEN];
-	if (!CP_emuTag(sdcard, path, tag, sizeof(tag)) || !cleanPath(path) || strlen(path) >= CP_PATH_LEN) return 0;
-	char game[CP_PATH_LEN];
-	char dir[CP_PATH_LEN];
-	if (!dirName(path, dir, sizeof(dir)) || !fmt(game, sizeof(game), "%s/%s.m3u", dir, baseName(dir)) || !isFile(game)) {
-		strcpy(game, path);
-	}
-	return fmt(key, size, "%s", game + strlen(sdcard));
-}
-
-int CP_overridePak(const char* file, const char* key, long max_bytes, char* out, size_t size) {
-	if (!file || !key || !key[0] || !out || !size) return 0;
-	FILE* f = fopen(file, "r");
-	if (!f) return 0;
-	int found = 0;
-	long seen = 0;
-	char line[LINE_LEN];
-	size_t key_len = strlen(key);
-	while (seen < max_bytes && fgets(line, sizeof(line), f)) {
-		size_t len = strlen(line);
-		seen += (long)len;
-		if (len && line[len - 1] != '\n' && !feof(f)) {
-			// too long to be ours; skip the rest of it
-			int c;
-			while ((c = fgetc(f)) != EOF && c != '\n') seen++;
-			continue;
-		}
-		while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = '\0';
-		if (strncmp(line, key, key_len) != 0 || line[key_len] != '\t') continue;
-		const char* pak = line + key_len + 1;
-		if (!CP_validName(pak)) continue;
-		found = fmt(out, size, "%s", pak);
-	}
-	fclose(f);
-	return found;
 }
 
 ///////////////////////////////////////

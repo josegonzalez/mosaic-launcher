@@ -227,74 +227,39 @@ void Si_historyInit(SiHistory* h) {
 	memset(h, 0, sizeof(*h));
 }
 
-// The CSV field at *p into out, unquoting it, moving *p past its comma.
-// Returns 0, or -1 at the end of the line or for one that doesn't fit.
-static int csvField(const char** p, char* out, size_t size) {
-	const char* s = *p;
-	size_t o = 0;
-	if (!*s || *s == '\r' || *s == '\n') return -1;
-	if (*s == '"') {
-		s++;
-		for (;;) {
-			if (!*s || *s == '\n') return -1;
-			if (*s == '"') {
-				if (s[1] != '"') {
-					s++;
-					break;
-				}
-				s++;
-			}
-			if (o + 1 >= size) return -1;
-			out[o++] = *s++;
-		}
-	} else {
-		while (*s && *s != ',' && *s != '\r' && *s != '\n') {
-			if (o + 1 >= size) return -1;
-			out[o++] = *s++;
-		}
-	}
-	out[o] = '\0';
-	if (*s == ',') s++;
-	else if (*s && *s != '\r' && *s != '\n') return -1;
-	*p = s;
-	return 0;
-}
-
-static int wholeNumber(const char* text, long long lo, long long hi, long long* out) {
+static int wholeNumber(const char* text, size_t len, long long lo, long long hi, long long* out) {
+	char number[32];
+	if (!len || len >= sizeof(number)) return -1;
+	memcpy(number, text, len);
+	number[len] = '\0';
 	char* end;
 	errno = 0;
-	long long v = strtoll(text, &end, 10);
-	if (errno || end == text || *end || v < lo || v > hi) return -1;
+	long long v = strtoll(number, &end, 10);
+	if (errno || end == number || *end || v < lo || v > hi) return -1;
 	*out = v;
 	return 0;
 }
 
 int Si_parseRow(const char* line, SiSession* out) {
 	if (!line) return -1;
-	char date[32], skip[2048], number[32];
+	long long fields[5];
+	static const long long lo[5] = { 0, 1, 0, 0, 0 };
+	static const long long hi[5] = { 1LL << 40, 100LL * 24 * 3600, 100, 100, 1 };
 	const char* p = line;
-	if (csvField(&p, date, sizeof(date)) || csvField(&p, skip, sizeof(skip)) || csvField(&p, skip, sizeof(skip)))
-		return -1;
-	struct tm tm;
-	memset(&tm, 0, sizeof(tm));
-	char tail;
-	if (sscanf(date, "%4d-%2d-%2d %2d:%2d:%2d%c", &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min,
-			&tm.tm_sec, &tail) != 6)
-		return -1;
-	if (tm.tm_mon < 1 || tm.tm_mon > 12 || tm.tm_mday < 1 || tm.tm_mday > 31) return -1;
-	tm.tm_year -= 1900;
-	tm.tm_mon -= 1;
-	tm.tm_isdst = -1;
-	time_t when = mktime(&tm);
-	if (when == (time_t)-1) return -1;
-	long long seconds, start_level, end_level;
-	if (csvField(&p, number, sizeof(number)) || wholeNumber(number, 1, 100LL * 24 * 3600, &seconds)) return -1;
-	if (csvField(&p, number, sizeof(number)) || wholeNumber(number, 0, 100, &start_level)) return -1;
-	if (csvField(&p, number, sizeof(number)) || wholeNumber(number, 0, 100, &end_level)) return -1;
-	out->start = (long long)when;
-	out->seconds = seconds;
-	out->start_level = (int)start_level;
-	out->end_level = (int)end_level;
+	for (int i = 0; i < 5; i++) {
+		size_t len = strcspn(p, i < 4 ? ",\r\n" : "\r\n");
+		if (wholeNumber(p, len, lo[i], hi[i], &fields[i]) != 0) return -1;
+		p += len;
+		if (i < 4) {
+			if (*p != ',') return -1;
+			p++;
+		}
+	}
+	if (*p && *p != '\r' && *p != '\n') return -1;
+	out->start = fields[0];
+	out->seconds = fields[1];
+	out->start_level = (int)fields[2];
+	out->end_level = (int)fields[3];
 	return 0;
 }
 
