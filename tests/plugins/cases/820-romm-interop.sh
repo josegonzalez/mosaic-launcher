@@ -82,7 +82,7 @@ done
 RI_PORT=$(cat "$RI_WORK/port" 2>/dev/null)
 [ -n "$RI_PORT" ] || fail "the stand-in RomM didn't start"
 # the Flashback button off, so Y is save-state-manager's alone
-printf 'url=http://127.0.0.1:%s\nuser=admin\npassword=Pw-820\nbutton=none\n' "$RI_PORT" >"$STATE/romm.cfg"
+printf 'url=http://127.0.0.1:%s\nuser=admin\npassword=Pw-86-secret\nbutton=none\n' "$RI_PORT" >"$STATE/romm.cfg"
 
 # the RomM folder's platforms and Game Boy's roms, then a download that
 # completes gamification's RomM quest as it goes on to launch the game
@@ -132,12 +132,12 @@ rm -f "$STATE/screener.cfg"
 ri_plugins romm=on home-dashboard=on
 ri_run home "r1" "$RI_ONE" "presser: done" || fail "the launcher exited early with home-dashboard"
 plugin=home-dashboard
-expect "history on, downloads 1"
+grep -qF ", history on, downloads 1" "$log" || fail "home-dashboard didn't read one download"
 grep -qxF "RECENTLY DOWNLOADED" "$texts" || fail "home-dashboard didn't draw the Recently downloaded heading"
 grep -qxF "Mosaic Test One" "$texts" || fail "home-dashboard didn't list the download"
 ri_plugins home-dashboard=on
 ri_run home-off "r1" "$RI_ONE" "presser: done" || fail "the launcher exited early with home-dashboard and no romm"
-expect "history on, downloads 0"
+grep -qF ", history on, downloads 0" "$log" || fail "home-dashboard didn't read no downloads"
 grep -qxF "RECENTLY DOWNLOADED" "$texts" && fail "home-dashboard drew Recently downloaded without romm"
 
 # save-state-manager: the state romm uploaded, marked, then Restore from
@@ -171,7 +171,7 @@ grep -qE "plugin save-state-manager: slots 0 of 1: Mosaic Test One, Slot 1, .*co
 kill "$RI_PID"
 wait "$RI_PID" 2>/dev/null
 for f in "$WORK"/romm-interop-*.log; do
-	grep -qF "Pw-820" "$f" && fail "romm logged the password in $(basename "$f")"
+	grep -qF "Pw-86-secret" "$f" && fail "romm logged the password in $(basename "$f")"
 done
 if [ -f "$RI_WORK/recent.txt.saved" ]; then cp "$RI_WORK/recent.txt.saved" "$RECENTS"; else rm -f "$RECENTS"; fi
 rm -f "$PLAY_DB"
