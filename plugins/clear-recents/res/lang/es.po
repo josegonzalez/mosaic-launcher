@@ -24,6 +24,9 @@ msgstr "Borrar recientes"
 msgid "Clear recents tile on the quick menu"
 msgstr "Icono de borrar recientes en el menú rápido"
 
+msgid "Clears the Recently Played list, one game at a time or all at once."
+msgstr "Borra la lista de Jugados recientemente, un juego cada vez o todos de una vez."
+
 msgid "Couldn't remove that"
 msgstr "No se pudo quitar"
 

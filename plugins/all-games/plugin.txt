@@ -3,6 +3,7 @@ name=All games
 api=1
 category=Library
 summary=Lists every game from every system in one list.
+description=Turns the first screen into one list of every game on the card, from all systems, sorted by name.
 slots=root
 # the root lists every game across systems, after a Systems folder and other plugins' folders
 setting.tags=toggle|Show the system on shared names|on

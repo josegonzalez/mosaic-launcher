@@ -32,3 +32,6 @@ msgstr "En la raíz"
 
 msgid "Order"
 msgstr "Orden"
+
+msgid "Puts your collections on the first screen in your order, with their art, and adds options for how collections list."
+msgstr "Pone tus colecciones en la primera pantalla en tu orden, con sus imágenes, y añade opciones para cómo se listan las colecciones."

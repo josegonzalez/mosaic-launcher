@@ -42,6 +42,9 @@ msgstr "Diseño en cuadrícula"
 msgid "Rows"
 msgstr "Filas"
 
+msgid "Shows the game list as a grid of tiles instead of the built-in list."
+msgstr "Muestra la lista de juegos como una cuadrícula de casillas en lugar de la lista integrada."
+
 msgid "auto"
 msgstr "auto"
 

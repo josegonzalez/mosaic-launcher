@@ -15,6 +15,9 @@ msgstr "Crear partida"
 msgid "Host address"
 msgstr "Dirección del anfitrión"
 
+msgid "Hosts or joins a game over the network. It stays off until NextUI adds netplay."
+msgstr "Crea o se une a una partida por la red. Sigue desactivado hasta que NextUI añada el juego en red."
+
 msgid "Join a game"
 msgstr "Unirse a una partida"
 

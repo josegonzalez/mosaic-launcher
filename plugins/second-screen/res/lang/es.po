@@ -48,6 +48,9 @@ msgstr "Editor"
 msgid "Second screen (experimental, desktop only)"
 msgstr "Segunda pantalla (experimental, solo escritorio)"
 
+msgid "Shows the selected game in a second window. It's experimental and only works on the desktop build."
+msgstr "Muestra el juego seleccionado en una segunda ventana. Es experimental y solo funciona en la versión de escritorio."
+
 msgid "Window size"
 msgstr "Tamaño de la ventana"
 

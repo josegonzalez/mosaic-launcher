@@ -1,6 +1,6 @@
-# The save-state-manager plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The save-state-manager plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -16,6 +16,10 @@ msgstr ""
 
 #: state_model.c
 msgid "Auto"
+msgstr ""
+
+#: plugin.txt
+msgid "Browses, previews and deletes the save states your games keep, on a screen of its own."
 msgstr ""
 
 #: save_state_manager.c

@@ -1,6 +1,6 @@
-# The video-previews plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The video-previews plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -40,6 +40,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Play after (seconds)"
+msgstr ""
+
+#: plugin.txt
+msgid "Plays a short clip of the selected game in place of its thumbnail."
 msgstr ""
 
 #: plugin.txt

@@ -3,7 +3,10 @@ name=Localization
 api=1
 category=Controls and setup
 summary=Translates the launcher and plugins from language packs.
+description=Translates the launcher and other plugins from language packs, so the menus show in your language.
 slots=strings
+# the service first-run sets the language through
+provides=localization.setup
 # the language pack to use, by its code; other takes the code below, and off translates nothing
 setting.language=choice|Language|off|off,other,ca,cs,da,de,el,es,fi,fr,hu,it,ja,ko,nl,no,pl,pt,pt_BR,ru,sv,tr,uk,zh_CN,zh_TW
 # a language code for other, eg. eu or pt_PT

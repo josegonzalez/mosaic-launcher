@@ -12,6 +12,9 @@ msgstr ""
 msgid "Ease"
 msgstr "Suavizado"
 
+msgid "Picks how folders open and close and how the game switcher comes in, while the Menu transitions setting is on."
+msgstr "Elige cómo se abren y cierran las carpetas y cómo entra el selector de juegos, mientras el ajuste Transiciones de menú está activado."
+
 msgid "Speed"
 msgstr "Velocidad"
 

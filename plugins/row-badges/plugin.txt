@@ -3,6 +3,7 @@ name=Row badges
 api=1
 category=Looks
 summary=Adds dots after a game's name for unplayed, favorite and tagged games and for tiers.
+description=Adds small dots after a game's name for games you haven't played, your favorites, games with a tag, and tiers.
 # the games.played service: whether a game was played, the one definition of it
 provides=games.played
 # a dot on games that weren't played: not in recents, with no save, state or resume slot, and no session in the play history

@@ -14,3 +14,6 @@ msgstr "Ocultar el número"
 
 msgid "Numeric prefix ordering"
 msgstr "Orden por prefijo numérico"
+
+msgid "Sorts names that start with a number by that number, so 2 comes before 10."
+msgstr "Ordena los nombres que empiezan por un número según ese número, para que el 2 vaya antes que el 10."

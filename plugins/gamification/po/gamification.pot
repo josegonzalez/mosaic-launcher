@@ -1,6 +1,6 @@
-# The gamification plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The gamification plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -106,6 +106,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "90"
+msgstr ""
+
+#: plugin.txt
+msgid "Adds daily and weekly quests and a play streak, from the games you launch and how long you play."
 msgstr ""
 
 #: gamification_model.c

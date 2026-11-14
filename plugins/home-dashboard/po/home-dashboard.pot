@@ -1,6 +1,6 @@
-# The home-dashboard plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The home-dashboard plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -63,6 +63,10 @@ msgstr ""
 
 #: home_model.c
 msgid "<1m"
+msgstr ""
+
+#: plugin.txt
+msgid "A home screen that comes before the game list, with your last game ready to resume."
 msgstr ""
 
 #: home_dashboard.c

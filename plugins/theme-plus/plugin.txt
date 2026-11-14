@@ -3,7 +3,10 @@ name=Theme plus
 api=1
 category=Looks
 summary=Changes colours, fonts, text size and wallpapers from a theme.
+description=Changes how the launcher looks, its colours, font, text size, wallpapers and button hints, from a theme, without touching stock's settings.
 slots=theme
+# the service first-run sets the theme through
+provides=theme-plus.setup
 # the theme: a folder name in Themes, a bundled theme, a palette's name, or stock for no change
 setting.theme=text|Theme|stock
 # a Theme tile on the quick menu that lists the themes

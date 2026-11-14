@@ -18,6 +18,9 @@ msgstr "Carátulas"
 msgid "Box, wheel and screenshot in .media"
 msgstr "Caja, logo y captura en .media"
 
+msgid "Finds box art in the art folders other firmware uses, so your games show it without you moving files."
+msgstr "Encuentra carátulas en las carpetas de imágenes que usan otros firmwares, para que tus juegos las muestren sin que muevas archivos."
+
 msgid "Folder covers"
 msgstr "Portadas de carpetas"
 

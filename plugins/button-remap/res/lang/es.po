@@ -18,6 +18,9 @@ msgstr "Reasignar botones"
 msgid "L2 button"
 msgstr "Botón L2"
 
+msgid "Puts the game list's own actions, or other plugins' actions, on different buttons."
+msgstr "Pone las acciones de la lista de juegos, o las de otros plugins, en otros botones."
+
 msgid "R2 button"
 msgstr "Botón R2"
 

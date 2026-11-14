@@ -9,6 +9,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Gives games with no art a generated thumbnail and box, so they don't show a blank space."
+msgstr "Da a los juegos sin imagen una miniatura y una caja generadas, para que no muestren un hueco vacío."
+
 msgid "Placeholder art"
 msgstr "Arte provisional"
 

@@ -3,6 +3,7 @@ name=Battery logger (unsupported on desktop)
 api=1
 category=Power
 summary=Logs how much battery each game used.
+description=Logs how much battery each game used, one row per play session, to a file you can open in a spreadsheet.
 # the battery.history service: the sessions it logged
 provides=battery.history
 # sessions shorter than this aren't logged

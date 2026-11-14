@@ -1,6 +1,6 @@
-# The hidden plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The hidden plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -36,6 +36,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Hide button"
+msgstr ""
+
+#: plugin.txt
+msgid "Hides the games you pick from every list."
 msgstr ""
 
 #: plugin.txt

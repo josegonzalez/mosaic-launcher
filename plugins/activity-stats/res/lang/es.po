@@ -100,6 +100,9 @@ msgstr "SELECT"
 msgid "Sat"
 msgstr "sáb"
 
+msgid "Shows how long you played each day and which games you played most, on a screen of its own. It reads the play history the Game Tracker tool keeps."
+msgstr "Muestra cuánto jugaste cada día y a qué juegos jugaste más, en una pantalla propia. Lee el historial de juego que guarda la herramienta Game Tracker."
+
 msgid "Sun"
 msgstr "dom"
 

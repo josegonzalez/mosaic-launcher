@@ -3,6 +3,7 @@ name=Carousel layout
 api=1
 category=Looks
 summary=Shows the game list as a carousel of covers.
+description=Shows the game list as a carousel of covers instead of the built-in list.
 slots=layout
 # slides the covers into place when the selection moves by one or two
 setting.slide=toggle|Slide between games|on

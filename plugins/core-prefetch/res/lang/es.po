@@ -39,6 +39,9 @@ msgstr "8"
 msgid "Core prefetch (unsupported on desktop)"
 msgstr "Precarga de núcleos (no disponible en escritorio)"
 
+msgid "Loads a game's emulator core ahead of time, so the game starts faster."
+msgstr "Carga antes de tiempo el núcleo del emulador de un juego, para que el juego arranque más rápido."
+
 msgid "Longest it waits (ms)"
 msgstr "Espera máxima (ms)"
 

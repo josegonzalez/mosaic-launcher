@@ -3,6 +3,7 @@ name=Play time limit
 api=1
 category=Play time
 summary=Sets a daily limit on how long games can be played.
+description=Sets a daily limit on how long games can be played, from the play history stock keeps.
 # the limit.left service: the daily limit and the time left today
 provides=limit.left
 # minutes of games a day, across every game, from stock's play tracker; once they're used up, games don't launch.

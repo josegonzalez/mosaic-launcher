@@ -17,3 +17,6 @@ msgstr "Mostrar el sistema en nombres compartidos"
 
 msgid "Systems"
 msgstr "Sistemas"
+
+msgid "Turns the first screen into one list of every game on the card, from all systems, sorted by name."
+msgstr "Convierte la primera pantalla en una lista de todos los juegos de la tarjeta, de todos los sistemas, ordenados por nombre."

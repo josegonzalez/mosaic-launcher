@@ -1,6 +1,6 @@
-# The led-status plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The led-status plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -48,6 +48,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "70"
+msgstr ""
+
+#: plugin.txt
+msgid "Colours the device's LEDs by the battery level or by a theme colour while the launcher is on screen."
 msgstr ""
 
 #: plugin.txt

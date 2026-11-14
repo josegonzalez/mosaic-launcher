@@ -81,6 +81,9 @@ msgstr "7"
 msgid "90"
 msgstr "90"
 
+msgid "Adds daily and weekly quests and a play streak, from the games you launch and how long you play."
+msgstr "Añade misiones diarias y semanales y una racha de juego, según los juegos que abres y cuánto juegas."
+
 #, c-format
 msgid "Best %i day"
 msgid_plural "Best %i days"

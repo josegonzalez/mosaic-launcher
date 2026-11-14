@@ -1,6 +1,6 @@
-# The romm plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The romm plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -41,6 +41,10 @@ msgstr ""
 
 #: romm_model.c
 msgid "B"
+msgstr ""
+
+#: plugin.txt
+msgid "Browses a RomM server's library, downloads games when you launch them and backs up your saves to the server."
 msgstr ""
 
 #: romm.c

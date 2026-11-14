@@ -18,6 +18,9 @@ msgstr "3"
 msgid "5"
 msgstr "5"
 
+msgid "A music player for the MP3, FLAC and WAV files on your card that keeps playing while you play a game."
+msgstr "Un reproductor de música para los archivos MP3, FLAC y WAV de tu tarjeta que sigue sonando mientras juegas."
+
 msgid "During games"
 msgstr "Durante los juegos"
 

@@ -30,6 +30,8 @@
 // theme changes. When it lacks any, a toast says so, once for each
 // language and font until one of them changes, and a note says so on the
 // Launcher pak's pages of this plugin and of the theme slot's owner.
+//
+// The localization.setup service sets the language, for first-run.
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE // dladdr
@@ -652,6 +654,56 @@ static void forgetWarning(void) {
 }
 
 ///////////////////////////////////////
+// localization.setup
+
+// The language setting's options but other, as plugin.txt lists them.
+static const char* const languages[] = { "off", "ca", "cs", "da", "de", "el", "es", "fi", "fr", "hu", "it", "ja", "ko", "nl",
+	"no", "pl", "pt", "pt_BR", "ru", "sv", "tr", "uk", "zh_CN", "zh_TW" };
+#define LANGUAGE_COUNT ((int)(sizeof(languages) / sizeof(languages[0])))
+
+// language=<off or a code> saves it, for the next start: a code the
+// language setting lists as itself, and any other as other with the code
+// setting. Gives the language now, other's code in place of other, and
+// the setting's options but other as its choices.
+static int provideSetup(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char wanted[CODE_MAX + 1];
+	int refused = 0;
+	int len = host->event_value(args, "language", wanted, sizeof(wanted));
+	if (len >= 0) {
+		int listed = 0;
+		for (int i = 0; i < LANGUAGE_COUNT && !listed; i++) listed = !strcmp(languages[i], wanted);
+		if (len >= (int)sizeof(wanted) || (!listed && !validCode(wanted)) || !strcmp(wanted, "other")) refused = 1;
+		else if (listed) {
+			host->cfg_set("language", wanted);
+			say("setup: language %s, from the next start", wanted);
+		} else {
+			host->cfg_set("language", "other");
+			host->cfg_set("code", wanted);
+			say("setup: language other, code %s, from the next start", wanted);
+		}
+	}
+	char current[CODE_MAX];
+	snprintf(current, sizeof(current), "%s", host->cfg_get("language", "off"));
+	if (!strcmp(current, "other")) {
+		const char* c = host->cfg_get("code", "");
+		snprintf(current, sizeof(current), "%s", validCode(c) ? c : "off");
+	}
+	size_t used = 0;
+	int n = snprintf(out, size, "language=%s\nlanguage.count=%i\n", current, LANGUAGE_COUNT);
+	if (n < 0 || (size_t)n >= size) return -1;
+	used = (size_t)n;
+	for (int i = 0; i < LANGUAGE_COUNT; i++) {
+		// the options as the Plugins page shows them, in this plugin's words
+		n = snprintf(out + used, size - used, "language.%i=%s\nlanguage.label.%i=%s\n", i, languages[i], i, tr(languages[i]));
+		if (n < 0 || (size_t)n >= size - used) return -1;
+		used += (size_t)n;
+	}
+	n = snprintf(out + used, size - used, "restart=1%s", refused ? "\nerror=language" : "");
+	return n < 0 || (size_t)n >= size - used;
+}
+
+///////////////////////////////////////
 // the plugin
 
 static int init(const MosaicHost* h) {
@@ -665,6 +717,7 @@ static int init(const MosaicHost* h) {
 	gathered = started = note_checked = 0;
 	note[0] = warn_key[0] = '\0';
 	findRes();
+	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".setup", provideSetup) != 0) say("couldn't provide " ID ".setup");
 
 	const char* f = host->cfg_get("folder", "Languages");
 	if (f[0] == '/') snprintf(folder, sizeof(folder), "%s", f);

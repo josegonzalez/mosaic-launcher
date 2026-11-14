@@ -27,6 +27,9 @@ msgstr "Fondo con arte"
 msgid "Dim"
 msgstr "Atenuar"
 
+msgid "Draws the selected game's art behind the game list, dimmed."
+msgstr "Dibuja la imagen del juego seleccionado detrás de la lista de juegos, atenuada."
+
 msgid "Fall back to the box"
 msgstr "Usar la caja si no hay"
 

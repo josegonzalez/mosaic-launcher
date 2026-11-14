@@ -1,6 +1,6 @@
-# The genre-view plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The genre-view plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -28,6 +28,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "4"
+msgstr ""
+
+#: plugin.txt
+msgid "Adds a Genres folder on the first screen that gathers the same genre from every system, such as all your platformers in one place."
 msgstr ""
 
 #: plugin.txt

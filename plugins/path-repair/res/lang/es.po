@@ -9,6 +9,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Keeps Recently Played and your collections pointing at games after you rename them."
+msgstr "Mantiene Jugados recientemente y tus colecciones apuntando a los juegos después de que los renombres."
+
 msgid "Path repair"
 msgstr "Reparar rutas"
 

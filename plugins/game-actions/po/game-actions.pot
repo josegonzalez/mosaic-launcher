@@ -1,6 +1,6 @@
-# The game-actions plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The game-actions plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -149,6 +149,10 @@ msgstr ""
 
 #: game_actions.c
 msgid "Renamed"
+msgstr ""
+
+#: plugin.txt
+msgid "Renames, deletes or adds the selected game to a collection, from one button."
 msgstr ""
 
 #: game_actions.c

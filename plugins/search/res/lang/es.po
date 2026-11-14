@@ -9,6 +9,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Finds games from every system by typing part of a name."
+msgstr "Encuentra juegos de todos los sistemas escribiendo parte de un nombre."
+
 msgid "L2"
 msgstr "L2"
 

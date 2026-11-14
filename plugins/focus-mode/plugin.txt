@@ -3,6 +3,7 @@ name=Focus mode
 api=1
 category=Library
 summary=Makes the first screen list only your favorites, or the games in a tag or collection.
+description=Makes the first screen list only your favorites, or the games with a tag or in a smart collection, so you reach them without scrolling past every console.
 slots=root
 # the root lists only the set's games and All systems; the Focus tile on the quick menu flips it too
 setting.on=toggle|Focus mode|on

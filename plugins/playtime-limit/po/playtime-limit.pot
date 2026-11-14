@@ -1,6 +1,6 @@
-# The playtime-limit plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The playtime-limit plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -92,6 +92,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Play time limit"
+msgstr ""
+
+#: plugin.txt
+msgid "Sets a daily limit on how long games can be played, from the play history stock keeps."
 msgstr ""
 
 #: playtime_limit.c

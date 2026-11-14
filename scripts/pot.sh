@@ -3,7 +3,7 @@
 # passes to TR(), TRC(), TRN() and TRCN() or marks with TR_MARK(), plus the
 # names of the systems NextUI ships under msgctxt "systems", and each
 # bundled plugin's plugins/<id>/po/<id>.pot (and the template's
-# template/po/example.pot): its name, setting labels and choice options
+# template/po/example.pot): its name, description, setting labels and choice options
 # from its plugin.txt and the fixed text its code passes to tr(),
 # trPlural() and register_action() or marks with TR_MARK(), with no
 # msgctxt for its id, for the strings slot's owner to translate. With

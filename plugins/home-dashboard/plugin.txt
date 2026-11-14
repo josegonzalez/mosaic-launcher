@@ -3,7 +3,10 @@ name=Home dashboard
 api=1
 category=Looks
 summary=A home screen before the game list, with your last game ready to resume.
+description=A home screen that comes before the game list, with your last game ready to resume.
 slots=home
+# the service first-run sets the mode through
+provides=home-dashboard.setup
 # loads after favorites, whose collection it reads as it starts
 optional=favorites
 # dashboard: tabs with a continue card, pinned games and stats; minui: a plain list of recent games;

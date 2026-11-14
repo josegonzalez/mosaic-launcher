@@ -39,5 +39,8 @@ msgstr "Tamaño máximo del registro (KB)"
 msgid "Log sessions that charged"
 msgstr "Registrar sesiones con carga"
 
+msgid "Logs how much battery each game used, one row per play session, to a file you can open in a spreadsheet."
+msgstr "Registra cuánta batería usó cada juego, una fila por sesión de juego, en un archivo que puedes abrir en una hoja de cálculo."
+
 msgid "Shortest session to log (minutes)"
 msgstr "Sesión mínima a registrar (minutos)"

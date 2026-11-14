@@ -1,6 +1,6 @@
-# The layout-grid plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The layout-grid plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -56,6 +56,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Rows"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the game list as a grid of tiles instead of the built-in list."
 msgstr ""
 
 #: plugin.txt

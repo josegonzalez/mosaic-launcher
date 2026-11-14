@@ -1,6 +1,6 @@
-# The numeric-prefix plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The numeric-prefix plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -20,4 +20,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "Numeric prefix ordering"
+msgstr ""
+
+#: plugin.txt
+msgid "Sorts names that start with a number by that number, so 2 comes before 10."
 msgstr ""

@@ -19,12 +19,14 @@
 // Recently Played, collections and Favorites itself keep their own order.
 //
 // Other plugins read the favorites as the "favorites" entry set (see
-// set_register), by the full paths the collection records.
+// set_register), by the full paths the collection records, and set the
+// collection, for the next start, through the favorites.setup service.
 
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include "mosaic_plugin.h"
 #include "pin_model.h"
@@ -363,6 +365,74 @@ static void setList(const char* name, void (*add)(const char* path, void* ctx), 
 	}
 }
 
+///////////////////////////////////////
+// favorites.setup
+
+#define SETUP_CHOICES 32
+
+// A name the collection setting can take: a file name in Collections/.
+static int collectionName(const char* name) {
+	if (!name || !name[0] || name[0] == '.' || strlen(name) >= sizeof(folder_name)) return 0;
+	for (const char* c = name; *c; c++) {
+		if (*c == '/' || (unsigned char)*c < 0x20) return 0;
+	}
+	return 1;
+}
+
+static int compareNames(const void* a, const void* b) {
+	return strcasecmp((const char*)a, (const char*)b);
+}
+
+// collection=<name> saves it, for the next start. Gives the collection
+// now and, as its choices, it and the other collections in Collections/
+// by name.
+static int provideSetup(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char wanted[256];
+	int refused = 0;
+	int len = host->event_value(args, "collection", wanted, sizeof(wanted));
+	if (len >= 0) {
+		if (len >= (int)sizeof(wanted) || !collectionName(wanted)) refused = 1;
+		else {
+			host->cfg_set("collection", wanted);
+			char message[sizeof(wanted) + 64];
+			snprintf(message, sizeof(message), "setup: collection %s, from the next start", wanted);
+			say(message);
+		}
+	}
+	const char* current = host->cfg_get("collection", "Favorites");
+	if (!current[0] || strchr(current, '/')) current = "Favorites"; // as init reads it
+
+	static char names[SETUP_CHOICES][sizeof(folder_name)];
+	int count = 0;
+	snprintf(names[count++], sizeof(names[0]), "%s", current);
+	DIR* dh = opendir(collections_dir);
+	struct dirent* dp;
+	while (dh && count < SETUP_CHOICES && (dp = readdir(dh)) != NULL) {
+		size_t n = strlen(dp->d_name);
+		if (n <= 4 || strcmp(dp->d_name + n - 4, ".txt") != 0 || n - 4 >= sizeof(names[0])) continue;
+		snprintf(names[count], sizeof(names[0]), "%.*s", (int)(n - 4), dp->d_name);
+		if (collectionName(names[count]) && strcmp(names[count], current) != 0) count++;
+	}
+	if (dh) closedir(dh);
+	qsort(names[1], (size_t)(count - 1), sizeof(names[0]), compareNames);
+
+	size_t used = 0;
+	int listed = 0;
+	int n = snprintf(out, size, "collection=%s\n", current);
+	if (n < 0 || (size_t)n >= size) return -1;
+	used = (size_t)n;
+	for (int i = 0; i < count; i++) {
+		// what's left must hold the last lines too
+		n = snprintf(out + used, size - used, "collection.%i=%s\ncollection.label.%i=%s\n", i, names[i], i, names[i]);
+		if (n < 0 || (size_t)n >= size - used || size - used - (size_t)n < 64) break;
+		used += (size_t)n;
+		listed++;
+	}
+	n = snprintf(out + used, size - used, "collection.count=%i\nrestart=1%s", listed, refused ? "\nerror=collection" : "");
+	return n < 0 || (size_t)n >= size - used;
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	const char* collection = host->cfg_get("collection", "Favorites");
@@ -381,6 +451,7 @@ static int init(const MosaicHost* h) {
 	if (MOSAIC_HOST_HAS(host, is_filtered) && host->set_register("favorites", setHas, setList) != 0) {
 		say("couldn't register the favorites set");
 	}
+	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".setup", provideSetup) != 0) say("couldn't provide " ID ".setup");
 
 	if (host->register_action("favorites.toggle", "FAVORITE", 0, canToggle, toggle, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "favorites.toggle") != 0) {

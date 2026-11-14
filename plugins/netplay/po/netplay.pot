@@ -1,6 +1,6 @@
-# The netplay plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The netplay plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -20,6 +20,10 @@ msgstr ""
 
 #: netplay.c
 msgid "Host address"
+msgstr ""
+
+#: plugin.txt
+msgid "Hosts or joins a game over the network. It stays off until NextUI adds netplay."
 msgstr ""
 
 #: netplay.c

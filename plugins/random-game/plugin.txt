@@ -3,6 +3,7 @@ name=Random game
 api=1
 category=Launching games
 summary=Picks a game at random and launches it.
+description=Picks a game at random and launches it.
 # unplayed games are four times as likely: games row-badges' games.played calls unplayed, or without it games not in Recently Played
 setting.unplayed=toggle|Prefer unplayed games|on
 # pick only unplayed games, from the games every pick comes from

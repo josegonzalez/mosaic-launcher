@@ -150,7 +150,7 @@ lint:
 	cmp sdk/mosaic_plugin.h template/sdk/mosaic_plugin.h
 	cmp sdk/LICENSE template/sdk/LICENSE
 	@# po/launcher.pot must list every TR() string, and each plugin's
-	@# po/<id>.pot its plugin.txt's name, setting labels and options and its tr() strings
+	@# po/<id>.pot its plugin.txt's name, description, setting labels and options and its tr() strings
 	./scripts/pot.sh --check
 
 # Writes po/launcher.pot, the gettext template of the launcher's strings,

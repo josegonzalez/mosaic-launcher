@@ -54,6 +54,9 @@ msgstr "Cambiar"
 msgid "Clock"
 msgstr "Reloj"
 
+msgid "Cycles through images on a full screen once the game list or the home screen has been left alone."
+msgstr "Pasa imágenes a pantalla completa cuando la lista de juegos o la pantalla de inicio se quedan sin usar."
+
 msgid "Game art"
 msgstr "Arte de los juegos"
 

@@ -14,3 +14,6 @@ msgstr "Campos"
 
 msgid "Metadata band"
 msgstr "Banda de metadatos"
+
+msgid "Shows a game's year, publisher and genre in a pill under its art."
+msgstr "Muestra el año, el editor y el género de un juego en una píldora bajo su imagen."

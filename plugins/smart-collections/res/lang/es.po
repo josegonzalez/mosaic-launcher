@@ -76,5 +76,8 @@ msgid_plural "Saved %d games as %s"
 msgstr[0] "Se guardó %d juego como %s"
 msgstr[1] "Se guardaron %d juegos como %s"
 
+msgid "Sorts your games into franchise collections, such as Mario, Zelda and Sonic, without you building any lists."
+msgstr "Ordena tus juegos en colecciones por franquicia, como Mario, Zelda y Sonic, sin que tengas que crear listas."
+
 msgid "Tag name"
 msgstr "Nombre de la etiqueta"

@@ -12,6 +12,9 @@ msgstr ""
 msgid "No games to pick from"
 msgstr "No hay juegos entre los que elegir"
 
+msgid "Picks a game at random and launches it."
+msgstr "Elige un juego al azar y lo abre."
+
 msgid "Prefer unplayed games"
 msgstr "Preferir juegos sin jugar"
 

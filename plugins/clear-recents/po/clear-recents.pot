@@ -1,6 +1,6 @@
-# The clear-recents plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The clear-recents plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -32,6 +32,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Clear recents tile on the quick menu"
+msgstr ""
+
+#: plugin.txt
+msgid "Clears the Recently Played list, one game at a time or all at once."
 msgstr ""
 
 #: clear_recents.c

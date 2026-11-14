@@ -9,6 +9,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Adds small dots after a game's name for games you haven't played, your favorites, games with a tag, and tiers."
+msgstr "Añade pequeños puntos tras el nombre de un juego para los juegos que no has jugado, tus favoritos, los juegos con una etiqueta y los niveles."
+
 msgid "Row badges"
 msgstr "Distintivos de filas"
 

@@ -1,6 +1,6 @@
-# The first-run plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The first-run plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -23,12 +23,40 @@ msgstr ""
 msgid "A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins."
 msgstr ""
 
+#: plugin.txt
+msgid "A short setup wizard the first time the launcher starts, with a few settings, plugins to try and what each button does."
+msgstr ""
+
 #: first_run.c
 msgid "All set"
 msgstr ""
 
 #: plugin.txt
 msgid "Already shown"
+msgstr ""
+
+#: first_run.c
+msgid "Anywhere"
+msgstr ""
+
+#: first_run.c
+msgid "Buttons"
+msgstr ""
+
+#: plugin.txt
+msgid "Buttons button"
+msgstr ""
+
+#: plugin.txt
+msgid "Buttons page"
+msgstr ""
+
+#: plugin.txt
+msgid "Buttons tile"
+msgstr ""
+
+#: first_run.c
+msgid "Favorites collection"
 msgstr ""
 
 #: first_run.c plugin.txt
@@ -40,7 +68,19 @@ msgid "First run button"
 msgstr ""
 
 #: first_run.c
+msgid "Game list"
+msgstr ""
+
+#: first_run.c
+msgid "Game switcher"
+msgstr ""
+
+#: first_run.c
 msgid "Haptic feedback"
+msgstr ""
+
+#: first_run.c
+msgid "Home mode"
 msgstr ""
 
 #: plugin.txt
@@ -48,7 +88,27 @@ msgid "L2"
 msgstr ""
 
 #: first_run.c
+msgid "Language"
+msgstr ""
+
+#: first_run.c
+msgid "Left and right change it, saved at once. Some show from the next start."
+msgstr ""
+
+#: first_run.c
+msgid "Left and right change the selected setting, saved at once."
+msgstr ""
+
+#: first_run.c
 msgid "Left and right change the selected setting, saved at once. Settings has them too."
+msgstr ""
+
+#: first_run.c
+msgid "Not on a button"
+msgstr ""
+
+#: first_run.c
+msgid "Nothing is on a button."
 msgstr ""
 
 #: first_run.c
@@ -76,11 +136,19 @@ msgid "PIN page"
 msgstr ""
 
 #: first_run.c
+msgid "Plugin settings"
+msgstr ""
+
+#: plugin.txt
+msgid "Plugin settings page"
+msgstr ""
+
+#: first_run.c
 msgid "Plugins"
 msgstr ""
 
 #: first_run.c
-msgid "Plugins to try:"
+msgid "Quick menu"
 msgstr ""
 
 #: plugin.txt
@@ -132,11 +200,15 @@ msgid "The launcher has no PIN."
 msgstr ""
 
 #: first_run.c
+msgid "Theme"
+msgstr ""
+
+#: first_run.c
 msgid "This goes over a few settings and plugins. A goes on, B goes back, and Y skips the rest."
 msgstr ""
 
 #: first_run.c
-msgid "Turn them on in Tools > Launcher > Plugins. They start the next time the launcher does."
+msgid "Turn them on in Tools > Launcher > Plugins."
 msgstr ""
 
 #: first_run.c
@@ -151,22 +223,6 @@ msgstr ""
 msgid "Y"
 msgstr ""
 
-#: wizard_model.c
-msgid "a Favorites folder, Y adds a game"
-msgstr ""
-
-#: wizard_model.c
-msgid "a home screen with your last game"
-msgstr ""
-
-#: wizard_model.c
-msgid "more game switcher styles"
-msgstr ""
-
 #: plugin.txt
 msgid "none"
-msgstr ""
-
-#: wizard_model.c
-msgid "search every game by name"
 msgstr ""

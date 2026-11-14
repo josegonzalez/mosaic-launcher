@@ -36,6 +36,9 @@ msgstr "Diseño destacado con fila de tarjetas"
 msgid "Logo fade"
 msgstr "Fundido del logo"
 
+msgid "Shows the game list as a row of cards along the bottom of the screen, under big art for the selected game."
+msgstr "Muestra la lista de juegos como una fila de tarjetas en la parte inferior de la pantalla, bajo una imagen grande del juego seleccionado."
+
 msgid "Tint"
 msgstr "Tinte"
 

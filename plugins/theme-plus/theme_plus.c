@@ -10,7 +10,8 @@
 // the quick menu (the "tile" setting) or a game list button (the "button"
 // setting), the palette the user picked in Settings marked; picking one
 // saves the setting and reloads the lists, which asks for the theme
-// again, so it shows at once. Stock's settings are never written.
+// again, so it shows at once. The theme-plus.setup service sets it the
+// same way, for first-run. Stock's settings are never written.
 //
 // The model (theme.txt, paths, the list, the merge) is in
 // theme_plus_model.c.
@@ -148,19 +149,19 @@ static void picked(int index, void* data) {
 	host->reload_lists();
 }
 
-static void pick(const char* path, void* data) {
-	(void)path;
-	(void)data;
+// Fills pickIds and pickLabels with Stock and the themes, as the picker
+// lists them, and returns how many; *cursor is the current theme's.
+static int listThemes(int* cursor) {
 	loadCatalog();
-	const char* labels[CHOICES_MAX];
 	const char* current = host->cfg_get("theme", "stock");
 	const TPEntry* selected = TP_find(&catalog, current);
 	int count = 0;
-	int cursor = 0;
+	*cursor = 0;
 	snprintf(pickIds[count], TP_NAME_MAX, "stock");
-	labels[count++] = tr("Stock");
+	snprintf(pickLabels[count], sizeof(pickLabels[count]), "%s", tr("Stock"));
+	count++;
 	for (int i = 0; i < catalog.theme_count && count < CHOICES_MAX; i++) {
-		if (&catalog.themes[i] == selected) cursor = count;
+		if (&catalog.themes[i] == selected) *cursor = count;
 		snprintf(pickIds[count], TP_NAME_MAX, "%s", catalog.themes[i].id);
 		if (catalog.themes[i].settings) {
 			// the user's palette from stock's Settings, marked as Settings shows it
@@ -168,11 +169,59 @@ static void pick(const char* path, void* data) {
 		} else {
 			snprintf(pickLabels[count], sizeof(pickLabels[count]), "%s", catalog.themes[i].label);
 		}
-		labels[count] = pickLabels[count];
 		count++;
 	}
+	return count;
+}
+
+static void pick(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	const char* labels[CHOICES_MAX];
+	int cursor = 0;
+	int count = listThemes(&cursor);
+	for (int i = 0; i < count; i++) labels[i] = pickLabels[i];
 	if (catalog.theme_count >= CHOICES_MAX) say("only the first %d themes are listed", CHOICES_MAX - 1);
 	if (host->choose(tr("Theme"), labels, count, cursor, picked, NULL) != 0) say("couldn't list the themes");
+}
+
+// theme-plus.setup: theme=<stock or a theme the picker lists> saves it and
+// reloads the lists, as picking it does, so it shows at once. Gives the
+// theme now and the picker's themes as its choices.
+static int provideSetup(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char wanted[TP_NAME_MAX + 1];
+	int refused = 0;
+	int cursor = 0;
+	int count = listThemes(&cursor);
+	int len = host->event_value(args, "theme", wanted, sizeof(wanted));
+	if (len >= 0) {
+		int found = -1;
+		for (int i = 0; len < (int)sizeof(wanted) && i < count && found < 0; i++) {
+			if (!strcmp(pickIds[i], wanted)) found = i;
+		}
+		if (found < 0) refused = 1;
+		else {
+			host->cfg_set("theme", pickIds[found]);
+			say("setup: theme %s", pickIds[found]);
+			host->reload_lists();
+			cursor = found;
+		}
+	}
+	size_t used = 0;
+	int listed = 0;
+	int n = snprintf(out, size, "theme=%s\n", pickIds[cursor]);
+	if (n < 0 || (size_t)n >= size) return -1;
+	used = (size_t)n;
+	for (int i = 0; i < count; i++) {
+		// what's left must hold the last lines too
+		n = snprintf(out + used, size - used, "theme.%i=%s\ntheme.label.%i=%s\n", i, pickIds[i], i, pickLabels[i]);
+		if (n < 0 || (size_t)n >= size - used || size - used - (size_t)n < 64) break;
+		used += (size_t)n;
+		listed++;
+	}
+	n = snprintf(out + used, size - used, "theme.count=%i\nrestart=0%s", listed, refused ? "\nerror=theme" : "");
+	return n < 0 || (size_t)n >= size - used;
 }
 
 static int init(const MosaicHost* h) {
@@ -182,6 +231,7 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	findBundled();
+	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".setup", provideSetup) != 0) say("couldn't provide " ID ".setup");
 	if (host->register_action(ACTION_ID, "Theme", 0, NULL, pick, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 0;

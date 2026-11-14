@@ -1,6 +1,6 @@
-# The layout-carousel plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The layout-carousel plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -16,6 +16,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Carousel layout"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the game list as a carousel of covers instead of the built-in list."
 msgstr ""
 
 #: plugin.txt

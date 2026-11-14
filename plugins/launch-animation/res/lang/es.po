@@ -18,6 +18,9 @@ msgstr "350"
 msgid "500"
 msgstr "500"
 
+msgid "Animates a game or tool starting from the game list."
+msgstr "Anima el arranque de un juego o una herramienta desde la lista de juegos."
+
 msgid "Duration"
 msgstr "Duración"
 

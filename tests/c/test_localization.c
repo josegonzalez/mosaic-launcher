@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "../../plugins/localization/localization.c"
 
 #define CARD TEST_DIR "/card"
@@ -1149,6 +1150,70 @@ static void testBundled(void) {
 	Po_free(pack);
 }
 
+// localization.setup: off or a code, a listed one as itself and any other
+// as other with the code setting, for the next start
+static void fakeCfgSetLanguage(const char* key, const char* value) {
+	if (!strcmp(key, "language")) snprintf(cfg_language, sizeof(cfg_language), "%s", value);
+	else if (!strcmp(key, "code")) snprintf(cfg_code, sizeof(cfg_code), "%s", value);
+	else CHECK(0);
+}
+
+static void testSetup(void) {
+	char out[MOSAIC_CALL_MAX], value[64];
+	fake_provider_count = 0;
+	fake.provide = fakeProvide;
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	start("off", NULL);
+	fake.cfg_set = fakeCfgSetLanguage;
+	CHECK(fakeCall("localization.setup", "", out, sizeof(out)) > 0);
+	CHECK(fakeEventValue(out, "language", value, sizeof(value)) > 0);
+	CHECK_STR(value, "off");
+	CHECK(fakeEventValue(out, "language.count", value, sizeof(value)) > 0);
+	CHECK_STR(value, "24");
+	CHECK(fakeEventValue(out, "language.0", value, sizeof(value)) > 0);
+	CHECK_STR(value, "off");
+	CHECK(fakeEventValue(out, "language.17", value, sizeof(value)) > 0);
+	CHECK_STR(value, "pt_BR");
+	CHECK(fakeEventValue(out, "restart", value, sizeof(value)) > 0);
+	CHECK_STR(value, "1");
+
+	CHECK(fakeCall("localization.setup", "language=es", out, sizeof(out)) > 0);
+	CHECK_STR(cfg_language, "es");
+	CHECK(fakeEventValue(out, "language", value, sizeof(value)) > 0);
+	CHECK_STR(value, "es");
+	CHECK(fakeCall("localization.setup", "language=eu", out, sizeof(out)) > 0);
+	CHECK_STR(cfg_language, "other");
+	CHECK_STR(cfg_code, "eu");
+	CHECK(fakeEventValue(out, "language", value, sizeof(value)) > 0);
+	CHECK_STR(value, "eu"); // other's code
+	static const char* const refused[] = { "language=other", "language=", "language=no/pe" };
+	for (size_t i = 0; i < sizeof(refused) / sizeof(refused[0]); i++) {
+		CHECK(fakeCall("localization.setup", refused[i], out, sizeof(out)) > 0);
+		CHECK(fakeEventValue(out, "error", value, sizeof(value)) > 0);
+		CHECK_STR(value, "language");
+	}
+	CHECK_STR(cfg_language, "other");
+
+	// the choices are plugin.txt's options but other
+	char* manifest = slurp(REPO_DIR "/plugins/localization/plugin.txt");
+	CHECK(manifest != NULL);
+	char options[512] = "off";
+	for (int i = 1; i < LANGUAGE_COUNT; i++) snprintf(options + strlen(options), sizeof(options) - strlen(options), ",%s%s",
+		i == 1 ? "other," : "", languages[i]);
+	char want[600];
+	snprintf(want, sizeof(want), "setting.language=choice|Language|off|%s\n", options);
+	CHECK(manifest && strstr(manifest, want) != NULL);
+	free(manifest);
+
+	fake.cfg_set = NULL;
+	fake.provide = NULL;
+	fake.call = NULL;
+	fake.event_value = NULL;
+	fake_provider_count = 0;
+	cfg_language[0] = cfg_code[0] = '\0';
+}
+
 int main(void) {
 	testPlural();
 	testParse();
@@ -1158,5 +1223,6 @@ int main(void) {
 	testChars();
 	testFontCheck();
 	testBundled();
+	testSetup();
 	CHECK_DONE();
 }

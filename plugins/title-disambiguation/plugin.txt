@@ -3,5 +3,6 @@ name=Title disambiguation
 api=1
 category=Library
 summary=Adds what tells two same-named games apart, only when needed.
+description=When two games in a list have the same name, adds what tells them apart, and only then.
 # also tell apart same-named games from one system (by tags or extension), not only games from different systems
 setting.same_system=toggle|Same system too|on

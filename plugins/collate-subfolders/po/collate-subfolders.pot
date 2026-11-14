@@ -1,6 +1,6 @@
-# The collate-subfolders plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The collate-subfolders plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -16,4 +16,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "Collate subfolders"
+msgstr ""
+
+#: plugin.txt
+msgid "Merges folders with the same name in a system listed from several folders, so you see one folder instead of several."
 msgstr ""

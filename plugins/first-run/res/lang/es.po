@@ -16,11 +16,32 @@ msgstr "%i de %i"
 msgid "A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins."
 msgstr "Un PIN impide a otros salir del modo simple y cambiar los ajustes protegidos de los plugins. Ponlo o cámbialo en la fila PIN de Herramientas > Launcher > Plugins."
 
+msgid "A short setup wizard the first time the launcher starts, with a few settings, plugins to try and what each button does."
+msgstr "Un breve asistente de configuración la primera vez que arranca el launcher, con algunos ajustes, plugins para probar y lo que hace cada botón."
+
 msgid "All set"
 msgstr "Todo listo"
 
 msgid "Already shown"
 msgstr "Ya mostrado"
+
+msgid "Anywhere"
+msgstr "En cualquier sitio"
+
+msgid "Buttons"
+msgstr "Botones"
+
+msgid "Buttons button"
+msgstr "Botón de botones"
+
+msgid "Buttons page"
+msgstr "Página de botones"
+
+msgid "Buttons tile"
+msgstr "Icono de botones"
+
+msgid "Favorites collection"
+msgstr "Colección de favoritos"
 
 msgid "First run"
 msgstr "Primer inicio"
@@ -28,14 +49,38 @@ msgstr "Primer inicio"
 msgid "First run button"
 msgstr "Botón de primer inicio"
 
+msgid "Game list"
+msgstr "Lista de juegos"
+
+msgid "Game switcher"
+msgstr "Selector de juegos"
+
 msgid "Haptic feedback"
 msgstr "Vibración"
+
+msgid "Home mode"
+msgstr "Modo de inicio"
 
 msgid "L2"
 msgstr "L2"
 
+msgid "Language"
+msgstr "Idioma"
+
+msgid "Left and right change it, saved at once. Some show from the next start."
+msgstr "Izquierda y derecha lo cambian y se guarda al momento. Algunos se ven desde el próximo arranque."
+
+msgid "Left and right change the selected setting, saved at once."
+msgstr "Izquierda y derecha cambian el ajuste seleccionado, que se guarda al momento."
+
 msgid "Left and right change the selected setting, saved at once. Settings has them too."
 msgstr "Izquierda y derecha cambian el ajuste elegido, que se guarda al momento. También están en Ajustes."
+
+msgid "Not on a button"
+msgstr "Sin botón"
+
+msgid "Nothing is on a button."
+msgstr "No hay nada en ningún botón."
 
 msgid "Off"
 msgstr "No"
@@ -55,11 +100,17 @@ msgstr "PIN"
 msgid "PIN page"
 msgstr "Página del PIN"
 
+msgid "Plugin settings"
+msgstr "Ajustes de plugins"
+
+msgid "Plugin settings page"
+msgstr "Página de ajustes de plugins"
+
 msgid "Plugins"
 msgstr "Plugins"
 
-msgid "Plugins to try:"
-msgstr "Plugins para probar:"
+msgid "Quick menu"
+msgstr "Menú rápido"
 
 msgid "Quick menu tile"
 msgstr "Icono del menú rápido"
@@ -97,11 +148,14 @@ msgstr "El launcher tiene un PIN."
 msgid "The launcher has no PIN."
 msgstr "El launcher no tiene PIN."
 
+msgid "Theme"
+msgstr "Tema"
+
 msgid "This goes over a few settings and plugins. A goes on, B goes back, and Y skips the rest."
 msgstr "Esto repasa algunos ajustes y plugins. A avanza, B retrocede e Y omite el resto."
 
-msgid "Turn them on in Tools > Launcher > Plugins. They start the next time the launcher does."
-msgstr "Actívalos en Herramientas > Launcher > Plugins. Se inician la próxima vez que lo haga el launcher."
+msgid "Turn them on in Tools > Launcher > Plugins."
+msgstr "Actívalos en Herramientas > Launcher > Plugins."
 
 msgid "Volume and display notifications"
 msgstr "Avisos de volumen y pantalla"
@@ -112,17 +166,5 @@ msgstr "Bienvenida"
 msgid "Y"
 msgstr "Y"
 
-msgid "a Favorites folder, Y adds a game"
-msgstr "una carpeta Favoritos; Y añade un juego"
-
-msgid "a home screen with your last game"
-msgstr "una pantalla de inicio con tu último juego"
-
-msgid "more game switcher styles"
-msgstr "más estilos del selector de juegos"
-
 msgid "none"
 msgstr "ninguno"
-
-msgid "search every game by name"
-msgstr "buscar cualquier juego por su nombre"

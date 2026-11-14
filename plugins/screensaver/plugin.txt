@@ -3,6 +3,7 @@ name=Screensaver
 api=1
 category=Extras
 summary=Cycles through images when the game list sits idle.
+description=Cycles through images on a full screen once the game list or the home screen has been left alone.
 # loads after favorites, which it asks about as it starts
 optional=favorites
 # the screen the launcher opens in the Launcher page's order of ambient screens

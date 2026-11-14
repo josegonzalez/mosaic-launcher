@@ -43,6 +43,13 @@ enum HDTab {
 int HD_modeOf(const char* name);
 const char* HD_modeName(int mode);
 
+// home-dashboard.setup's reply to a call (see README.md): mode=<current>,
+// mode.count and each mode as mode.<i> with its label, in the caller's
+// words, as mode.label.<i>, restart=1, as a new mode shows the next time
+// the launcher starts, and error=mode when refused. Returns its length, or
+// -1 when it doesn't fit in size.
+int HD_setupReply(const char* current, int refused, char* out, size_t size);
+
 // The dashboard's tabs in order, written to out: home always, pinned when
 // it's on and favorites is loaded, stats when it's on. Returns how many.
 int HD_tabs(int pinned_on, int favorites_loaded, int stats_on, int* out);

@@ -27,6 +27,9 @@ msgstr "Modo enfoque activado"
 msgid "Favorites"
 msgstr "Favoritos"
 
+msgid "Makes the first screen list only your favorites, or the games with a tag or in a smart collection, so you reach them without scrolling past every console."
+msgstr "Hace que la primera pantalla liste solo tus favoritos, o los juegos con una etiqueta o de una colección inteligente, para que llegues a ellos sin pasar por cada consola."
+
 msgid "Tag: %s"
 msgstr "Etiqueta: %s"
 

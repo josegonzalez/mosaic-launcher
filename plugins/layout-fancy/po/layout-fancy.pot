@@ -1,6 +1,6 @@
-# The layout-fancy plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The layout-fancy plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -20,4 +20,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "Prefer state preview"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the game list's rows beside a panel with the selected game's art."
 msgstr ""

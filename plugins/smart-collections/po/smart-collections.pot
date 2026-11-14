@@ -1,6 +1,6 @@
-# The smart-collections plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The smart-collections plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -102,6 +102,10 @@ msgstr ""
 
 #: plugin.txt smart_collections.c
 msgid "Smart Collections"
+msgstr ""
+
+#: plugin.txt
+msgid "Sorts your games into franchise collections, such as Mario, Zelda and Sonic, without you building any lists."
 msgstr ""
 
 #: smart_collections.c

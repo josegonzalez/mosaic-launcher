@@ -3,6 +3,7 @@ name=Screenshot viewer
 api=1
 category=Extras
 summary=Browses the screenshots you took in games.
+description=Browses the screenshots you took in games, newest first, on a screen of its own.
 # a Screenshots tile on the quick menu, shown while there are screenshots
 setting.tile=toggle|Quick menu tile|on
 # a game list button that opens the screenshots

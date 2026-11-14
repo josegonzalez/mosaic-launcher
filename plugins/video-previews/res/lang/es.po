@@ -30,6 +30,9 @@ msgstr "p. m."
 msgid "Play after (seconds)"
 msgstr "Reproducir tras (segundos)"
 
+msgid "Plays a short clip of the selected game in place of its thumbnail."
+msgstr "Reproduce un vídeo corto del juego seleccionado en lugar de su miniatura."
+
 msgid "Sound"
 msgstr "Sonido"
 

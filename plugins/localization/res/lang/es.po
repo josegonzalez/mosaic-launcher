@@ -59,6 +59,9 @@ msgstr "R2"
 msgid "SELECT"
 msgstr "SELECT"
 
+msgid "Translates the launcher and other plugins from language packs, so the menus show in your language."
+msgstr "Traduce el launcher y otros plugins desde paquetes de idioma, para que los menús salgan en tu idioma."
+
 msgid "WRITE"
 msgstr "ESCRIBIR"
 

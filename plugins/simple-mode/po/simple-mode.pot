@@ -1,6 +1,6 @@
-# The simple-mode plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The simple-mode plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -13,6 +13,10 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "A simple mode for kids or a shared device: it hides Tools and the settings, so nothing gets changed by accident."
+msgstr ""
 
 #: plugin.txt
 msgid "Hide settings tiles"

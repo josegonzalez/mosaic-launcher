@@ -18,6 +18,9 @@ msgstr "Sin vista previa"
 msgid "Play time captions"
 msgstr "Rótulos de tiempo de juego"
 
+msgid "Replaces the game switcher with your recent games, in a choice of styles."
+msgstr "Sustituye el selector de juegos por tus juegos recientes, con varios estilos a elegir."
+
 msgid "Style"
 msgstr "Estilo"
 

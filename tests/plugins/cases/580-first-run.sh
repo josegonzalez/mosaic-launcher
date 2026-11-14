@@ -3,10 +3,10 @@
 
 # the bundled first-run: on a card where it hasn't been seen it opens by
 # itself over the game list, and screener walks it: on to the toggles,
-# flipping two, back to the welcome, then on through the PIN, plugins and
-# last pages and A to finish, which sets its seen setting. Started again
-# it stays closed, and its action opens it, with a PIN set and the
-# suggestions read from plugins.txt, until Y skips it. With a home screen
+# flipping two, back to the welcome, then on through the PIN, plugins,
+# buttons and last pages and A to finish, which sets its seen setting.
+# Started again it stays closed, and its action opens it, with a PIN set
+# and the suggestions read from plugins.txt, until Y skips it. With a home screen
 # (screener's) it opens over that instead, and closing goes back there.
 FR_CFG="$STATE/first-run.cfg"
 FR_PIN="$STATE/pin.txt"
@@ -16,7 +16,7 @@ mkdir -p "$STATE" "$(dirname "$SETTINGS")"
 [ -f "$SETTINGS" ] && cp "$SETTINGS" "$WORK/first-run-settings.saved"
 rm -f "$FR_CFG" "$FR_PIN" "$HOME_LEFT"
 
-printf 'steps=a,right,down,right,b,a,a,a,a,a\n' >"$STATE/screener.cfg"
+printf 'steps=a,right,down,right,b,a,a,a,a,a,a\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/first-run.log" "plugin screener: done" || fail "the launcher exited early with first-run"
 log="$WORK/first-run.log"
 plugin=first-run
@@ -26,13 +26,14 @@ grep -qE "plugin first-run: toggles: show_clock (on|off), show_battery_percent (
 	|| fail "first-run didn't list stock's toggles"
 expect "pin: not set"
 expect "suggesting home-dashboard off, switcher-plus off, favorites off, search off"
-expect "showing welcome, 1 of 5"
-expect "showing toggles, 2 of 5"
+expect "showing welcome, 1 of 6"
+expect "showing toggles, 2 of 6"
 grep -qE "plugin first-run: show_clock now (on|off)$" "$log" || fail "first-run didn't flip the clock"
 grep -qE "plugin first-run: show_battery_percent now (on|off)$" "$log" || fail "first-run didn't flip the battery percentage"
-expect "showing pin, 3 of 5"
-expect "showing plugins, 4 of 5"
-expect "showing done, 5 of 5"
+expect "showing pin, 3 of 6"
+expect "showing plugins, 4 of 6"
+expect "showing buttons, 5 of 6"
+expect "showing done, 6 of 6"
 expect "finished"
 expect "closed"
 [ "$(seen)" = "first-run.main gamelist " ] || [ "$(seen)" = "gamelist first-run.main gamelist " ] \

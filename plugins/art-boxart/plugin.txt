@@ -3,6 +3,7 @@ name=Box art
 api=1
 category=Looks
 summary=Finds box art in the art folders other firmware uses.
+description=Finds box art in the art folders other firmware uses, so your games show it without you moving files.
 # also use this art as the thumbnail, before stock's .media/<game>.png
 setting.thumbnail=toggle|Use as the thumbnail|off
 # nx-redux: .media/boxart2d, boxart, wheel and screenshot beside the games

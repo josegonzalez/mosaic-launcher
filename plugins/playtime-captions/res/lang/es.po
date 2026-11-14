@@ -143,6 +143,9 @@ msgstr "sept"
 msgid "Sessions"
 msgstr "Sesiones"
 
+msgid "Shows a caption at the right of each game you played, such as how long you played it and when."
+msgstr "Muestra un rótulo a la derecha de cada juego que jugaste, como cuánto tiempo lo jugaste y cuándo."
+
 msgid "compact"
 msgstr "compacto"
 

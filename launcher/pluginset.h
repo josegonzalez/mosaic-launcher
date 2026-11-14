@@ -82,9 +82,9 @@ const char* Manifest_buttonSetting(const PluginManifest* m, const char* action_i
 int Manifest_option(const char* options, int index, char* out, size_t size);
 
 // Calls fn with each piece of a plugin's text the Plugins page shows, for
-// translating under the plugin's id: its name, then each setting's label
-// and, for a choice, each of its options, in order. Repeats are passed
-// again. Values, such as defaults, are left out.
+// translating under the plugin's id: its name, its description when it has
+// one, then each setting's label and, for a choice, each of its options, in
+// order. Repeats are passed again. Values, such as defaults, are left out.
 void Manifest_strings(const PluginManifest* m, void (*fn)(const char* text, void* data), void* data);
 
 // Writes the plugin's resource folder, <its directory>/res, to out (size

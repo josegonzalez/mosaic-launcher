@@ -11,3 +11,6 @@ msgstr ""
 
 msgid "Collate subfolders"
 msgstr "Agrupar subcarpetas"
+
+msgid "Merges folders with the same name in a system listed from several folders, so you see one folder instead of several."
+msgstr "Une las carpetas con el mismo nombre de un sistema que se lista desde varias carpetas, para que veas una carpeta en lugar de varias."

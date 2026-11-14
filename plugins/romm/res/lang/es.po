@@ -31,6 +31,9 @@ msgstr "50"
 msgid "B"
 msgstr "B"
 
+msgid "Browses a RomM server's library, downloads games when you launch them and backs up your saves to the server."
+msgstr "Explora la biblioteca de un servidor RomM, descarga los juegos cuando los abres y hace copia de tus partidas guardadas en el servidor."
+
 msgid "Busy, try again"
 msgstr "Ocupado, inténtalo de nuevo"
 

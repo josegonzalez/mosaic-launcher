@@ -70,6 +70,9 @@ msgstr "Tiempo extra (minutos)"
 msgid "Play time limit"
 msgstr "Límite de tiempo de juego"
 
+msgid "Sets a daily limit on how long games can be played, from the play history stock keeps."
+msgstr "Pone un límite diario a cuánto tiempo se puede jugar, según el historial de juego que guarda NextUI original."
+
 msgid "Time's up"
 msgstr "Se acabó el tiempo"
 

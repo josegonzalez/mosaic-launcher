@@ -1,6 +1,6 @@
-# The platform-jump plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The platform-jump plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -20,6 +20,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Jump between systems on the root"
+msgstr ""
+
+#: plugin.txt
+msgid "Makes L1 and R1 jump between systems instead of letters."
 msgstr ""
 
 #: plugin.txt

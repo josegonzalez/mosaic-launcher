@@ -1,6 +1,6 @@
-# The quick-menu-plus plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The quick-menu-plus plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -30,6 +30,10 @@ msgstr ""
 
 #: quick_model.c
 msgid "Battery %"
+msgstr ""
+
+#: plugin.txt
+msgid "Changes the quick menu: renames or hides its tiles, and adds tiles that flip stock's settings."
 msgstr ""
 
 #: quick_model.c

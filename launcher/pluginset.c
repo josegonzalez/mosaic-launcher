@@ -228,6 +228,7 @@ int Manifest_option(const char* options, int index, char* out, size_t size) {
 
 void Manifest_strings(const PluginManifest* m, void (*fn)(const char* text, void* data), void* data) {
 	fn(m->name, data);
+	if (m->description[0]) fn(m->description, data);
 	for (int i = 0; i < m->setting_count; i++) {
 		const PluginSetting* s = &m->settings[i];
 		if (s->label[0]) fn(s->label, data);

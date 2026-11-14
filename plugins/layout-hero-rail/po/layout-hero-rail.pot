@@ -1,6 +1,6 @@
-# The layout-hero-rail plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The layout-hero-rail plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -48,6 +48,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Logo fade"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the game list as a row of cards along the bottom of the screen, under big art for the selected game."
 msgstr ""
 
 #: plugin.txt

@@ -78,6 +78,9 @@ msgstr "R2"
 msgid "SELECT"
 msgstr "SELECT"
 
+msgid "Shows the device's battery, Wi-Fi, storage, memory and uptime on a screen of its own. It never changes a setting."
+msgstr "Muestra la batería, el Wi-Fi, el almacenamiento, la memoria y el tiempo encendido del dispositivo en una pantalla propia. Nunca cambia ningún ajuste."
+
 msgid "Storage"
 msgstr "Almacenamiento"
 

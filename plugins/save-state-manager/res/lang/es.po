@@ -12,6 +12,9 @@ msgstr ""
 msgid "Auto"
 msgstr "Auto"
 
+msgid "Browses, previews and deletes the save states your games keep, on a screen of its own."
+msgstr "Explora, previsualiza y borra los estados guardados de tus juegos, en una pantalla propia."
+
 msgid "Couldn't delete that state"
 msgstr "No se pudo borrar ese estado"
 

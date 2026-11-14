@@ -20,3 +20,6 @@ msgstr "Reconectar tras la suspensión"
 
 msgid "Reconnect at start"
 msgstr "Reconectar al iniciar"
+
+msgid "Reconnects your last Bluetooth device when the launcher starts and after the device wakes from sleep."
+msgstr "Vuelve a conectar tu último dispositivo Bluetooth cuando arranca el launcher y cuando el dispositivo despierta de la suspensión."

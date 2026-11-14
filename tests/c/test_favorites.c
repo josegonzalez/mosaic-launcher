@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "fakesets.h"
 #include "../../plugins/favorites/favorites.c"
 
@@ -40,9 +41,15 @@ static void sayYes(void) {
 	answer_yes = NULL;
 }
 static const char* pin_setting = NULL; // the "pin" setting, or NULL for its default
+static char collection_setting[256] = ""; // the "collection" setting, or "" for its default
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "pin") && pin_setting) return pin_setting;
+	if (!strcmp(key, "collection") && collection_setting[0]) return collection_setting;
 	return fallback;
+}
+static void fakeCfgSet(const char* key, const char* value) {
+	CHECK_STR(key, "collection");
+	snprintf(collection_setting, sizeof(collection_setting), "%s", value);
 }
 static int reloads = 0;
 static void fakeReload(void) { reloads++; }
@@ -392,6 +399,48 @@ int main(void) {
 	writeText(COLLECTION, "/Roms/GB/Alpha.gb\n");
 	CHECK(p->sort_compare(tetris, zelda, CARD "/Roms/PS") == 0); // another folder re-reads, and Zelda is gone
 	CHECK(p->sort_compare(alpha, zelda, CARD "/Roms/GB") < 0);
+
+	// favorites.setup: the collection now and the others in Collections/ by
+	// name, and a name it can take saved for the next start
+	writeText(CARD "/Collections/Zelda games.txt", "");
+	writeText(CARD "/Collections/arcade.txt", "");
+	writeText(CARD "/Collections/.hidden.txt", "");
+	writeText(CARD "/Collections/notes.md", "");
+	MosaicHost with_setup = fake;
+	with_setup.cfg_set = fakeCfgSet;
+	with_setup.provide = fakeProvide;
+	with_setup.call = fakeCall;
+	with_setup.event_value = fakeEventValue;
+	CHECK(p->init(&with_setup) == 0);
+	char out[MOSAIC_CALL_MAX], value[128];
+	CHECK(fakeCall("favorites.setup", "", out, sizeof(out)) > 0);
+	CHECK(fakeEventValue(out, "collection", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Favorites");
+	CHECK(fakeEventValue(out, "collection.count", value, sizeof(value)) > 0);
+	CHECK_STR(value, "3");
+	CHECK(fakeEventValue(out, "collection.0", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Favorites");
+	CHECK(fakeEventValue(out, "collection.1", value, sizeof(value)) > 0);
+	CHECK_STR(value, "arcade");
+	CHECK(fakeEventValue(out, "collection.label.2", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Zelda games");
+	CHECK(fakeEventValue(out, "restart", value, sizeof(value)) > 0);
+	CHECK_STR(value, "1");
+	CHECK(fakeCall("favorites.setup", "collection=Zelda games", out, sizeof(out)) > 0);
+	CHECK_STR(collection_setting, "Zelda games");
+	CHECK(fakeEventValue(out, "collection.0", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Zelda games");
+	CHECK(fakeEventValue(out, "collection.2", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Favorites");
+	CHECK(fakeEventValue(out, "error", value, sizeof(value)) < 0);
+	// not a file name in Collections/
+	static const char* const refused[] = { "collection=", "collection=a/b", "collection=.hidden" };
+	for (size_t i = 0; i < sizeof(refused) / sizeof(refused[0]); i++) {
+		CHECK(fakeCall("favorites.setup", refused[i], out, sizeof(out)) > 0);
+		CHECK(fakeEventValue(out, "error", value, sizeof(value)) > 0);
+		CHECK_STR(value, "collection");
+	}
+	CHECK_STR(collection_setting, "Zelda games");
 
 	CHECK_DONE();
 }

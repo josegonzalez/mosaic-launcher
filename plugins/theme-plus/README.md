@@ -107,6 +107,7 @@ With `localization` on and a language picked, a theme whose font lacks some of t
 - Owns the `theme` slot (`slots=theme`) and applies the theme without writing to stock's settings.
 - Passes other plugins' keys (with a `.`) to `theme_value`. The bundled plugins' keys are `art-backdrop.dim`, `art-placeholder.style`, `layout-grid.columns`, `layout-grid.rows`, `layout-hero-rail.cards`, `layout-shelf.shelves` and `led-status.colour`.
 - Registers the `theme-plus.pick` action, which the `button` setting follows, and a quick menu tile.
+- Provides the `theme-plus.setup` service (`provides=theme-plus.setup`), which [`first-run`](../first-run/README.md) sets the theme through. With no arguments it gives the Theme setting now as `theme=<id>` and, as its choices, what the Theme tile lists, Stock first, as `theme.<i>=<id>` and `theme.label.<i>=<its name, as the list shows it>` from 0, as many as fit, with `theme.count=<n>`, and `restart=0`. `theme=<id>` of one of them saves the setting and reloads the lists first, as picking it from the list does, so it shows at once; any other gives `error=theme` and saves nothing. Other keys are ignored.
 - Reads `<sd>/Themes/<name>/`, `<sd>/Palettes/*.txt`, and the stock background files named above.
 
 ## Credits

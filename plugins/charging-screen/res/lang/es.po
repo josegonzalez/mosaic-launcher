@@ -48,5 +48,8 @@ msgstr "p. m."
 msgid "Show after idle on a charger (seconds)"
 msgstr "Mostrar tras inactividad cargando (segundos)"
 
+msgid "Shows a full screen with the battery level while the device charges and you aren't using it."
+msgstr "Muestra una pantalla completa con el nivel de batería mientras el dispositivo se carga y no lo estás usando."
+
 msgid "off"
 msgstr "desactivado"

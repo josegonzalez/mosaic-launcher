@@ -9,6 +9,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "A simple mode for kids or a shared device: it hides Tools and the settings, so nothing gets changed by accident."
+msgstr "Un modo simple para niños o un dispositivo compartido: oculta las herramientas y los ajustes, para que nada se cambie por accidente."
+
 msgid "Hide settings tiles"
 msgstr "Ocultar iconos de ajustes"
 

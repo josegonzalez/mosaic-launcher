@@ -17,6 +17,9 @@ msgstr "%s está llena"
 msgid "Added to %s"
 msgstr "Añadido a %s"
 
+msgid "Adds a Favorites folder on the first screen, and a button to add or remove the selected game."
+msgstr "Añade una carpeta Favoritos en la primera pantalla y un botón para añadir o quitar el juego seleccionado."
+
 msgid "Collection"
 msgstr "Colección"
 

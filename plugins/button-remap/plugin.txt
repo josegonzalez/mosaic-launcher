@@ -3,6 +3,7 @@ name=Button remap
 api=1
 category=Controls and setup
 summary=Puts the game list's actions on other buttons.
+description=Puts the game list's own actions, or other plugins' actions, on different buttons.
 # A resumes the selected game, or opens it when there's nothing to resume, and X opens it without resuming
 setting.resume_with_a=toggle|Resume with A|off
 # X acts on press instead of release

@@ -9,6 +9,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Adds a small pill beside the status pill with free storage, an SSH dot, a profile badge and the FPS."
+msgstr "Añade una pequeña píldora junto a la de estado con el almacenamiento libre, un punto de SSH, una insignia de perfil y los FPS."
+
 msgid "FPS"
 msgstr "FPS"
 

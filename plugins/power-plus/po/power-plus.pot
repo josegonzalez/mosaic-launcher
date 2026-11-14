@@ -1,6 +1,6 @@
-# The power-plus plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The power-plus plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -95,4 +95,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "Power plus"
+msgstr ""
+
+#: plugin.txt
+msgid "Warns when the battery runs low and powers the device off cleanly, and can power it off after a long sleep."
 msgstr ""

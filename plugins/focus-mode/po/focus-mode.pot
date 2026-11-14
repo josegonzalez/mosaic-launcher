@@ -1,6 +1,6 @@
-# The focus-mode plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The focus-mode plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -62,6 +62,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "L2"
+msgstr ""
+
+#: plugin.txt
+msgid "Makes the first screen list only your favorites, or the games with a tag or in a smart collection, so you reach them without scrolling past every console."
 msgstr ""
 
 #: focus_mode.c

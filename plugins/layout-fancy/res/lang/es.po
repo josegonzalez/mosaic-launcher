@@ -14,3 +14,6 @@ msgstr "Diseño vistoso"
 
 msgid "Prefer state preview"
 msgstr "Preferir la vista del estado"
+
+msgid "Shows the game list's rows beside a panel with the selected game's art."
+msgstr "Muestra las filas de la lista de juegos junto a un panel con la imagen del juego seleccionado."

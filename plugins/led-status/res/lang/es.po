@@ -36,6 +36,9 @@ msgstr "60"
 msgid "70"
 msgstr "70"
 
+msgid "Colours the device's LEDs by the battery level or by a theme colour while the launcher is on screen."
+msgstr "Colorea los LED del dispositivo según el nivel de batería o un color del tema mientras el launcher está en pantalla."
+
 msgid "LED colour follows"
 msgstr "El color del LED sigue"
 

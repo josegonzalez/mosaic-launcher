@@ -1,6 +1,6 @@
-# The battery-logger plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The battery-logger plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -52,6 +52,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Log sessions that charged"
+msgstr ""
+
+#: plugin.txt
+msgid "Logs how much battery each game used, one row per play session, to a file you can open in a spreadsheet."
 msgstr ""
 
 #: plugin.txt

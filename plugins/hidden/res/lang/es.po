@@ -27,6 +27,9 @@ msgstr "Juegos ocultos"
 msgid "Hide button"
 msgstr "Botón de ocultar"
 
+msgid "Hides the games you pick from every list."
+msgstr "Oculta de todas las listas los juegos que elijas."
+
 msgid "L2"
 msgstr "L2"
 

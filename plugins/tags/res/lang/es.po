@@ -31,6 +31,9 @@ msgstr "¿Borrar la etiqueta %s?"
 msgid "L2"
 msgstr "L2"
 
+msgid "Lets you put your own tags on games, and shows each tag as a folder."
+msgstr "Te deja poner tus propias etiquetas a los juegos y muestra cada etiqueta como una carpeta."
+
 msgid "New tag"
 msgstr "Nueva etiqueta"
 

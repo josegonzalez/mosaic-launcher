@@ -36,6 +36,7 @@ Pin to top on: µCity, a favorite, comes first in Game Boy Color.
 ## For plugin authors
 
 - Provides the `favorites` entry set (`provides=sets.favorites`). It's announced as changed (`launcher.set_changed`) each time a favorite is added or removed.
+- Provides the `favorites.setup` service (`provides=favorites.setup`), which [`first-run`](../first-run/README.md) sets the collection through. With no arguments it gives the Collection setting now as `collection=<name>` and, as its choices, that name and the other collections in `Collections/` by name, as `collection.<i>=<name>` and `collection.label.<i>=<name>` from 0, as many as fit, with `collection.count=<n>`, and `restart=1`, as a new collection is used from the next time the launcher starts. `collection=<name>` saves the setting first; a name that can't be a file in `Collections/` (empty, starting with `.`, or with a `/` or a control character) gives `error=collection` and saves nothing. Other keys are ignored.
 - Other plugins read favorites through the entry set rather than the collection file: [`search`](../search/README.md), [`random-game`](../random-game/README.md), [`focus-mode`](../focus-mode/README.md), [`row-badges`](../row-badges/README.md), [`home-dashboard`](../home-dashboard/README.md) and [`screensaver`](../screensaver/README.md).
 - Stores favorites in the collection file in `Collections/`.
 - Its model code is in `pin_model.c`.

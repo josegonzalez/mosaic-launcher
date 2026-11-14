@@ -3,6 +3,7 @@ name=Transition styles
 api=1
 category=Looks
 summary=Picks how folders open and close and how the game switcher comes in.
+description=Picks how folders open and close and how the game switcher comes in, while the Menu transitions setting is on.
 slots=transition
 # how folders push and pop and the game switcher comes in; only while the
 # launcher's Menu transitions setting is on, as with it off there are none

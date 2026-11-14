@@ -1,6 +1,6 @@
-# The core-prefetch plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The core-prefetch plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -52,6 +52,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Core prefetch (unsupported on desktop)"
+msgstr ""
+
+#: plugin.txt
+msgid "Loads a game's emulator core ahead of time, so the game starts faster."
 msgstr ""
 
 #: plugin.txt

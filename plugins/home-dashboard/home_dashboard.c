@@ -987,6 +987,23 @@ static int setting(const char* key, const char* fallback) {
 	return !strcmp(host->cfg_get(key, fallback), "on");
 }
 
+// home-dashboard.setup: mode=<a mode> saves it, for the next start
+static int provideSetup(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char wanted[64];
+	int refused = 0;
+	if (host->event_value(args, "mode", wanted, sizeof(wanted)) >= 0) {
+		if (strcmp(HD_modeName(HD_modeOf(wanted)), wanted) != 0) refused = 1;
+		else {
+			host->cfg_set("mode", wanted);
+			char message[sizeof(wanted) + 64];
+			snprintf(message, sizeof(message), "setup: mode %s, from the next start", wanted);
+			say(message);
+		}
+	}
+	return HD_setupReply(host->cfg_get("mode", "dashboard"), refused, out, size) < 0;
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	static const HDWords words = { tr, trPlural };
@@ -1002,6 +1019,7 @@ static int init(const MosaicHost* h) {
 	snprintf(pico_tags, sizeof(pico_tags), "%s", host->cfg_get("pico8_tags", "P8,PICO8,PICO"));
 
 	favorites_loaded = HD_pluginLoaded(host, "favorites");
+	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".setup", provideSetup) != 0) say("couldn't provide " ID ".setup");
 
 	MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),

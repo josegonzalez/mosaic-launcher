@@ -115,6 +115,9 @@ msgstr "Renombrar"
 msgid "Renamed"
 msgstr "Renombrado"
 
+msgid "Renames, deletes or adds the selected game to a collection, from one button."
+msgstr "Renombra, borra o añade a una colección el juego seleccionado, desde un solo botón."
+
 msgid "That name can't be a collection"
 msgstr "Ese nombre no puede ser una colección"
 

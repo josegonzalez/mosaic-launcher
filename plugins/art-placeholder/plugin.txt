@@ -3,6 +3,7 @@ name=Placeholder art
 api=1
 category=Looks
 summary=Gives games with no art a generated thumbnail and box.
+description=Gives games with no art a generated thumbnail and box, so they don't show a blank space.
 # what a game with no art gets: its name on a card in the theme's colours,
 # or a pattern of its own; theme: the theme's art-placeholder.style, or title without one
 setting.style=choice|Style|theme|theme,title,pattern

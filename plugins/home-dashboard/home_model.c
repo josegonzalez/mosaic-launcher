@@ -43,6 +43,23 @@ const char* HD_modeName(int mode) {
 	return mode_names[mode];
 }
 
+int HD_setupReply(const char* current, int refused, char* out, size_t size) {
+	int count = (int)(sizeof(mode_names) / sizeof(mode_names[0]));
+	size_t used = 0;
+	int n = snprintf(out, size, "mode=%s\nmode.count=%i\n", current ? current : "", count);
+	if (n < 0 || (size_t)n >= size) return -1;
+	used = (size_t)n;
+	for (int i = 0; i < count; i++) {
+		// the options as the Plugins page shows them, in this plugin's words
+		n = snprintf(out + used, size - used, "mode.%i=%s\nmode.label.%i=%s\n", i, mode_names[i], i, tr(mode_names[i]));
+		if (n < 0 || (size_t)n >= size - used) return -1;
+		used += (size_t)n;
+	}
+	n = snprintf(out + used, size - used, "restart=1%s", refused ? "\nerror=mode" : "");
+	if (n < 0 || (size_t)n >= size - used) return -1;
+	return (int)(used + (size_t)n);
+}
+
 int HD_tabs(int pinned_on, int favorites_loaded, int stats_on, int* out) {
 	int n = 0;
 	out[n++] = HD_TAB_HOME;

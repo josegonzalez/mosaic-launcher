@@ -284,15 +284,15 @@ int main(void) {
 	CHECK(!Manifest_option("a", -1, option, sizeof(option)));
 
 	// the text the Plugins page shows, for make pot and translating: the
-	// name, then each label and a choice's options, but no defaults or
-	// text values
+	// name, the description, then each label and a choice's options, but
+	// no defaults or text values
 	PluginManifest t = { .bundled = 1 };
-	CHECK(Manifest_parse("id=tr\nname=Translated\nsetting.on=toggle|Turn it on|off\n"
+	CHECK(Manifest_parse("id=tr\nname=Translated\ndescription=Says hello.\nsetting.on=toggle|Turn it on|off\n"
 		"setting.pick=choice|Pick one|b|a, b,,c\nsetting.note=text|Note|typed\nsetting.bad=choice|Empty|x|\n"
 		"setting.q=choice|\"Quoted\" \\ (%)|n|n\n", &t) == 0);
 	strings[0] = '\0';
 	Manifest_strings(&t, append, NULL);
-	CHECK_STR(strings, "Translated;Turn it on;Pick one;a;b;c;Note;\"Quoted\" \\ (%);n;");
+	CHECK_STR(strings, "Translated;Says hello.;Turn it on;Pick one;a;b;c;Note;\"Quoted\" \\ (%);n;");
 	PluginManifest bare = { .bundled = 1 };
 	CHECK(Manifest_parse("id=bare\n", &bare) == 0);
 	strings[0] = '\0';

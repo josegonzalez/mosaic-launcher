@@ -1,6 +1,6 @@
-# The collections-plus plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The collections-plus plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -44,4 +44,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "Order"
+msgstr ""
+
+#: plugin.txt
+msgid "Puts your collections on the first screen in your order, with their art, and adds options for how collections list."
 msgstr ""

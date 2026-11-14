@@ -3,6 +3,7 @@ name=Emulator override
 api=1
 category=Launching games
 summary=Lets you pick which emulator a game launches with.
+description=Lets you pick which emulator a game launches with, in place of its system's usual one.
 # the emulator.choice service: the emulator pak chosen for a game
 provides=emulator.choice
 # the game list button that picks a game's emulator, shared with other plugins' actions on it

@@ -3,7 +3,9 @@
 # Writes the index of bundled plugins in docs/plugins.md, between its
 # "plugins:start" and "plugins:end" comments, from each bundled plugin's
 # plugins/<name>/plugin.txt: its `category` (the heading it's listed under)
-# and its one-sentence `summary`. Each entry links the plugin's README.md,
+# and its one-sentence `summary`. Each plugin.txt must also have a
+# `description`, which first-run shows, of at most 255 bytes, the most
+# MosaicPluginInfo holds. Each entry links the plugin's README.md,
 # which must start with a "# <name>" heading. Categories come in the order
 # CATEGORIES lists them and plugins in name order. With --check, changes
 # nothing and fails if the index is out of date.
@@ -36,6 +38,15 @@ for txt in "$ROOT"/plugins/*/plugin.txt; do
 	}
 	[ -n "$summary" ] || {
 		echo "plugins/$name/plugin.txt has no summary=" >&2
+		exit 1
+	}
+	description="$(field description "$txt")"
+	[ -n "$description" ] || {
+		echo "plugins/$name/plugin.txt has no description=" >&2
+		exit 1
+	}
+	[ "$(printf '%s' "$description" | wc -c)" -le 255 ] || {
+		echo "plugins/$name/plugin.txt: description= is longer than 255 bytes" >&2
 		exit 1
 	}
 	case "|$CATEGORIES|" in

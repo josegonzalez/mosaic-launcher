@@ -1,6 +1,6 @@
-# The activity-stats plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The activity-stats plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -130,6 +130,10 @@ msgstr ""
 
 #: activity_model.c
 msgid "Sat"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows how long you played each day and which games you played most, on a screen of its own. It reads the play history the Game Tracker tool keeps."
 msgstr ""
 
 #: activity_model.c

@@ -1,5 +1,5 @@
 // Writes the gettext template of one plugin to stdout: its plugin.txt's
-// name, setting labels and choice options, read by the launcher's own
+// name, description, setting labels and choice options, read by the launcher's own
 // parser (Manifest_strings), and the strings xgettext found in its code
 // (-c <file>), with no msgctxt, as the Launcher pak's Plugins page and
 // host->tr ask for them with the plugin's id and no context. Entries are
@@ -197,9 +197,9 @@ int main(int argc, char* argv[]) {
 	int plurals = 0;
 	for (int i = 0; i < entry_count; i++) plurals |= entries[i].plural[0] != '\0';
 
-	printf("# The %s plugin's name, setting labels and choice options, from its\n"
-		"# plugin.txt, and the fixed text its code hands the launcher. Written\n"
-		"# by make pot.\n", m.id);
+	printf("# The %s plugin's name, description, setting labels and choice\n"
+		"# options, from its plugin.txt, and the fixed text its code hands the\n"
+		"# launcher. Written by make pot.\n", m.id);
 	fputs("#, fuzzy\n"
 		"msgid \"\"\n"
 		"msgstr \"\"\n", stdout);

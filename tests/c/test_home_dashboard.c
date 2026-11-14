@@ -434,6 +434,7 @@ static MosaicHost fake = {
 	.draw_hints = fakeDrawHints,
 	.set_list = fakeSetListCall,
 	.is_filtered = fakeFiltered,
+	.provide = fakeProvide,
 };
 
 static void writeFile(const char* path, const char* text) {
@@ -689,6 +690,53 @@ static void testDownloads(void) {
 	fake.event_value = NULL;
 }
 
+// home-dashboard.setup: a mode it has is saved, any other refused
+static void fakeCfgSetMode(const char* key, const char* value) {
+	CHECK_STR(key, "mode");
+	snprintf(cfg_mode, sizeof(cfg_mode), "%s", value);
+}
+
+static void testSetup(void) {
+	char out[MOSAIC_CALL_MAX], value[64];
+	fake_provider_count = 0;
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	fake.cfg_set = fakeCfgSetMode;
+	reset("dashboard");
+	CHECK(fakeCall("home-dashboard.setup", "", out, sizeof(out)) > 0);
+	CHECK(fakeEventValue(out, "mode", value, sizeof(value)) > 0);
+	CHECK_STR(value, "dashboard");
+	CHECK(fakeEventValue(out, "mode.count", value, sizeof(value)) > 0);
+	CHECK_STR(value, "4");
+	CHECK(fakeEventValue(out, "mode.3", value, sizeof(value)) > 0);
+	CHECK_STR(value, "pico8");
+	CHECK(fakeEventValue(out, "mode.label.1", value, sizeof(value)) > 0);
+	CHECK_STR(value, "minui");
+	CHECK(fakeEventValue(out, "restart", value, sizeof(value)) > 0);
+	CHECK_STR(value, "1");
+	CHECK(fakeEventValue(out, "error", value, sizeof(value)) < 0);
+
+	CHECK(fakeCall("home-dashboard.setup", "mode=minui", out, sizeof(out)) > 0);
+	CHECK_STR(cfg_mode, "minui");
+	CHECK(fakeEventValue(out, "mode", value, sizeof(value)) > 0);
+	CHECK_STR(value, "minui");
+	CHECK(strstr(logged, "setup: mode minui, from the next start") != NULL);
+	CHECK(fakeCall("home-dashboard.setup", "mode=fancy", out, sizeof(out)) > 0);
+	CHECK_STR(cfg_mode, "minui");
+	CHECK(fakeEventValue(out, "error", value, sizeof(value)) > 0);
+	CHECK_STR(value, "mode");
+	// keys it doesn't take are ignored
+	CHECK(fakeCall("home-dashboard.setup", "theme=dark", out, sizeof(out)) > 0);
+	CHECK(fakeEventValue(out, "error", value, sizeof(value)) < 0);
+	// a reply that doesn't fit is an error
+	CHECK(HD_setupReply("dashboard", 0, out, 40) == -1);
+
+	fake_provider_count = 0;
+	fake.call = NULL;
+	fake.event_value = NULL;
+	fake.cfg_set = NULL;
+}
+
 int main(void) {
 	CHECK(system("rm -rf '" TEST_SDCARD_PATH "'") == 0);
 	testModes();
@@ -705,5 +753,6 @@ int main(void) {
 	testPlugin();
 	testServices();
 	testDownloads();
+	testSetup();
 	CHECK_DONE();
 }

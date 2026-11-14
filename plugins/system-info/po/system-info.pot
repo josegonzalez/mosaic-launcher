@@ -1,6 +1,6 @@
-# The system-info plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The system-info plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -102,6 +102,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "SELECT"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the device's battery, Wi-Fi, storage, memory and uptime on a screen of its own. It never changes a setting."
 msgstr ""
 
 #: info_model.c

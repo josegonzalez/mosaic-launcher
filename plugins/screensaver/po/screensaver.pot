@@ -1,6 +1,6 @@
-# The screensaver plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The screensaver plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -72,6 +72,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Clock"
+msgstr ""
+
+#: plugin.txt
+msgid "Cycles through images on a full screen once the game list or the home screen has been left alone."
 msgstr ""
 
 #: plugin.txt

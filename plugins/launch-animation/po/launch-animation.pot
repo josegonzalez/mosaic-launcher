@@ -1,6 +1,6 @@
-# The launch-animation plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The launch-animation plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -24,6 +24,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "500"
+msgstr ""
+
+#: plugin.txt
+msgid "Animates a game or tool starting from the game list."
 msgstr ""
 
 #: plugin.txt

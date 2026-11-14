@@ -1,6 +1,6 @@
-# The transitions plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The transitions plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -16,6 +16,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Ease"
+msgstr ""
+
+#: plugin.txt
+msgid "Picks how folders open and close and how the game switcher comes in, while the Menu transitions setting is on."
 msgstr ""
 
 #: plugin.txt

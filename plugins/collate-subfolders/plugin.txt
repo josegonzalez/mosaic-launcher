@@ -3,3 +3,4 @@ name=Collate subfolders
 api=1
 category=Library
 summary=Merges same-named folders from a system's several folders into one.
+description=Merges folders with the same name in a system listed from several folders, so you see one folder instead of several.

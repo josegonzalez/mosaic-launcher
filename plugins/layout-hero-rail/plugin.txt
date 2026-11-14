@@ -3,6 +3,7 @@ name=Hero and card rail layout
 api=1
 category=Looks
 summary=Shows the game list as a row of cards under big art for the selected game.
+description=Shows the game list as a row of cards along the bottom of the screen, under big art for the selected game.
 slots=layout
 # how tall the cards along the bottom are: 22, 28 or 34 percent of the screen above the hints;
 # theme: the theme's layout-hero-rail.cards, or medium without one

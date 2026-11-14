@@ -15,6 +15,9 @@ msgstr "Saltar entre sistemas en las colecciones"
 msgid "Jump between systems on the root"
 msgstr "Saltar entre sistemas en la raíz"
 
+msgid "Makes L1 and R1 jump between systems instead of letters."
+msgstr "Hace que L1 y R1 salten entre sistemas en lugar de letras."
+
 msgid "Platform jump"
 msgstr "Salto de plataforma"
 

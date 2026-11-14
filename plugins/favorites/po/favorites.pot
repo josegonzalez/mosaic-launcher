@@ -1,6 +1,6 @@
-# The favorites plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The favorites plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -22,6 +22,10 @@ msgstr ""
 #: favorites.c
 #, c-format
 msgid "Added to %s"
+msgstr ""
+
+#: plugin.txt
+msgid "Adds a Favorites folder on the first screen, and a button to add or remove the selected game."
 msgstr ""
 
 #: plugin.txt

@@ -38,6 +38,9 @@ msgstr "Emulador: %s"
 msgid "L2"
 msgstr "L2"
 
+msgid "Lets you pick which emulator a game launches with, in place of its system's usual one."
+msgstr "Te deja elegir con qué emulador se abre un juego, en lugar del habitual de su sistema."
+
 msgid "List every emulator pak"
 msgstr "Listar todos los paks de emulador"
 

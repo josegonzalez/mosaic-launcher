@@ -1,6 +1,6 @@
-# The screenshot-viewer plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The screenshot-viewer plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -13,6 +13,10 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "Browses the screenshots you took in games, newest first, on a screen of its own."
+msgstr ""
 
 #: screenshot_viewer.c
 msgid "Can't show this screenshot"

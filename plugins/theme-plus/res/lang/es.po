@@ -43,6 +43,9 @@ msgstr "8"
 msgid "Background colour"
 msgstr "Color de fondo"
 
+msgid "Changes how the launcher looks, its colours, font, text size, wallpapers and button hints, from a theme, without touching stock's settings."
+msgstr "Cambia el aspecto del launcher, sus colores, fuente, tamaño del texto, fondos y botones de ayuda, desde un tema, sin tocar los ajustes de NextUI original."
+
 msgid "Contrast"
 msgstr "Contraste"
 

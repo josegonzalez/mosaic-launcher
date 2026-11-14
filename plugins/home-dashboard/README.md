@@ -81,6 +81,7 @@ With romm and two games it downloaded: the Stats tab scrolled down to Recently d
 ## For plugin authors
 
 - Owns the `home` slot (`slots=home`).
+- Provides the `home-dashboard.setup` service (`provides=home-dashboard.setup`), which [`first-run`](../first-run/README.md) sets the home mode through. With no arguments it gives the mode now as `mode=<mode>`, `mode.count=4` and each mode as `mode.<i>=<mode>` with its label, as the Plugins page shows it in the user's language, as `mode.label.<i>`, from 0, and `restart=1`, as a new mode shows the next time the launcher starts. `mode=<dashboard, minui, retroachievements or pico8>` saves the Home mode setting first, and any other mode gives `error=mode` and saves nothing. Other keys are ignored.
 - Lists `favorites` as `optional`, so it loads after it, since it asks as it starts whether favorites is loaded. The Pinned tab is the `favorites` entry set, read with `set_list` each time the screen opens.
 - Leaves out of every tab what `is_filtered` says a plugin's filter hides, such as the [`hidden`](../hidden/README.md) plugin's games.
 - Reads stock's play tracker, the switcher's recents, and the host's `achievements` call.

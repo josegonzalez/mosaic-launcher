@@ -1,6 +1,6 @@
-# The second-screen plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The second-screen plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -64,6 +64,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Second screen (experimental, desktop only)"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the selected game in a second window. It's experimental and only works on the desktop build."
 msgstr ""
 
 #: plugin.txt

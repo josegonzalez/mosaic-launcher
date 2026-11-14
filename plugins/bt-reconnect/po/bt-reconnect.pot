@@ -1,6 +1,6 @@
-# The bt-reconnect plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The bt-reconnect plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -28,4 +28,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "Reconnect at start"
+msgstr ""
+
+#: plugin.txt
+msgid "Reconnects your last Bluetooth device when the launcher starts and after the device wakes from sleep."
 msgstr ""

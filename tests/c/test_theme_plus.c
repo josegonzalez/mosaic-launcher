@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "check.h"
+#include "fakeproviders.h"
 #include "../../plugins/theme-plus/theme_plus.c"
 
 #ifndef TEST_SDCARD_PATH
@@ -899,6 +900,44 @@ static void testPlugin(void) {
 	t = asked();
 	CHECK(hostLogged("theme Mixed (card, palette Mine)"));
 	CHECK(t.colors[6] == 0x445566 && t.colors[1] == 0x9B2257);
+
+	// theme-plus.setup: the picker's themes, and one of them saved and
+	// shown at once, as a pick does
+	char out[MOSAIC_CALL_MAX], value[128];
+	fake.event_value = fakeEventValue;
+	reloads = 0;
+	CHECK(provideSetup("theme-plus.setup", "", out, sizeof(out)) == 0);
+	CHECK(fakeEventValue(out, "theme", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Mixed");
+	CHECK(fakeEventValue(out, "theme.count", value, sizeof(value)) > 0);
+	CHECK_STR(value, "9");
+	CHECK(fakeEventValue(out, "theme.0", value, sizeof(value)) > 0);
+	CHECK_STR(value, "stock");
+	CHECK(fakeEventValue(out, "theme.label.0", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Stock");
+	CHECK(fakeEventValue(out, "theme.label.8", value, sizeof(value)) > 0);
+	CHECK_STR(value, "Mine (in Settings)");
+	CHECK(fakeEventValue(out, "restart", value, sizeof(value)) > 0);
+	CHECK_STR(value, "0");
+	CHECK(reloads == 0);
+	CHECK(provideSetup("theme-plus.setup", "theme=nord", out, sizeof(out)) == 0);
+	CHECK_STR(cfgTheme, "nord");
+	CHECK(reloads == 1);
+	CHECK(fakeEventValue(out, "theme", value, sizeof(value)) > 0);
+	CHECK_STR(value, "nord");
+	CHECK(hostLogged("setup: theme nord"));
+	CHECK(provideSetup("theme-plus.setup", "theme=Nowhere", out, sizeof(out)) == 0);
+	CHECK_STR(cfgTheme, "nord");
+	CHECK(reloads == 1);
+	CHECK(fakeEventValue(out, "error", value, sizeof(value)) > 0);
+	CHECK_STR(value, "theme");
+	CHECK(fakeEventValue(out, "theme", value, sizeof(value)) > 0);
+	CHECK_STR(value, "nord");
+	// a small buffer lists what fits
+	CHECK(provideSetup("theme-plus.setup", "", out, 200) == 0);
+	CHECK(fakeEventValue(out, "theme.count", value, sizeof(value)) > 0 && atoi(value) < 9);
+	fake.event_value = NULL;
+	snprintf(cfgTheme, sizeof(cfgTheme), "Mixed");
 
 	// a launcher without the palette calls lists none
 	MosaicHost noPalettes = fake;

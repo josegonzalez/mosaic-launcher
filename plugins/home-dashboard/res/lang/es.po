@@ -40,6 +40,9 @@ msgstr "%s jugado"
 msgid "<1m"
 msgstr "<1 min"
 
+msgid "A home screen that comes before the game list, with your last game ready to resume."
+msgstr "Una pantalla de inicio que va antes de la lista de juegos, con tu último juego listo para continuar."
+
 msgid "Achievements"
 msgstr "Logros"
 

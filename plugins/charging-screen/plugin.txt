@@ -3,6 +3,7 @@ name=Charging screen (unsupported on desktop)
 api=1
 category=Power
 summary=Shows a full screen with the battery level while the device charges and sits idle.
+description=Shows a full screen with the battery level while the device charges and you aren't using it.
 # the screen the launcher opens in the Launcher page's order of ambient screens
 ambient=charging-screen.main
 # how long the game list or home is left alone on a charger before the screen shows

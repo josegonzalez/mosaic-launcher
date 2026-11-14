@@ -1,6 +1,6 @@
-# The art-boxart plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The art-boxart plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -24,6 +24,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Box, wheel and screenshot in .media"
+msgstr ""
+
+#: plugin.txt
+msgid "Finds box art in the art folders other firmware uses, so your games show it without you moving files."
 msgstr ""
 
 #: plugin.txt

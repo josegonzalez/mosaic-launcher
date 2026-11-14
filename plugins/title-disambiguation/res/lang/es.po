@@ -14,3 +14,6 @@ msgstr "También del mismo sistema"
 
 msgid "Title disambiguation"
 msgstr "Desambiguación de títulos"
+
+msgid "When two games in a list have the same name, adds what tells them apart, and only then."
+msgstr "Cuando dos juegos de una lista tienen el mismo nombre, añade lo que los distingue, y solo entonces."

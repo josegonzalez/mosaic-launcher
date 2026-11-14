@@ -1,6 +1,6 @@
-# The button-remap plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The button-remap plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -24,6 +24,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "L2 button"
+msgstr ""
+
+#: plugin.txt
+msgid "Puts the game list's own actions, or other plugins' actions, on different buttons."
 msgstr ""
 
 #: plugin.txt

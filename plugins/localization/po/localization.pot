@@ -1,6 +1,6 @@
-# The localization plugin's name, setting labels and choice options, from its
-# plugin.txt, and the fixed text its code hands the launcher. Written
-# by make pot.
+# The localization plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
 #, fuzzy
 msgid ""
 msgstr ""
@@ -78,6 +78,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "SELECT"
+msgstr ""
+
+#: plugin.txt
+msgid "Translates the launcher and other plugins from language packs, so the menus show in your language."
 msgstr ""
 
 #: localization.c

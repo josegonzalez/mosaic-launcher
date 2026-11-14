@@ -3,6 +3,7 @@ name=Genre view
 api=1
 category=Library
 summary=Gathers the same genre from every system into one Genres folder.
+description=Adds a Genres folder on the first screen that gathers the same genre from every system, such as all your platformers in one place.
 # the fewest consoles a genre's folders need to come from
 setting.min=choice|Consoles a genre needs|1|1,2,3,4
 # folder names that aren't genres, comma-separated, eg. Hacks, Homebrew
