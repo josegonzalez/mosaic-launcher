@@ -402,7 +402,7 @@ msgstr ""
 
 #: vendor/NextUI/skeleton/EXTRAS/Roms
 msgctxt "systems"
-msgid "Pokémon mini"
+msgid "Pokémon mini"
 msgstr ""
 
 #: launcher/quickitems.c
