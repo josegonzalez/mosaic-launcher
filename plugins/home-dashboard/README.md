@@ -20,6 +20,7 @@ Turn on **Home dashboard** in Launcher > Plugins ([how](../../docs/plugins.md#tu
 | **A** | Opens the selected game: a recent through the switcher's own call, resuming its save state when it has one, and anything else as the game list opens it |
 | **B** | Does nothing, as at the first screen |
 | **L1** and **R1** | Switch tabs, in the dashboard mode |
+| Up and down | Scroll the Stats tab when it doesn't fit |
 
 ### Modes
 
@@ -28,7 +29,7 @@ The Home mode setting picks the home.
 - **dashboard** (the default) has tabs, switched with **L1** and **R1** and kept when the home screen opens again:
   - Home: a continue card for the last game played, with its save state's preview (or its thumbnail or box) and its [`playtime-captions`](../playtime-captions/README.md) caption, such as "1h 25m · today", in that plugin's parts and format, which **A** resumes. While playtime-captions is off, the card shows the game's play time instead, such as "1h 25m played". Under it is a top shelf of the games played before it (the Top shelf setting).
   - Pinned: favorites' games in the favorites collection's order, shown while the [`favorites`](../favorites/README.md) plugin is loaded (the Pinned tab setting).
-  - Stats: today's play time, the time left today while [`playtime-limit`](../playtime-limit/README.md) has a daily limit set (such as "35m of 1h 0m", of today's limit with any extra time), the recently played games' total and the five most played of the recent and pinned games (the Stats tab setting). The launcher has no call for the whole play history, so Stats covers only the games the dashboard knows about. With no play history (no database yet, or no sqlite) it says so rather than showing numbers.
+  - Stats: today's play time, the time left today while [`playtime-limit`](../playtime-limit/README.md) has a daily limit set (such as "35m of 1h 0m", of today's limit with any extra time), the recently played games' total and the five most played of the recent and pinned games (the Stats tab setting). When they don't all fit, up and down scroll the tab, and the Most played heading only shows with a game under it. The launcher has no call for the whole play history, so Stats covers only the games the dashboard knows about. With no play history (no database yet, or no sqlite) it says so rather than showing numbers.
 - **minui:** a plain list of the recently played games, then Games, which goes on to the game list.
 - **retroachievements:** the recent and pinned games with RetroAchievements progress on the card, as "12/40 · 150/400 points", from what minarch keeps there through the host's `achievements` call. Games with nothing cached are left out, and nothing is fetched.
 - **pico8:** the Pico-8 carts (`.p8` and `.p8.png`) in the `Roms` folders whose tag is one of the Pico-8 folder tags setting's, as a grid, with their art or else their first letter.
@@ -58,6 +59,10 @@ With playtime-captions: its caption on the continue card.
 With playtime-limit's daily limit set to 60 minutes: the time left on the Stats tab.
 
 ![With playtime-limit's daily limit set to 60 minutes: the time left on the Stats tab](docs/with-playtime-limit.png)
+
+The same, scrolled down to the most played games.
+
+![The same, scrolled down to the most played games](docs/with-playtime-limit-scrolled.png)
 
 ## Settings
 

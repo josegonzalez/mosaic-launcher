@@ -28,3 +28,9 @@ on playtime-limit home-dashboard
 cfg playtime-limit limit=60
 press "r1"
 shot with-playtime-limit
+
+begin
+on playtime-limit home-dashboard
+cfg playtime-limit limit=60
+press "r1 down down"
+shot with-playtime-limit-scrolled

@@ -72,6 +72,15 @@ int HD_listMove(int selected, int count, int delta, int wrap);
 // far as it takes from first.
 int HD_window(int selected, int count, int rows, int first);
 
+// A list that scrolls without a selection, such as the Stats tab: the
+// first of count rows in view after scrolling by rows from first, with
+// rows in view, never past the last page. 0 when they all fit.
+int HD_scroll(int first, int by, int count, int rows);
+// How many rows to draw from first, with rows in view: as many as fit,
+// less any section headings (header[i] set) at the bottom, so a heading
+// never shows with nothing under it.
+int HD_shown(const int* header, int count, int first, int rows);
+
 // Play time as text: "2h 15m", "45m", "<1m" under a minute, "" for 0 or
 // less.
 void HD_duration(long long seconds, char* out, size_t size);

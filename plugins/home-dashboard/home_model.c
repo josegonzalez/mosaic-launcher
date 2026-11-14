@@ -105,6 +105,22 @@ int HD_window(int selected, int count, int rows, int first) {
 	return first < 0 ? 0 : first;
 }
 
+int HD_scroll(int first, int by, int count, int rows) {
+	int last = count - (rows > 0 ? rows : 1);
+	if (last < 0) last = 0;
+	first += by;
+	if (first > last) first = last;
+	return first < 0 ? 0 : first;
+}
+
+int HD_shown(const int* header, int count, int first, int rows) {
+	if (first < 0) first = 0;
+	int n = count - first;
+	if (n > rows) n = rows;
+	while (n > 0 && header[first + n - 1]) n--;
+	return n < 0 ? 0 : n;
+}
+
 void HD_duration(long long seconds, char* out, size_t size) {
 	if (seconds <= 0) snprintf(out, size, "%s", "");
 	else if (seconds < 60) snprintf(out, size, "%s", tr("<1m"));

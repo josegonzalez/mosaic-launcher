@@ -32,7 +32,8 @@
 // play time ("2h 15m played"). While playtime-limit has a daily limit
 // set, its limit.left service gives the Stats tab a Time left today row,
 // with the time left of today's limit; with no limit, or without
-// playtime-limit, there's no row.
+// playtime-limit, there's no row. Up and down scroll the Stats tab when
+// its rows don't fit, and a heading never shows as its last row.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -102,6 +103,8 @@ static int home_focus = HD_FOCUS_CONTINUE;
 static int shelf_first = 0;
 static int list_selected = 0;
 static int list_first = 0;
+static int stats_first = 0; // the Stats tab's first row in view
+static int stats_fit = 1;   // and how many fit, from the last draw
 static int cart_selected = 0;
 static int cart_first_row = 0;
 static int shelf_cells = 1; // shelf cards in view at the last render
@@ -402,18 +405,27 @@ static void drawMessage(MosaicSurface* screen, const MosaicRect* rect, const cha
 		C_HINT(), rect->w);
 }
 
-// rows[] as list rows in rect, the selected one (-1 for none) on a pill,
-// scrolled to keep it in view.
+// rows[] as list rows in rect, the selected one on a pill, scrolled to
+// keep it in view; with none (-1), from *first as up and down scroll it,
+// and never with a heading last.
 static void drawRows(MosaicSurface* screen, const MosaicRect* rect, int selected, int* first) {
 	int scale = host->screen_scale();
 	int pad = 10 * scale;
 	int row_h = 30 * scale;
 	int fit = rect->h / row_h;
 	if (fit < 1) return;
-	*first = selected >= 0 ? HD_window(selected, row_count, fit, *first) : 0;
+	int shown = fit;
+	if (selected >= 0) *first = HD_window(selected, row_count, fit, *first);
+	else {
+		stats_fit = fit;
+		*first = HD_scroll(*first, 0, row_count, fit);
+		int header[ROWS_MAX];
+		for (int i = 0; i < row_count; i++) header[i] = rows[i].header;
+		shown = HD_shown(header, row_count, *first, fit);
+	}
 	int large_h = host->text_height(MOSAIC_FONT_LARGE);
 	int small_h = host->text_height(MOSAIC_FONT_SMALL);
-	for (int i = *first; i < row_count && i < *first + fit; i++) {
+	for (int i = *first; i < row_count && i < *first + shown; i++) {
 		Row* row = &rows[i];
 		MosaicRect r = { rect->x, rect->y + (i - *first) * row_h, rect->w, row_h };
 		int on = i == selected;
@@ -622,8 +634,7 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 			snprintf(row->right, sizeof(row->right), "%s", played);
 		}
 	}
-	int first = 0;
-	drawRows(screen, &layout->content, -1, &first);
+	drawRows(screen, &layout->content, -1, &stats_first);
 }
 
 static void drawMinUI(MosaicSurface* screen, const HDLayout* layout) {
@@ -792,6 +803,7 @@ static void setTab(int index) {
 	tab = tabs[index];
 	list_selected = 0;
 	list_first = 0;
+	stats_first = 0;
 	char message[64];
 	snprintf(message, sizeof(message), "tab %s", HD_tabLabel(tab));
 	say(message);
@@ -835,6 +847,12 @@ static int input(const MosaicInput* input, void* data) {
 					int index = home_focus == HD_FOCUS_CONTINUE ? 0 : home_focus + 1;
 					if (index < recent_count) openItem(&recents[index]);
 				}
+			}
+			else if (tab == HD_TAB_STATS) {
+				int before = stats_first;
+				if (pressedBit(input->repeated, MOSAIC_BUTTON_UP)) stats_first = HD_scroll(stats_first, -1, row_count, stats_fit);
+				if (pressedBit(input->repeated, MOSAIC_BUTTON_DOWN)) stats_first = HD_scroll(stats_first, 1, row_count, stats_fit);
+				moved = stats_first != before;
 			}
 			else if (tab == HD_TAB_PINNED) {
 				moved = listInput(input, pinned_count);
@@ -886,6 +904,7 @@ static int enter(void* data) {
 	if (home_focus >= recent_count - 1) home_focus = HD_FOCUS_CONTINUE;
 	if (cart_selected >= cart_count) cart_selected = 0;
 	showing = 1;
+	stats_first = 0;
 	shown_caption[0] = '\x01'; // logged again on the first frame
 	shown_left[0] = '\x01';
 	char message[256];

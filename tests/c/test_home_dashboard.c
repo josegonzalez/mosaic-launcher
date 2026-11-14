@@ -92,6 +92,27 @@ static void testLists(void) {
 	CHECK(HD_window(0, 0, 4, 3) == 0);
 }
 
+// the Stats tab: scrolling with no selection, never a heading last
+static void testScroll(void) {
+	CHECK(HD_scroll(0, 1, 6, 4) == 1);
+	CHECK(HD_scroll(1, 1, 6, 4) == 2);
+	CHECK(HD_scroll(2, 1, 6, 4) == 2); // the last page
+	CHECK(HD_scroll(2, -1, 6, 4) == 1);
+	CHECK(HD_scroll(0, -1, 6, 4) == 0);
+	CHECK(HD_scroll(3, 1, 3, 4) == 0); // all fit
+	CHECK(HD_scroll(5, 0, 6, 0) == 5);
+
+	// Played today, Time left, Recently played, MOST PLAYED, two games
+	const int header[] = { 0, 0, 0, 1, 0, 0 };
+	CHECK(HD_shown(header, 6, 0, 4) == 3); // the heading would be last
+	CHECK(HD_shown(header, 6, 1, 4) == 4);
+	CHECK(HD_shown(header, 6, 2, 4) == 4);
+	CHECK(HD_shown(header, 6, 0, 6) == 6);
+	CHECK(HD_shown(header, 6, 0, 10) == 6);
+	CHECK(HD_shown(header, 4, 0, 4) == 3); // a heading with no games after it
+	CHECK(HD_shown(header, 6, 3, 1) == 0);
+}
+
 static void testText(void) {
 	char out[64];
 	HD_duration(0, out, sizeof(out));
@@ -613,6 +634,7 @@ int main(void) {
 	testTabs();
 	testHomeMove();
 	testLists();
+	testScroll();
 	testText();
 	testWords();
 	testMostPlayed();
