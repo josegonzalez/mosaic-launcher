@@ -31,6 +31,9 @@
 #   shot <name>             starts the launcher and saves that frame as
 #                           plugins/<id>/docs/<name>.png, <id> being the file's
 #
+# The launcher's own shots, such as its lock, are in shots/launcher.sh, and
+# are saved in docs/images/ in place of a plugin's docs.
+#
 # A block can also change the card under $CARD before its shot, such as
 # $CARD/Collections/Favorites.txt, or export tests/screenshots/device.c's
 # variables for a device's sample values in place of this computer's.
@@ -211,13 +214,22 @@ cfg() {
 }
 
 press() { keys="$*"; }
+
+# docs_dir: where the shots in $plugin's file go
+docs_dir() {
+	if [ "$plugin" = launcher ]; then
+		echo "$ROOT/docs/images"
+	else
+		echo "$ROOT/plugins/$plugin/docs"
+	fi
+}
 after() { keep_after="$1"; }
 args() { elf_args="$*"; }
 
 # shot <name>: runs the launcher until presser is done, and keeps the frame
 # shown "after" milliseconds after the last press as plugins/<id>/docs/<name>.png
 shot() {
-	out="$ROOT/plugins/$plugin/docs/$1.png"
+	out="$(docs_dir)/$1.png"
 	log="$WORK/logs/$plugin-$1.log"
 	frame="$WORK/frames/$plugin-$1"
 	mkdir -p "$(dirname "$out")" "$WORK/logs" "$WORK/frames"
@@ -263,7 +275,7 @@ shot() {
 		-define png:exclude-chunks=date,time -define png:compression-level=9 "PNG8:$out" \
 		|| fail "$plugin $1: converting the frame"
 	count=$((count + 1))
-	echo "  $plugin/docs/$1.png"
+	echo "  ${out#"$ROOT"/}"
 }
 
 if [ $# -eq 0 ]; then
@@ -282,7 +294,7 @@ for file in "$@"; do
 	fi
 	echo "$plugin"
 	# a shot renamed or dropped leaves no picture behind
-	rm -f "$ROOT/plugins/$plugin/docs/"*.png
+	rm -f "$(docs_dir)/"*.png
 	# shellcheck source=/dev/null
 	. "$file"
 done

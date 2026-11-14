@@ -33,6 +33,9 @@
 #include "callsite.h"
 #include "providers.h"
 #include "actionlist.h"
+#include "cfgfile.h"
+#include "lockmodel.h"
+#include "ambientmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -67,6 +70,7 @@ typedef struct LoadedPlugin {
 	int owns_switcher;   // claims the switcher slot, so its MOSAIC_SCREEN_GAME_SWITCHER screen is in place of the game switcher
 	int owns_strings;    // claims the strings slot, so its translate is asked
 	int owns_theme;      // claims the theme slot, so its theme is asked
+	int lock_text_off;   // its lock_text failed, so its lines are left off the lock screen
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -102,9 +106,24 @@ static int switcher_declined = 0; // the switcher screen's enter declined, so th
 // cfg_get act on its settings. Every call into a plugin goes through it.
 #define AS_PLUGIN(i) AS_CALLER(loaded[i].id)
 
+// A screen's owner, the launcher for its own lock screen, and its hooks
+// run as that owner.
+#define SCREEN_OWNER(s) ((s)->owner >= 0 ? loaded[(s)->owner].id : "launcher")
+#define AS_SCREEN(s) AS_CALLER((s)->owner >= 0 ? loaded[(s)->owner].id : NULL)
+
 static void dropOverrides(int owner);
 static void saveBindings(int* counts);
 static void dropBindings(const int* counts);
+// the built-in lock and ambient screens, at the end
+static void lockStart(void);
+static int lockFrame(unsigned long now);
+static void lockHeader(SDL_Surface* surface, HeaderRow* row);
+static void lockDropOwner(int owner);
+static void idleReset(unsigned long now);
+static int hostLock(void);
+static int hostIsLocked(void);
+static int hostLockButton(int button, const char* action_id);
+static int hostRegisterAmbient(const char* screen_id, int (*wants)(unsigned long idle_ms, void* data), void* data);
 static PluginManifest manifests[PLUGIN_MAX];
 static int manifest_count = 0;
 static int discovered = 0; // manifests holds what discover() found
@@ -1759,6 +1778,10 @@ static const MosaicHost host = {
 	.actions_count = hostActionsCount,
 	.action_info = hostActionInfo,
 	.theme_value = hostThemeValue,
+	.lock = hostLock,
+	.is_locked = hostIsLocked,
+	.lock_button = hostLockButton,
+	.register_ambient = hostRegisterAmbient,
 };
 
 ///////////////////////////////////////
@@ -1884,6 +1907,7 @@ static void load(const PluginManifest* m) {
 		hostInhibitSleep(m->id, 0);
 		hostLedClear(m->id);
 		// none can be open: open_screen refuses from init
+		lockDropOwner(loaded_count - 1);
 		ScreenSet_dropOwner(&screens, loaded_count - 1);
 		fnReleaseAll(m->id);
 		setsReleaseAll(m->id);
@@ -2069,7 +2093,7 @@ static void claimHome(void) {
 		const PluginScreen* s = &screens.screens[i];
 		if (s->owner != owner && (s->hooks.flags & MOSAIC_SCREEN_HOME)) {
 			LOG_warn("plugins: %s's screen %s is marked home but %s has no slots=" HOME_SLOT ", so it's an ordinary screen\n",
-				loaded[s->owner].id, s->id, loaded[s->owner].id);
+				SCREEN_OWNER(s), s->id, loaded[s->owner].id);
 		}
 	}
 	if (owner < 0) return;
@@ -2089,7 +2113,7 @@ static void claimSwitcher(void) {
 		const PluginScreen* s = &screens.screens[i];
 		if (s->owner != owner && (s->hooks.flags & MOSAIC_SCREEN_GAME_SWITCHER)) {
 			LOG_warn("plugins: %s's screen %s is marked switcher but %s has no slots=" SWITCHER_SLOT ", so it's an ordinary screen\n",
-				loaded[s->owner].id, s->id, loaded[s->owner].id);
+				SCREEN_OWNER(s), s->id, loaded[s->owner].id);
 		}
 	}
 	if (owner < 0) return;
@@ -2130,6 +2154,8 @@ static int settingsGuard(void) {
 static void start(void) {
 	Audio_setMainThread();
 	ScreenSet_clear(&screens);
+	// before any plugin, and whether or not any loads
+	if (!settings_only) lockStart();
 	if (settings_only) {
 		if (!settingsGuard()) return;
 	}
@@ -2876,6 +2902,8 @@ void Plugins_afterResume(void) {
 	// so plugins' after_resume see a fresh address soon
 	Bluetooth_pause(0);
 	Wifi_pause(0);
+	// waking counts as a button for ambient screens
+	idleReset(SDL_GetTicks());
 	EACH_PLUGIN_WITH(after_resume) p->after_resume();
 }
 
@@ -2962,14 +2990,18 @@ static int filterButtons(LayoutButton* out) {
 }
 
 void Plugins_inputFilter(unsigned long now) {
+	// any button down, before anything takes it, for ambient screens
+	if (pad.just_pressed || pad.is_pressed || pad.just_released) idleReset(now);
+	// the lock takes what it takes before every filter
+	int locked = lockFrame(now);
 	int any = 0;
 	for (int i = 0; i < loaded_count && !any; i++) any = filters(i);
 	// a press taken before a filter failed is still timed
-	if (!any && !power_hold.taken_at) return;
+	if (!any && !locked && !power_hold.taken_at) return;
 	LayoutButton map[LAYOUT_BUTTONS + 5];
 	int count = filterButtons(map);
 	int pressed = pad.just_pressed, repeated = pad.just_repeated, released = pad.just_released;
-	int taken = 0;
+	int taken = locked;
 	for (int i = 0; i < loaded_count; i++) {
 		if (!filters(i)) continue;
 		MosaicInput input;
@@ -3272,6 +3304,8 @@ static void headerOff(int i, const char* hook, int rc) {
 }
 
 void Plugins_header(SDL_Surface* surface, HeaderRow* row) {
+	// the lock's padlock first, next to the status pill
+	lockHeader(surface, row);
 	for (int i = 0; i < loaded_count; i++) {
 		if (!hasHeader(i)) continue;
 		int room = HeaderRow_room(row);
@@ -3404,10 +3438,10 @@ static int openScreen(int index, int slide) {
 	if (s->hooks.enter) {
 		screen_hook = 1;
 		int rc = 0;
-		AS_PLUGIN(s->owner) rc = s->hooks.enter(s->hooks.data);
+		AS_SCREEN(s) rc = s->hooks.enter(s->hooks.data);
 		screen_hook = 0;
 		if (rc != 0) {
-			LOG_info("plugins: %s's screen %s didn't open (enter returned %i)\n", loaded[s->owner].id, s->id, rc);
+			LOG_info("plugins: %s's screen %s didn't open (enter returned %i)\n", SCREEN_OWNER(s), s->id, rc);
 			return -1;
 		}
 	}
@@ -3442,7 +3476,7 @@ static int hostOpenScreen(const char* id) {
 static void runExit(PluginScreen* s) {
 	if (!s->hooks.exit) return;
 	screen_hook = 1;
-	AS_PLUGIN(s->owner) s->hooks.exit(s->hooks.data);
+	AS_SCREEN(s) s->hooks.exit(s->hooks.data);
 	screen_hook = 0;
 }
 
@@ -3517,7 +3551,7 @@ static void screenFailed(PluginScreen* s, const char* hook, int rc) {
 	s->off = 1;
 	state.dirty = 1;
 	LOG_warn("plugins: %s's screen %s's %s returned %i, closing it until the launcher restarts\n",
-		loaded[s->owner].id, s->id, hook, rc);
+		SCREEN_OWNER(s), s->id, hook, rc);
 	if (s - screens.screens == screens.home) LOG_warn("plugins: using the root list in place of the home screen until the launcher restarts\n");
 }
 
@@ -3548,7 +3582,7 @@ void Plugins_screenInput(void) {
 		int count = screenButtons(map);
 		MosaicInput input;
 		LayoutInput_fill(&input, map, count, pad.just_pressed, pad.just_repeated, pad.just_released, pad.is_pressed);
-		AS_PLUGIN(s->owner) rc = s->hooks.input(&input, s->hooks.data);
+		AS_SCREEN(s) rc = s->hooks.input(&input, s->hooks.data);
 	}
 	else rc = PAD_justPressed(BTN_B) ? MOSAIC_SCREEN_CLOSE : MOSAIC_SCREEN_STAY;
 	if (rc != MOSAIC_SCREEN_STAY && rc != MOSAIC_SCREEN_CLOSE) screenFailed(s, "input", rc);
@@ -3564,7 +3598,7 @@ void Plugins_screenInput(void) {
 	if (currentScreen != SCREEN_PLUGIN || now_top < 0) return;
 	PluginScreen* shown = &screens.screens[now_top];
 	int animating = 0;
-	if (!shown->off && shown->hooks.animating) AS_PLUGIN(shown->owner) animating = shown->hooks.animating(shown->hooks.data);
+	if (!shown->off && shown->hooks.animating) AS_SCREEN(shown) animating = shown->hooks.animating(shown->hooks.data);
 	if (animating) state.dirty = 1;
 }
 
@@ -3581,7 +3615,7 @@ void Plugins_screenRender(SDL_Surface* surface, const MosaicScreenView* view) {
 	hints_screen = lent;
 	hints_view = view;
 	int rc = 0;
-	AS_PLUGIN(s->owner) rc = s->hooks.render(lent, view, s->hooks.data);
+	AS_SCREEN(s) rc = s->hooks.render(lent, view, s->hooks.data);
 	hints_screen = NULL;
 	hints_view = NULL;
 	screen_drawing = 0;
@@ -3707,4 +3741,417 @@ void Plugins_overlays(SDL_Surface* surface, const MosaicScreenView* view) {
 	}
 	screen_drawing = 0;
 	PluginDraw_unlend(lent);
+}
+
+///////////////////////////////////////
+// the built-in lock and ambient screens
+
+#define LOCK_BINDINGS_MAX 16
+#define LOCK_LINES_MAX 3 // a plugin's lines on the lock screen
+
+typedef struct LockBinding {
+	int button;     // a MosaicButton
+	char action[64];
+	int owner;      // the loaded plugin that put it there
+} LockBinding;
+
+static LockState lock_state;
+static int lock_on = 0; // the chord or the switch can lock
+static char lock_chord_name[64];
+static MosaicRect lock_logged_rect; // where the padlock was last logged
+static int lock_logged = 0;
+static long lock_minute = -1; // the lock screen's clock, to redraw when it changes
+static LockBinding lock_bindings[LOCK_BINDINGS_MAX];
+static int lock_binding_count = 0;
+static AmbientSet ambients;
+static int ambients_sorted = 0;
+static char ambient_setting[512]; // the user's order, "" for the default
+static unsigned long idle_since = 0;
+static int ambient_shown = -1; // the ambient screen on top last frame, or -1
+
+static void idleReset(unsigned long now) {
+	idle_since = now;
+	for (int i = 0; i < ambients.count; i++) ambients.items[i].refused = 0;
+}
+
+static unsigned int lockBits(int button) {
+	return MOSAIC_BUTTON_BIT(button);
+}
+
+static int lockScreenOnTop(void) {
+	int top = currentScreen == SCREEN_PLUGIN ? ScreenSet_top(&screens) : -1;
+	return top >= 0 && !strcmp(screens.screens[top].id, AMBIENT_LOCK);
+}
+
+// The lock screen's buttons, less the chord's, which only unlock.
+static unsigned int lockButtonBits(void) {
+	unsigned int bits = 0;
+	for (int i = 0; i < lock_binding_count; i++) bits |= lockBits(lock_bindings[i].button);
+	return bits & ~lock_state.chord;
+}
+
+static MosaicColor lockColor(int index, unsigned int fallback) {
+	int rgb = hostThemeColor(index);
+	return mosaic_color(rgb < 0 ? fallback : (unsigned int)rgb, 255);
+}
+
+static int lockWants(unsigned long idle_ms, void* data) {
+	(void)idle_ms;
+	(void)data;
+	return Lock_locked(&lock_state);
+}
+
+static int lockEnter(void* data) {
+	(void)data;
+	lock_minute = -1;
+	return 0;
+}
+
+// Every button but the plugins' ones was taken before it.
+static int lockInput(const MosaicInput* input, void* data) {
+	(void)data;
+	for (int i = 0; i < lock_binding_count; i++) {
+		LockBinding* b = &lock_bindings[i];
+		if (!(input->pressed & lockBits(b->button) & ~lock_state.chord)) continue;
+		const Action* action = Actions_find(b->action);
+		if (!action || !Action_available(action, NULL)) continue;
+		LOG_info("lock: running %s on the lock screen\n", action->id);
+		Action_run(action, NULL);
+		state.dirty = 1;
+	}
+	return MOSAIC_SCREEN_STAY;
+}
+
+static void lockClock(char* out, size_t size) {
+	time_t t = time(NULL);
+	struct tm local;
+	out[0] = '\0';
+	if (!localtime_r(&t, &local)) return;
+	if (CFG_getClock24H()) strftime(out, size, "%H:%M", &local);
+	else {
+		char text[32];
+		strftime(text, sizeof(text), "%I:%M %p", &local);
+		snprintf(out, size, "%s", text[0] == '0' ? text + 1 : text);
+	}
+}
+
+static void lockCentred(MosaicSurface* screen, int font, const char* text, const MosaicRect* area, int y, MosaicColor color) {
+	char cut[512];
+	int pad = SCALE1(BUTTON_MARGIN);
+	int w = PluginDraw_textTruncate(font, text, area->w - 2 * pad, cut, sizeof(cut));
+	if (w <= 0) return;
+	PluginDraw_drawText(screen, font, cut, area->x + (area->w - w) / 2, y, color, 0);
+}
+
+// Plugins' lines, in load order, up to LOCK_LINES_MAX each.
+static int lockLines(char lines[][256], int max) {
+	int n = 0;
+	for (int i = 0; i < loaded_count && n < max; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (loaded[i].lock_text_off || !Plugin_has(p, lock_text) || !p->lock_text) continue;
+		char text[LOCK_LINES_MAX * 256] = "";
+		int rc = 0;
+		AS_PLUGIN(i) rc = p->lock_text(text, sizeof(text));
+		if (rc != 0) {
+			loaded[i].lock_text_off = 1;
+			LOG_warn("plugins: %s's lock_text returned %i, leaving its lines off the lock screen until the launcher restarts\n",
+				loaded[i].id, rc);
+			continue;
+		}
+		text[sizeof(text) - 1] = '\0';
+		char* line = text;
+		for (int k = 0; k < LOCK_LINES_MAX && line && n < max; k++) {
+			char* end = strchr(line, '\n');
+			if (end) *end = '\0';
+			if (line[0]) snprintf(lines[n++], 256, "%s", line);
+			line = end ? end + 1 : NULL;
+		}
+	}
+	return n;
+}
+
+static int lockRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
+	(void)data;
+	const MosaicRect area = view->area;
+	int large = PluginDraw_textHeight(MOSAIC_FONT_LARGE), small = PluginDraw_textHeight(MOSAIC_FONT_SMALL);
+	int gap = SCALE1(4);
+	MosaicColor main_color = lockColor(MOSAIC_COLOR_MAIN, 0xFFFFFF);
+	MosaicColor hint_color = lockColor(MOSAIC_COLOR_HINT, 0x999999);
+
+	char clock[32];
+	lockClock(clock, sizeof(clock));
+	char lines[12][256];
+	int n = lockLines(lines, 12);
+
+	// the time and the lines, in the middle between the header and the hints
+	int top = area.y + SCALE1(PADDING + PILL_SIZE);
+	int bottom = area.y + area.h - SCALE1(PADDING + PILL_SIZE) - small - gap * 2;
+	int total = large + (n ? gap * 2 + n * small + (n - 1) * gap : 0);
+	int y = top + (bottom - top - total) / 2;
+	lockCentred(screen, MOSAIC_FONT_LARGE, clock, &area, y, main_color);
+	y += large + gap * 2;
+	for (int i = 0; i < n; i++, y += small + gap) lockCentred(screen, MOSAIC_FONT_SMALL, lines[i], &area, y, main_color);
+
+	char unlock[160] = "";
+	if (lock_state.switch_locked) snprintf(unlock, sizeof(unlock), "%s", TR("Turn off the hold switch to unlock"));
+	else if (lock_state.chord) snprintf(unlock, sizeof(unlock), TR("Hold %s to unlock"), lock_chord_name);
+	lockCentred(screen, MOSAIC_FONT_SMALL, unlock, &area, bottom + gap, hint_color);
+
+	// the plugins' buttons
+	MosaicHint hints[LOCK_BINDINGS_MAX];
+	int count = 0;
+	for (int i = 0; i < lock_binding_count && count < 3; i++) {
+		if (lockBits(lock_bindings[i].button) & lock_state.chord) continue;
+		const Action* action = Actions_find(lock_bindings[i].action);
+		if (!action || !Action_available(action, NULL)) continue;
+		hints[count++] = (MosaicHint){ lock_bindings[i].button, Action_label(action) };
+	}
+	if (count) hostDrawHints(screen, MOSAIC_HINTS_RIGHT, hints, count, NULL);
+
+	char message[1024];
+	int used = snprintf(message, sizeof(message), "lock: lock screen %s, %s", clock, unlock);
+	for (int i = 0; i < n && used > 0 && used < (int)sizeof(message); i++) {
+		used += snprintf(message + used, sizeof(message) - used, " | %s", lines[i]);
+	}
+	static char logged[sizeof(message)];
+	// the clock aside, what changed
+	const char* after = strchr(message, ',');
+	const char* was = strchr(logged, ',');
+	if (!was || !after || strcmp(after, was)) LOG_info("%s\n", message);
+	snprintf(logged, sizeof(logged), "%s", message);
+	return 0;
+}
+
+static void lockStart(void) {
+	AmbientSet_clear(&ambients);
+	ambients_sorted = 0;
+	ambient_shown = -1;
+	lock_binding_count = 0;
+	lock_logged = 0;
+	idle_since = SDL_GetTicks();
+
+	char chord_text[64], hold_text[16], switch_text[16];
+	Cfg_get(LAUNCHER_SETTINGS_PATH, LOCK_CHORD_KEY, LOCK_CHORD_DEFAULT, chord_text, sizeof(chord_text));
+	Cfg_get(LAUNCHER_SETTINGS_PATH, LOCK_HOLD_KEY, LOCK_HOLD_DEFAULT, hold_text, sizeof(hold_text));
+	Cfg_get(LAUNCHER_SETTINGS_PATH, LOCK_SWITCH_KEY, LOCK_SWITCH_DEFAULT, switch_text, sizeof(switch_text));
+	Cfg_get(LAUNCHER_SETTINGS_PATH, AMBIENT_ORDER_KEY, "", ambient_setting, sizeof(ambient_setting));
+	unsigned int chord = 0;
+	if (!Lock_parseChord(chord_text, &chord)) {
+		LOG_warn("lock: unknown chord \"%s\", so the chord is off\n", chord_text);
+		chord = 0;
+	}
+	unsigned long hold_ms = Lock_parseHoldMs(hold_text, LOCK_HOLD_MS_DEFAULT);
+	int use_switch = !strcmp(switch_text, "on");
+	Lock_init(&lock_state, chord, hold_ms, use_switch);
+	Lock_chordName(chord, lock_chord_name, sizeof(lock_chord_name));
+	lock_on = chord || use_switch;
+	if (use_switch && !HAS_HOLD_SWITCH) {
+		LOG_info("lock: unsupported on %s: no hold switch, so only the chord locks\n", PLATFORM);
+	}
+	if (chord) LOG_info("lock: %s held %lus locks and unlocks%s\n", lock_chord_name, hold_ms / 1000, use_switch ? ", and the hold switch locks" : "");
+	else if (use_switch) LOG_info("lock: the hold switch locks\n");
+
+	MosaicScreenHooks hooks = {
+		.size = sizeof(hooks),
+		.enter = lockEnter,
+		.input = lockInput,
+		.render = lockRender,
+	};
+	if (ScreenSet_add(&screens, AMBIENT_LOCK, -1, &hooks) != SCREEN_ADDED) LOG_warn("lock: couldn't add the lock screen\n");
+	AmbientSet_add(&ambients, AMBIENT_LOCK, -1, lockWants, NULL);
+}
+
+// The pad's buttons the lock takes this frame.
+static int lockFrame(unsigned long now) {
+	if (!lock_on) return 0;
+	LayoutButton map[LAYOUT_BUTTONS + 5];
+	int count = filterButtons(map);
+	MosaicInput input;
+	LayoutInput_fill(&input, map, count, pad.just_pressed, pad.just_repeated, pad.just_released, pad.is_pressed);
+	int position = lock_state.use_switch ? hostHoldSwitch() : -1;
+	unsigned int consumed = 0;
+	int change = Lock_frame(&lock_state, input.held, position, now, &consumed);
+	switch (change) {
+		case LOCK_LOCKED_CHORD: LOG_info("lock: locked by the chord\n"); break;
+		case LOCK_UNLOCKED_CHORD: LOG_info("lock: unlocked by the chord\n"); break;
+		case LOCK_LOCKED_SWITCH: LOG_info("lock: locked by the switch\n"); break;
+		case LOCK_UNLOCKED_SWITCH: LOG_info("lock: unlocked by the switch\n"); break;
+	}
+	if (change != LOCK_SAME) {
+		if (!Lock_locked(&lock_state)) lock_logged = 0;
+		state.dirty = 1;
+	}
+	// the lock screen's own buttons reach it
+	if (Lock_locked(&lock_state) && lockScreenOnTop()) consumed &= ~lockButtonBits();
+	return LayoutInput_padBits(map, count, consumed);
+}
+
+static void lockHeader(SDL_Surface* surface, HeaderRow* row) {
+	if (!Lock_locked(&lock_state) || HeaderRow_room(row) < row->h) return;
+	MosaicRect rect;
+	if (!HeaderRow_place(row, row->h, &rect)) return;
+	MosaicSurface* lent = PluginDraw_lend(surface, &(SDL_Rect){ rect.x, rect.y, rect.w, rect.h });
+	if (!lent) return;
+	MosaicColor pill = lockColor(MOSAIC_COLOR_ACCENT, 0xFFFFFF);
+	MosaicColor ink = lockColor(MOSAIC_COLOR_HINT, 0x000000);
+	LockPadlock p;
+	Lock_padlock(&rect, &p);
+	PluginDraw_fillRoundRect(lent, &rect, rect.h / 2, pill);
+	PluginDraw_fillRoundRect(lent, &p.shackle, p.shackle_radius, ink);
+	PluginDraw_fillRoundRect(lent, &p.hole, p.hole_radius, pill);
+	PluginDraw_fillRoundRect(lent, &p.body, p.body_radius, ink);
+	PluginDraw_fillRect(lent, &p.keyhole, pill);
+	PluginDraw_unlend(lent);
+	if (!lock_logged || memcmp(&rect, &lock_logged_rect, sizeof(rect))) {
+		LOG_info("lock: padlock at %i,%i %ix%i\n", rect.x, rect.y, rect.w, rect.h);
+		lock_logged_rect = rect;
+		lock_logged = 1;
+	}
+}
+
+static void lockDropOwner(int owner) {
+	if (AmbientSet_dropOwner(&ambients, owner)) ambients_sorted = 0;
+	int kept = 0;
+	for (int i = 0; i < lock_binding_count; i++) {
+		if (lock_bindings[i].owner != owner) lock_bindings[kept++] = lock_bindings[i];
+	}
+	lock_binding_count = kept;
+}
+
+static int hostLock(void) {
+	LoadedPlugin* p = callingPlugin("lock");
+	if (!p) return -1;
+	int rc = Lock_request(&lock_state);
+	if (rc < 0) {
+		LOG_warn("lock: %s can't lock: the lock's chord is off, so nothing could unlock it\n", p->id);
+		return -1;
+	}
+	if (rc > 0) {
+		LOG_info("lock: locked by %s\n", p->id);
+		state.dirty = 1;
+	}
+	return 0;
+}
+
+static int hostIsLocked(void) {
+	return Lock_locked(&lock_state);
+}
+
+static int hostLockButton(int button, const char* action_id) {
+	if (initializing < 0) {
+		LOG_warn("plugins: lock_button only works from init\n");
+		return -1;
+	}
+	const char* owner = loaded[initializing].id;
+	static const int allowed[] = { MOSAIC_BUTTON_A, MOSAIC_BUTTON_B, MOSAIC_BUTTON_X, MOSAIC_BUTTON_Y, MOSAIC_BUTTON_L1,
+		MOSAIC_BUTTON_R1, MOSAIC_BUTTON_L2, MOSAIC_BUTTON_R2, MOSAIC_BUTTON_UP, MOSAIC_BUTTON_DOWN, MOSAIC_BUTTON_LEFT,
+		MOSAIC_BUTTON_RIGHT };
+	int ok = 0;
+	for (size_t i = 0; i < sizeof(allowed) / sizeof(allowed[0]); i++) ok |= allowed[i] == button;
+	const char* why = NULL;
+	if (!ok) why = "the lock screen doesn't take that button";
+	else if (!action_id || !Actions_find(action_id)) why = "there's no such action";
+	else if (lock_binding_count >= LOCK_BINDINGS_MAX) why = "the lock screen has too many buttons";
+	for (int i = 0; !why && i < lock_binding_count; i++) {
+		if (lock_bindings[i].button == button) why = "it has an action already";
+	}
+	if (!why && strlen(action_id) >= sizeof(lock_bindings[0].action)) why = "its id is too long";
+	if (why) {
+		LOG_warn("plugins: %s can't put %s on the lock screen's button %i: %s\n", owner, action_id ? action_id : "(null)",
+			button, why);
+		return -1;
+	}
+	LockBinding* b = &lock_bindings[lock_binding_count++];
+	b->button = button;
+	b->owner = initializing;
+	snprintf(b->action, sizeof(b->action), "%s", action_id);
+	LOG_info("plugins: %s put %s on the lock screen's button %i\n", owner, action_id, button);
+	return 0;
+}
+
+static int hostRegisterAmbient(const char* screen_id, int (*wants)(unsigned long idle_ms, void* data), void* data) {
+	if (initializing < 0) {
+		LOG_warn("plugins: register_ambient only works from init\n");
+		return -1;
+	}
+	const LoadedPlugin* p = &loaded[initializing];
+	int index = ScreenSet_find(&screens, screen_id);
+	const char* why = NULL;
+	if (index < 0 || screens.screens[index].owner != initializing) why = "it isn't a screen it registered";
+	else if (!csvHas(p->manifest->ambient, screen_id)) why = "its plugin.txt's ambient= doesn't list it";
+	else {
+		int rc = AmbientSet_add(&ambients, screen_id, initializing, wants, data);
+		why = rc == AMBIENT_ADDED ? NULL : rc == AMBIENT_BAD ? "it has no wants" : rc == AMBIENT_TAKEN ? "it's ambient already"
+			: "there are too many ambient screens";
+	}
+	if (why) {
+		LOG_warn("plugins: %s can't make %s an ambient screen: %s\n", p->id, screen_id ? screen_id : "(null)", why);
+		return -1;
+	}
+	ambients_sorted = 0;
+	LOG_info("plugins: %s registered ambient screen %s\n", p->id, screen_id);
+	return 0;
+}
+
+void Plugins_ambientCheck(unsigned long now) {
+	if (!ambients_sorted) {
+		AmbientSet_sort(&ambients, ambient_setting);
+		ambients_sorted = 1;
+		char order[512] = "";
+		for (int k = 0; k < ambients.count; k++) {
+			size_t used = strlen(order);
+			snprintf(order + used, sizeof(order) - used, "%s%s", k ? ", " : "", ambients.items[ambients.order[k]].id);
+		}
+		LOG_info("plugins: ambient screens in order: %s\n", order);
+	}
+	if (currentScreen == SCREEN_MODAL || state.startgame) {
+		idle_since = now;
+		return;
+	}
+	// the lock screen goes once it's unlocked
+	int lock_screen = ScreenSet_find(&screens, AMBIENT_LOCK);
+	if (lock_screen >= 0 && !Lock_locked(&lock_state) && ScreenSet_position(&screens, lock_screen) >= 0) {
+		LOG_info("lock: closing the lock screen\n");
+		closeTo(lock_screen);
+	}
+
+	int top = currentScreen == SCREEN_PLUGIN ? ScreenSet_top(&screens) : -1;
+	int shown = top >= 0 ? AmbientSet_find(&ambients, screens.screens[top].id) : -1;
+	// one closed, so the count starts again
+	if (ambient_shown >= 0 && shown != ambient_shown) idle_since = now;
+	ambient_shown = shown;
+	int idle_spot = shown >= 0 || currentScreen == SCREEN_GAMELIST || (top >= 0 && top == screens.home);
+	if (!idle_spot) {
+		idle_since = now;
+		return;
+	}
+	// the lock screen's clock
+	if (shown >= 0 && shown == AmbientSet_find(&ambients, AMBIENT_LOCK)) {
+		long minute = (long)(time(NULL) / 60);
+		if (minute != lock_minute) {
+			if (lock_minute >= 0) state.dirty = 1;
+			lock_minute = minute;
+		}
+	}
+
+	unsigned long idle = now - idle_since;
+	for (int k = 0; k < ambients.count; k++) {
+		int i = ambients.order[k];
+		if (i == shown) break;
+		Ambient* a = &ambients.items[i];
+		int index = ScreenSet_find(&screens, a->id);
+		if (a->refused || index < 0 || screens.screens[index].off) continue;
+		int wants = 0;
+		AS_CALLER(a->owner >= 0 ? loaded[a->owner].id : NULL) wants = a->wants(idle, a->data);
+		if (!wants) continue;
+		if (shown >= 0) closeTo(ScreenSet_find(&screens, ambients.items[shown].id));
+		if (openScreen(index, SLIDE_LEFT) != 0) {
+			a->refused = 1;
+			LOG_info("plugins: ambient screen %s didn't open; it's asked again after the next button\n", a->id);
+			break;
+		}
+		ambient_shown = i;
+		LOG_info("plugins: opened ambient screen %s after %lus idle\n", a->id, idle / 1000);
+		break;
+	}
 }

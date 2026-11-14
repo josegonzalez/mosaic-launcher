@@ -6,6 +6,8 @@
 #include "pluginorder.h"
 #include "settings.h"
 #include "drawmodel.h"
+#include "lockmodel.h"
+#include "ambientmodel.h"
 
 // Anything that mounts, unmounts or edits the boot hook goes through
 // Launcher.pak/bin/manage.sh, so the rules live in one place and stay
@@ -23,7 +25,7 @@
 // options through Tr_plugin() as its own text, the same as host->tr. Values
 // the user typed show as typed.
 
-enum MenuKind { MENU_MAIN, MENU_PLUGINS, MENU_PLUGIN, MENU_CHOICE };
+enum MenuKind { MENU_MAIN, MENU_PLUGINS, MENU_PLUGIN, MENU_CHOICE, MENU_AMBIENT };
 
 enum RowKind {
 	ROW_INFO,      // can't be selected
@@ -37,6 +39,9 @@ enum RowKind {
 	ROW_SETTING,   // arg: setting index
 	ROW_OPTION,    // a choice setting's option
 	ROW_PIN,       // the launcher's PIN
+	ROW_LAUNCHER,  // one of the launcher's own choices; arg: its index in launcher_settings
+	ROW_AMBIENT,   // opens the ambient screens' order
+	ROW_AMBIENT_SCREEN, // arg: its place in the order
 };
 
 typedef struct Row {
@@ -68,6 +73,30 @@ static int manifest_count = 0;
 static char pak[512];
 static int done = 0;
 static int unlocked = 0; // the PIN was typed since the pak opened
+
+// The launcher's own settings on its main page, in LAUNCHER_SETTINGS_PATH:
+// the built-in lock's.
+typedef struct LauncherSetting {
+	const char* key;
+	const char* label;
+	const char* fallback;
+	const char* options; // comma-separated; a toggle's are on,off
+	int toggle;
+} LauncherSetting;
+
+static const LauncherSetting launcher_settings[] = {
+	{ LOCK_CHORD_KEY, TR_MARK("Lock chord"), LOCK_CHORD_DEFAULT, LOCK_CHORD_OPTIONS, 0 },
+	{ LOCK_HOLD_KEY, TR_MARK("Hold the chord for (seconds)"), LOCK_HOLD_DEFAULT, LOCK_HOLD_OPTIONS, 0 },
+	{ LOCK_SWITCH_KEY, TR_MARK("Lock with the hold switch"), LOCK_SWITCH_DEFAULT, "on,off", 1 },
+};
+#define LAUNCHER_SETTING_COUNT (int)(sizeof(launcher_settings) / sizeof(launcher_settings[0]))
+
+// The ambient screens page: the lock and the ambient= screens of the
+// plugins that are on, in the user's order.
+static char ambient_ids[AMBIENT_MAX][AMBIENT_ID_MAX];
+static char ambient_labels[AMBIENT_MAX][128];
+static int ambient_count = 0;
+static int ambient_moving = 0; // A picked the selected one up, so up and down move it
 
 ///////////////////////////////////////
 // the launcher's state, through manage.sh
@@ -266,6 +295,69 @@ static void nextOption(const char* options, const char* current, int step, char*
 	snprintf(out, size, "%s", items[at]);
 }
 
+static void launcherValue(const LauncherSetting* l, char* out, size_t size) {
+	Cfg_get(LAUNCHER_SETTINGS_PATH, l->key, l->fallback, out, size);
+}
+
+static void setLauncherValue(const LauncherSetting* l, const char* value) {
+	Plugins_ensureStateDir();
+	if (Cfg_set(LAUNCHER_SETTINGS_PATH, l->key, value) != 0) LOG_warn("settings: couldn't save %s in %s\n", l->key, LAUNCHER_SETTINGS_PATH);
+}
+
+// The ambient screens there are, in the saved order.
+static void listAmbient(void) {
+	static char kept[AMBIENT_MAX][AMBIENT_ID_MAX];
+	const char* ids[AMBIENT_MAX];
+	char labels[AMBIENT_MAX][128];
+	int n = 0;
+	ids[n] = AMBIENT_LOCK;
+	snprintf(labels[n++], sizeof(labels[0]), "%s", TR("Lock"));
+	for (int i = 0; i < manifest_count && n < AMBIENT_MAX; i++) {
+		const PluginManifest* m = &manifests[i];
+		if (!m->ambient[0] || !pluginOn(m)) continue;
+		char list[256];
+		snprintf(list, sizeof(list), "%s", m->ambient);
+		int several = strchr(list, ',') != NULL;
+		for (char* id = strtok(list, ","); id && n < AMBIENT_MAX; id = strtok(NULL, ",")) {
+			while (*id == ' ') id++;
+			if (!*id || strlen(id) >= AMBIENT_ID_MAX) continue;
+			snprintf(kept[n], AMBIENT_ID_MAX, "%s", id);
+			ids[n] = kept[n];
+			const char* name = Tr_plugin(m->id, NULL, m->name);
+			const char* dot = strchr(id, '.');
+			if (several) snprintf(labels[n], sizeof(labels[0]), "%s (%s)", name, dot ? dot + 1 : id);
+			else snprintf(labels[n], sizeof(labels[0]), "%s", name);
+			n++;
+		}
+	}
+	char setting[512];
+	Cfg_get(LAUNCHER_SETTINGS_PATH, AMBIENT_ORDER_KEY, "", setting, sizeof(setting));
+	int order[AMBIENT_MAX];
+	Ambient_order(setting, ids, n, order);
+	for (int i = 0; i < n; i++) {
+		snprintf(ambient_ids[i], AMBIENT_ID_MAX, "%s", ids[order[i]]);
+		snprintf(ambient_labels[i], sizeof(ambient_labels[0]), "%s", labels[order[i]]);
+	}
+	ambient_count = n;
+}
+
+// Moves the selected ambient screen one step, saving the order.
+static void moveAmbient(int step) {
+	Menu* m = &stack[depth - 1];
+	const char* shown[AMBIENT_MAX];
+	for (int i = 0; i < ambient_count; i++) shown[i] = ambient_ids[i];
+	char setting[512], next[512];
+	Cfg_get(LAUNCHER_SETTINGS_PATH, AMBIENT_ORDER_KEY, "", setting, sizeof(setting));
+	int to = Ambient_move(setting, shown, ambient_count, m->selected, step, next, sizeof(next));
+	if (to < 0) return;
+	Plugins_ensureStateDir();
+	if (Cfg_set(LAUNCHER_SETTINGS_PATH, AMBIENT_ORDER_KEY, next) != 0) {
+		LOG_warn("settings: couldn't save %s in %s\n", AMBIENT_ORDER_KEY, LAUNCHER_SETTINGS_PATH);
+		return;
+	}
+	m->selected = to;
+}
+
 ///////////////////////////////////////
 // menus
 
@@ -325,6 +417,15 @@ static void buildRows(void) {
 		addRow(ROW_INFO, 0, statusText(&s), NULL);
 		if (s.try_again) addRow(ROW_TRY_AGAIN, 0, TR("Try again"), NULL);
 		if (manifest_count) addRow(ROW_PLUGINS, 0, TR("Plugins"), NULL);
+		for (int i = 0; i < LAUNCHER_SETTING_COUNT; i++) {
+			const LauncherSetting* l = &launcher_settings[i];
+			char value[64];
+			launcherValue(l, value, sizeof(value));
+			// on and off as the toggles show them; the other choices as saved
+			int on_off = l->toggle || !strcmp(value, "off");
+			addRow(ROW_LAUNCHER, i, TR(l->label), on_off ? onOff(!strcmp(value, "on")) : value);
+		}
+		addRow(ROW_AMBIENT, 0, TR("Ambient screens"), NULL);
 		if (s.enabled) addRow(ROW_TURN_OFF, 0, TR("Turn off"), NULL);
 		else addRow(ROW_TURN_ON, 0, TR("Turn on"), NULL);
 	}
@@ -354,6 +455,13 @@ static void buildRows(void) {
 			else if (s->type == SETTING_CHOICE) addRow(ROW_SETTING, i, label, choiceShown(p, s, value));
 			else addRow(ROW_SETTING, i, label, value); // typed, so shown as typed
 			memset(value, 0, sizeof(value));
+		}
+	}
+	else if (m->kind == MENU_AMBIENT) {
+		snprintf(title, sizeof(title), "%s", TR("Ambient screens"));
+		listAmbient();
+		for (int i = 0; i < ambient_count; i++) {
+			addRow(ROW_AMBIENT_SCREEN, i, ambient_labels[i], ambient_moving && i == m->selected ? TR("Moving") : NULL);
 		}
 	}
 	else if (m->kind == MENU_CHOICE) {
@@ -391,6 +499,7 @@ static void push(int kind, int plugin, int setting) {
 }
 
 static void pop(void) {
+	ambient_moving = 0;
 	if (depth <= 1) {
 		done = 1;
 		return;
@@ -419,6 +528,17 @@ static void activate(int step) {
 	switch (r->kind) {
 		case ROW_TRY_AGAIN: if (!cycling) tryAgain(); break;
 		case ROW_PLUGINS: if (!cycling) push(MENU_PLUGINS, 0, 0); break;
+		case ROW_LAUNCHER: {
+			const LauncherSetting* l = &launcher_settings[r->arg];
+			char value[64], next[64];
+			launcherValue(l, value, sizeof(value));
+			snprintf(next, sizeof(next), "%s", value);
+			nextOption(l->options, value, cycling ? step : 1, next, sizeof(next));
+			setLauncherValue(l, next);
+			break;
+		}
+		case ROW_AMBIENT: if (!cycling) push(MENU_AMBIENT, 0, 0); break;
+		case ROW_AMBIENT_SCREEN: if (!cycling) ambient_moving = !ambient_moving; break;
 		case ROW_TURN_ON: if (!cycling) turnOn(); break;
 		case ROW_TURN_OFF:
 			if (cycling) break;
@@ -509,6 +629,15 @@ static void move(int step) {
 }
 
 static void handleInput(void) {
+	if (ambient_moving && top()->kind == MENU_AMBIENT) {
+		// up and down move the one picked up; A or B puts it down
+		if (PAD_justRepeated(BTN_UP)) moveAmbient(-1);
+		else if (PAD_justRepeated(BTN_DOWN)) moveAmbient(1);
+		else if (PAD_justPressed(BTN_A) || PAD_justPressed(BTN_B)) ambient_moving = 0;
+		else return;
+		buildRows();
+		return;
+	}
 	if (PAD_justRepeated(BTN_UP)) move(-1);
 	else if (PAD_justRepeated(BTN_DOWN)) move(1);
 	else if (PAD_justRepeated(BTN_LEFT)) activate(-1);
@@ -540,6 +669,9 @@ static const char* confirmLabel(void) {
 		case ROW_STATUS: return TR("CHANGE");
 		case ROW_SETTING: return TR("CHANGE");
 		case ROW_PIN: return TR("CHANGE");
+		case ROW_LAUNCHER: return TR("CHANGE");
+		case ROW_AMBIENT: return TR("OPEN");
+		case ROW_AMBIENT_SCREEN: return ambient_moving ? TR("DONE") : TR("MOVE");
 		default: return TR("SELECT");
 	}
 }

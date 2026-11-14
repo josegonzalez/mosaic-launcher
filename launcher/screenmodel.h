@@ -23,7 +23,7 @@ enum ScreenKind {
 
 typedef struct PluginScreen {
 	char id[SCREEN_ID_MAX];
-	int owner;               // the loaded plugin's index
+	int owner;               // the loaded plugin's index, or -1 for the launcher's lock screen
 	MosaicScreenHooks hooks; // the plugin's, copied; fields past its size are zero
 	int off;                 // failed, so it can't open until the launcher restarts
 } PluginScreen;
@@ -44,13 +44,14 @@ void ScreenSet_clear(ScreenSet* set);
 // Why ScreenSet_add refused, or 0.
 enum ScreenAddResult {
 	SCREEN_ADDED = 0,
-	SCREEN_BAD_ID = -1,    // NULL, empty, too long, or a built-in screen's name
+	SCREEN_BAD_ID = -1,    // NULL, empty, too long, or a built-in screen's name for a plugin
 	SCREEN_BAD_HOOKS = -2, // NULL, too small to have render, or no render
 	SCREEN_TAKEN = -3,     // another screen has the id
 	SCREEN_FULL = -4,      // SCREENS_MAX already
 };
 
-// Registers a screen for owner, copying the part of hooks its size says
+// Registers a screen for owner, -1 for the launcher's own, which alone may
+// have a built-in screen's name, copying the part of hooks its size says
 // it has. Returns an enum ScreenAddResult.
 int ScreenSet_add(ScreenSet* set, const char* id, int owner, const MosaicScreenHooks* hooks);
 

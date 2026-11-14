@@ -8,7 +8,7 @@ void ScreenSet_clear(ScreenSet* set) {
 	set->switcher = -1;
 }
 
-static const char* const builtins[] = { "gamelist", "switcher", "quickmenu", "dialog" };
+static const char* const builtins[] = { "gamelist", "switcher", "quickmenu", "dialog", "lock" };
 
 int Screen_builtinName(const char* id) {
 	for (size_t i = 0; id && i < sizeof(builtins) / sizeof(builtins[0]); i++) {
@@ -25,7 +25,7 @@ int ScreenSet_find(const ScreenSet* set, const char* id) {
 }
 
 int ScreenSet_add(ScreenSet* set, const char* id, int owner, const MosaicScreenHooks* hooks) {
-	if (!id || !id[0] || strlen(id) >= SCREEN_ID_MAX || Screen_builtinName(id)) return SCREEN_BAD_ID;
+	if (!id || !id[0] || strlen(id) >= SCREEN_ID_MAX || (owner >= 0 && Screen_builtinName(id))) return SCREEN_BAD_ID;
 	size_t need = offsetof(MosaicScreenHooks, render) + sizeof(hooks->render);
 	if (!hooks || hooks->size < need || !hooks->render) return SCREEN_BAD_HOOKS;
 	if (ScreenSet_find(set, id) >= 0) return SCREEN_TAKEN;

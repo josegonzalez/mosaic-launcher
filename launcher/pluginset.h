@@ -41,6 +41,7 @@ typedef struct PluginManifest {
 	char conflicts[256]; // comma-separated ids that can't load alongside it
 	char optional[256];  // comma-separated ids it loads after when they load, and does without
 	char provides[256];  // comma-separated capabilities it offers, for has_capability
+	char ambient[256];   // comma-separated screens it makes ambient screens, for register_ambient
 	char description[256]; // one line about it, for plugin_info
 	char dir[512];       // the plugin's directory
 	int bundled;         // 1: ships in Launcher.pak, off by default; 0: its own pak, on by default

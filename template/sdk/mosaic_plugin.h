@@ -1593,6 +1593,52 @@ typedef struct MosaicHost {
 	// launcher's thread, and returns fallback elsewhere. Check for it with
 	// MOSAIC_HOST_HAS(host, theme_value).
 	const char* (*theme_value)(const char* key, const char* fallback);
+
+	// The launcher's built-in lock. The user sets its chord (SELECT and
+	// START, L1 and R1, L2 and R2, or off), how long it's held and whether
+	// the hold switch locks, on the Launcher page. While it's locked, the
+	// launcher takes every button before input_filter sees it, except a
+	// long power press, and shows a padlock in the header; over the game
+	// list or home its lock screen shows, an ambient screen (see
+	// register_ambient) with the time, plugins' lock_text lines and their
+	// lock_button buttons. lock locks it as the chord does, such as for a
+	// lock action, and returns 0, or -1 when nothing could unlock it (the
+	// chord is off) or where cfg_get is refused; the launcher logs each
+	// refusal. Plugins can't unlock it. is_locked returns 1 while it's
+	// locked, else 0. lock_button, from init only, puts an action from
+	// register_action on a button of the lock screen, A, B, X, Y, L1, R1,
+	// L2, R2 or the d-pad: a press there runs it, and its hint shows,
+	// labelled with the action's label, while it's available. A button in
+	// the user's chord does nothing there. It returns 0, or -1 for an
+	// unknown action, another button, one another plugin put an action on
+	// first, or a call from anywhere but init. Check for them with
+	// MOSAIC_HOST_HAS(host, register_ambient).
+	int (*lock)(void);
+	int (*is_locked)(void);
+	int (*lock_button)(int button, const char* action_id);
+
+	// Ambient screens: screens that open by themselves, such as the lock, a
+	// charging screen or a screensaver. The user puts them in order on the
+	// Launcher page (by default the lock, charging-screen's, then
+	// screensaver's, then the rest as they load), and the launcher opens
+	// the first that wants to show. register_ambient, from init only, makes
+	// screen_id, a screen the plugin registered with register_screen and
+	// lists in its plugin.txt's ambient=, an ambient screen. Each frame
+	// while the game list, the home screen or an ambient screen is on top,
+	// with no dialog showing, the launcher calls wants(idle_ms, data), as
+	// the plugin (as for cfg_get), for each ambient screen before the one
+	// showing, in order, with how long it's been since a button was down,
+	// the device woke, an ambient screen closed or another screen showed;
+	// it returns 1 to show. The first that does opens, as open_screen
+	// would, over the ambient screen showing, which closes first. One whose
+	// enter declines isn't asked again until a button is pressed. The
+	// launcher doesn't close an ambient screen: it closes itself, such as
+	// on a button, as any screen does. Keep wants cheap: it runs every
+	// frame. It returns 0, or -1 for a screen the plugin didn't register,
+	// one its ambient= doesn't list, one that's already ambient, past 16,
+	// no wants, or a call from anywhere but init; the launcher logs each
+	// refusal. Check for it with MOSAIC_HOST_HAS(host, register_ambient).
+	int (*register_ambient)(const char* screen_id, int (*wants)(unsigned long idle_ms, void* data), void* data);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1962,6 +2008,16 @@ typedef struct MosaicPlugin {
 	// font that won't open, is refused and logged, and none is used. An
 	// older launcher never asks.
 	const char* (*fallback_font)(void);
+
+	// The lock screen's lines (see lock in MosaicHost), such as what's
+	// playing. Every plugin's lock_text runs, in load order, each time the
+	// lock screen draws, and writes up to 3 lines, separated by '\n', into
+	// out (size bytes, empty on entry), which show in the small font under
+	// the time, each cut to fit. Call host->request_redraw from tick to
+	// change them. It returns 0, or anything else for an error, after
+	// which the launcher logs it and leaves this plugin's lines out until
+	// it restarts. Check for it with MOSAIC_HOST_HAS(host, register_ambient).
+	int (*lock_text)(char* out, size_t size);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

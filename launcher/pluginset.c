@@ -146,6 +146,7 @@ static void manifestField(const char* key, const char* value, void* data) {
 	else if (!strcmp(key, "conflicts")) copyField(m->conflicts, sizeof(m->conflicts), value);
 	else if (!strcmp(key, "optional")) copyField(m->optional, sizeof(m->optional), value);
 	else if (!strcmp(key, "provides")) copyField(m->provides, sizeof(m->provides), value);
+	else if (!strcmp(key, "ambient")) copyField(m->ambient, sizeof(m->ambient), value);
 	else if (!strcmp(key, "description")) copyField(m->description, sizeof(m->description), value);
 }
 

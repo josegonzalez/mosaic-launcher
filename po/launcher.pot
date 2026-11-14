@@ -31,6 +31,10 @@ msgstr ""
 msgid "%s failed"
 msgstr ""
 
+#: launcher/settings.c
+msgid "Ambient screens"
+msgstr ""
+
 #: vendor/NextUI/skeleton/EXTRAS/Roms
 msgctxt "systems"
 msgid "Amiga"
@@ -147,7 +151,7 @@ msgstr ""
 msgid "DELETE"
 msgstr ""
 
-#: launcher/modal.c
+#: launcher/modal.c launcher/settings.c
 msgid "DONE"
 msgstr ""
 
@@ -191,6 +195,15 @@ msgstr ""
 
 #: launcher/quicktiles.c
 msgid "Games"
+msgstr ""
+
+#: launcher/plugins.c
+#, c-format
+msgid "Hold %s to unlock"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Hold the chord for (seconds)"
 msgstr ""
 
 #: launcher/pluginorder.c
@@ -244,6 +257,18 @@ msgid "Layout"
 msgstr ""
 
 #: launcher/settings.c
+msgid "Lock"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Lock chord"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Lock with the hold switch"
+msgstr ""
+
+#: launcher/settings.c
 msgid "Locked"
 msgstr ""
 
@@ -255,6 +280,10 @@ msgstr ""
 msgid "MORE"
 msgstr ""
 
+#: launcher/settings.c
+msgid "MOVE"
+msgstr ""
+
 #: launcher/pluginorder.c
 msgid "Main menu"
 msgstr ""
@@ -262,6 +291,10 @@ msgstr ""
 #: vendor/NextUI/skeleton/EXTRAS/Roms
 msgctxt "systems"
 msgid "Microsoft MSX"
+msgstr ""
+
+#: launcher/settings.c
+msgid "Moving"
 msgstr ""
 
 #: launcher/screen_gamelist.c
@@ -369,7 +402,7 @@ msgstr ""
 
 #: vendor/NextUI/skeleton/EXTRAS/Roms
 msgctxt "systems"
-msgid "Pokémon mini"
+msgid "Pokémon mini"
 msgstr ""
 
 #: launcher/quickitems.c
@@ -512,6 +545,10 @@ msgstr ""
 
 #: launcher/settings.c
 msgid "Turn off"
+msgstr ""
+
+#: launcher/plugins.c
+msgid "Turn off the hold switch to unlock"
 msgstr ""
 
 #: launcher/settings.c

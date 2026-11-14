@@ -23,6 +23,7 @@
 #define PLUGIN_STATE_DIR USERDATA_PATH "/launcher"
 #define PLUGIN_CHOICES_PATH PLUGIN_STATE_DIR "/plugins.txt"
 #define PIN_PATH PLUGIN_STATE_DIR "/pin.txt" // the launcher's PIN; see pin.h
+#define LAUNCHER_SETTINGS_PATH PLUGIN_STATE_DIR "/settings.txt" // the Launcher page's own settings, such as the lock's
 #define ROOT_SLOT "root" // the exclusive slot root_replace belongs to
 #define LAYOUT_SLOT "layout" // the exclusive slot layout_init, layout_input and layout_render belong to
 #define TRANSITION_SLOT "transition" // the exclusive slot asked how folders push and pop and screens change
@@ -238,6 +239,12 @@ void Plugins_screensCheck(void);
 
 // Closes every open screen, running their exit, as for a launch or quit.
 void Plugins_screensClose(void);
+
+// The built-in lock's screen and plugins' ambient screens: closes the lock
+// screen once it's unlocked, and opens the first ambient screen in the
+// user's order that wants to show, over the game list, home or a later
+// ambient screen. Once a frame, after plugins' ticks.
+void Plugins_ambientCheck(unsigned long now);
 
 // The home slot. Once at start, after currentScreen is set: opens the home
 // screen over the game list, or remembers it's under the quick menu or game

@@ -1,7 +1,7 @@
-// Presses the bundled hold-lock's chord, SELECT and START, to lock, then
+// Presses the launcher's lock chord, SELECT and START, to lock, then
 // down, then the chord again to unlock and down again, logging what the
-// game list and its own input filter (after hold-lock's in load order)
-// saw. Like filterer, it pushes key events with SDL_PushEvent, found in
+// game list and its own input filter (after the lock, which takes buttons
+// before every filter) saw. Like filterer, it pushes key events with SDL_PushEvent, found in
 // the launcher with dlsym: a test-only shortcut, as plugins otherwise
 // never touch SDL. It adds two folders to the root, so down has a row to
 // move to.

@@ -41,11 +41,17 @@ static void testAdd(void) {
 	longest[SCREEN_ID_MAX - 1] = 'x';
 	longest[SCREEN_ID_MAX] = '\0';
 	CHECK(ScreenSet_add(&set, longest, 0, &h) == SCREEN_BAD_ID);
-	const char* builtin[] = { "gamelist", "switcher", "quickmenu", "dialog" };
-	for (int i = 0; i < 4; i++) {
+	const char* builtin[] = { "gamelist", "switcher", "quickmenu", "dialog", "lock" };
+	for (int i = 0; i < 5; i++) {
 		CHECK(Screen_builtinName(builtin[i]));
 		CHECK(ScreenSet_add(&set, builtin[i], 0, &h) == SCREEN_BAD_ID);
 	}
+	// the launcher's own lock screen has its built-in name
+	ScreenSet own;
+	ScreenSet_clear(&own);
+	CHECK(ScreenSet_add(&own, "lock", -1, &h) == SCREEN_ADDED);
+	CHECK(ScreenSet_find(&own, "lock") == 0 && own.screens[0].owner == -1);
+	CHECK(ScreenSet_add(&own, "lock", -1, &h) == SCREEN_TAKEN);
 	CHECK(!Screen_builtinName("gamelist2"));
 	CHECK(!Screen_builtinName(NULL));
 

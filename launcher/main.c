@@ -169,6 +169,8 @@ int main (int argc, char *argv[]) {
 
 		Power_update(&state.dirty, &show_setting);
 		Plugins_tick(now);
+		// the lock screen, and ambient screens that want to show
+		Plugins_ambientCheck(now);
 		// a plugin asked to power off or reboot (host->power_off)
 		if (state.power_off) {
 			int reboot = state.power_off == 2;
