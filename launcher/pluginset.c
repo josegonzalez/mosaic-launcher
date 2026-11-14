@@ -97,7 +97,7 @@ static void settingButtons(const char* field, char* out, size_t size) {
 
 // setting.<key>=<type>|<label>|<default>[|<options>[|<flags>]]
 static void manifestSetting(PluginManifest* m, const char* key, const char* value) {
-	if (m->setting_count >= PLUGIN_SETTINGS_MAX || !key[0]) return;
+	if (!key[0]) return;
 	char fields[512];
 	copyField(fields, sizeof(fields), value);
 	char* parts[5] = { NULL, NULL, NULL, NULL, NULL };
@@ -112,7 +112,9 @@ static void manifestSetting(PluginManifest* m, const char* key, const char* valu
 	}
 	if (n < 3) return; // type, label and default are required
 
-	PluginSetting* s = &m->settings[m->setting_count];
+	PluginSetting setting;
+	PluginSetting* s = &setting;
+	memset(s, 0, sizeof(*s));
 	if (!strcmp(parts[0], "toggle")) s->type = SETTING_TOGGLE;
 	else if (!strcmp(parts[0], "choice")) s->type = SETTING_CHOICE;
 	else if (!strcmp(parts[0], "text")) s->type = SETTING_TEXT;
@@ -124,7 +126,10 @@ static void manifestSetting(PluginManifest* m, const char* key, const char* valu
 	s->flags = parts[4] ? settingFlags(parts[4], s->type) : 0;
 	settingButtons(parts[4] ? parts[4] : "", s->buttons, sizeof(s->buttons));
 	if (s->type == SETTING_CHOICE && !s->options[0]) return; // nothing to choose from
-	m->setting_count++;
+	PluginSetting* grown = realloc(m->settings, (m->setting_count + 1) * sizeof(*grown));
+	if (!grown) return;
+	m->settings = grown;
+	m->settings[m->setting_count++] = setting;
 }
 
 static void manifestField(const char* key, const char* value, void* data) {
@@ -148,14 +153,24 @@ int Manifest_parse(const char* text, PluginManifest* out) {
 	char dir[sizeof(out->dir)];
 	int bundled = out->bundled;
 	copyField(dir, sizeof(dir), out->dir);
+	Manifest_free(out);
 	memset(out, 0, sizeof(*out));
 	copyField(out->dir, sizeof(out->dir), dir);
 	out->bundled = bundled;
 
 	eachLine(text, manifestField, out);
-	if (!out->id[0]) return -1;
+	if (!out->id[0]) {
+		Manifest_free(out);
+		return -1;
+	}
 	if (!out->name[0]) copyField(out->name, sizeof(out->name), out->id);
 	return 0;
+}
+
+void Manifest_free(PluginManifest* m) {
+	free(m->settings);
+	m->settings = NULL;
+	m->setting_count = 0;
 }
 
 int Manifest_res(const PluginManifest* m, char* out, size_t size) {

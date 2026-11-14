@@ -64,6 +64,10 @@ msgid "Contrast"
 msgstr ""
 
 #: plugin.txt
+msgid "Fallback font"
+msgstr ""
+
+#: plugin.txt
 msgid "L2"
 msgstr ""
 

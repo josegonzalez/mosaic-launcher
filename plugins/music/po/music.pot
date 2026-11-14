@@ -30,6 +30,10 @@ msgstr ""
 msgid "During games"
 msgstr ""
 
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
 #: music.c
 msgid "Lock screen"
 msgstr ""
@@ -40,6 +44,10 @@ msgstr ""
 
 #: music.c plugin.txt
 msgid "Music"
+msgstr ""
+
+#: plugin.txt
+msgid "Music button"
 msgstr ""
 
 #: music.c
@@ -84,6 +92,10 @@ msgid "Quick menu tile"
 msgstr ""
 
 #: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
 msgid "Repeat"
 msgstr ""
 
@@ -96,6 +108,10 @@ msgstr ""
 msgid "Resume after power-off"
 msgstr ""
 
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
 #: music.c plugin.txt
 msgid "Shuffle"
 msgstr ""
@@ -104,12 +120,20 @@ msgstr ""
 msgid "Stay awake while playing"
 msgstr ""
 
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
 #: music_model.c plugin.txt
 msgid "all"
 msgstr ""
 
 #: plugin.txt
 msgid "always"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
 msgstr ""
 
 #: music_model.c plugin.txt

@@ -21,6 +21,9 @@ msgstr "5"
 msgid "During games"
 msgstr "Durante los juegos"
 
+msgid "L2"
+msgstr "L2"
+
 msgid "Lock screen"
 msgstr "Bloquear pantalla"
 
@@ -29,6 +32,9 @@ msgstr "Bloqueado: SELECT y luego START para desbloquear"
 
 msgid "Music"
 msgstr "Música"
+
+msgid "Music button"
+msgstr "Botón de música"
 
 msgid "Music can't play"
 msgstr "La música no puede sonar"
@@ -61,6 +67,9 @@ msgstr "Reproduciendo"
 msgid "Quick menu tile"
 msgstr "Icono del menú rápido"
 
+msgid "R2"
+msgstr "R2"
+
 msgid "Repeat"
 msgstr "Repetir"
 
@@ -71,17 +80,26 @@ msgstr "Repetir: %s"
 msgid "Resume after power-off"
 msgstr "Reanudar tras apagar"
 
+msgid "SELECT"
+msgstr "SELECT"
+
 msgid "Shuffle"
 msgstr "Aleatorio"
 
 msgid "Stay awake while playing"
 msgstr "No suspender mientras suena"
 
+msgid "Y"
+msgstr "Y"
+
 msgid "all"
 msgstr "todo"
 
 msgid "always"
 msgstr "siempre"
+
+msgid "none"
+msgstr "ninguno"
 
 msgid "off"
 msgstr "desactivado"

@@ -47,5 +47,9 @@ msgid "Imgs folders"
 msgstr ""
 
 #: plugin.txt
+msgid "Pico-8 carts as art"
+msgstr ""
+
+#: plugin.txt
 msgid "Use as the thumbnail"
 msgstr ""

@@ -107,6 +107,7 @@ static void saveBindings(int* counts);
 static void dropBindings(const int* counts);
 static PluginManifest manifests[PLUGIN_MAX];
 static int manifest_count = 0;
+static int discovered = 0; // manifests holds what discover() found
 static int listed = 0; // every plugin has loaded, so plugin_info lists them
 
 // The Launcher pak's settings, with only the strings and theme slots'
@@ -200,9 +201,8 @@ int Plugins_pakDir(char* out, size_t size) {
 }
 
 static void discover(void) {
-	static int done = 0;
-	if (done) return;
-	done = 1;
+	if (discovered) return;
+	discovered = 1;
 	const char* override = getenv("MOSAIC_LAUNCHER_PLUGIN_PATH");
 	if (override && override[0]) {
 		char dirs[1024];
@@ -2265,6 +2265,10 @@ void Plugins_quit(void) {
 	// a Wi-Fi look still running is left to finish, its answer dropped
 	Wifi_quit();
 	settingsExit();
+	// the manifests go last, as the loaded plugins pointed at them
+	for (int i = 0; i < manifest_count; i++) Manifest_free(&manifests[i]);
+	manifest_count = 0;
+	discovered = 0;
 }
 
 int Plugins_discover(const PluginManifest** out) {

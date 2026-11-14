@@ -46,6 +46,9 @@ msgstr "Color de fondo"
 msgid "Contrast"
 msgstr "Contraste"
 
+msgid "Fallback font"
+msgstr "Fuente alternativa"
+
 msgid "L2"
 msgstr "L2"
 

@@ -33,5 +33,8 @@ msgstr "Carpetas Images"
 msgid "Imgs folders"
 msgstr "Carpetas Imgs"
 
+msgid "Pico-8 carts as art"
+msgstr "Cartuchos de Pico-8 como arte"
+
 msgid "Use as the thumbnail"
 msgstr "Usar como miniatura"

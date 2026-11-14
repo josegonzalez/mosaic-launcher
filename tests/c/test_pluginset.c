@@ -50,7 +50,7 @@ static int loads(int n, const char* id) {
 }
 
 // Manifest_strings' texts, each followed by ;
-static char strings[512];
+static char strings[2048];
 static void append(const char* text, void* data) {
 	(void)data;
 	snprintf(strings + strlen(strings), sizeof(strings) - strlen(strings), "%s;", text);
@@ -299,6 +299,34 @@ int main(void) {
 	Manifest_strings(&bare, append, NULL);
 	CHECK_STR(strings, "bare;"); // the name defaults to the id
 
+	// a plugin keeps every setting its plugin.txt lists, however many
+	char many[8192] = "id=many\n";
+	for (int i = 0; i < 40; i++) {
+		snprintf(many + strlen(many), sizeof(many) - strlen(many),
+			"setting.s%d=choice|Setting %d|a|a,b%s\n", i, i, i == 39 ? "|public" : "");
+	}
+	PluginManifest big = { .bundled = 1 };
+	CHECK(Manifest_parse(many, &big) == 0);
+	CHECK(big.setting_count == 40);
+	CHECK_STR(big.settings[0].key, "s0");
+	CHECK_STR(big.settings[8].label, "Setting 8");
+	CHECK_STR(big.settings[39].key, "s39");
+	CHECK_STR(big.settings[39].options, "a,b");
+	CHECK(Manifest_isPublic(&big, "s39"));
+	strings[0] = '\0';
+	Manifest_strings(&big, append, NULL);
+	CHECK(strstr(strings, "Setting 39;a;b;") != NULL);
+	// parsing again replaces them, and a missing id leaves none
+	CHECK(Manifest_parse("id=many\nsetting.one=toggle|One|on\n", &big) == 0);
+	CHECK(big.setting_count == 1);
+	CHECK_STR(big.settings[0].key, "one");
+	CHECK(Manifest_parse(many + strlen("id=many\n"), &big) == -1);
+	CHECK(big.setting_count == 0 && big.settings == NULL);
+	CHECK(Manifest_parse(many, &big) == 0);
+	Manifest_free(&big);
+	CHECK(big.setting_count == 0 && big.settings == NULL);
+	Manifest_free(&big); // twice is fine
+
 	// the Launcher pak's settings load only the strings and theme slots'
 	// owners: one claiming either, or both, or with another slot too, but
 	// not one turned off, one that lost its slot, or one that claims
@@ -414,5 +442,14 @@ int main(void) {
 	CHECK(n == 2 && !loads(n, "x"));
 	CHECK_STR(out[0].manifest->id, "x");
 
+	for (int i = 0; i < (int)(sizeof(manifests) / sizeof(manifests[0])); i++) Manifest_free(&manifests[i]);
+	Manifest_free(&m);
+	Manifest_free(&s);
+	Manifest_free(&g);
+	Manifest_free(&only_secret);
+	Manifest_free(&marked);
+	Manifest_free(&pub);
+	Manifest_free(&t);
+	Manifest_free(&bare);
 	CHECK_DONE();
 }

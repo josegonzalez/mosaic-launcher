@@ -119,5 +119,6 @@ int main(void) {
 
 	remove(owner_path);
 	remove(reader_path);
+	Manifest_free(&m);
 	CHECK_DONE();
 }

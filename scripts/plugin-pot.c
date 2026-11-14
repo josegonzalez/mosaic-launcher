@@ -151,6 +151,23 @@ static void quoted(const char* s) {
 	putchar('"');
 }
 
+// How many setting.<key>= lines text has, so one the parser drops, such
+// as an unknown type or a choice with no options, fails make pot and make
+// lint instead of going missing from the Plugins page.
+static int settingLines(const char* text) {
+	int count = 0;
+	const char* line = text;
+	while (*line) {
+		const char* end = strchr(line, '\n');
+		if (!end) end = line + strlen(line);
+		while (line < end && (*line == ' ' || *line == '\t')) line++;
+		const char* eq = memchr(line, '=', (size_t)(end - line));
+		if (end - line > 8 && !strncmp(line, "setting.", 8) && eq) count++;
+		line = *end ? end + 1 : end;
+	}
+	return count;
+}
+
 int main(int argc, char* argv[]) {
 	static PluginManifest m;
 	if (argc != 2 && !(argc == 4 && !strcmp(argv[2], "-c"))) {
@@ -164,6 +181,12 @@ int main(int argc, char* argv[]) {
 	}
 	if (Manifest_parse(text, &m) != 0) {
 		fprintf(stderr, "plugin-pot: %s has no id\n", argv[1]);
+		return 1;
+	}
+	int lines = settingLines(text);
+	if (lines != m.setting_count) {
+		fprintf(stderr, "plugin-pot: %s lists %d settings but the launcher reads %d; check each setting line\n", argv[1],
+			lines, m.setting_count);
 		return 1;
 	}
 	free(text);
@@ -216,5 +239,6 @@ int main(int argc, char* argv[]) {
 		else printf("\nmsgstr \"\"\n");
 		i = j;
 	}
+	Manifest_free(&m);
 	return 0;
 }

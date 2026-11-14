@@ -56,12 +56,12 @@ typedef struct Menu {
 } Menu;
 
 #define MENU_DEPTH 4
-#define ROWS_MAX (PLUGIN_MAX + PLUGIN_GROUP_COUNT + 5)
 
 static Menu stack[MENU_DEPTH];
 static int depth = 0;
-static Row rows[ROWS_MAX];
+static Row* rows = NULL; // grown to fit the longest page, such as a plugin with many settings
 static int row_count = 0;
+static int row_room = 0;
 static char title[128];
 static const PluginManifest* manifests;
 static int manifest_count = 0;
@@ -274,7 +274,13 @@ static Menu* top(void) {
 }
 
 static Row* addRow(int kind, int arg, const char* label, const char* value) {
-	if (row_count >= ROWS_MAX) return NULL;
+	if (row_count >= row_room) {
+		int room = row_room ? row_room * 2 : 32;
+		Row* grown = realloc(rows, room * sizeof(*grown));
+		if (!grown) return NULL;
+		rows = grown;
+		row_room = room;
+	}
 	Row* r = &rows[row_count++];
 	r->kind = kind;
 	r->arg = arg;
@@ -393,10 +399,14 @@ static void pop(void) {
 	buildRows();
 }
 
+// The text setting the keyboard is open for.
+static int typing_plugin = 0;
+static int typing_setting = 0;
+
 static void typed(const char* text, void* data) {
-	intptr_t which = (intptr_t)data;
-	const PluginManifest* p = &manifests[which / PLUGIN_SETTINGS_MAX];
-	if (text) setSetting(p, &p->settings[which % PLUGIN_SETTINGS_MAX], text);
+	(void)data;
+	const PluginManifest* p = &manifests[typing_plugin];
+	if (text) setSetting(p, &p->settings[typing_setting], text);
 	buildRows();
 }
 
@@ -467,8 +477,9 @@ static void activate(int step) {
 			}
 			else if (!cycling) {
 				// a secret is replaced, never shown, so its keyboard starts empty
-				Modal_keyboard(pluginText(p, s->label), s->flags & SETTING_SECRET ? "" : value, typed,
-					(void*)(intptr_t)(m->plugin * PLUGIN_SETTINGS_MAX + r->arg));
+				typing_plugin = m->plugin;
+				typing_setting = r->arg;
+				Modal_keyboard(pluginText(p, s->label), s->flags & SETTING_SECRET ? "" : value, typed, NULL);
 				memset(value, 0, sizeof(value));
 				return;
 			}
@@ -638,7 +649,12 @@ int Settings_main(int argc, char* argv[]) {
 		else GFX_sync();
 	}
 
-	Plugins_quit();
+	Plugins_quit(); // frees the manifests
+	manifests = NULL;
+	manifest_count = 0;
+	free(rows);
+	rows = NULL;
+	row_count = row_room = 0;
 	PWR_quit();
 	PAD_quit();
 	GFX_quit();

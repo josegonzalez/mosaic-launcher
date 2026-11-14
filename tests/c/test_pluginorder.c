@@ -134,5 +134,6 @@ int main(void) {
 	CHECK_STR(manifests[rows[PLUGIN_MAX / 2 + 2].plugin].id, "p00");
 	CHECK_STR(manifests[rows[n - 1].plugin].id, "p62");
 
+	for (int i = 0; i < PLUGIN_MAX; i++) Manifest_free(&manifests[i]);
 	CHECK_DONE();
 }

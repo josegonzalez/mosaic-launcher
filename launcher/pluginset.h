@@ -7,7 +7,6 @@
 #include <stddef.h>
 
 #define PLUGIN_MAX 64
-#define PLUGIN_SETTINGS_MAX 8
 
 enum PluginSettingType {
 	SETTING_TOGGLE, // on or off
@@ -45,7 +44,7 @@ typedef struct PluginManifest {
 	char description[256]; // one line about it, for plugin_info
 	char dir[512];       // the plugin's directory
 	int bundled;         // 1: ships in Launcher.pak, off by default; 0: its own pak, on by default
-	PluginSetting settings[PLUGIN_SETTINGS_MAX];
+	PluginSetting* settings; // as many as plugin.txt lists, allocated as they're parsed; Manifest_free frees them
 	int setting_count;
 } PluginManifest;
 
@@ -56,7 +55,13 @@ typedef struct PluginDecision {
 } PluginDecision;
 
 // Parses plugin.txt (key=value lines). Returns 0, or -1 when id is missing.
+// out is zeroed or holds an earlier parse, whose settings are freed first.
+// After a 0, Manifest_free frees its settings; after a -1 there's nothing
+// to free.
 int Manifest_parse(const char* text, PluginManifest* out);
+
+// Frees the manifest's settings, leaving it with none.
+void Manifest_free(PluginManifest* m);
 
 // True when any of the plugin's settings is protected.
 int Manifest_isProtected(const PluginManifest* m);
