@@ -21,7 +21,8 @@
 //
 // It's a source for the screensaver too: the screensaver's videos source
 // calls video.play with a game, and the game's clip plays on this plugin's
-// own full screen, video-previews.saver, opened over the screensaver's,
+// own full screen, video-previews.saver, opened in place over the
+// screensaver's (MOSAIC_SCREEN_INSTANT, so it doesn't slide),
 // with the screensaver's clock and what music plays drawn over it, until
 // the screensaver moves on to an image without a clip or closes, which
 // closes this screen too. With Sound on, it pauses music while the clip
@@ -499,7 +500,8 @@ static int init(const MosaicHost* h) {
 	// a source for the screensaver
 	MosaicScreenHooks hooks = {
 		.size = sizeof(hooks),
-		.flags = MOSAIC_SCREEN_FULL,
+		// in place over the screensaver, with no slide
+		.flags = MOSAIC_SCREEN_FULL | MOSAIC_SCREEN_INSTANT,
 		.enter = saverEnter,
 		.exit = saverExit,
 		.input = saverInput,

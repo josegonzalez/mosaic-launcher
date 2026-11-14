@@ -3450,7 +3450,7 @@ static int openScreen(int index, int slide) {
 	// the base is only kept from the first, which opens over a built-in screen
 	ScreenSet_push(&screens, index, currentScreen);
 	currentScreen = SCREEN_PLUGIN;
-	if (ScreenKind_slides(from, ScreenSet_kind(&screens, index))) state.animationdirection = slide;
+	if (ScreenKind_slidesWith(from, ScreenSet_kind(&screens, index), s->hooks.flags)) state.animationdirection = slide;
 	state.dirty = 1;
 	LOG_info("plugins: opened screen %s\n", s->id);
 	return 0;
@@ -3506,7 +3506,9 @@ static void closeTo(int index) {
 		to = screenKind(currentScreen);
 	}
 	int forward = screens.depth == 0 && top == screens.home;
-	if (ScreenKind_slides(ScreenSet_kind(&screens, top), to)) state.animationdirection = forward ? SLIDE_LEFT : SLIDE_RIGHT;
+	if (ScreenKind_slidesWith(ScreenSet_kind(&screens, top), to, screens.screens[top].hooks.flags)) {
+		state.animationdirection = forward ? SLIDE_LEFT : SLIDE_RIGHT;
+	}
 	folderbgchanged = 1; // the screen cleared every layer; repaint the background
 	state.dirty = 1;
 	if (after == AFTER_SWITCHER) {

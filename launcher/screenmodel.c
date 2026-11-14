@@ -90,6 +90,10 @@ int ScreenKind_slides(int from, int to) {
 	return from != SCREENKIND_SWITCHER && from != SCREENKIND_DIALOG && to != SCREENKIND_SWITCHER && to != SCREENKIND_DIALOG;
 }
 
+int ScreenKind_slidesWith(int from, int to, int flags) {
+	return !(flags & MOSAIC_SCREEN_INSTANT) && ScreenKind_slides(from, to);
+}
+
 int ScreenKind_overlays(int kind, int flags) {
 	if (kind == SCREENKIND_DIALOG) return 0;
 	if (kind == SCREENKIND_PLUGIN && (flags & MOSAIC_SCREEN_FULL)) return 0;

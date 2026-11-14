@@ -549,6 +549,10 @@ enum MosaicScreenFlag {
 	// slot's owner (slots=switcher), on one of its screens other than its
 	// home screen; the first it registers with the flag wins.
 	MOSAIC_SCREEN_GAME_SWITCHER = 4,
+	// Opens and closes at once, with no slide, such as a screen that takes
+	// over from the one under it in place: video-previews' clip over the
+	// screensaver.
+	MOSAIC_SCREEN_INSTANT = 8,
 };
 
 // A button hint for host->draw_hints: a button and what it does there,

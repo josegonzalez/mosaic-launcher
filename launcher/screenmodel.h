@@ -94,6 +94,10 @@ int ScreenSet_pop(ScreenSet* set);
 // itself in, or a dialog, which stock shows at once.
 int ScreenKind_slides(int from, int to);
 
+// The same for a plugin screen with flags opening or closing: never for
+// one with MOSAIC_SCREEN_INSTANT.
+int ScreenKind_slidesWith(int from, int to, int flags);
+
 // 1 when plugins' overlays draw over a kind of screen: not over dialogs,
 // whose questions they could hide, or a plugin screen with
 // MOSAIC_SCREEN_FULL.

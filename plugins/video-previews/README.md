@@ -39,7 +39,7 @@ A clip playing in place of the thumbnail, with the default settings.
 - Nothing is decoded until a clip is due: ffmpeg is loaded then, with `dlopen`.
 - On devices that's a trimmed LGPL build of ffmpeg 6.1.2 in the plugin's own lib folder, which `make devices` builds (see [DEVELOPMENT.md](../../docs/DEVELOPMENT.md)). On desktop it loads the system's ffmpeg (Homebrew's on macOS).
 - Draws through the layouts' `art_replacement` spot, and reads `<rom dir>/.videos/<rom name>.mp4`.
-- Provides `video.play`, listed in its `provides=`, for the screensaver's `videos` source: `path=<game>` plays the game's clip on its own full screen, `video-previews.saver`, opened over the screensaver's, with `clock=<off, 24h or 12h>` and music's `music.now` line drawn over it, answering `playing=1`; a game without a clip, or no `path`, closes that screen and answers `playing=0`. It pauses and plays on music with `music.pause` and `music.play`.
+- Provides `video.play`, listed in its `provides=`, for the screensaver's `videos` source: `path=<game>` plays the game's clip on its own full screen, `video-previews.saver`, opened over the screensaver's in place, with no slide (`MOSAIC_SCREEN_INSTANT`), with `clock=<off, 24h or 12h>` and music's `music.now` line drawn over it, answering `playing=1`; a game without a clip, or no `path`, closes that screen and answers `playing=0`. It pauses and plays on music with `music.pause` and `music.play`.
 - Where ffmpeg isn't there, it doesn't provide `video.play`, so the screensaver shows the games' art. For the tests only, `MOSAIC_VIDEO_PREVIEWS_FAKE` plays a plain grey picture in place of each of the screensaver's clips, without ffmpeg.
 
 ## Credits
