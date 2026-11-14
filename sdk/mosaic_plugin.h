@@ -410,6 +410,34 @@ typedef struct MosaicActionInfo {
 	MosaicActionBinding bindings[MOSAIC_ACTION_BINDINGS]; // the first of them
 } MosaicActionInfo;
 
+// What an entry of the card index is (see index_count).
+enum MosaicIndexKind {
+	MOSAIC_INDEX_SYSTEM = 0, // a system folder in Roms, such as Roms/Game Boy (GB)
+	MOSAIC_INDEX_FOLDER = 1, // a plain folder inside one, which stock opens as a folder
+	MOSAIC_INDEX_GAME = 2,   // a game: a file, a .pak folder, or a game folder (one holding a .cue or .m3u named after itself)
+};
+
+// An entry of the card index, for host->index_entry and host->index_find.
+// The plugin sets size to sizeof(MosaicIndexEntry) before asking, and the
+// launcher fills in only the fields that fit in it, so fields are only
+// added at the end. The strings are the launcher's, never NULL, and stay
+// valid until the hook or callback that asked returns.
+typedef struct MosaicIndexEntry {
+	size_t size;           // sizeof(MosaicIndexEntry) in the plugin
+	int kind;              // an enum MosaicIndexKind
+	int type;              // how the game list lists it: MOSAIC_ENTRY_ROM, MOSAIC_ENTRY_PAK or MOSAIC_ENTRY_DIR
+	int depth;             // the folders between its system folder and it: 0 directly inside, -1 for the system folder itself
+	int emulator;          // 1 when its system folder has an emulator, as stock lists only those, else 0
+	const char* path;      // its full path, as entry_path gives it: a game folder's is the folder
+	const char* launch;    // what opening it launches: a game folder's .cue (else its .m3u), otherwise path
+	const char* system;    // its system folder's name, such as "Game Boy (GB)"
+	const char* tag;       // the emulator tag in that name's last parentheses, such as "GB", or the whole name without any
+	const char* name;      // the name stock's list shows: its map.txt alias, else its file name tidied as stock tidies it
+	const char* year;      // from its .info sidecar (see entry_info), "" for none
+	const char* publisher; // the same
+	const char* genre;     // the same
+} MosaicIndexEntry;
+
 // How button hints are drawn, as stock's Settings app offers them (its
 // "Input prompt style"): the button's name as text, or an icon from one of
 // three sets. host->hint_style returns the style in effect, and a theme
@@ -1487,11 +1515,12 @@ typedef struct MosaicHost {
 	// launcher's own events are launcher.launch (path=<path>, type=rom or
 	// pak, once a launch goes ahead past every pre_launch), launcher.return
 	// (the same payload, as the launcher starts again after it, after
-	// post_return), launcher.set_changed (name=<set>, from set_changed) and
+	// post_return), launcher.set_changed (name=<set>, from set_changed),
 	// launcher.theme_changed (no payload, when the theme slot's owner
 	// puts a different theme in place, or its theme fails and stock's is
-	// back). A name is 1 to 63 bytes with no spaces or control
-	// characters, matched exactly. A payload is NULL, or key=value lines
+	// back) and launcher.index_ready (count=<entries>, when the card index
+	// changes; see index_count). A name is 1 to 63 bytes with no spaces or
+	// control characters, matched exactly. A payload is NULL, or key=value lines
 	// separated by \n, under 1024 bytes: keys of 1 to 31 letters, digits,
 	// '_', '-' or '.', values with no control characters. publish returns
 	// 0, or -1 for a name that isn't the plugin's, a bad payload, or a full
@@ -1656,6 +1685,39 @@ typedef struct MosaicHost {
 	// it when the text or the font changes (launcher.theme_changed), not
 	// each frame. Check for it with MOSAIC_HOST_HAS(host, font_missing).
 	int (*font_missing)(const char* text, char* out, size_t size);
+	// The card index: every system folder in Roms, every folder in them
+	// and every game, as stock lists them, kept by the launcher so plugins
+	// don't each read the card. Nothing is read until a plugin first asks.
+	// Then the copy kept on the card (card-index.txt in the launcher's
+	// folder), when there is one, answers at once, while a thread of the
+	// launcher's checks it against the card, reading again only the
+	// systems whose folders changed; without one, the index isn't ready
+	// until that thread has read the card. It's checked again when the
+	// lists reload and when a plugin calls index_refresh, such as after
+	// adding or renaming a game. launcher.index_ready (count=<entries>) is
+	// published each time its entries change after a plugin asked: once
+	// the first read is done when nothing was kept, and after a check that
+	// found the card changed, before the next frame's ticks. It lists what
+	// a plugin's filter hides too, but not what stock never lists (dot
+	// files, *.disabled, map.txt and names map.txt hides) or anything more
+	// than 7 folders inside a system folder. Entries are by system folder,
+	// by name bytewise, and in each by path bytewise, so a system folder
+	// comes first, then everything in it. index_count returns how many
+	// entries system (a system folder's name, or NULL for every system)
+	// has, 0 for one that isn't there, or MOSAIC_INDEX_NOT_READY before the
+	// index is ready. index_entry fills out (see MosaicIndexEntry) for the
+	// entry at index in system (NULL for every system) and returns 0, or -1
+	// for an index past the end, a NULL out or before it's ready.
+	// index_find fills out, when it isn't NULL, for the entry at path and
+	// returns its index among every system's, or -1 for a path the index
+	// doesn't have. index_refresh asks for a check and returns 0. They work
+	// where cfg_get does, on the launcher's thread; elsewhere index_count
+	// returns MOSAIC_INDEX_NOT_READY and the others -1. Check for them with
+	// MOSAIC_HOST_HAS(host, index_refresh).
+	int (*index_count)(const char* system);
+	int (*index_entry)(const char* system, int index, MosaicIndexEntry* out);
+	int (*index_find)(const char* path, MosaicIndexEntry* out);
+	int (*index_refresh)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1681,6 +1743,9 @@ typedef struct MosaicHost {
 #define MOSAIC_CALL_FAILED -4
 #define MOSAIC_CALL_MAX 4096
 #define MOSAIC_CALL_DEPTH 8
+
+// What index_count returns before the card index is first ready.
+#define MOSAIC_INDEX_NOT_READY -1
 
 // True when the launcher's host table has this field, so a plugin can use
 // newer features when they're there and do without on older launchers.

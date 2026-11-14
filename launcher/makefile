@@ -32,7 +32,7 @@ MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	pluginset.c pluginorder.c plugins.c toast.c awake.c power.c powerwatch.c pakhooks.c kbmodel.c modal.c \
 	cfgfile.c settings.c listsort.c launchcmd.c stocktoggles.c leds.c bluetooth.c caller.c plugincfg.c fnbinds.c actionlist.c entrysets.c events.c providers.c capturemodel.c capture.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c \
-	statusmodel.c statuspill.c infomodel.c transmodel.c background.c playmodel.c playhistory.c \
+	statusmodel.c statuspill.c infomodel.c indexmodel.c cardindex.c transmodel.c background.c playmodel.c playhistory.c \
 	inputmodel.c pin.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c lockmodel.c ambientmodel.c \
 	theme.c thememodel.c palettes.c fallback.c fallbackmodel.c smooth.c scalemodel.c
 

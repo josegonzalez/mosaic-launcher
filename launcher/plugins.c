@@ -36,6 +36,7 @@
 #include "cfgfile.h"
 #include "lockmodel.h"
 #include "ambientmodel.h"
+#include "cardindex.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -414,6 +415,64 @@ static int hostPluginInfo(int index, MosaicPluginInfo* out) {
 	return 0;
 }
 
+///////////////////////////////////////
+// the card index (cardindex.c)
+
+static void indexLog(const char* message) {
+	LOG_info("plugins: %s", message);
+}
+
+// The fields of out that fit in the plugin's struct.
+static void indexFill(const IndexEntry* e, const IndexSystem* sys, MosaicIndexEntry* out) {
+	MosaicIndexEntry full = {
+		.size = out->size,
+		.kind = e->kind,
+		.type = e->type,
+		.depth = e->depth,
+		.emulator = sys->emulator,
+		.path = Index_str(sys, e->path),
+		.launch = Index_str(sys, e->launch),
+		.system = sys->folder,
+		.tag = sys->tag,
+		.name = Index_str(sys, e->name),
+		.year = Index_str(sys, e->year),
+		.publisher = Index_str(sys, e->publisher),
+		.genre = Index_str(sys, e->genre),
+	};
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+}
+
+static int hostIndexCount(const char* system) {
+	if (!callingPlugin("index_count")) return MOSAIC_INDEX_NOT_READY;
+	const CardIndex* index = CardIndex_get();
+	return index ? Index_count(index, system) : MOSAIC_INDEX_NOT_READY;
+}
+
+static int hostIndexEntry(const char* system, int i, MosaicIndexEntry* out) {
+	if (!callingPlugin("index_entry") || !out || out->size < sizeof(size_t)) return -1;
+	const IndexSystem* sys = NULL;
+	const IndexEntry* e = Index_at(CardIndex_get(), system, i, &sys);
+	if (!e) return -1;
+	indexFill(e, sys, out);
+	return 0;
+}
+
+static int hostIndexFind(const char* path, MosaicIndexEntry* out) {
+	if (!callingPlugin("index_find") || (out && out->size < sizeof(size_t))) return -1;
+	const IndexEntry* e = NULL;
+	const IndexSystem* sys = NULL;
+	int at = Index_find(CardIndex_get(), path, &e, &sys);
+	if (at >= 0 && out) indexFill(e, sys, out);
+	return at;
+}
+
+static int hostIndexRefresh(void) {
+	if (!callingPlugin("index_refresh")) return -1;
+	// the first ask reads the card anyway
+	if (CardIndex_get()) CardIndex_refresh();
+	return 0;
+}
+
 static int hostFontMissing(const char* text, char* out, size_t size) {
 	return Fallback_missing(text, out, size);
 }
@@ -562,6 +621,8 @@ static int hostRecentOpen(int index, int resume) {
 static void hostReloadLists(void) {
 	// on the next frame, so a hook mid-listing never has its list freed
 	state.reload = 1;
+	// and the card index, once a plugin has asked for it
+	CardIndex_refresh();
 }
 
 // Set while list_ready hooks run, the only time entry_set_name works.
@@ -1788,6 +1849,10 @@ static const MosaicHost host = {
 	.lock_button = hostLockButton,
 	.register_ambient = hostRegisterAmbient,
 	.font_missing = hostFontMissing,
+	.index_count = hostIndexCount,
+	.index_entry = hostIndexEntry,
+	.index_find = hostIndexFind,
+	.index_refresh = hostIndexRefresh,
 };
 
 ///////////////////////////////////////
@@ -2187,6 +2252,8 @@ static void start(void) {
 	if (!settings_only) Plugins_adoptPin(); // before simple mode's cfg is read; the settings adopt it themselves
 	Bluetooth_setLog(bluetoothLog);
 	Wifi_setLog(wifiLog);
+	// only where to look: nothing is read until a plugin asks
+	CardIndex_setup(SDCARD_PATH, PLATFORM, PLUGIN_STATE_DIR "/card-index.txt", indexLog);
 
 	char* choices = readText(PLUGIN_CHOICES_PATH);
 	static PluginDecision decisions[PLUGIN_MAX];
@@ -2326,6 +2393,8 @@ void Plugins_quit(void) {
 	Bluetooth_quit();
 	// a Wi-Fi look still running is left to finish, its answer dropped
 	Wifi_quit();
+	// a build still running stops at its next file
+	CardIndex_quit();
 	settingsExit();
 	// the manifests go last, as the loaded plugins pointed at them
 	for (int i = 0; i < manifest_count; i++) Manifest_free(&manifests[i]);
@@ -2916,6 +2985,12 @@ void Plugins_tick(unsigned long now) {
 	if (loaded_count && wifiSupported()) Wifi_setEnabled(wifiOn());
 	// RetroAchievements answers came in, for the rows that asked
 	if (RAProgress_news()) state.dirty = 1;
+	// a card index the worker built that changed, before the events
+	if (CardIndex_poll()) {
+		char payload[32];
+		snprintf(payload, sizeof(payload), "count=%i", Index_count(CardIndex_get(), NULL));
+		hostEvent(EVENT_HOST_PREFIX "index_ready", payload);
+	}
 	// what was published since the last frame, before plugins' ticks
 	eventsDeliver();
 	EACH_PLUGIN_WITH(tick) p->tick(now);
