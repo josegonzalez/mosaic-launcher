@@ -23,7 +23,7 @@ A game's states are a grid in slot order, each with its preview, name and time. 
 
 While [`romm`](../romm/README.md) is on with a server set:
 
-- A state romm restored from the server through Flashback shows a SYNCED mark on its preview (a dot where the cell is too small for the word), and Synced in the title when it's selected, until it changes on the card.
+- A state romm uploaded (with its Upload states after playing setting on) or restored from the server through Flashback shows a SYNCED mark on its preview (a dot where the cell is too small for the word), and Synced in the title when it's selected, until it changes on the card.
 - A game from RomM, opened from the game list, has a Restore from server cell after its states. **A** on it opens romm's Flashback for the game, and its states are read again when you come back.
 
 Without romm there's no mark and no cell.
@@ -54,7 +54,7 @@ Every game with states, from the quick menu tile.
 
 ![Every game with states, from the quick menu tile](docs/all-games.png)
 
-With romm set up, on a game from RomM: Slot 1, which romm restored, marked synced, and Restore from server selected.
+With romm set up, on a game from RomM: Slot 1, which romm synced, marked synced, and Restore from server selected.
 
 ![With romm set up: Slot 1 marked synced, and Restore from server selected](docs/with-romm.png)
 

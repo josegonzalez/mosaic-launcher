@@ -39,6 +39,8 @@ Turn on **RomM** in Launcher > Plugins ([how](../../docs/plugins.md#turning-plug
 
 When a game from RomM comes back, its save in `Saves/<tag>/` (whichever of minarch's save names is newest) is uploaded if its MD5 differs from the last one synced (the Upload saves after playing setting). It goes into a slot of its own on the server that keeps the last Saves kept on the server uploads. One that can't go up is tried again the next time the launcher starts.
 
+With Upload states after playing on (off by default), the game's save states in `.userdata/shared/<tag>-<core>/` go up too when it comes back: each one, by any of the names minarch's State format setting gives it, that changed since romm last uploaded or restored it (its size or modification time differs), the newest four at a time, with the core's name as the state's emulator. One that can't go up is tried again the next time the launcher starts, and the rest the next time the game returns.
+
 Press **Y** on a game from RomM (the Flashback button setting picks another, shared with other plugins' actions there) to open Flashback: the game's saves and save states on the server, newest first, with their times and sizes. A game launched from its folder in `Roms` has Flashback there too.
 
 | Button | What it does |
@@ -47,7 +49,7 @@ Press **Y** on a game from RomM (the Flashback button setting picks another, sha
 | **X** | Fetches the list again |
 | **B** | Goes back |
 
-With [`save-state-manager`](../save-state-manager/README.md) on, a state Flashback restored shows a SYNCED mark there until it changes, and a game from RomM gets a Restore from server cell after its states, which opens Flashback. Each finished download counts towards [`gamification`](../gamification/README.md)'s RomM quest and shows on [`home-dashboard`](../home-dashboard/README.md)'s Stats tab under Recently downloaded.
+With [`save-state-manager`](../save-state-manager/README.md) on, a state romm uploaded or Flashback restored shows a SYNCED mark there until it changes, and a game from RomM gets a Restore from server cell after its states, which opens Flashback. Each finished download counts towards [`gamification`](../gamification/README.md)'s RomM quest and shows on [`home-dashboard`](../home-dashboard/README.md)'s Stats tab under Recently downloaded.
 
 A state in any of the layouts minarch writes (its own `.st0` to `.st9`, or RetroArch's `.state`, `.state1` to `.state9`, `.state.0` to `.state.9` and `.state.auto`) restores under the name minarch's State format setting gives it. It goes into `.userdata/shared/<tag>-<core>/` for the core the system's emulator pak runs, else the only state folder the system has, else the one named for the emulator the server recorded. A state in another layout, or with no way to tell its folder, can't be restored.
 
@@ -69,6 +71,7 @@ A state in any of the layouts minarch writes (its own `.st0` to `.st9`, or Retro
 | Certificate fingerprint, SHA-256 (`pin`) | text | empty | `https://` only: the server certificate's SHA-256 fingerprint, for a self-signed home server |
 | CA certificates file (`ca_file`) | text | empty | `https://` only: a PEM file of CA certificates to trust in place of the device's own |
 | Upload saves after playing (`sync`) | on, off | on | Uploads a game's save after it returns, when it changed |
+| Upload states after playing (`sync_states`) | on, off | off | Uploads a game's save states after it returns, the ones that changed since they were last uploaded or restored |
 | Saves kept on the server (`keep`) | 5, 10, 20, 50 | 10 | How many of a game's uploaded saves the server keeps |
 | Flashback button (`button`) | none, Y, L2, R2, SELECT | Y | The game list button that opens the selected game's Flashback |
 

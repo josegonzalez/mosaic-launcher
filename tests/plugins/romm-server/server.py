@@ -177,19 +177,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.note("POST %s" % self.path)
         if not self.authorised():
             return
-        if url.path != "/api/saves":
+        if url.path not in ("/api/saves", "/api/states"):
             return self.send(404, b"{}")
+        field = b'name="saveFile"' if url.path == "/api/saves" else b'name="stateFile"'
         kind = self.headers.get("Content-Type", "")
         boundary = kind.split("boundary=", 1)[1].encode() if "boundary=" in kind else b""
         parts = body.split(b"--" + boundary)
         name, data = "", b""
         for part in parts:
             head, _, rest = part.partition(b"\r\n\r\n")
-            if b'name="saveFile"' in head:
+            if field in head:
                 name = head.split(b'filename="', 1)[1].split(b'"', 1)[0].decode()
                 data = rest[:-2] if rest.endswith(b"\r\n") else rest
-        self.note("UPLOAD %s %s" % (name, data.decode(errors="replace")))
         query = urllib.parse.parse_qs(url.query)
+        if url.path == "/api/states":
+            self.note("UPLOAD-STATE %s %s %s" % (query.get("emulator", [""])[0], name, data.decode(errors="replace")))
+        else:
+            self.note("UPLOAD %s %s" % (name, data.decode(errors="replace")))
         reply = {"id": 9, "rom_id": int(query.get("rom_id", ["0"])[0]), "file_name": name,
                  "file_size_bytes": len(data), "updated_at": "2026-11-09T09:00:00+00:00"}
         self.send(200, json.dumps(reply).encode())

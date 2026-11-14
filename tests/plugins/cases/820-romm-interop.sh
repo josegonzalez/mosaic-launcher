@@ -5,8 +5,9 @@
 # tests/plugins/romm-server, the stand-in RomM. A download from the RomM
 # folder publishes romm.download_done, which completes gamification's
 # RomM quest, offered only while romm has a server; home-dashboard's Stats
-# tab lists it under Recently downloaded. save-state-manager marks a state
-# romm.synced says romm restored (a faked synced.txt entry), and its
+# tab lists it under Recently downloaded. With Upload states after
+# playing on, the game's changed state goes up when it returns, and
+# save-state-manager marks it, as romm.synced says, until it changes; its
 # Restore from server cell runs romm.flashback on the game. Without romm,
 # there's no mark, no cell, no quest and no section. The card's recents
 # and the launches' /tmp files are put back afterwards.
@@ -100,6 +101,23 @@ expect "download $RI_ONE"
 expect "quest done: download (Download a game from RomM)"
 grep -q "^done=download " "$RI_GM_STATE/state.txt" 2>/dev/null || fail "gamification didn't keep the RomM quest done"
 
+# back from the game with a state: not uploaded with Upload states after
+# playing off (the default), and uploaded once it's on
+printf state >"$RI_STATE_FILE"
+touch -t 203001010900 "$RI_STATE_FILE"
+ri_plugins romm=on
+ri_run return "wait wait wait wait" "$RI_ONE" "presser: done" || fail "the launcher exited early back from the game"
+grep -qF "UPLOAD-STATE" "$RI_WORK/requests.log" && fail "romm uploaded a state with Upload states after playing off"
+printf '%s' "$RI_ONE" >"$RI_STATE/pending.txt"
+printf 'sync_states=on\n' >>"$STATE/romm.cfg"
+ri_run return-states "wait wait wait wait" "$RI_ONE" "plugin romm: uploaded state Mosaic Test One (World).gb.st0 for rom 2" \
+	|| fail "the launcher exited early uploading the state"
+grep -qF "POST /api/states?rom_id=2&emulator=gambatte" "$RI_WORK/requests.log" || fail "the state upload's query isn't RomM's"
+grep -qF "UPLOAD-STATE gambatte Mosaic Test One (World).gb.st0 state" "$RI_WORK/requests.log" \
+	|| fail "the stand-in didn't get the state"
+grep -qF "up	" "$RI_STATE/synced.txt" 2>/dev/null || fail "romm didn't note the uploaded state"
+[ -f "$RI_STATE/pending.txt" ] && fail "the state upload left the pending file"
+
 # the quests: offered with romm, and not without it
 printf 'steps=action:gamification.open,b\n' >"$STATE/screener.cfg"
 ri_plugins romm=on gamification=on screener=on
@@ -122,12 +140,8 @@ ri_run home-off "r1" "$RI_ONE" "presser: done" || fail "the launcher exited earl
 expect "history on, downloads 0"
 grep -qxF "RECENTLY DOWNLOADED" "$texts" && fail "home-dashboard drew Recently downloaded without romm"
 
-# save-state-manager: a state romm restored (as its synced.txt has it),
-# marked, then Restore from server opens romm's Flashback for the game
-printf state >"$RI_STATE_FILE"
-touch -t 203001010900 "$RI_STATE_FILE"
-ri_stat=$(python3 -I -c 'import os, sys; s = os.lstat(sys.argv[1]); print(s.st_size, int(s.st_mtime))' "$RI_STATE_FILE")
-printf 'down\t%s\t%s\t%s\t%s\n' "$(date +%s)" "${ri_stat% *}" "${ri_stat#* }" "$RI_STATE_FILE" >"$RI_STATE/synced.txt"
+# save-state-manager: the state romm uploaded, marked, then Restore from
+# server opens romm's Flashback for the game
 printf 'steps=action:save-state-manager.game,right,a\n' >"$STATE/screener.cfg"
 ri_plugins romm=on save-state-manager=on screener=on
 ri_run states "wait wait wait wait wait wait wait wait" "$RI_ONE" "plugin screener: done" "plugin romm: flashback for rom 2: 3 saves, 1 states" \

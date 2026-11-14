@@ -1022,6 +1022,16 @@ int RM_stateName(const char* rom_file, int format, int slot, char* out, size_t s
 	return n < 0 || (size_t)n >= size ? -1 : 0;
 }
 
+int RM_stateOf(const char* rom_file, const char* file) {
+	for (int format = 0; format <= 4; format++) {
+		for (int slot = 0; slot <= 9; slot++) {
+			char name[RM_NAME_MAX + 16];
+			if (RM_stateName(rom_file, format, slot, name, sizeof(name)) == 0 && !strcmp(name, file)) return slot;
+		}
+	}
+	return -1;
+}
+
 int RM_stateFormat(const char* settings) {
 	for (const char* line = settings; line && *line;) {
 		int v;

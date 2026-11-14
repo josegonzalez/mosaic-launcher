@@ -161,6 +161,10 @@ msgid "RomM: save uploaded"
 msgstr ""
 
 #: romm.c
+msgid "RomM: state uploaded"
+msgstr ""
+
+#: romm.c
 msgid "RomM: that folder isn't on the card"
 msgstr ""
 
@@ -208,6 +212,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Upload saves after playing"
+msgstr ""
+
+#: plugin.txt
+msgid "Upload states after playing"
 msgstr ""
 
 #: plugin.txt

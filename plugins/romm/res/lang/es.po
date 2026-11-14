@@ -178,3 +178,9 @@ msgstr "ninguno"
 
 msgid "unknown time"
 msgstr "hora desconocida"
+
+msgid "Upload states after playing"
+msgstr "Subir estados al terminar de jugar"
+
+msgid "RomM: state uploaded"
+msgstr "RomM: estado subido"

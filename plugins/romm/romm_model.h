@@ -215,6 +215,9 @@ int RM_stateSlot(const char* server_file);
 // format setting (stateFormat in .userdata/shared/minuisettings.txt, 0 to
 // 4). Returns 0, or -1.
 int RM_stateName(const char* rom_file, int format, int slot, char* out, size_t size);
+// The slot of file when it's one of rom_file's states, by any of the names
+// RM_stateName gives it in any format, or -1.
+int RM_stateOf(const char* rom_file, const char* file);
 // The stateFormat in minuisettings.txt's text, or 0 (minarch's own) when
 // it isn't there or isn't one minarch knows.
 int RM_stateFormat(const char* settings);

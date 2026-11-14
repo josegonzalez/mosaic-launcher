@@ -17,7 +17,7 @@ press "menu wait left a"
 shot all-games
 
 # with romm set up (no server is asked: these are the files it keeps), on
-# Tobu Tobu Girl, a game from RomM: slot 1, which romm restored, marked
+# Tobu Tobu Girl, a game from RomM: slot 1, which romm synced, marked
 # synced, and Restore from server selected
 begin
 on romm save-state-manager

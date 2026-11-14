@@ -1197,6 +1197,14 @@ static int keepAllBut(const char* path) {
 
 // what's synced and downloaded: lines, lists kept newest first, replies
 static void testSynced(void) {
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (World).gb.st3") == 3);
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (World).state.auto") == 9);
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (World).state") == 0);
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (World).state.4") == 4);
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (World).state7") == 7);
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (World).gb.sav") == -1);
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (USA).gb.st3") == -1);
+	CHECK(RM_stateOf("Tetris (World).gb", "Tetris (World).gb.st10") == -1);
 	RMSynced e;
 	CHECK(RM_syncedParse("down\t1700000000\t20\t1699999999\t/sd/.userdata/shared/GB-gambatte/A.gb.st1\r", &e) == 0);
 	CHECK(e.down == 1 && e.at == 1700000000 && e.size == 20 && e.mtime == 1699999999);

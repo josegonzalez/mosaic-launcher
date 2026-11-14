@@ -371,7 +371,8 @@ static void logShown(int shown_view, int got) {
 				game->count);
 		}
 	} else if (onRestore(game)) {
-		snprintf(line, sizeof(line), "slots %i of %i: %s, restore from server", slot_sel, slotCells(game), game->display);
+		snprintf(line, sizeof(line), "slots %i of %i: %.256s, restore from server", slot_sel, slotCells(game),
+			game->display);
 	} else if (!game || game->count <= 0) {
 		snprintf(line, sizeof(line), "no save states");
 	} else {

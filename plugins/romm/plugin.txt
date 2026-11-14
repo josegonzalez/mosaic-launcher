@@ -17,6 +17,8 @@ setting.pin=text|Certificate fingerprint (SHA-256)|||protected
 setting.ca_file=text|CA certificates file|||protected
 # upload a game's save after it returns, when it changed
 setting.sync=toggle|Upload saves after playing|on
+# upload a game's save states after it returns, the ones that changed since they were last uploaded or restored
+setting.sync_states=toggle|Upload states after playing|off
 # how many of a game's uploaded saves the server keeps
 setting.keep=choice|Saves kept on the server|10|5,10,20,50
 # the game list button that opens the selected game's Flashback, shared with other plugins' actions on it

@@ -82,6 +82,7 @@ static char data_dir[RM_PATH_MAX]; // .userdata/<platform>/launcher/romm
 static char root_path[RM_PATH_MAX]; // <sd>/RomM, the virtual folder
 static char status_path[RM_PATH_MAX];
 static int sync_saves = 1;
+static int sync_states = 0;
 static int keep_saves = 10;
 
 static void say(const char* message) {
@@ -189,6 +190,7 @@ static void loadSettings(void) {
 	char user_copy[256];
 	put(user_copy, sizeof(user_copy), "%s", user);
 	sync_saves = strcmp(host->cfg_get("sync", "on"), "off") != 0;
+	sync_states = strcmp(host->cfg_get("sync_states", "off"), "on") == 0;
 	keep_saves = atoi(host->cfg_get("keep", "10"));
 	if (keep_saves < 1 || keep_saves > 1000) keep_saves = 10;
 	if (!url[0]) {
@@ -259,7 +261,7 @@ static int networkReady(int quiet) {
 ///////////////////////////////////////
 // jobs
 
-enum { J_PLATFORMS, J_ROMS, J_DOWNLOAD, J_UPLOAD, J_ASSETS, J_FETCH };
+enum { J_PLATFORMS, J_ROMS, J_DOWNLOAD, J_UPLOAD, J_ASSETS, J_FETCH, J_STATE_UPLOAD };
 
 typedef struct Job {
 	int kind;
@@ -283,6 +285,7 @@ typedef struct Job {
 	char unpack[RM_PATH_MAX];
 	char md5[33];
 	long long file_size, file_mtime; // an upload's file as it was when queued
+	char emulator[RM_NAME_MAX];      // a state's core, from its <tag>-<core> folder
 	long long expect;
 	// what came of it
 	int ok;
@@ -436,8 +439,9 @@ static void runUpload(Job* j) {
 	RM_hex(random, sizeof(random), hex, sizeof(hex));
 	put(boundary, sizeof(boundary), "mosaicromm%s", hex);
 	char before[RM_NAME_MAX + 256], after[96];
-	if (RM_multipart(boundary, "saveFile", j->file, before, sizeof(before), after, sizeof(after)) != 0) {
-		put(j->error, sizeof(j->error), "the save's name is too long");
+	int state = j->kind == J_STATE_UPLOAD;
+	if (RM_multipart(boundary, state ? "stateFile" : "saveFile", j->file, before, sizeof(before), after, sizeof(after)) != 0) {
+		put(j->error, sizeof(j->error), state ? "the state's name is too long" : "the save's name is too long");
 		return;
 	}
 	char content_type[96];
@@ -445,9 +449,15 @@ static void runUpload(Job* j) {
 	RNCall call;
 	memset(&call, 0, sizeof(call));
 	call.method = "POST";
-	put(call.target, sizeof(call.target),
-		"/api/saves?rom_id=%d&slot=%s&content_hash=%s&autocleanup=true&autocleanup_limit=%d", j->rom_id, SAVE_SLOT,
-		j->md5, keep_saves);
+	if (state) {
+		char emulator[RM_NAME_MAX * 3];
+		RM_urlEncode(j->emulator, emulator, sizeof(emulator));
+		put(call.target, sizeof(call.target), "/api/states?rom_id=%d&emulator=%s", j->rom_id, emulator);
+	} else {
+		put(call.target, sizeof(call.target),
+			"/api/saves?rom_id=%d&slot=%s&content_hash=%s&autocleanup=true&autocleanup_limit=%d", j->rom_id, SAVE_SLOT,
+			j->md5, keep_saves);
+	}
 	call.content_type = content_type;
 	call.body_file = j->path;
 	call.body_before = before;
@@ -517,7 +527,8 @@ static void* jobThread(void* arg) {
 	case J_PLATFORMS: runPlatforms(j); break;
 	case J_ROMS: runRoms(j); break;
 	case J_DOWNLOAD: runDownload(j); break;
-	case J_UPLOAD: runUpload(j); break;
+	case J_UPLOAD:
+	case J_STATE_UPLOAD: runUpload(j); break;
 	case J_ASSETS: runAssets(j); break;
 	case J_FETCH: runFetch(j); break;
 	}
@@ -1012,6 +1023,87 @@ static const char* baseName(const char* path) {
 
 static char pending_path[RM_PATH_MAX];
 
+static int state_failed = 0; // a state upload failed since the last look, so the pending file stays
+
+#define STATE_UPLOADS_MAX 4 // a game's changed states queued at once; the rest go on its next return
+
+// After a game from RomM: queues its states that changed since they were
+// last uploaded or restored, the newest first. Returns -1 when there are
+// some but the network isn't ready, so the pending file stays for the
+// next return or start, else 0.
+static int syncStates(const RMRecord* record, int quiet) {
+	if (!sync_states) return 0;
+	const char* rom_file = baseName(record->path);
+	char shared[RM_PATH_MAX], prefix[RM_TAG_MAX + 2];
+	put(shared, sizeof(shared), "%s/.userdata/shared", sd);
+	put(prefix, sizeof(prefix), "%s-", record->tag);
+	struct {
+		char path[RM_PATH_MAX];
+		char file[RM_NAME_MAX];
+		char emulator[RM_NAME_MAX];
+		long long size, mtime;
+	} found[STATE_UPLOADS_MAX];
+	int count = 0;
+	DIR* d = opendir(shared);
+	struct dirent* e;
+	while (d && (e = readdir(d))) {
+		if (strncmp(e->d_name, prefix, strlen(prefix)) != 0 || !e->d_name[strlen(prefix)] || !RM_safeName(e->d_name)) continue;
+		char dir[RM_PATH_MAX];
+		put(dir, sizeof(dir), "%s/%s", shared, e->d_name);
+		DIR* inner = isDir(dir) ? opendir(dir) : NULL;
+		struct dirent* f;
+		while (inner && (f = readdir(inner))) {
+			if (RM_stateOf(rom_file, f->d_name) < 0) continue;
+			char path[RM_PATH_MAX];
+			long long size, mtime;
+			put(path, sizeof(path), "%s/%s", dir, f->d_name);
+			if (fileStat(path, &size, &mtime) != 0 || size <= 0 || size > SAVE_MAX) continue;
+			const RMSynced* known = RM_syncedFind(synced, synced_count, path);
+			if (known && known->size == size && known->mtime == mtime) continue;
+			// keep the newest STATE_UPLOADS_MAX
+			int at = count < STATE_UPLOADS_MAX ? count++ : -1;
+			if (at < 0) {
+				at = 0;
+				for (int i = 1; i < count; i++) {
+					if (found[i].mtime < found[at].mtime) at = i;
+				}
+				if (found[at].mtime >= mtime) continue;
+			}
+			put(found[at].path, sizeof(found[at].path), "%s", path);
+			put(found[at].file, sizeof(found[at].file), "%s", f->d_name);
+			put(found[at].emulator, sizeof(found[at].emulator), "%s", e->d_name + strlen(prefix));
+			found[at].size = size;
+			found[at].mtime = mtime;
+		}
+		if (inner) closedir(inner);
+	}
+	if (d) closedir(d);
+	if (!count) return 0;
+	if (!networkReady(quiet)) return -1;
+	state_failed = 0;
+	for (int i = 0; i < count; i++) {
+		int queued_already = 0;
+		for (int k = -1; k < queued && !queued_already; k++) {
+			Job* q = k < 0 ? running : queue[k];
+			queued_already = q && q->kind == J_STATE_UPLOAD && !strcmp(q->path, found[i].path);
+		}
+		if (queued_already) continue;
+		Job* j = jobNew(J_STATE_UPLOAD);
+		if (!j) break;
+		j->rom_id = record->rom_id;
+		put(j->path, sizeof(j->path), "%s", found[i].path);
+		put(j->file, sizeof(j->file), "%s", found[i].file);
+		put(j->tag, sizeof(j->tag), "%s", record->tag);
+		put(j->name, sizeof(j->name), "%s", record->path);
+		put(j->emulator, sizeof(j->emulator), "%s", found[i].emulator);
+		j->file_size = found[i].size;
+		j->file_mtime = found[i].mtime;
+		if (jobAdd(j) != 0) break;
+		sayf("uploading state %s for rom %d", j->file, j->rom_id);
+	}
+	return 0;
+}
+
 // After a game from RomM: uploads its save when it changed since the last sync
 static void syncSave(int quiet) {
 	char file[RM_PATH_MAX];
@@ -1026,16 +1118,18 @@ static void syncSave(int quiet) {
 		unlink(file);
 		return;
 	}
+	// states first, so a save that needs nothing doesn't drop the pending file they need
+	int keep = syncStates(&record, quiet) != 0;
 	char save[RM_PATH_MAX];
 	if (localSave(record.tag, baseName(record.path), save, sizeof(save)) < 0) {
 		sayf("no save for %s", baseName(record.path));
-		unlink(file);
+		if (!keep) unlink(file);
 		return;
 	}
 	char md5[33];
 	if (RN_md5File(save, SAVE_MAX, md5) != 0) {
 		sayf("can't read the save %s", save);
-		unlink(file);
+		if (!keep) unlink(file);
 		return;
 	}
 	if (!strcmp(md5, record.value)) {
@@ -1046,7 +1140,7 @@ static void syncSave(int quiet) {
 		if (known && fileStat(save, &size, &mtime) == 0 && (known->size != size || known->mtime != mtime)) {
 			syncedNote(save, known->down, size, mtime);
 		}
-		unlink(file);
+		if (!keep) unlink(file);
 		return;
 	}
 	if (!sync_saves || jobPending(J_UPLOAD, record.rom_id)) return;
@@ -1751,11 +1845,24 @@ static void finished(Job* j) {
 				recordPut(&r);
 			}
 			if (j->file_size >= 0) syncedNote(j->path, 0, j->file_size, j->file_mtime);
-			if (!strcmp(pending_path, j->name)) {
+			if (!strcmp(pending_path, j->name) && !state_failed) {
 				char file[RM_PATH_MAX];
 				put(file, sizeof(file), "%s/pending.txt", data_dir);
 				unlink(file);
 			}
+		}
+		break;
+	case J_STATE_UPLOAD:
+		if (j->ok) {
+			sayf("uploaded state %s for rom %d", j->file, j->rom_id);
+			toast(tr("RomM: state uploaded"));
+			syncedNote(j->path, 0, j->file_size, j->file_mtime);
+		} else if (!j->cancel) {
+			// tried again the next time the launcher starts, as a save is
+			char file[RM_PATH_MAX];
+			put(file, sizeof(file), "%s/pending.txt", data_dir);
+			if (!isFile(file)) writeFile(file, j->name, strlen(j->name));
+			state_failed = 1;
 		}
 		break;
 	case J_ASSETS:
@@ -1782,7 +1889,7 @@ static void finished(Job* j) {
 	}
 	if (!j->ok && !j->cancel && j->error[0]) {
 		static const char* what[] = { "listing platforms", "listing roms", "downloading", "uploading the save",
-			"listing saves", "restoring" };
+			"listing saves", "restoring", "uploading a state" };
 		sayf("%s failed: %s", what[j->kind], j->error);
 		char message[512];
 		put(message, sizeof(message), tr("RomM: %s"), j->error);
