@@ -173,8 +173,8 @@ static void readManifests(const char* dir, const char* suffix) {
 			char name[sizeof(suggest_name[0])], what[sizeof(suggest_text[0])];
 			if (suggest_read[i] || !FR_manifest(text, suggest[i], name, sizeof(name), what, sizeof(what))) continue;
 			suggest_read[i] = 1;
-			snprintf(suggest_name[i], sizeof(suggest_name[i]), "%s", name);
-			if (!suggest_text[i][0]) snprintf(suggest_text[i], sizeof(suggest_text[i]), "%s", what);
+			snprintf(suggest_name[i], sizeof(suggest_name[i]), "%.127s", name);
+			if (!suggest_text[i][0]) snprintf(suggest_text[i], sizeof(suggest_text[i]), "%.255s", what);
 		}
 	}
 	closedir(dh);
@@ -185,7 +185,7 @@ static void readPlugins(void) {
 	for (int i = 0; i < suggest_count; i++) {
 		suggest_on[i] = FR_pluginLoaded(host, suggest[i]);
 		suggest_read[i] = 0;
-		snprintf(suggest_name[i], sizeof(suggest_name[i]), "%s", suggest[i]);
+		snprintf(suggest_name[i], sizeof(suggest_name[i]), "%.63s", suggest[i]);
 		suggest_text[i][0] = '\0';
 	}
 	// loaded plugins' descriptions, and where this plugin is
@@ -195,7 +195,7 @@ static void readPlugins(void) {
 		if (host->plugin_info(p, &info) != 0) break;
 		if (!strcmp(info.id, ID)) snprintf(own, sizeof(own), "%s", info.res);
 		for (int i = 0; i < suggest_count; i++) {
-			if (!strcmp(info.id, suggest[i])) snprintf(suggest_text[i], sizeof(suggest_text[i]), "%s", info.description);
+			if (!strcmp(info.id, suggest[i])) snprintf(suggest_text[i], sizeof(suggest_text[i]), "%.255s", info.description);
 		}
 	}
 	// the rest from their plugin.txt: beside this plugin's folder, or in Tools
@@ -244,7 +244,7 @@ static void readButtons(void) {
 		if (!MOSAIC_HOST_HAS(host, fn_release)) continue;
 		const char* name = host->fn_name(MOSAIC_BUTTON_FN1 + i);
 		if (!name || !name[0]) continue;
-		snprintf(fn_names[i], sizeof(fn_names[i]), "%s", name);
+		snprintf(fn_names[i], sizeof(fn_names[i]), "%.31s", name);
 		fn_there[i] = host->fn_binding(MOSAIC_BUTTON_FN1 + i, &fn[i]) == 0;
 	}
 	line_count = FR_buttonLines(actions, got, fn, fn_there, lines, FR_LINES_MAX);
@@ -287,7 +287,7 @@ static void logSuggestions(void) {
 	say(line);
 	for (int i = 0; i < suggest_count; i++) {
 		char about[512];
-		snprintf(about, sizeof(about), "about %s: %s", suggest[i], suggest_text[i][0] ? suggest_text[i] : "nothing");
+		snprintf(about, sizeof(about), "about %.63s: %.255s", suggest[i], suggest_text[i][0] ? suggest_text[i] : "nothing");
 		say(about);
 	}
 }
@@ -296,7 +296,7 @@ static void logButtons(void) {
 	for (int i = 0; i < line_count; i++) {
 		if (lines[i].heading) continue;
 		char line[256];
-		snprintf(line, sizeof(line), "on %s: %s (%s)", lines[i].button < 0 ? "no button" : buttonName(lines[i].button),
+		snprintf(line, sizeof(line), "on %.31s: %.127s (%s)", lines[i].button < 0 ? "no button" : buttonName(lines[i].button),
 			lines[i].label, screenName(lines[i].screen));
 		say(line);
 	}
@@ -605,7 +605,7 @@ static void change(void) {
 	const char* service = steps[setup_step[r]].service;
 	const char* key = steps[setup_step[r]].key;
 	char args[FR_VALUE_MAX + 64], line[FR_VALUE_MAX + 128], error[64];
-	snprintf(args, sizeof(args), "%s=%s", key, s->values[choice]);
+	snprintf(args, sizeof(args), "%.31s=%.127s", key, s->values[choice]);
 	static char reply[MOSAIC_CALL_MAX];
 	FrSetup now;
 	if (host->call(service, args, reply, sizeof(reply)) < 0 || FR_parseSetup(reply, key, &now) != 0) {
@@ -614,8 +614,8 @@ static void change(void) {
 		return;
 	}
 	*s = now;
-	if (FR_value(reply, "error", error, sizeof(error)) > 0) snprintf(line, sizeof(line), "%s refused %s", service, args);
-	else snprintf(line, sizeof(line), "%s now %s", service, s->value);
+	if (FR_value(reply, "error", error, sizeof(error)) > 0) snprintf(line, sizeof(line), "%.63s refused %.159s", service, args);
+	else snprintf(line, sizeof(line), "%.63s now %.127s", service, s->value);
 	say(line);
 }
 

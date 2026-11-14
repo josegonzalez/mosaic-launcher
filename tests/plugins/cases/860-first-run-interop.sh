@@ -35,8 +35,12 @@ expect "localization.setup now ca"
 # the next collection and theme by name, after the card's others
 fi_collection=$(sed -n 's/.*plugin first-run: favorites.setup now //p' "$log")
 fi_theme=$(sed -n 's/.*plugin first-run: theme-plus.setup now //p' "$log")
-[ -n "$fi_collection" ] && [ "$fi_collection" != Favorites ] || fail "first-run didn't change the collection: $(grep "favorites" "$log")"
-[ -n "$fi_theme" ] && [ "$fi_theme" != stock ] || fail "first-run didn't change the theme: $(grep "theme-plus" "$log")"
+case "$fi_collection" in
+"" | Favorites) fail "first-run didn't change the collection: $(grep "favorites" "$log")" ;;
+esac
+case "$fi_theme" in
+"" | stock) fail "first-run didn't change the theme: $(grep "theme-plus" "$log")" ;;
+esac
 expect "showing buttons, 6 of 7"
 expect "finished"
 grep -qxF "collection=$fi_collection" "$STATE/favorites.cfg" || fail "favorites didn't save the collection: $(cat "$STATE/favorites.cfg")"
