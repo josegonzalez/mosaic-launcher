@@ -840,6 +840,42 @@ static void test_plugin_sort_reorders_collections(void) {
 	Directory_free(dir);
 }
 
+// Stock sorts by display name only, so titles that match keep no set
+// order between them. Whatever order the file system lists the files in,
+// the other rows land in the same places and each match shows its file name.
+static void test_same_name_rows_match_in_any_listing_order(void) {
+	static char* paths[] = {
+		ROMS_PATH "/Game Boy (GB)/Tetris.gb",
+		ROMS_PATH "/Game Boy (GB)/Tetris.gbc",
+		ROMS_PATH "/Game Boy (GB)/Alleyway.gb",
+		ROMS_PATH "/Game Boy (GB)/Zelda.gb",
+	};
+	static const int orders[][4] = {
+		{0, 1, 2, 3}, {1, 0, 2, 3}, {3, 2, 1, 0}, {3, 2, 0, 1},
+		{2, 1, 3, 0}, {1, 3, 0, 2}, {0, 3, 1, 2}, {2, 0, 3, 1},
+	};
+	for (int o = 0; o < (int)(sizeof(orders) / sizeof(orders[0])); o++) {
+		Array* entries = Array_new();
+		for (int i = 0; i < 4; i++) Array_push(entries, Entry_new(paths[orders[o][i]], ENTRY_ROM));
+		EntryArray_sort(entries);
+		Listing_markDuplicates(entries);
+
+		CHECK_STR(names(entries), "Alleyway,Tetris,Tetris,Zelda");
+		Entry* first = entries->items[1];
+		Entry* second = entries->items[2];
+		CHECK(((Entry*)entries->items[0])->unique == NULL);
+		CHECK(((Entry*)entries->items[3])->unique == NULL);
+		CHECK(first->unique && second->unique);
+		if (first->unique && second->unique) {
+			int gb_first = !strcmp(first->unique, "Tetris.gb");
+			CHECK_STR((gb_first ? first : second)->unique, "Tetris.gb");
+			CHECK_STR((gb_first ? second : first)->unique, "Tetris.gbc");
+			CHECK_STR((gb_first ? first : second)->path, paths[0]);
+		}
+		EntryArray_free(entries);
+	}
+}
+
 // Gives games that share a title their extension, as a title
 // disambiguation plugin would. Returns 1 if it renamed any.
 static const char* ready_dir = NULL;
@@ -881,12 +917,19 @@ static void test_list_ready_names_are_drawn_and_indexed(void) {
 	writeFile(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", "");
 	writeFile(ROMS_PATH "/Game Boy (GB)/Zelda.gb", "");
 
-	// stock: the colliding titles show their file names
+	// stock: the colliding titles show their file names, in whichever
+	// order the file system lists them
 	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
 	CHECK(dir->entries->count == 4);
 	if (dir->entries->count == 4) {
 		CHECK_STR(at(dir, 1)->name, "Tetris");
-		CHECK(at(dir, 1)->unique && !strcmp(at(dir, 1)->unique, "Tetris.gb"));
+		CHECK_STR(at(dir, 2)->name, "Tetris");
+		CHECK(at(dir, 1)->unique && at(dir, 2)->unique);
+		if (at(dir, 1)->unique && at(dir, 2)->unique) {
+			int gb_first = !strcmp(at(dir, 1)->unique, "Tetris.gb");
+			CHECK_STR(at(dir, gb_first ? 1 : 2)->unique, "Tetris.gb");
+			CHECK_STR(at(dir, gb_first ? 2 : 1)->unique, "Tetris.gbc");
+		}
 	}
 	Directory_free(dir);
 
@@ -1140,6 +1183,7 @@ int main(void) {
 	test_console_folder_sorted_and_hidden_files_skipped();
 	test_map_renames_resorts_and_hides();
 	test_same_name_shows_file_names();
+	test_same_name_rows_match_in_any_listing_order();
 	test_collated_folders_merge_and_tag_duplicates();
 	test_roms_lists_playable_consoles_once();
 	test_roms_map_renames_consoles();
