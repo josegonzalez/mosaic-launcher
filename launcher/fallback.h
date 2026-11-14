@@ -31,6 +31,11 @@ void Fallback_set(const char* path, const char* owner);
 // The fallback font in use, or "".
 const char* Fallback_path(void);
 
+// host->font_missing: how many different characters of text the UI font
+// has no glyph for, with the first that fit in out (size bytes, when out
+// isn't NULL), or -1 for a NULL text or before stock's fonts are open.
+int Fallback_missing(const char* text, char* out, size_t size);
+
 // Called by the launcher's build of api.c (patches/api.c.patch) once stock's
 // five fonts are open, and once they're closed.
 void Fallback_fontsLoaded(void);

@@ -24,6 +24,11 @@ msgstr[1] "Nombres añadidos a map.txt en %d carpetas"
 msgid "Fallback font"
 msgstr "Fuente de respaldo"
 
+msgid "Font lacks %d character of this language"
+msgid_plural "Font lacks %d characters of this language"
+msgstr[0] "A la fuente le falta %d carácter del idioma"
+msgstr[1] "A la fuente le faltan %d caracteres del idioma"
+
 msgid "L2"
 msgstr "L2"
 

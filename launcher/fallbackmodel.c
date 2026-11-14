@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <string.h>
 #include "fallbackmodel.h"
 
 size_t FallbackModel_decode(const char* s, size_t n, uint32_t* cp) {
@@ -123,4 +125,37 @@ size_t FallbackModel_line(const char* text, size_t len, int max_width, FallbackM
 	}
 	*next = len;
 	return len;
+}
+
+int FallbackModel_missing(const char* text, size_t len, FallbackHas has, void* data, char* out, size_t size) {
+	if (out && size) out[0] = '\0';
+	// one bit for each code point, so each is counted once
+	unsigned char* seen = calloc(0x110000 / 8, 1);
+	if (!seen) return -1;
+	int count = 0;
+	size_t used = 0;
+	int full = 0;
+	size_t at = 0;
+	while (at < len) {
+		uint32_t cp;
+		size_t n = FallbackModel_decode(text + at, len - at, &cp);
+		size_t start = at;
+		at += n;
+		// what's drawn with the character before it, control characters
+		// and malformed bytes have no glyph of their own to ask about
+		if (cp == FALLBACK_BAD || cp < 0x20 || cp == 0x7F || FallbackModel_joins(cp)) continue;
+		if (seen[cp >> 3] & (1u << (cp & 7))) continue;
+		seen[cp >> 3] |= (unsigned char)(1u << (cp & 7));
+		if (has(cp, data)) continue;
+		count++;
+		// the first that fit, in the order they come
+		if (out && !full && used + n < size) {
+			memcpy(out + used, text + start, n);
+			used += n;
+			out[used] = '\0';
+		}
+		else full = 1;
+	}
+	free(seen);
+	return count;
 }

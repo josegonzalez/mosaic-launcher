@@ -51,4 +51,15 @@ typedef int (*FallbackMeasure)(const char* text, size_t len, void* data);
 // writes where the next line starts (len after the last line).
 size_t FallbackModel_line(const char* text, size_t len, int max_width, FallbackMeasure measure, void* data, size_t* next);
 
+// 1 when a font has a glyph for cp.
+typedef int (*FallbackHas)(uint32_t cp, void* data);
+
+// How many different characters of text (len bytes) has says the font
+// has no glyph for, or -1 when there's no memory. Control characters,
+// malformed bytes and what's drawn with the character before it (see
+// FallbackModel_joins) aren't asked about. When out isn't NULL it gets
+// the first of them that fit in size bytes, in the order they come, as
+// UTF-8.
+int FallbackModel_missing(const char* text, size_t len, FallbackHas has, void* data, char* out, size_t size);
+
 #endif

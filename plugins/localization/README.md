@@ -44,6 +44,12 @@ The launcher's fallback font draws the characters the UI font has no glyphs for,
 
 The launcher only uses a regular file on the card that opens as a font, and a theme's fallback font wins over this one. No font is bundled. Freely licensed ones that cover CJK are Noto Sans CJK and Source Han Sans (both SIL Open Font License), or a smaller subset of one, as casualducko's fork ships a subset of Noto Sans JP. To choose a CJK-capable font for the whole launcher, use the theme slot's `font`, which [`theme-plus`](../theme-plus/README.md) owns.
 
+## Font check
+
+With a language picked, it checks the UI font, the theme's (from [`theme-plus`](../theme-plus/README.md)) or stock's, has every character the language's translations use: the launcher's and the plugins' that are on. A font that lacks any gets a toast saying how many, such as "Font lacks 9 characters of this language", once at start and again when the theme changes, and the toast doesn't repeat until the language or the font changes. While it lacks them, a note under Status on this plugin's page and on the theme's (theme-plus's) in Launcher > Plugins says the same; the pages count the packs of every plugin they list, on or off.
+
+The characters a theme's font lacks are drawn with the fallback font, theme-plus's Fallback font or this plugin's (below), or with none of those, with stock's own font. With the language off there's no check. Stock's font is checked the same way, so a language it lacks characters of, such as Korean, warns too, and a fallback font below draws them.
+
 ## Screenshots
 
 Language set to es: the first screen in Spanish.
@@ -53,6 +59,14 @@ Language set to es: the first screen in Spanish.
 Language set to es: the quick menu in Spanish.
 
 ![Language set to es: the quick menu in Spanish](docs/spanish-quick-menu.png)
+
+Language set to es, with a theme whose font has none of Spanish's accents: the toast at start.
+
+![The toast saying the font lacks 9 characters of the language](docs/font-toast.png)
+
+The same, on this plugin's page in Launcher > Plugins: the note under Status.
+
+![Localization's page with the note under Status](docs/font-note.png)
 
 ## Settings
 
@@ -72,6 +86,7 @@ Language set to es: the quick menu in Spanish.
 - Plural forms come from the header's `Plural-Forms`, evaluated by its own reader of the expressions gettext allows (`n`, numbers, parentheses, `!`, arithmetic, comparisons, `&&`, `||` and `?:`, and nothing else). A header without a usable `Plural-Forms`, or a rule that divides by zero or picks a form past `nplurals`, picks as English does.
 - Registers the `localization.map` action, which the `button` setting follows.
 - Reads `<folder>/<code>.po`, `<folder>/<plugin id>/<code>.po`, `<folder>/<code>/<TAG>.txt` and the font file, and writes each system's `map.txt`.
+- Checks the UI font with `host->font_missing`, at its first `tick` and on `launcher.theme_changed`, and keeps what it last warned about in its own cfg's `warned` key. Its `settings_note` notes its page and the `theme` slot owner's.
 
 ## Credits
 

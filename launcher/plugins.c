@@ -71,6 +71,7 @@ typedef struct LoadedPlugin {
 	int owns_strings;    // claims the strings slot, so its translate is asked
 	int owns_theme;      // claims the theme slot, so its theme is asked
 	int lock_text_off;   // its lock_text failed, so its lines are left off the lock screen
+	int note_off;        // its settings_note failed, so its notes are left off the Launcher pak's pages
 } LoadedPlugin;
 
 static LoadedPlugin loaded[PLUGIN_MAX];
@@ -411,6 +412,10 @@ static int hostPluginInfo(int index, MosaicPluginInfo* out) {
 	// only the fields the plugin knows about
 	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
 	return 0;
+}
+
+static int hostFontMissing(const char* text, char* out, size_t size) {
+	return Fallback_missing(text, out, size);
 }
 
 // A plugin that's on and whose init succeeded: while one's init runs, it
@@ -1782,6 +1787,7 @@ static const MosaicHost host = {
 	.is_locked = hostIsLocked,
 	.lock_button = hostLockButton,
 	.register_ambient = hostRegisterAmbient,
+	.font_missing = hostFontMissing,
 };
 
 ///////////////////////////////////////
@@ -2032,7 +2038,7 @@ static void claimTheme(void) {
 }
 
 // The fallback font: the theme's, else the strings slot's owner's, else
-// none.
+// stock's own font while the theme's font is in its place, else none.
 static void fallbackRefresh(void) {
 	char path[512] = "";
 	char from[300] = "";
@@ -2048,6 +2054,10 @@ static void fallbackRefresh(void) {
 			if (given && given[0] && Fallback_check(owner->id, "fallback font", given, path, sizeof(path)) == 0)
 				snprintf(from, sizeof(from), "%s", owner->id);
 		}
+	}
+	if (!path[0] && theme_owner >= 0 && !theme_failed && Theme_stockFont()[0]) {
+		snprintf(path, sizeof(path), "%s", Theme_stockFont());
+		snprintf(from, sizeof(from), "stock's font, under %s's theme,", loaded[theme_owner].id);
 	}
 	if (strcmp(path, Fallback_path()) != 0) state.dirty = 1;
 	Fallback_set(path, from);
@@ -2245,6 +2255,32 @@ void Plugins_init(void) {
 void Plugins_initSettings(void) {
 	settings_only = 1;
 	start();
+}
+
+void Plugins_settingsNotes(const char* plugin_id, void (*each)(const char* note, void* data), void* data) {
+	if (!settings_only || !plugin_id) return;
+	for (int i = 0; i < loaded_count; i++) {
+		LoadedPlugin* lp = &loaded[i];
+		const MosaicPlugin* p = lp->plugin;
+		if (lp->note_off || !Plugin_has(p, settings_note) || !p->settings_note) continue;
+		char note[256] = "";
+		int rc = 0;
+		AS_PLUGIN(i) rc = p->settings_note(plugin_id, note, sizeof(note));
+		if (rc != 0) {
+			lp->note_off = 1;
+			LOG_warn("plugins: %s's settings_note returned %i, leaving its notes off the pages until they close\n", lp->id, rc);
+			continue;
+		}
+		// one line
+		note[sizeof(note) - 1] = '\0';
+		for (char* c = note; *c; c++) {
+			if ((unsigned char)*c < 0x20) {
+				*c = '\0';
+				break;
+			}
+		}
+		if (note[0]) each(note, data);
+	}
 }
 
 void Plugins_started(void) {

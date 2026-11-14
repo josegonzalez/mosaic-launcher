@@ -447,7 +447,10 @@ static void fakeLog(const char* id, const char* m) {
 	size_t len = strlen(logged);
 	snprintf(logged + len, sizeof(logged) - len, "%s\n", m);
 }
+static char cfg_warned[128];
+static int cfg_sets = 0;
 static const char* fakeCfgGet(const char* key, const char* fallback) {
+	if (!strcmp(key, "warned") && cfg_warned[0]) return cfg_warned;
 	if (!strcmp(key, "language") && cfg_language[0]) return cfg_language;
 	if (!strcmp(key, "code") && cfg_code[0]) return cfg_code;
 	if (!strcmp(key, "folder") && cfg_folder[0]) return cfg_folder;
@@ -933,6 +936,184 @@ static void checkPlugin(const char* dir, const char* id) {
 // The bundled packs read, every string the launcher's translates is in
 // po/launcher.pot, and every plugin's Spanish, and the template's, has
 // exactly the strings in its own template.
+///////////////////////////////////////
+// the font check
+
+static void testChars(void) {
+	CmChars chars = { 0 };
+	CHECK(Cm_add(&chars, NULL) == 0 && chars.len == 0);
+	// each character once, in order, without control characters or
+	// malformed bytes
+	CHECK(Cm_add(&chars, "a\xC3\xB1o\nn\xC3\xB1\xFF\t") == 0);
+	CHECK_STR(chars.text, "a\xC3\xB1on");
+	CHECK(Cm_add(&chars, "\xED\x95\x9C a") == 0);
+	CHECK_STR(chars.text, "a\xC3\xB1on\xED\x95\x9C ");
+	Cm_free(&chars);
+	CHECK(chars.text == NULL && chars.len == 0);
+
+	// a catalog's translations, plural forms too, but not its English
+	char err[200];
+	const char* po = HEADER("nplurals=2; plural=n != 1;")
+		"msgid \"Open\"\nmsgstr \"Abrir\"\n\n"
+		"msgid \"%d folder\"\nmsgid_plural \"%d folders\"\nmsgstr[0] \"%d carpeta\"\nmsgstr[1] \"%d carpetas \xC3\xA9\"\n";
+	PoCatalog* catalog = Po_parse(po, strlen(po), err, sizeof(err));
+	CHECK(catalog != NULL);
+	CHECK(Cm_addCatalog(&chars, catalog) == 0 && Cm_addCatalog(&chars, NULL) == 0);
+	CHECK(strchr(chars.text, 'O') == NULL && strchr(chars.text, 'f') == NULL);
+	CHECK(strstr(chars.text, "\xC3\xA9") != NULL && strchr(chars.text, 'A') != NULL);
+	Po_free(catalog);
+	Cm_free(&chars);
+
+	// the key, and when a warning is due
+	char key[64], other[64];
+	Cm_key("es", 2, "\xC3\xB1\xC3\xA9", key, sizeof(key));
+	CHECK(strncmp(key, "es:2:", 5) == 0 && strlen(key) == 13);
+	Cm_key("es", 2, "\xC3\xA9\xC3\xB1", other, sizeof(other));
+	CHECK(strcmp(key, other) != 0);
+	Cm_key("fr", 2, "\xC3\xB1\xC3\xA9", other, sizeof(other));
+	CHECK(strcmp(key, other) != 0);
+	CHECK(Cm_warnDue(2, key, ""));
+	CHECK(Cm_warnDue(2, key, NULL));
+	CHECK(!Cm_warnDue(2, key, key));
+	CHECK(Cm_warnDue(2, key, other));
+	CHECK(!Cm_warnDue(0, "", ""));
+}
+
+// the UI font: ASCII and Latin-1 only, or everything
+static int font_full = 0;
+static int font_fail = 0;
+static int font_asks = 0;
+static int fakeFontMissing(const char* text, char* out, size_t size) {
+	font_asks++;
+	if (out && size) out[0] = '\0';
+	if (!text || font_fail) return -1;
+	int count = 0;
+	size_t used = 0;
+	for (const unsigned char* c = (const unsigned char*)text; *c; c++) {
+		// a lead byte past Latin-1's (U+0100 and up)
+		if (font_full || *c < 0xC4 || (*c & 0xC0) == 0x80) continue;
+		count++;
+		size_t n = *c >= 0xF0 ? 4 : *c >= 0xE0 ? 3 : 2;
+		if (out && used + n < size) {
+			memcpy(out + used, c, n);
+			used += n;
+			out[used] = '\0';
+		}
+	}
+	return count;
+}
+static void fakeCfgSet(const char* key, const char* value) {
+	if (!strcmp(key, "warned")) snprintf(cfg_warned, sizeof(cfg_warned), "%s", value);
+	cfg_sets++;
+}
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)on_event;
+	(void)data;
+	return strcmp(name, "launcher.theme_changed") ? -1 : 0;
+}
+static int fakePluginLoaded(const char* id) {
+	return !strcmp(id, ID) || !strcmp(id, "theme-x");
+}
+
+static void testFontCheck(void) {
+	// the launcher's pack has Latin-1 only, alpha's Hangul too
+	writeFile(RES "/lang/launcher/yy.po", "msgid \"OPEN\"\nmsgstr \"\xC3\xB1OPEN\"\n");
+	writeFile(TEST_DIR "/alpha/res/lang/yy.po", "msgid \"Hello\"\nmsgstr \"\xED\x95\x9C\xEA\xB8\x80\"\n");
+	cfg_warned[0] = '\0';
+	char out[256];
+
+	// with no font_missing, nothing is checked
+	start("yy", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	tick(1);
+	CHECK(toasted[0] == '\0' && cfg_warned[0] == '\0');
+	CHECK(settingsNote(ID, out, sizeof(out)) == 0 && out[0] == '\0');
+
+	fake.font_missing = fakeFontMissing;
+	fake.cfg_set = fakeCfgSet;
+	fake.subscribe = fakeSubscribe;
+	fake.plugin_loaded = fakePluginLoaded;
+
+	// at start: alpha's two Hangul are missing, so a toast, once
+	start("yy", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	font_asks = 0;
+	tick(1);
+	CHECK_STR(toasted, "Font lacks 2 characters of this language");
+	CHECK(saidLine("the font lacks 2 characters yy's translations use: \xED\x95\x9C\xEA\xB8\x80"));
+	CHECK(strncmp(cfg_warned, "yy:2:", 5) == 0);
+	CHECK(font_asks == 1);
+	toasted[0] = '\0';
+	tick(2);
+	CHECK(toasted[0] == '\0' && font_asks == 1);
+
+	// the next start with the same language and font doesn't repeat it
+	start("yy", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	tick(1);
+	CHECK(toasted[0] == '\0');
+	CHECK(saidLine("already warned about this language and font"));
+
+	// a theme with every glyph forgets the warning, and back again warns
+	font_full = 1;
+	themeChanged("launcher.theme_changed", "", NULL);
+	CHECK(toasted[0] == '\0' && cfg_warned[0] == '\0');
+	CHECK(saidLine("the font has every character yy's translations use"));
+	font_full = 0;
+	themeChanged("launcher.theme_changed", "", NULL);
+	CHECK_STR(toasted, "Font lacks 2 characters of this language");
+	toasted[0] = '\0';
+
+	// without alpha loaded, the launcher's pack is all in the font
+	start("yy", NULL);
+	tick(1);
+	CHECK(toasted[0] == '\0' && cfg_warned[0] == '\0');
+
+	// the language off forgets it too, and checks nothing
+	start("yy", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	tick(1);
+	CHECK(cfg_warned[0] != '\0');
+	toasted[0] = '\0';
+	font_asks = 0;
+	start(NULL, NULL);
+	CHECK(cfg_warned[0] == '\0');
+	tick(1);
+	CHECK(toasted[0] == '\0' && font_asks == 0);
+	CHECK(settingsNote(ID, out, sizeof(out)) == 0 && out[0] == '\0');
+
+	// the Launcher pak's pages: the note on this plugin's page and the
+	// theme slot's owner's, checked once, and never a toast
+	start("yy", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	font_asks = 0;
+	CHECK(settingsNote(ID, out, sizeof(out)) == 0);
+	CHECK_STR(out, "Font lacks 2 characters of this language");
+	CHECK(settingsNote("theme-x", out, sizeof(out)) == 0);
+	CHECK_STR(out, "Font lacks 2 characters of this language");
+	out[0] = '\0';
+	CHECK(settingsNote("other", out, sizeof(out)) == 0 && out[0] == '\0');
+	CHECK(font_asks == 1 && toasted[0] == '\0');
+
+	// a launcher that can't say leaves the warning as it was
+	start("yy", NULL);
+	list("alpha", TEST_DIR "/alpha/res");
+	snprintf(cfg_warned, sizeof(cfg_warned), "kept");
+	font_fail = 1;
+	tick(1);
+	font_fail = 0;
+	CHECK_STR(cfg_warned, "kept");
+	CHECK(saidLine("couldn't check the font") && toasted[0] == '\0');
+	cfg_warned[0] = '\0';
+
+	fake.font_missing = NULL;
+	fake.cfg_set = NULL;
+	fake.subscribe = NULL;
+	fake.plugin_loaded = NULL;
+	unlink(RES "/lang/launcher/yy.po");
+	unlink(TEST_DIR "/alpha/res/lang/yy.po");
+}
+
 static void testBundled(void) {
 	PoCatalog* pack = readPack(REPO_DIR "/plugins/localization/res/" LAUNCHER_DIR "/es.po");
 	PoCatalog* launcher = readTemplate(REPO_DIR "/po/launcher.pot");
@@ -974,6 +1155,8 @@ int main(void) {
 	testMalformed();
 	testNames();
 	testPlugin();
+	testChars();
+	testFontCheck();
 	testBundled();
 	CHECK_DONE();
 }

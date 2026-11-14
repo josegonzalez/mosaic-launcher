@@ -32,6 +32,10 @@ int Theme_fillWallpaper(int spot, char* path, size_t size);
 // The theme's fallback font, checked, or "" for none.
 const char* Theme_fallbackFont(void);
 
+// Stock's font, the user's own, while the theme's font is in its place,
+// or "" with none.
+const char* Theme_stockFont(void);
+
 // host->theme_value: the value of a key the theme passes on to other
 // plugins, or fallback when it has none or there's no theme.
 const char* Theme_value(const char* key, const char* fallback);

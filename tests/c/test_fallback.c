@@ -144,11 +144,40 @@ static void testLines(void) {
 	CHECK_STR(wrapped("one two", 35), "one two");
 }
 
+// A font with ASCII only.
+static int asciiOnly(uint32_t cp, void* data) {
+	(*(int*)data)++;
+	return cp < 0x80;
+}
+
+static void testMissing(void) {
+	char out[64];
+	int asks = 0;
+	// each character once, whatever its count: é and ñ
+	CHECK(FallbackModel_missing("caf\xC3\xA9 a\xC3\xB1o \xC3\xA9", 13, asciiOnly, &asks, out, sizeof(out)) == 2);
+	CHECK(strcmp(out, "\xC3\xA9\xC3\xB1") == 0);
+	CHECK(asks == 7); // c a f é space ñ o, each once
+	// all there
+	asks = 0;
+	CHECK(FallbackModel_missing("OPEN", 4, asciiOnly, &asks, out, sizeof(out)) == 0 && out[0] == '\0');
+	CHECK(FallbackModel_missing("", 0, asciiOnly, &asks, out, sizeof(out)) == 0);
+	// control characters, malformed bytes and combining marks aren't asked
+	asks = 0;
+	CHECK(FallbackModel_missing("a\n\t\x7F\xFF\xC3" "e\xCC\x81\xE2\x80\x8D", 11, asciiOnly, &asks, out, sizeof(out)) == 0);
+	CHECK(asks == 2); // a and e
+	// out gets what fits, whole characters in order, and the count is all
+	CHECK(FallbackModel_missing("\xED\x95\x9C\xEA\xB8\x80\xC3\xA9", 8, asciiOnly, &asks, out, 7) == 3);
+	CHECK(strcmp(out, "\xED\x95\x9C\xEA\xB8\x80") == 0);
+	CHECK(FallbackModel_missing("\xED\x95\x9C\xC3\xA9", 5, asciiOnly, &asks, out, 3) == 2 && out[0] == '\0');
+	CHECK(FallbackModel_missing("\xF0\x9F\x98\x80", 4, asciiOnly, &asks, NULL, 0) == 1); // past the BMP
+}
+
 int main(void) {
 	testDecode();
 	testJoins();
 	testRuns();
 	testWidths();
 	testLines();
+	testMissing();
 	CHECK_DONE();
 }

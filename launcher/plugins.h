@@ -305,6 +305,10 @@ void Plugins_init(void);
 // settings crashed with plugins loaded. Plugins_quit closes them.
 void Plugins_initSettings(void);
 
+// The Launcher pak's settings: each loaded plugin's settings_note for
+// plugin_id's page, in load order, one line each, passed to each.
+void Plugins_settingsNotes(const char* plugin_id, void (*each)(const char* note, void* data), void* data);
+
 // Call after the first frame is on screen. Until then, a crash leaves a
 // marker that pauses plugins on the next start.
 void Plugins_started(void);

@@ -98,7 +98,9 @@ The settings other than Theme, the tile and the button override the theme's valu
 | Screen margins (`margins`) | theme, auto, 2, 5, 8, 10, 15, 20 | theme | Screen margins |
 | Fallback font (`fallback_font`) | text | empty | A font for the characters the UI font has no glyphs for, a TrueType or OpenType file on the card, relative to it or a full path. Empty keeps the theme's, or none. One that isn't a file on the card is logged and the theme's is used |
 
-The fallback font, the theme's or the setting's, overrides stock's too, and wins over the one [`localization`](../localization/README.md) supplies.
+The fallback font, the theme's or the setting's, overrides stock's too, and wins over the one [`localization`](../localization/README.md) supplies. With neither, a theme's font falls back to stock's own font for the characters it lacks.
+
+With `localization` on and a language picked, a theme whose font lacks some of the language's characters gets a toast saying so, and a note under Status on this plugin's page in Launcher > Plugins (see [localization's font check](../localization/README.md#font-check)).
 
 ## For plugin authors
 

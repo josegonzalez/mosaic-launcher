@@ -289,3 +289,18 @@ void Fallback_set(const char* given, const char* owner) {
 const char* Fallback_path(void) {
 	return path;
 }
+
+// fallbackmodel.c's has, for the UI font
+static int uiHas(uint32_t cp, void* data) {
+	(void)data;
+	return provided(ui[0], ui_has, cp, 1);
+}
+
+int Fallback_missing(const char* text, char* out, size_t size) {
+	if (out && size) out[0] = '\0';
+	if (!text || !ui[0]) return -1;
+	if (fontMutex) SDL_LockMutex(fontMutex);
+	int count = FallbackModel_missing(text, strlen(text), uiHas, NULL, out, size);
+	if (fontMutex) SDL_UnlockMutex(fontMutex);
+	return count;
+}

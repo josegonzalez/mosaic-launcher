@@ -7,4 +7,4 @@ $(BUILD)/test_localization: test_localization.c $(wildcard $(LOCALIZATION)/*.c $
 	mkdir -p $(BUILD)
 	$(CC) -std=gnu99 -Wall -Werror -I. -I$(SDK) -I$(LOCALIZATION) -DTEST_DIR=\"$(BUILD)/localization\" \
 		-DLOCALIZATION_TEST_RES=\"$(BUILD)/localization/res\" -DREPO_DIR=\"$(abspath ../..)\" \
-		test_localization.c $(LOCALIZATION)/po_model.c $(LOCALIZATION)/names_model.c -o $@
+		test_localization.c $(LOCALIZATION)/po_model.c $(LOCALIZATION)/names_model.c $(LOCALIZATION)/chars_model.c -o $@

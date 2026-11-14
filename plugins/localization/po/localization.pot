@@ -33,6 +33,13 @@ msgstr[1] ""
 msgid "Fallback font"
 msgstr ""
 
+#: localization.c
+#, c-format
+msgid "Font lacks %d character of this language"
+msgid_plural "Font lacks %d characters of this language"
+msgstr[0] ""
+msgstr[1] ""
+
 #: plugin.txt
 msgid "L2"
 msgstr ""

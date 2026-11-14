@@ -23,6 +23,13 @@
 // "font" setting's file (relative to the card, or a full path), or with it
 // empty <folder>/<code>.ttf or .otf beside the user's pack, when there's
 // one. The launcher checks it's a font on the card; a theme's wins.
+//
+// With a language on, it checks the UI font (the theme's, or stock's) has
+// every character the language's translations use, the launcher's and
+// the loaded plugins' (chars_model.c), once at start and again when the
+// theme changes. When it lacks any, a toast says so, once for each
+// language and font until one of them changes, and a note says so on the
+// Launcher pak's pages of this plugin and of the theme slot's owner.
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE // dladdr
@@ -38,6 +45,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "mosaic_plugin.h"
+#include "chars_model.h"
 #include "names_model.h"
 #include "po_model.h"
 
@@ -73,6 +81,12 @@ static PluginPacks* plugin_packs;
 static int plugin_count = -1; // -1 until plugin_info lists them
 static int tile_on = 0;
 static char font[700]; // the fallback font, or "" for none
+static CmChars chars;  // the characters the translations use, once gathered
+static int gathered = 0;
+static int started = 0;     // the first tick checked the font
+static int note_checked = 0;
+static char note[256];      // the font check's note, or "" when the font has them all
+static char warn_key[128];  // and what it was about
 
 static void say(const char* format, ...) __attribute__((format(printf, 1, 2)));
 static void say(const char* format, ...) {
@@ -547,6 +561,97 @@ static void runMap(const char* path, void* data) {
 }
 
 ///////////////////////////////////////
+// the font check
+
+// Every character the language's translations use: the launcher's packs
+// and each loaded plugin's, read now if they weren't yet.
+static void gatherChars(void) {
+	if (gathered) return;
+	gathered = 1;
+	int ok = Cm_addCatalog(&chars, user_pack) == 0 && Cm_addCatalog(&chars, bundled_pack) == 0;
+	listPlugins();
+	for (int i = 0; ok && i < plugin_count; i++) {
+		PluginPacks* p = pluginPacks(plugin_packs[i].id);
+		ok = p && Cm_addCatalog(&chars, p->user) == 0 && Cm_addCatalog(&chars, p->bundled) == 0;
+	}
+	if (!ok) say("no memory to check the font");
+}
+
+// Checks the UI font for the translations' characters, setting the note
+// and its key. Returns how many it lacks, or -1 when the launcher couldn't
+// say.
+static int fontCheck(void) {
+	note[0] = warn_key[0] = '\0';
+	if (!code[0] || !MOSAIC_HOST_HAS(host, font_missing)) return 0;
+	gatherChars();
+	if (!chars.len) return 0;
+	char missing[128]; // whole characters, the first that fit
+	int count = host->font_missing(chars.text, missing, sizeof(missing));
+	if (count < 0) {
+		say("couldn't check the font");
+		return -1;
+	}
+	if (count == 0) {
+		say("the font has every character %s's translations use", code);
+		return 0;
+	}
+	say("the font lacks %i characters %s's translations use: %s", count, code, missing);
+	Cm_key(code, count, missing, warn_key, sizeof(warn_key));
+	snprintf(note, sizeof(note), trPlural("Font lacks %d character of this language", "Font lacks %d characters of this language",
+		(unsigned long)count), count);
+	return count;
+}
+
+// In the launcher: checks the font, with a toast when that's new.
+static void fontWarn(void) {
+	int count = fontCheck();
+	if (count < 0) return;
+	char saved[128];
+	snprintf(saved, sizeof(saved), "%s", host->cfg_get("warned", ""));
+	if (!Cm_warnDue(count, warn_key, saved)) {
+		if (count > 0) say("already warned about this language and font");
+		else if (saved[0]) host->cfg_set("warned", "");
+		return;
+	}
+	host->cfg_set("warned", warn_key);
+	toast(note);
+}
+
+static void themeChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	fontWarn();
+}
+
+static void tick(unsigned long now) {
+	(void)now;
+	if (started) return;
+	started = 1;
+	fontWarn();
+}
+
+// The Launcher pak's pages: the note on this plugin's page and the theme
+// slot's owner's, the only other plugin they load.
+static int settingsNote(const char* plugin_id, char* out, size_t size) {
+	if (!plugin_id || (strcmp(plugin_id, ID) != 0 && !(MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded(plugin_id)))) {
+		return 0;
+	}
+	if (!note_checked) {
+		note_checked = 1;
+		fontCheck();
+	}
+	snprintf(out, size, "%s", note);
+	return 0;
+}
+
+// With the language off, the next warning shows even for the same
+// language and font as the last.
+static void forgetWarning(void) {
+	if (host->cfg_get("warned", "")[0]) host->cfg_set("warned", "");
+}
+
+///////////////////////////////////////
 // the plugin
 
 static int init(const MosaicHost* h) {
@@ -557,6 +662,8 @@ static int init(const MosaicHost* h) {
 	plugin_count = -1;
 	write_count = 0;
 	writes = NULL;
+	gathered = started = note_checked = 0;
+	note[0] = warn_key[0] = '\0';
 	findRes();
 
 	const char* f = host->cfg_get("folder", "Languages");
@@ -570,11 +677,13 @@ static int init(const MosaicHost* h) {
 	if (!language[0] || !strcmp(language, "off")) {
 		say("language off, so nothing is translated");
 		findFont();
+		forgetWarning();
 		return 0;
 	}
 	if (!validCode(language)) {
 		say("\"%.40s\" isn't a language code, so nothing is translated", language);
 		findFont();
+		forgetWarning();
 		return 0;
 	}
 	snprintf(code, sizeof(code), "%s", language);
@@ -585,6 +694,9 @@ static int init(const MosaicHost* h) {
 	else launcher_dir[0] = '\0';
 	if (!user_pack && !bundled_pack) say("no pack for %s in %s or %s, so the launcher's strings stay English", code, folder, launcher_dir);
 	say("language %s", code);
+	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
+		say("couldn't subscribe to launcher.theme_changed");
+	}
 
 	if (host->register_action(MAP_ACTION, "Write map.txt names", 0, mapAvailable, runMap, NULL) != 0) {
 		say("couldn't register " MAP_ACTION);
@@ -619,6 +731,7 @@ static void quit(void) {
 	user_pack = bundled_pack = NULL;
 	freePlugins();
 	freeWrites();
+	Cm_free(&chars);
 }
 
 static const MosaicPlugin plugin = {
@@ -630,6 +743,8 @@ static const MosaicPlugin plugin = {
 	.translate = translate,
 	.translate_plural = translatePlural,
 	.fallback_font = fallbackFont,
+	.tick = tick,
+	.settings_note = settingsNote,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

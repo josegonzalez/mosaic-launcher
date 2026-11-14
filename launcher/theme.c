@@ -12,6 +12,7 @@ static int colors[MOSAIC_THEME_COLORS]; // 0xRRGGBB or MOSAIC_THEME_UNSET
 static int contrast = 0;
 static char font_path[512];          // "" for stock's
 static char fallback_path[512];      // "" for none
+static char stock_font[512];         // the user's own font, as stock loads it
 static ThemeWalls walls;
 static int hint_style = MOSAIC_HINT_STYLE_USER;
 static ThemeExtras extras;
@@ -87,7 +88,12 @@ int Theme_hintStyle(void) {
 }
 
 const char* Theme_fontPath(const char* stock) {
+	if (stock) snprintf(stock_font, sizeof(stock_font), "%s", stock);
 	return active && font_path[0] ? font_path : stock;
+}
+
+const char* Theme_stockFont(void) {
+	return active && font_path[0] && strcmp(font_path, stock_font) != 0 ? stock_font : "";
 }
 
 void Theme_colors(void) {

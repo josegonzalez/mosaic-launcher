@@ -467,7 +467,7 @@ typedef struct MosaicTheme {
 	char wallpaper[512];               // the background where the card has no bg.png (and no folder's .media/bg.png), or ""
 	char wallpaper_list[512];          // a game folder's background where it has no .media/bglist.png and the card no bg.png, or "" for wallpaper
 	char wallpaper_quick[512];         // the quick menu's background where the card has no .media/quick_<name>.png or quick.png, or ""
-	char fallback_font[512];           // a TrueType or OpenType font for the characters the UI font has no glyphs for, or "" for the strings slot's owner's (see fallback_font in MosaicPlugin) or none
+	char fallback_font[512];           // a TrueType or OpenType font for the characters the UI font has no glyphs for, or "" for the strings slot's owner's (see fallback_font in MosaicPlugin), else stock's font while font is set, or none
 	int hint_style;                    // an enum MosaicHintStyle the launcher draws button hints in over the user's, or MOSAIC_HINT_STYLE_USER for the user's
 	char extra[MOSAIC_THEME_EXTRA_MAX]; // keys for other plugins: key=value lines separated by \n, or "" for none
 } MosaicTheme;
@@ -1643,6 +1643,19 @@ typedef struct MosaicHost {
 	// no wants, or a call from anywhere but init; the launcher logs each
 	// refusal. Check for it with MOSAIC_HOST_HAS(host, register_ambient).
 	int (*register_ambient)(const char* screen_id, int (*wants)(unsigned long idle_ms, void* data), void* data);
+
+	// How many different characters of text, one or more lines of UTF-8,
+	// the UI font in use (the theme's, or stock's) has no glyph for, such
+	// as a language pack's translations in a theme's font. Control
+	// characters, malformed bytes and characters drawn with the one before
+	// them (combining marks, variation selectors and zero width joiners)
+	// aren't counted, and a fallback font's glyphs don't count either.
+	// When out isn't NULL it gets as many of those characters as fit in
+	// size bytes, whole, in the order they come. It returns the count, or
+	// -1 for a NULL text. It asks the font about every character, so call
+	// it when the text or the font changes (launcher.theme_changed), not
+	// each frame. Check for it with MOSAIC_HOST_HAS(host, font_missing).
+	int (*font_missing)(const char* text, char* out, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -2022,6 +2035,19 @@ typedef struct MosaicPlugin {
 	// which the launcher logs it and leaves this plugin's lines out until
 	// it restarts. Check for it with MOSAIC_HOST_HAS(host, register_ambient).
 	int (*lock_text)(char* out, size_t size);
+
+	// A note on the Launcher pak's page of the plugin plugin_id, such as a
+	// warning about its settings. The pages load only the strings and
+	// theme slots' owners, and ask each of them that has settings_note,
+	// in load order, each time a plugin's page is drawn again: it writes
+	// one line into out (size bytes, empty on entry), or leaves it empty
+	// for none, and returns 0. Each note shows under the page's Status
+	// row in the small font, as it's given (translate it with host->tr
+	// first), cut to fit.
+	// Anything but 0 is an error: the launcher logs it and leaves this
+	// plugin's notes out until the pages close. The launcher itself never
+	// asks. Check for it with MOSAIC_HOST_HAS(host, font_missing).
+	int (*settings_note)(const char* plugin_id, char* out, size_t size);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

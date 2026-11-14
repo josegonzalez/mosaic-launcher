@@ -42,6 +42,7 @@ enum RowKind {
 	ROW_LAUNCHER,  // one of the launcher's own choices; arg: its index in launcher_settings
 	ROW_AMBIENT,   // opens the ambient screens' order
 	ROW_AMBIENT_SCREEN, // arg: its place in the order
+	ROW_NOTE,      // a loaded plugin's settings_note on a plugin's page; can't be selected
 };
 
 typedef struct Row {
@@ -400,11 +401,17 @@ static const char* choiceShown(const PluginManifest* m, const PluginSetting* s, 
 }
 
 static int selectable(const Row* r) {
-	return r->kind != ROW_INFO && r->kind != ROW_HEADER;
+	return r->kind != ROW_INFO && r->kind != ROW_HEADER && r->kind != ROW_NOTE;
 }
 
 static const char* onOff(int on) {
 	return on ? TR("On") : TR("Off");
+}
+
+// A plugin's note from a loaded plugin's settings_note, under its Status.
+static void addNote(const char* note, void* data) {
+	(void)data;
+	addRow(ROW_NOTE, 0, note, NULL);
 }
 
 static void buildRows(void) {
@@ -444,6 +451,7 @@ static void buildRows(void) {
 		const PluginManifest* p = &manifests[m->plugin];
 		snprintf(title, sizeof(title), "%s", pluginText(p, p->name));
 		addRow(ROW_STATUS, 0, TR("Status"), onOff(pluginOn(p)));
+		Plugins_settingsNotes(p->id, addNote, NULL);
 		for (int i = 0; i < p->setting_count; i++) {
 			const PluginSetting* s = &p->settings[i];
 			const char* label = pluginText(p, s->label);
@@ -665,6 +673,7 @@ static const char* confirmLabel(void) {
 	switch (r->kind) {
 		case ROW_INFO: return NULL;
 		case ROW_HEADER: return NULL;
+		case ROW_NOTE: return NULL;
 		case ROW_PLUGIN: return manifests[r->arg].setting_count ? TR("OPEN") : TR("CHANGE");
 		case ROW_STATUS: return TR("CHANGE");
 		case ROW_SETTING: return TR("CHANGE");
@@ -702,7 +711,8 @@ static void render(int ow) {
 	for (int i = m->start, j = 1; i < row_count && j <= visible; i++, j++) {
 		const Row* r = &rows[i];
 		int y = SCALE1(PADDING + j * PILL_SIZE);
-		if (r->kind == ROW_HEADER) {
+		// group names and notes in the small font
+		if (r->kind == ROW_HEADER || r->kind == ROW_NOTE) {
 			char label[256];
 			int label_w = Text_truncate(font.small, r->label, label, sizeof(label), width, pad * 2);
 			blitRowText(font.small, label, normal, left + pad, y, label_w - pad * 2);
