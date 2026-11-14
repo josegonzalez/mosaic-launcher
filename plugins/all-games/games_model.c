@@ -1,111 +1,7 @@
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "games_model.h"
-
-static int endsWith(const char* s, const char* suffix) {
-	size_t a = strlen(s), b = strlen(suffix);
-	return a >= b && !strcmp(s + a - b, suffix);
-}
-
-void AG_cleanName(const char* file_name, char* out, size_t size) {
-	if (!size) return;
-	snprintf(out, size, "%s", file_name);
-
-	char* dot;
-	while ((dot = strrchr(out, '.')) != NULL) {
-		size_t len = strlen(dot);
-		if (len < 3 || len > 5) break;
-		*dot = '\0';
-	}
-
-	char bare[AG_NAME_LEN];
-	snprintf(bare, sizeof(bare), "%s", out);
-	for (;;) {
-		char* open = strrchr(out, '(');
-		if (!open) open = strrchr(out, '[');
-		if (!open || open == out) break;
-		*open = '\0';
-	}
-	if (!out[0]) snprintf(out, size, "%s", bare);
-
-	size_t len = strlen(out);
-	while (len > 1 && isspace((unsigned char)out[len - 1])) out[--len] = '\0';
-}
-
-///////////////////////////////////////
-// map.txt
-
-static int compareItems(const void* a, const void* b) {
-	const AGMapItem* x = a;
-	const AGMapItem* y = b;
-	int c = strcmp(x->key, y->key);
-	return c ? c : x->line - y->line;
-}
-
-int AG_mapParse(AGMap* map, char* text) {
-	memset(map, 0, sizeof(*map));
-	map->text = text;
-	if (!text) return 0;
-
-	int lines = 1;
-	for (const char* p = text; *p; p++) {
-		if (*p == '\n') lines++;
-	}
-	map->items = malloc(sizeof(AGMapItem) * (size_t)lines);
-	if (!map->items) return -1;
-
-	int line = 0;
-	for (char* p = text; p; line++) {
-		char* end = strchr(p, '\n');
-		if (end) *end = '\0';
-		size_t len = strlen(p);
-		while (len > 0 && p[len - 1] == '\r') p[--len] = '\0';
-		char* tab = strchr(p, '\t');
-		if (tab && tab[1]) {
-			*tab = '\0';
-			map->items[map->count++] = (AGMapItem){ p, tab + 1, line };
-		}
-		p = end ? end + 1 : NULL;
-	}
-
-	// the later of two lines for a file name wins: keep only the last
-	qsort(map->items, (size_t)map->count, sizeof(AGMapItem), compareItems);
-	int kept = 0;
-	for (int i = 0; i < map->count; i++) {
-		if (i + 1 < map->count && !strcmp(map->items[i].key, map->items[i + 1].key)) continue;
-		map->items[kept++] = map->items[i];
-	}
-	map->count = kept;
-	return 0;
-}
-
-const char* AG_mapGet(const AGMap* map, const char* file_name) {
-	if (!map || !map->count) return NULL;
-	int lo = 0, hi = map->count - 1;
-	while (lo <= hi) {
-		int mid = lo + (hi - lo) / 2;
-		int c = strcmp(file_name, map->items[mid].key);
-		if (!c) return map->items[mid].value;
-		if (c < 0) hi = mid - 1;
-		else lo = mid + 1;
-	}
-	return NULL;
-}
-
-void AG_mapFree(AGMap* map) {
-	free(map->items);
-	free(map->text);
-	memset(map, 0, sizeof(*map));
-}
-
-///////////////////////////////////////
-// paths
-
-int AG_hidden(const char* name) {
-	return name[0] == '.' || endsWith(name, ".disabled") || !strcmp(name, "map.txt");
-}
 
 void AG_emuTag(const char* system, char* out, size_t size) {
 	if (!size) return;
@@ -179,9 +75,7 @@ void AG_indexFree(AGIndex* index) {
 		free(index->games[i].path);
 		free(index->games[i].name);
 	}
-	for (int i = 0; i < index->folder_count; i++) free(index->folders[i].path);
 	free(index->games);
-	free(index->folders);
 	AG_indexInit(index);
 }
 
@@ -207,16 +101,6 @@ int AG_indexAdd(AGIndex* index, const char* path, const char* name, int type) {
 		return -1;
 	}
 	index->game_count++;
-	return 0;
-}
-
-int AG_indexAddFolder(AGIndex* index, const char* path, time_t mtime) {
-	if (grow((void**)&index->folders, &index->folder_cap, index->folder_count, sizeof(AGFolder)) != 0) return -1;
-	AGFolder* folder = &index->folders[index->folder_count];
-	folder->path = strdup(path);
-	if (!folder->path) return -1;
-	folder->mtime = mtime;
-	index->folder_count++;
 	return 0;
 }
 

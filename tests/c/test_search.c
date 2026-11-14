@@ -8,6 +8,7 @@
 #include "fakeproviders.h"
 #include "fakesets.h"
 #include "../../plugins/search/search.c"
+#include "fakeindex.h"
 
 struct MosaicEntry {
 	char path[1024];
@@ -59,39 +60,6 @@ static void testFold(void) {
 	CHECK_STR(small, "pokem");
 }
 
-static void testNames(void) {
-	char name[SE_NAME_LEN];
-	SE_cleanName("Tetris (World) (Rev 1).gb", name, sizeof(name));
-	CHECK_STR(name, "Tetris");
-	SE_cleanName("Pokemon Red [!] (USA).gb", name, sizeof(name));
-	CHECK_STR(name, "Pokemon Red");
-	SE_cleanName("Doom.pak", name, sizeof(name));
-	CHECK_STR(name, "Doom");
-	SE_cleanName("Game.p8.png", name, sizeof(name));
-	CHECK_STR(name, "Game");
-	SE_cleanName("(USA).gb", name, sizeof(name));
-	CHECK_STR(name, "(USA)");
-	SE_cleanName("Final Fantasy VII (USA)", name, sizeof(name));
-	CHECK_STR(name, "Final Fantasy VII");
-
-	CHECK(SE_hidden(".media"));
-	CHECK(SE_hidden("Old.gb.disabled"));
-	CHECK(SE_hidden("map.txt"));
-	CHECK(!SE_hidden("Tetris.gb"));
-
-	SEMap map;
-	CHECK(SE_mapParse(&map, strdup("Tetris.gb\tTetris DX\r\nbad line\nEmpty.gb\t\nTetris.gb\tTetris Again\nKirby.gb\tKirby\n")) == 0);
-	CHECK(map.count == 2);
-	CHECK_STR(SE_mapGet(&map, "Tetris.gb"), "Tetris Again");
-	CHECK_STR(SE_mapGet(&map, "Kirby.gb"), "Kirby");
-	CHECK(SE_mapGet(&map, "Empty.gb") == NULL);
-	CHECK(SE_mapGet(&map, "Mario.gb") == NULL);
-	SE_mapFree(&map);
-	CHECK(SE_mapParse(&map, NULL) == 0);
-	CHECK(SE_mapGet(&map, "Tetris.gb") == NULL);
-	SE_mapFree(&map);
-}
-
 static void testRank(void) {
 	CHECK(SE_rank("tetris", "tetris") == SE_RANK_EXACT);
 	CHECK(SE_rank("tetris dx", "tetris") == SE_RANK_PREFIX);
@@ -127,8 +95,6 @@ static void testSearch(void) {
 	CHECK(SE_indexAdd(&index, "/r/GB/Zelda", "Zelda", MOSAIC_ENTRY_DIR) == 0);
 	CHECK(index.game_count == 9);
 	CHECK_STR(index.games[7].folded, "pokemon red");
-	CHECK(SE_indexAddFolder(&index, "/r/GB", 7) == 0);
-	CHECK(index.folder_count == 1 && index.folders[0].mtime == 7);
 
 	SEHit hits[9];
 	int count = find(&index, "  MARIO ", hits);
@@ -167,7 +133,7 @@ static void testSearch(void) {
 	SE_orderFree(&order);
 
 	SE_indexFree(&index);
-	CHECK(index.game_count == 0 && index.folder_count == 0 && index.games == NULL);
+	CHECK(index.game_count == 0 && index.games == NULL);
 }
 
 static void testParse(void) {
@@ -524,6 +490,8 @@ static MosaicHost fake = {
 	.list_get = fakeListGet,
 	.select_index = fakeSelectIndex,
 	.current_screen = fakeCurrentScreen,
+	.subscribe = fakeIndexSubscribe,
+	FAKE_INDEX_HOST,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -576,6 +544,7 @@ static MosaicList* listSearch(const MosaicPlugin* p) {
 
 static void testPlugin(void) {
 	makeCard();
+	fakeIndexDrop();
 	const MosaicPlugin* p = mosaic_plugin_get(&fake);
 	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "search");
@@ -819,9 +788,32 @@ static void testPlugin(void) {
 	freeList(shown);
 	shown = NULL;
 
-	// a changed folder is scanned again
+	// a game added shows once the index has it, which lists the folder again
 	writeText(GB "/Mario Golf.gb", "");
-	CHECK(system("touch -t 202001010000 '" GB "'") == 0);
+	list = listSearch(p);
+	CHECK(list && indexOf(list, GB "/Mario Golf.gb") < 0);
+	freeList(list);
+	snprintf(current, sizeof(current), "%s", SEARCH);
+	reloads = 0;
+	fakeIndexRebuild();
+	CHECK(reloads == 1);
+	list = listSearch(p);
+	CHECK(list && indexOf(list, GB "/Mario Golf.gb") >= 0);
+	freeList(list);
+	snprintf(current, sizeof(current), "%s", GB);
+	p->quit();
+
+	// before the index is ready nothing is found, and nothing said
+	fakeIndexDrop();
+	fake_index_ready = 0;
+	CHECK(p->init(&fake) == 0);
+	toasted[0] = '\0';
+	keyboard_done("mario", NULL);
+	CHECK(toasted[0] == '\0');
+	list = listSearch(p);
+	CHECK(list && list->count == 0);
+	freeList(list);
+	fakeIndexRebuild();
 	list = listSearch(p);
 	CHECK(list && indexOf(list, GB "/Mario Golf.gb") >= 0);
 	freeList(list);
@@ -911,7 +903,7 @@ static void (*set_changed_fn)(const char*, const char*, void*);
 static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
 	(void)data;
 	if (!strcmp(name, "launcher.set_changed")) set_changed_fn = on_event;
-	return 0;
+	return fakeIndexSubscribe(name, on_event, data);
 }
 
 static const char* recent_list[1];
@@ -935,6 +927,7 @@ static void checkCount(const char* text, int want) {
 
 static void testPluginFilters(void) {
 	makeCard();
+	fakeIndexDrop();
 	cfg_count = 0;
 	fakeCfgSet("recents", "off");
 	fake.set_list = fakeSetListCall;
@@ -1008,7 +1001,7 @@ static void testPluginFilters(void) {
 	checkCount("fav:", 0);
 	checkCount("-fav: system:ps", 2);
 	p->quit();
-	fake.subscribe = NULL;
+	fake.subscribe = fakeIndexSubscribe;
 	fake.call = NULL;
 	fake.recents_count = NULL;
 	fake.recent_path = NULL;
@@ -1017,7 +1010,6 @@ static void testPluginFilters(void) {
 
 int main(void) {
 	testFold();
-	testNames();
 	testRank();
 	testSearch();
 	testParse();

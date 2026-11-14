@@ -23,19 +23,20 @@
 // first: the name itself, then names starting with the query, then names
 // with each word starting a word, then the rest, each by name.
 //
-// The card is scanned the way stock lists it the first time a search
-// needs it, and again only when a folder it read changes. The query is
+// The games come from the launcher's card index (index_count and the
+// rest): systems with an emulator, as stock lists them, three folders
+// deep. A search before the index is first ready lists nothing and is
+// run again once it is (launcher.index_ready), as is the folder each time
+// the index changes. The query is
 // kept in the plugin's cfg, so the folder lists the same results after
 // the launcher restarts. Back from a game launched from the results,
 // stock opens the game's own folder; the plugin backs out to the root and
 // opens the results again with the game selected, from the game's path
 // kept in /tmp while it runs.
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #include "mosaic_plugin.h"
@@ -44,7 +45,7 @@
 #define ID "search"
 #define FOLDER_NAME "Search"
 #define MAX_PATH_LEN 512
-#define MAX_DEPTH 3 // subfolders below a system folder that are scanned
+#define MAX_DEPTH 3 // subfolders below a system folder that are searched
 #define SE_RECENTS_LOOKED 64 // more than the game switcher keeps
 #ifndef SE_LAST_FILE
 #define SE_LAST_FILE "/tmp/mosaic-search.last" // the game launched from the results, for post_return
@@ -54,7 +55,7 @@ static const MosaicHost* host;
 static char folder_path[MAX_PATH_LEN]; // <sd>/Search, the virtual folder
 static char roms_path[MAX_PATH_LEN];   // <sd>/Roms
 static SEIndex index_;
-static int scanned = 0;
+static int listed = 0; // index_ holds the index's games
 static char query[SE_QUERY_LEN];       // the query the folder lists
 static SERecents recents;
 static int recents_max = SE_RECENTS_MAX;
@@ -85,28 +86,6 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
-static int exists(const char* path) {
-	struct stat st;
-	return stat(path, &st) == 0;
-}
-
-static int endsWith(const char* s, const char* suffix) {
-	size_t a = strlen(s), b = strlen(suffix);
-	return a >= b && !strcmp(s + a - b, suffix);
-}
-
-static char* readFile(const char* path) {
-	FILE* f = fopen(path, "r");
-	if (!f) return NULL;
-	fseek(f, 0, SEEK_END);
-	long size = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	char* text = size >= 0 ? malloc((size_t)size + 1) : NULL;
-	if (text) text[fread(text, 1, (size_t)size, f)] = '\0';
-	fclose(f);
-	return text;
-}
-
 static double millis(void) {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -125,114 +104,41 @@ static int onGameList(void) {
 }
 
 ///////////////////////////////////////
-// scanning
+// the games, from the card index
 
-// True when a system folder has an emulator, as stock checks before
-// listing it: the emulator is the tag in the folder's last parentheses.
-static int hasEmulator(const char* system) {
-	char emu[256];
-	const char* open = strrchr(system, '(');
-	if (snprintf(emu, sizeof(emu), "%s", open ? open + 1 : system) >= (int)sizeof(emu)) return 0;
-	char* close = strchr(emu, ')');
-	if (open && close) *close = '\0';
-
-	char path[MAX_PATH_LEN * 2];
-	if (snprintf(path, sizeof(path), "%s/.system/%s/paks/Emus/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-			&& exists(path)) return 1;
-	return snprintf(path, sizeof(path), "%s/Emus/%s/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-		&& exists(path);
-}
-
-// A folder that launches a game when opened: it holds a .cue or .m3u
-// named after itself.
-static int isGameFolder(const char* path, const char* name) {
-	char file[MAX_PATH_LEN * 2];
-	if (snprintf(file, sizeof(file), "%s/%s.cue", path, name) < (int)sizeof(file) && exists(file)) return 1;
-	return snprintf(file, sizeof(file), "%s/%s.m3u", path, name) < (int)sizeof(file) && exists(file);
-}
-
-static int isDirEntry(const struct dirent* dp, const char* path) {
-	if (dp->d_type == DT_DIR) return 1;
-	if (dp->d_type != DT_UNKNOWN) return 0;
-	struct stat st;
-	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
-}
-
-static void addFolder(const char* dir) {
-	struct stat st;
-	SE_indexAddFolder(&index_, dir, stat(dir, &st) == 0 ? st.st_mtime : 0);
-}
-
-static void scanDir(const char* dir, int depth) {
-	DIR* dh = opendir(dir);
-	if (!dh) return;
-	addFolder(dir);
-
-	char map_path[MAX_PATH_LEN + 16];
-	snprintf(map_path, sizeof(map_path), "%s/map.txt", dir);
-	SEMap map;
-	SE_mapParse(&map, readFile(map_path));
-
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (SE_hidden(dp->d_name)) continue;
-		char path[MAX_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", dir, dp->d_name) >= (int)sizeof(path)) continue;
-
-		int type = MOSAIC_ENTRY_ROM;
-		if (isDirEntry(dp, path)) {
-			if (endsWith(dp->d_name, ".pak")) type = MOSAIC_ENTRY_PAK;
-			else if (isGameFolder(path, dp->d_name)) type = MOSAIC_ENTRY_DIR; // opening it launches the game
-			else {
-				if (depth < MAX_DEPTH) scanDir(path, depth + 1);
-				continue;
-			}
-		}
-
-		char name[SE_NAME_LEN];
-		const char* alias = SE_mapGet(&map, dp->d_name);
-		if (alias) snprintf(name, sizeof(name), "%s", alias);
-		else SE_cleanName(dp->d_name, name, sizeof(name));
-		if (SE_hidden(name)) continue; // map.txt can hide a game
-		SE_indexAdd(&index_, path, name, type);
-	}
-	closedir(dh);
-	SE_mapFree(&map);
-}
-
-static void scan(void) {
+// Lists the games the index has. 0, or -1 while it isn't ready.
+static int listGames(void) {
 	double start = millis();
 	SE_indexFree(&index_);
-	scanned = 1;
 	hits_valid = 0;
-
-	DIR* dh = opendir(roms_path);
-	if (!dh) return;
-	addFolder(roms_path);
+	if (!MOSAIC_HOST_HAS(host, index_refresh) || host->index_count(NULL) == MOSAIC_INDEX_NOT_READY) return -1;
+	int count = host->index_count(NULL);
 	int systems = 0;
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (SE_hidden(dp->d_name)) continue;
-		char path[MAX_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", roms_path, dp->d_name) >= (int)sizeof(path)) continue;
-		if (!isDirEntry(dp, path) || !hasEmulator(dp->d_name)) continue;
-		scanDir(path, 0);
-		systems++;
+	const char* last_system = "";
+	for (int i = 0; i < count; i++) {
+		MosaicIndexEntry e = { .size = sizeof(e) };
+		if (host->index_entry(NULL, i, &e) != 0) break;
+		if (e.kind != MOSAIC_INDEX_GAME || !e.emulator || e.depth > MAX_DEPTH) continue;
+		if (SE_indexAdd(&index_, e.path, e.name, e.type) != 0) break;
+		if (strcmp(e.system, last_system) != 0) systems++;
+		last_system = e.system;
 	}
-	closedir(dh);
+	listed = 1;
 
 	char message[128];
-	snprintf(message, sizeof(message), "%d games in %d systems, scanned in %.1f ms", index_.game_count, systems, millis() - start);
+	snprintf(message, sizeof(message), "%d games in %d systems, listed in %.1f ms", index_.game_count, systems, millis() - start);
 	say(message);
+	return 0;
 }
 
-// True when a folder the scan read changed since, or is gone.
-static int cardChanged(void) {
-	for (int i = 0; i < index_.folder_count; i++) {
-		struct stat st;
-		if (stat(index_.folders[i].path, &st) != 0 || st.st_mtime != index_.folders[i].mtime) return 1;
-	}
-	return 0;
+// The index changed: the results may have too.
+static void indexReady(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	listed = 0;
+	hits_valid = 0;
+	if (inFolder() && MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 }
 
 ///////////////////////////////////////
@@ -339,7 +245,10 @@ static void setChanged(const char* name, const char* payload, void* data) {
 
 // Searches for query, unless the results for it are still good.
 static void refresh(void) {
-	if (!scanned || cardChanged()) scan();
+	if (!listed && listGames() != 0) {
+		hit_count = 0;
+		return; // nothing until the index is ready
+	}
 	if (hits_valid && !strcmp(hits_query, query)) return;
 
 	SE_orderFree(&order);
@@ -403,7 +312,7 @@ static void run(const char* text) {
 	}
 
 	refresh();
-	if (!hit_count && MOSAIC_HOST_HAS(host, toast)) {
+	if (!hit_count && listed && MOSAIC_HOST_HAS(host, toast)) {
 		char message[SE_QUERY_LEN + 256];
 		snprintf(message, sizeof(message), tr("No games match %s"), query);
 		host->toast(message);
@@ -574,7 +483,7 @@ static int init(const MosaicHost* h) {
 	snprintf(roms_path, sizeof(roms_path), "%s/Roms", host->sdcard_path);
 	SE_indexInit(&index_);
 	memset(&order, 0, sizeof(order));
-	scanned = 0;
+	listed = 0;
 	hits = NULL;
 	hit_count = 0;
 	hits_valid = 0;
@@ -594,6 +503,11 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 	if (MOSAIC_HOST_HAS(host, set_names)) host->subscribe("launcher.set_changed", setChanged, NULL);
+	if (!MOSAIC_HOST_HAS(host, index_refresh)) say("this launcher has no card index; nothing is found");
+	else {
+		host->subscribe("launcher.index_ready", indexReady, NULL);
+		host->index_count(NULL); // starts reading the card, so it's ready by the first search
+	}
 	if (host->register_action("search.open", "SEARCH", 0, canSearch, searchAction, NULL) != 0) {
 		say("couldn't register search.open");
 		return 0;

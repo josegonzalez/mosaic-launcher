@@ -46,13 +46,6 @@ void RG_systemKey(const char* folder, char* out, size_t size);
 // in one or that system has no games.
 int RG_systemOf(const RGLibrary* lib, const char* roms, const char* path);
 
-// Names stock leaves out of its lists: dot files, .disabled and map.txt.
-int RG_hiddenName(const char* name);
-
-// Looks up a file name in a map.txt's text (file name, a tab, the name to
-// show, one per line). Writes the name and returns 1, or returns 0.
-int RG_mapLookup(const char* map, const char* filename, char* out, size_t size);
-
 // Full paths, kept sorted for quick lookups.
 typedef struct RGPathSet {
 	char** paths;

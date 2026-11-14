@@ -19,6 +19,10 @@
 //
 // each part single-quoted by the launcher, so the pak takes the game as
 // its last argument and passes the ones before it to minarch.
+//
+// A game is one the launcher's card index lists as a game file, with its
+// system's emulator tag from there; until the index is first ready, any
+// file in a system folder, with the tag from its path.
 
 #include <stdio.h>
 #include <string.h>
@@ -55,11 +59,23 @@ static int port(void) {
 	return NP_port(host->cfg_get("port", "55435"), NP_DEFAULT_PORT);
 }
 
+// A game's emulator tag, from the card index, or from its path until the
+// index is ready. 0, or -1 for anything but a game file in a system
+// folder.
+static int gameTag(const char* path, char* out, size_t size) {
+	if (MOSAIC_HOST_HAS(host, index_refresh) && host->index_count(NULL) != MOSAIC_INDEX_NOT_READY) {
+		MosaicIndexEntry e = { .size = sizeof(e) };
+		if (host->index_find(path, &e) < 0 || e.kind != MOSAIC_INDEX_GAME || e.type != MOSAIC_ENTRY_ROM) return -1;
+		return snprintf(out, size, "%s", e.tag) < (int)size ? 0 : -1;
+	}
+	return NP_emuTag(roms_path, path, out, size);
+}
+
 // The emulator pak's launch.sh for a game, where stock looks: the
 // system's own paks first, then Emus/<platform>/.
 static int emulatorFor(const char* path, char* out, size_t size) {
 	char tag[128];
-	if (NP_emuTag(roms_path, path, tag, sizeof(tag)) != 0) return -1;
+	if (gameTag(path, tag, sizeof(tag)) != 0) return -1;
 	if (snprintf(out, size, "%s/.system/%s/paks/Emus/%s.pak/launch.sh", host->sdcard_path, host->platform, tag) < (int)size
 			&& isFile(out)) return 0;
 	if (snprintf(out, size, "%s/Emus/%s/%s.pak/launch.sh", host->sdcard_path, host->platform, tag) < (int)size
@@ -99,8 +115,7 @@ static int canOpen(const char* path, void* data) {
 	(void)data;
 	const MosaicEntry* entry = host->selected_entry();
 	char tag[128];
-	return entry && host->entry_type(entry) == MOSAIC_ENTRY_ROM
-		&& NP_emuTag(roms_path, host->entry_path(entry), tag, sizeof(tag)) == 0;
+	return entry && host->entry_type(entry) == MOSAIC_ENTRY_ROM && gameTag(host->entry_path(entry), tag, sizeof(tag)) == 0;
 }
 
 static void open_(const char* path, void* data) {

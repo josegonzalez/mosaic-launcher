@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include "check.h"
 #include "../../plugins/genre-view/genre_view.c"
+#include "fakeindex.h"
 
 struct MosaicEntry {
 	char path[512];
@@ -85,6 +86,8 @@ static const MosaicHost fake = {
 	.list_get = fakeListGet,
 	.list_push = fakeListPush,
 	.entry_set_name = fakeSetName,
+	.subscribe = fakeIndexSubscribe,
+	FAKE_INDEX_HOST,
 };
 
 static void touch(const char* path) {
@@ -135,7 +138,9 @@ static int rootHasGenres(void) {
 	return found ? 1 : any ? -1 : 0;
 }
 
+// A start after the card changed, which the card index reads again.
 static void restart(void) {
+	fakeIndexDrop();
 	init(&fake);
 }
 

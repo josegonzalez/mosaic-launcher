@@ -126,32 +126,6 @@ int SM_catalogAddList(SMCatalog* catalog, const char* list) {
 	return added;
 }
 
-void SM_cleanName(const char* file_name, char* out, size_t size) {
-	char name[256];
-	snprintf(name, sizeof(name), "%s", file_name);
-
-	// extensions, eg. .p8.png
-	char* tmp;
-	while ((tmp = strrchr(name, '.')) != NULL) {
-		size_t len = strlen(tmp);
-		if (len > 2 && len <= 5) *tmp = '\0';
-		else break;
-	}
-
-	// tags such as (USA) and [!]
-	char kept[256];
-	snprintf(kept, sizeof(kept), "%s", name);
-	while ((tmp = strrchr(name, '(')) != NULL || (tmp = strrchr(name, '[')) != NULL) {
-		if (tmp == name) break;
-		*tmp = '\0';
-	}
-	if (!name[0]) snprintf(name, sizeof(name), "%s", kept);
-
-	size_t len = strlen(name);
-	while (len > 1 && isspace((unsigned char)name[len - 1])) name[--len] = '\0';
-	snprintf(out, size, "%s", name);
-}
-
 void SM_normalize(const char* in, char* out, size_t size) {
 	size_t n = 0;
 	int space = 1; // no leading space
@@ -188,24 +162,6 @@ int SM_hasKeyword(const char* title, const char* keyword) {
 int SM_inFranchise(const SMFranchise* franchise, const char* title) {
 	for (int k = 0; k < franchise->keyword_count; k++) {
 		if (SM_hasKeyword(title, franchise->keywords[k])) return 1;
-	}
-	return 0;
-}
-
-int SM_mapLookup(const char* map, const char* file_name, char* out, size_t size) {
-	size_t len = strlen(file_name);
-	for (const char* line = map; line && *line; ) {
-		const char* end = strchr(line, '\n');
-		if (!strncmp(line, file_name, len) && line[len] == '\t') {
-			const char* alias = line + len + 1;
-			size_t n = end ? (size_t)(end - alias) : strlen(alias);
-			while (n > 0 && (alias[n - 1] == '\r' || alias[n - 1] == '\n')) n--;
-			if (n >= size) n = size - 1;
-			memcpy(out, alias, n);
-			out[n] = '\0';
-			return 1;
-		}
-		line = end ? end + 1 : NULL;
 	}
 	return 0;
 }

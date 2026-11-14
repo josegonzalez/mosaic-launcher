@@ -676,29 +676,28 @@ static const RMPlatform* platformById(int id) {
 	return NULL;
 }
 
-// The Roms folder for a tag: one on the card whose name ends in "(TAG)",
-// else the name stock gives it.
+// The Roms folder for a tag: the first system folder in the launcher's
+// card index whose name ends in "(TAG)", else the name stock gives it, or
+// "" until the index is first ready.
 static void romsFolder(const char* slug, const char* tag, char* out, size_t size) {
-	char roms[RM_PATH_MAX];
-	put(roms, sizeof(roms), "%s/Roms", sd);
+	out[0] = '\0';
+	if (!MOSAIC_HOST_HAS(host, index_refresh) || host->index_count(NULL) == MOSAIC_INDEX_NOT_READY) return;
 	char want[RM_TAG_MAX + 4];
 	put(want, sizeof(want), "(%s)", tag);
 	size_t want_len = strlen(want);
-	out[0] = '\0';
-	DIR* d = opendir(roms);
-	if (d) {
-		struct dirent* e;
-		while ((e = readdir(d))) {
-			size_t len = strlen(e->d_name);
-			if (!RM_safeName(e->d_name) || len < want_len || strcmp(e->d_name + len - want_len, want) != 0) continue;
-			char full[RM_PATH_MAX];
-			put(full, sizeof(full), "%s/%s", roms, e->d_name);
-			if (!isDir(full)) continue;
-			if (!out[0] || strcmp(e->d_name, out) < 0) put(out, size, "%s", e->d_name);
+	int count = host->index_count(NULL);
+	for (int i = 0; i < count; i++) {
+		MosaicIndexEntry e = { .size = sizeof(e) };
+		if (host->index_entry(NULL, i, &e) != 0) break;
+		if (e.kind != MOSAIC_INDEX_SYSTEM) continue;
+		size_t len = strlen(e.system);
+		// systems come by name, so the first is the one stock would sort first
+		if (RM_safeName(e.system) && len >= want_len && !strcmp(e.system + len - want_len, want)) {
+			put(out, size, "%s", e.system);
+			return;
 		}
-		closedir(d);
 	}
-	if (!out[0]) RM_tagFor(slug, NULL, 0, out, size);
+	RM_tagFor(slug, NULL, 0, out, size);
 }
 
 static void romListSave(const RomList* list) {
@@ -1825,6 +1824,8 @@ static void finished(Job* j) {
 			recordPut(&r);
 			statusWrite("done", j->expect > 0 ? j->expect / 1024 : 0, j->expect > 0 ? j->expect / 1024 : 0, j->name);
 			downloadNote(j->path, j->name);
+			// a game on the card the index doesn't have yet
+			if (MOSAIC_HOST_HAS(host, index_refresh)) host->index_refresh();
 			put(launch_after, sizeof(launch_after), "%s", j->path);
 		} else if (j->cancel) {
 			statusClear();
@@ -2147,6 +2148,15 @@ static void removeLeftovers(void) {
 	removeLeftoversIn(".userdata/shared");
 }
 
+// The card index changed: a platform's folder may have a Roms folder now.
+static void indexReady(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	for (int i = 0; i < rom_list_count; i++) rom_lists[i].folder[0] = '\0'; // looked up again
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	static const RMWords words = { tr };
@@ -2164,6 +2174,11 @@ static int init(const MosaicHost* h) {
 		if (host->provide("romm.downloads", provideDownloads) != 0) say("couldn't provide romm.downloads");
 	}
 	if (!configured) return 0;
+	if (MOSAIC_HOST_HAS(host, index_refresh)) {
+		host->subscribe("launcher.index_ready", indexReady, NULL);
+		host->index_count(NULL); // starts reading the card, so it's ready by the first listing
+	}
+	else say("this launcher has no card index; platforms' folders list nothing");
 	makeDirs(data_dir);
 	removeLeftovers();
 	statusClear();

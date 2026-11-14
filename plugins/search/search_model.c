@@ -5,41 +5,6 @@
 #include <strings.h>
 #include "search_model.h"
 
-static int endsWith(const char* s, const char* suffix) {
-	size_t a = strlen(s), b = strlen(suffix);
-	return a >= b && !strcmp(s + a - b, suffix);
-}
-
-void SE_cleanName(const char* file_name, char* out, size_t size) {
-	if (!size) return;
-	snprintf(out, size, "%s", file_name);
-
-	char* dot;
-	while ((dot = strrchr(out, '.')) != NULL) {
-		size_t len = strlen(dot);
-		if (len < 3 || len > 5) break;
-		*dot = '\0';
-	}
-
-	char bare[SE_NAME_LEN];
-	snprintf(bare, sizeof(bare), "%s", out);
-	for (;;) {
-		char* open = strrchr(out, '(');
-		char* square = strrchr(out, '[');
-		if (!open || (square && square > open)) open = square;
-		if (!open || open == out) break;
-		*open = '\0';
-	}
-	if (!out[0]) snprintf(out, size, "%s", bare);
-
-	size_t len = strlen(out);
-	while (len > 1 && isspace((unsigned char)out[len - 1])) out[--len] = '\0';
-}
-
-int SE_hidden(const char* name) {
-	return name[0] == '.' || endsWith(name, ".disabled") || !strcmp(name, "map.txt");
-}
-
 ///////////////////////////////////////
 // folding
 
@@ -142,72 +107,6 @@ size_t SE_fold(const char* text, char* out, size_t size) {
 }
 
 ///////////////////////////////////////
-// map.txt
-
-static int compareItems(const void* a, const void* b) {
-	const SEMapItem* x = a;
-	const SEMapItem* y = b;
-	int c = strcmp(x->key, y->key);
-	return c ? c : x->line - y->line;
-}
-
-int SE_mapParse(SEMap* map, char* text) {
-	memset(map, 0, sizeof(*map));
-	map->text = text;
-	if (!text) return 0;
-
-	int lines = 1;
-	for (const char* p = text; *p; p++) {
-		if (*p == '\n') lines++;
-	}
-	map->items = malloc(sizeof(SEMapItem) * (size_t)lines);
-	if (!map->items) return -1;
-
-	int line = 0;
-	for (char* p = text; p; line++) {
-		char* end = strchr(p, '\n');
-		if (end) *end = '\0';
-		size_t len = strlen(p);
-		while (len > 0 && p[len - 1] == '\r') p[--len] = '\0';
-		char* tab = strchr(p, '\t');
-		if (tab && tab[1]) {
-			*tab = '\0';
-			map->items[map->count++] = (SEMapItem){ p, tab + 1, line };
-		}
-		p = end ? end + 1 : NULL;
-	}
-
-	// keep only the last line for a file name
-	qsort(map->items, (size_t)map->count, sizeof(SEMapItem), compareItems);
-	int kept = 0;
-	for (int i = 0; i < map->count; i++) {
-		if (i + 1 < map->count && !strcmp(map->items[i].key, map->items[i + 1].key)) continue;
-		map->items[kept++] = map->items[i];
-	}
-	map->count = kept;
-	return 0;
-}
-
-const char* SE_mapGet(const SEMap* map, const char* file_name) {
-	if (!map || !map->count) return NULL;
-	int lo = 0, hi = map->count - 1;
-	while (lo <= hi) {
-		int mid = lo + (hi - lo) / 2;
-		int c = strcmp(file_name, map->items[mid].key);
-		if (!c) return map->items[mid].value;
-		if (c < 0) hi = mid - 1;
-		else lo = mid + 1;
-	}
-	return NULL;
-}
-
-void SE_mapFree(SEMap* map) {
-	free(map->items);
-	free(map->text);
-	memset(map, 0, sizeof(*map));
-}
-
-///////////////////////////////////////
 // index
 
 void SE_indexInit(SEIndex* index) {
@@ -220,9 +119,7 @@ void SE_indexFree(SEIndex* index) {
 		free(index->games[i].name);
 		free(index->games[i].folded);
 	}
-	for (int i = 0; i < index->folder_count; i++) free(index->folders[i].path);
 	free(index->games);
-	free(index->folders);
 	SE_indexInit(index);
 }
 
@@ -252,16 +149,6 @@ int SE_indexAdd(SEIndex* index, const char* path, const char* name, int type) {
 		return -1;
 	}
 	index->game_count++;
-	return 0;
-}
-
-int SE_indexAddFolder(SEIndex* index, const char* path, time_t mtime) {
-	if (grow((void**)&index->folders, &index->folder_cap, index->folder_count, sizeof(SEFolder)) != 0) return -1;
-	SEFolder* folder = &index->folders[index->folder_count];
-	folder->path = strdup(path);
-	if (!folder->path) return -1;
-	folder->mtime = mtime;
-	index->folder_count++;
 	return 0;
 }
 

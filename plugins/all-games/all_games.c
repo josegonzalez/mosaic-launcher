@@ -2,12 +2,14 @@
 // every system, named as each system's list names them (map.txt aliases
 // included), with a Systems folder first for the consoles.
 //
-// The card is scanned once per launcher start, the first time the root is
-// listed. After that each listing only checks the folders the scan read
-// for changes, and scans again if one changed. Subfolders of a system are
-// flattened, two levels deep; a game folder (one holding a .cue or .m3u
-// named after itself) is listed as that file, so it launches as stock's
-// folder would.
+// The games come from the launcher's card index (index_count and the
+// rest), only systems with an emulator, as stock lists them. Subfolders of
+// a system are flattened, two levels deep; a game folder (one holding a
+// .cue or .m3u named after itself) is listed as that file, so it launches
+// as stock's folder would. The list is made again, and the lists reloaded,
+// each time the index changes (launcher.index_ready). Until the index is
+// first ready, as on the first start with a card the launcher hasn't read,
+// the root is stock's.
 //
 // Other plugins' root folders join the root and, with Systems, stay above
 // the games. When games from different systems share a name, each shows
@@ -15,22 +17,20 @@
 // setting turns that off. Recents, Collections and Tools stay on the quick
 // menu.
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include "games_model.h"
 #include "mosaic_plugin.h"
 
 #define ID "all-games"
 #define MAX_PATH_LEN 512
-#define MAX_DEPTH 2 // subfolders below a system folder that are scanned
+#define MAX_DEPTH 2 // subfolders below a system folder that are listed
 
 static const MosaicHost* host;
 static char roms_path[MAX_PATH_LEN]; // <sd>/Roms
 static AGIndex index_;
-static int scanned = 0;
+static int listed = 0; // index_ holds the index's games
 static int replaced = 0; // the last root listing was ours
 static int tags = 1;
 static int placing = 0; // back from a game: the selection may need placing
@@ -38,11 +38,6 @@ static int placing = 0; // back from a game: the selection may need placing
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
-}
-
-static int exists(const char* path) {
-	struct stat st;
-	return stat(path, &st) == 0;
 }
 
 static int endsWith(const char* s, const char* suffix) {
@@ -54,123 +49,41 @@ static int isRoot(const char* path) {
 	return path && !strcmp(path, host->sdcard_path);
 }
 
-static char* readFile(const char* path) {
-	FILE* f = fopen(path, "r");
-	if (!f) return NULL;
-	fseek(f, 0, SEEK_END);
-	long size = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	char* text = size >= 0 ? malloc((size_t)size + 1) : NULL;
-	if (text) text[fread(text, 1, (size_t)size, f)] = '\0';
-	fclose(f);
-	return text;
-}
-
 ///////////////////////////////////////
-// scanning
+// the games, from the card index
 
-// True when a system folder has an emulator, as stock checks before
-// listing it: the emulator is the tag in the folder's last parentheses.
-static int hasEmulator(const char* system) {
-	char emu[256];
-	AG_emuTag(system, emu, sizeof(emu));
-	char path[MAX_PATH_LEN * 2];
-	if (snprintf(path, sizeof(path), "%s/.system/%s/paks/Emus/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-			&& exists(path)) return 1;
-	return snprintf(path, sizeof(path), "%s/Emus/%s/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-		&& exists(path);
-}
-
-// What opening a game folder launches: its <name>.cue, else its
-// <name>.m3u, written to out. 0 for a folder that isn't a game.
-static int gameFolderLaunch(const char* path, const char* name, char* out, size_t size) {
-	if (snprintf(out, size, "%s/%s.cue", path, name) < (int)size && exists(out)) return 1;
-	return snprintf(out, size, "%s/%s.m3u", path, name) < (int)size && exists(out);
-}
-
-static int isDirEntry(const struct dirent* dp, const char* path) {
-	if (dp->d_type == DT_DIR) return 1;
-	if (dp->d_type != DT_UNKNOWN) return 0;
-	struct stat st;
-	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
-}
-
-static void addFolder(const char* dir) {
-	struct stat st;
-	AG_indexAddFolder(&index_, dir, stat(dir, &st) == 0 ? st.st_mtime : 0);
-}
-
-static void scanDir(const char* dir, int depth) {
-	DIR* dh = opendir(dir);
-	if (!dh) return;
-	addFolder(dir);
-
-	char map_path[MAX_PATH_LEN + 16];
-	snprintf(map_path, sizeof(map_path), "%s/map.txt", dir);
-	AGMap map;
-	AG_mapParse(&map, readFile(map_path));
-
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (AG_hidden(dp->d_name)) continue;
-		char path[MAX_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", dir, dp->d_name) >= (int)sizeof(path)) continue;
-
-		char launch[MAX_PATH_LEN * 2];
-		const char* game = path;
-		int type = MOSAIC_ENTRY_ROM;
-		if (isDirEntry(dp, path)) {
-			if (endsWith(dp->d_name, ".pak")) type = MOSAIC_ENTRY_PAK;
-			else if (gameFolderLaunch(path, dp->d_name, launch, sizeof(launch))) game = launch;
-			else {
-				if (depth < MAX_DEPTH) scanDir(path, depth + 1);
-				continue;
-			}
-		}
-
-		char name[AG_NAME_LEN];
-		const char* alias = AG_mapGet(&map, dp->d_name);
-		if (alias) snprintf(name, sizeof(name), "%s", alias);
-		else AG_cleanName(dp->d_name, name, sizeof(name));
-		if (AG_hidden(name)) continue; // map.txt can hide a game
-		AG_indexAdd(&index_, game, name, type);
-	}
-	closedir(dh);
-	AG_mapFree(&map);
-}
-
-static void scan(void) {
+// Lists the games the index has. 0, or -1 while it isn't ready.
+static int listGames(void) {
 	AG_indexFree(&index_);
-	scanned = 1;
-
-	DIR* dh = opendir(roms_path);
-	if (!dh) return;
-	addFolder(roms_path);
+	if (!MOSAIC_HOST_HAS(host, index_refresh) || host->index_count(NULL) == MOSAIC_INDEX_NOT_READY) return -1;
+	int count = host->index_count(NULL);
 	int systems = 0;
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (AG_hidden(dp->d_name)) continue;
-		char path[MAX_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", roms_path, dp->d_name) >= (int)sizeof(path)) continue;
-		if (!isDirEntry(dp, path) || !hasEmulator(dp->d_name)) continue;
-		scanDir(path, 0);
-		systems++;
+	const char* last_system = "";
+	for (int i = 0; i < count; i++) {
+		MosaicIndexEntry e = { .size = sizeof(e) };
+		if (host->index_entry(NULL, i, &e) != 0) break;
+		if (e.kind != MOSAIC_INDEX_GAME || !e.emulator || e.depth > MAX_DEPTH) continue;
+		// a game folder launches as its .cue or .m3u
+		if (AG_indexAdd(&index_, e.launch, e.name, e.type == MOSAIC_ENTRY_PAK ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_ROM) != 0) break;
+		if (strcmp(e.system, last_system) != 0) systems++;
+		last_system = e.system;
 	}
-	closedir(dh);
 	AG_indexSort(&index_);
+	listed = 1;
 
 	char message[96];
 	snprintf(message, sizeof(message), "%d games in %d systems", index_.game_count, systems);
 	host->log(ID, message);
+	return 0;
 }
 
-// True when a folder the scan read changed since, or is gone.
-static int cardChanged(void) {
-	for (int i = 0; i < index_.folder_count; i++) {
-		struct stat st;
-		if (stat(index_.folders[i].path, &st) != 0 || st.st_mtime != index_.folders[i].mtime) return 1;
-	}
-	return 0;
+// The index changed: list the games again, on the root if it shows.
+static void indexReady(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	listed = 0;
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 }
 
 ///////////////////////////////////////
@@ -178,7 +91,7 @@ static int cardChanged(void) {
 
 static MosaicList* rootReplace(void) {
 	replaced = 0;
-	if (!scanned || cardChanged()) scan();
+	if (!listed && listGames() != 0) return NULL; // stock's root until the index is ready
 	if (index_.game_count == 0) return NULL; // stock's root, so Tools and the rest stay in reach
 
 	MosaicList* root = host->list_new();
@@ -281,7 +194,12 @@ static int init(const MosaicHost* h) {
 	snprintf(roms_path, sizeof(roms_path), "%s/Roms", host->sdcard_path);
 	tags = strcmp(host->cfg_get("tags", "on"), "off") != 0;
 	AG_indexInit(&index_);
-	scanned = 0;
+	listed = 0;
+	if (!MOSAIC_HOST_HAS(host, index_refresh)) host->log(ID, "this launcher has no card index; the root stays stock's");
+	else {
+		host->subscribe("launcher.index_ready", indexReady, NULL);
+		host->index_count(NULL); // starts reading the card, so it's ready by the first listing
+	}
 	replaced = 0;
 	placing = 0;
 	return 0;

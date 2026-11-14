@@ -16,13 +16,14 @@
 // system's tag, eg. "Tetris (GB)" and "Tetris (GBC)"; the "tags" setting
 // shows it on every game instead, or leaves it to stock.
 //
-// Nothing is cached: each listing reads the folders it needs from the card.
+// The folders and games come from the launcher's card index (index_count
+// and the rest), each listing asking it for the folders it needs, and the
+// lists are reloaded each time the index changes (launcher.index_ready).
+// Until it's first ready there are no genres.
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include "genre_model.h"
 #include "mosaic_plugin.h"
 
@@ -42,104 +43,43 @@ static const char* tr(const char* text) {
 	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
 }
 
-static int exists(const char* path) {
-	struct stat st;
-	return stat(path, &st) == 0;
-}
-
-static int endsWith(const char* s, const char* suffix) {
-	size_t a = strlen(s), b = strlen(suffix);
-	return a >= b && !strcmp(s + a - b, suffix);
-}
-
-static char* readFile(const char* path) {
-	FILE* f = fopen(path, "r");
-	if (!f) return NULL;
-	fseek(f, 0, SEEK_END);
-	long size = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	char* text = size >= 0 ? malloc((size_t)size + 1) : NULL;
-	if (text) text[fread(text, 1, (size_t)size, f)] = '\0';
-	fclose(f);
-	return text;
-}
-
-static int isDirEntry(const struct dirent* dp, const char* path) {
-	if (dp->d_type == DT_DIR) return 1;
-	if (dp->d_type != DT_UNKNOWN) return 0;
-	struct stat st;
-	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
-}
-
-static void loadMap(const char* dir, GVMap* map) {
-	char path[MAX_PATH_LEN + 16];
-	snprintf(path, sizeof(path), "%s/map.txt", dir);
-	GV_mapParse(map, readFile(path));
-}
-
 ///////////////////////////////////////
-// the card
+// the card index
 
-// True when a system folder has an emulator, as stock checks before
-// listing it: the emulator is the tag in the folder's last parentheses.
-static int hasEmulator(const char* system) {
-	char emu[256];
-	GV_emuTag(system, emu, sizeof(emu));
-	char path[MAX_PATH_LEN * 2];
-	if (snprintf(path, sizeof(path), "%s/.system/%s/paks/Emus/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-			&& exists(path)) return 1;
-	return snprintf(path, sizeof(path), "%s/Emus/%s/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-		&& exists(path);
-}
-
-// A folder that launches a game when opened: it holds a .cue or .m3u
-// named after itself.
-static int isGameFolder(const char* path, const char* name) {
-	char file[MAX_PATH_LEN * 2];
-	if (snprintf(file, sizeof(file), "%s/%s.cue", path, name) < (int)sizeof(file) && exists(file)) return 1;
-	return snprintf(file, sizeof(file), "%s/%s.m3u", path, name) < (int)sizeof(file) && exists(file);
+// True when e is a folder or game directly inside dir.
+static int inFolder(const MosaicIndexEntry* e, const char* dir) {
+	size_t len = strlen(dir);
+	return e->kind != MOSAIC_INDEX_SYSTEM && !strncmp(e->path, dir, len) && e->path[len] == '/' && !strchr(e->path + len + 1, '/');
 }
 
 // Reads a folder in a system. Its plain subfolders go into folders, by
 // the name they show as; with items, its games, paks and game folders go
 // there.
 static void readFolder(const char* dir, const char* system, GVGroups* folders, GVItems* items) {
-	DIR* dh = opendir(dir);
-	if (!dh) return;
-	GVMap map;
-	loadMap(dir, &map);
-
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (GV_hidden(dp->d_name)) continue;
-		char path[MAX_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", dir, dp->d_name) >= (int)sizeof(path)) continue;
-		int is_dir = isDirEntry(dp, path);
-		if (!is_dir && !items) continue; // only folders wanted
-		char name[GV_NAME_LEN];
-		if (!GV_shownName(&map, dp->d_name, name, sizeof(name))) continue;
-
-		int type = MOSAIC_ENTRY_ROM;
-		if (is_dir) {
-			if (endsWith(dp->d_name, ".pak")) type = MOSAIC_ENTRY_PAK;
-			else if (isGameFolder(path, dp->d_name)) type = MOSAIC_ENTRY_DIR;
-			else {
-				// an alias with a slash can't be part of a path
-				if (GV_groupsAdd(folders, name, path, system) < 0 && strchr(name, '/')) {
-					GV_cleanName(dp->d_name, name, sizeof(name));
-					GV_groupsAdd(folders, name, path, system);
-				}
-				continue;
+	int count = host->index_count(system);
+	for (int i = 0; i < count; i++) {
+		MosaicIndexEntry e = { .size = sizeof(e) };
+		if (host->index_entry(system, i, &e) != 0) break;
+		if (!inFolder(&e, dir)) continue;
+		if (e.kind == MOSAIC_INDEX_FOLDER) {
+			// an alias with a slash can't be part of a path
+			if (GV_groupsAdd(folders, e.name, e.path, system) < 0 && strchr(e.name, '/')) {
+				char name[GV_NAME_LEN];
+				GV_cleanName(strrchr(e.path, '/') + 1, name, sizeof(name));
+				GV_groupsAdd(folders, name, e.path, system);
 			}
+			continue;
 		}
-		if (items) GV_itemsAdd(items, path, name, type);
+		if (items) GV_itemsAdd(items, e.path, e.name, e.type);
 	}
-	closedir(dh);
-	GV_mapFree(&map);
 }
 
-static int compareNames(const void* a, const void* b) {
-	return strcmp(*(char* const*)a, *(char* const*)b);
+// The index changed: list the folders again.
+static void indexReady(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 }
 
 // The genres on the card: every system's plain subfolders, merged by
@@ -147,34 +87,13 @@ static int compareNames(const void* a, const void* b) {
 // order, so a genre is named as the first system names it.
 static void genres(GVGroups* out) {
 	GV_groupsInit(out);
-	DIR* dh = opendir(roms_path);
-	if (!dh) return;
-	char** systems = NULL;
-	int count = 0, cap = 0;
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (GV_hidden(dp->d_name)) continue;
-		char path[MAX_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", roms_path, dp->d_name) >= (int)sizeof(path)) continue;
-		if (!isDirEntry(dp, path) || !hasEmulator(dp->d_name)) continue;
-		if (count == cap) {
-			int next = cap ? cap * 2 : 32;
-			char** bigger = realloc(systems, sizeof(char*) * (size_t)next);
-			if (!bigger) break;
-			systems = bigger;
-			cap = next;
-		}
-		if ((systems[count] = strdup(dp->d_name)) != NULL) count++;
-	}
-	closedir(dh);
-
-	if (count > 1) qsort(systems, (size_t)count, sizeof(char*), compareNames);
+	if (!MOSAIC_HOST_HAS(host, index_refresh) || host->index_count(NULL) == MOSAIC_INDEX_NOT_READY) return;
+	int count = host->index_count(NULL);
 	for (int i = 0; i < count; i++) {
-		char path[MAX_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", roms_path, systems[i]) < (int)sizeof(path)) readFolder(path, systems[i], out, NULL);
-		free(systems[i]);
+		MosaicIndexEntry e = { .size = sizeof(e) };
+		if (host->index_entry(NULL, i, &e) != 0) break;
+		if (e.kind == MOSAIC_INDEX_SYSTEM && e.emulator) readFolder(e.path, e.system, out, NULL);
 	}
-	free(systems);
 	GV_groupsKeep(out, min_systems, skip);
 	GV_groupsSort(out);
 }
@@ -312,6 +231,11 @@ static int init(const MosaicHost* h) {
 	if (min_systems < 1) min_systems = 1;
 	snprintf(skip, sizeof(skip), "%s", host->cfg_get("skip", ""));
 	tags = GV_tagsMode(host->cfg_get("tags", "shared"));
+	if (!MOSAIC_HOST_HAS(host, index_refresh)) host->log(ID, "this launcher has no card index; there are no genres");
+	else {
+		host->subscribe("launcher.index_ready", indexReady, NULL);
+		host->index_count(NULL); // starts reading the card, so it's ready by the first listing
+	}
 	return 0;
 }
 

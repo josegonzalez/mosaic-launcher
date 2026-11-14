@@ -88,38 +88,6 @@ int RG_systemOf(const RGLibrary* lib, const char* roms, const char* path) {
 }
 
 ///////////////////////////////////////
-// names stock hides
-
-static int endsWith(const char* s, const char* suffix) {
-	size_t a = strlen(s), b = strlen(suffix);
-	return a >= b && !strcmp(s + a - b, suffix);
-}
-
-int RG_hiddenName(const char* name) {
-	return name[0] == '.' || endsWith(name, ".disabled") || !strcmp(name, "map.txt");
-}
-
-int RG_mapLookup(const char* map, const char* filename, char* out, size_t size) {
-	size_t len = strlen(filename);
-	const char* line = map;
-	while (line && *line) {
-		const char* end = strchr(line, '\n');
-		size_t line_len = end ? (size_t)(end - line) : strlen(line);
-		if (line_len > len && !strncmp(line, filename, len) && line[len] == '\t') {
-			const char* value = line + len + 1;
-			size_t value_len = line_len - len - 1;
-			while (value_len && value[value_len - 1] == '\r') value_len--;
-			if (value_len >= size) value_len = size - 1;
-			memcpy(out, value, value_len);
-			out[value_len] = '\0';
-			return 1;
-		}
-		line = end ? end + 1 : NULL;
-	}
-	return 0;
-}
-
-///////////////////////////////////////
 // path sets
 
 void RG_setInit(RGPathSet* set) {

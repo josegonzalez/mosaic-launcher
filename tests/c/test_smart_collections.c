@@ -7,6 +7,7 @@
 #include "fakeproviders.h"
 #include "fakesets.h"
 #include "../../plugins/smart-collections/smart_collections.c"
+#include "fakeindex.h"
 
 struct MosaicEntry {
 	char path[512];
@@ -140,6 +141,8 @@ static MosaicHost fake = {
 	.set_changed = fakeSetChanged,
 	.set_names = fakeSetNames,
 	.is_filtered = fakeIsFiltered,
+	.subscribe = fakeIndexSubscribe,
+	FAKE_INDEX_HOST,
 };
 
 static void touch(const char* path) {
@@ -154,9 +157,10 @@ static void writeText(const char* path, const char* text) {
 	fclose(f);
 }
 
+// As the card index names it.
 static const char* cleaned(const char* file_name) {
 	static char out[256];
-	SM_cleanName(file_name, out, sizeof(out));
+	Index_cleanName(file_name, out, sizeof(out));
 	return out;
 }
 
@@ -223,15 +227,6 @@ static void testModel(void) {
 	char title[256];
 	SM_normalize("Lufia II - Rise of the Sinistrals", title, sizeof(title));
 	CHECK(SM_inFranchise(&catalog.items[SM_find(&catalog, "Lufia")], title));
-
-	// map.txt aliases
-	const char* map = "sf2.zip\tStreet Fighter II\r\nmslug.zip\tMetal Slug\n";
-	char alias[64];
-	CHECK(SM_mapLookup(map, "sf2.zip", alias, sizeof(alias)));
-	CHECK_STR(alias, "Street Fighter II");
-	CHECK(SM_mapLookup(map, "mslug.zip", alias, sizeof(alias)));
-	CHECK_STR(alias, "Metal Slug");
-	CHECK(!SM_mapLookup(map, "sf2", alias, sizeof(alias)));
 
 	// grouping: a game can be in two franchises, and others aren't kept
 	SMIndex index;
@@ -309,6 +304,7 @@ static void testPlugin(void) {
 	touch(CARD "/Roms/Arcade (FBN)/mario.zip");
 	writeText(CARD "/Roms/Arcade (FBN)/map.txt", "sf2.zip\tStreet Fighter II\nsf2ce.zip\tStreet Fighter II' - Champion Edition\nmario.zip\t.Mario Bros.\n");
 	touch(CARD "/Roms/Unplayable (NOPE)/Super Mario Bros.nes"); // no emulator
+	fakeIndexDrop();
 
 	const MosaicPlugin* p = mosaic_plugin_get(&fake);
 	CHECK(p->size == sizeof(MosaicPlugin));
@@ -424,8 +420,13 @@ static void testPlugin(void) {
 	CHECK(p->virtual_dir(FOLDER)->count == 4);
 	CHECK(!pressY()); // nothing left to bring back
 
-	// a game deleted since the scan isn't listed
+	// a game deleted since the index was read isn't listed
 	CHECK(remove(CARD "/Roms/Super Nintendo (SFC)/Super Mario World (USA).sfc") == 0);
+	CHECK(p->virtual_dir(FOLDER "/Mario")->count == 2);
+	// and once the index has changed, its collection is grouped again
+	reloads = 0;
+	fakeIndexRebuild();
+	CHECK(reloads == 1);
 	CHECK(p->virtual_dir(FOLDER "/Mario")->count == 2);
 
 	// settings: a bigger minimum, extra franchises, no built-ins

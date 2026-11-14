@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "check.h"
 #include "../../plugins/netplay/netplay.c"
+#include "fakeindex.h"
 
 struct MosaicEntry {
 	char path[1024];
@@ -117,6 +118,7 @@ static MosaicHost fake = {
 	.open_path = fakeOpenPath,
 	.choose = fakeChoose,
 	.replace_launch = fakeReplace,
+	FAKE_INDEX_HOST,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -300,6 +302,16 @@ static void testAvailable(void) {
 	CHECK(!action_available(NULL, NULL));
 	select_(CARD "/Collections/Mine.txt", MOSAIC_ENTRY_ROM);
 	CHECK(!action_available(NULL, NULL));
+	// a file the card index doesn't list isn't a game
+	select_(GB "/Gone.gb", MOSAIC_ENTRY_ROM);
+	CHECK(!action_available(NULL, NULL));
+	// until the index is ready, any file in a system folder is
+	fakeIndexDrop();
+	fake_index_ready = 0;
+	CHECK(action_available(NULL, NULL));
+	select_(CARD "/Collections/Mine.txt", MOSAIC_ENTRY_ROM);
+	CHECK(!action_available(NULL, NULL));
+	fake_index_ready = 1;
 }
 
 static void testHost(void) {

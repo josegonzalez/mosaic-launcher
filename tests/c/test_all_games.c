@@ -3,9 +3,9 @@
 
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include "check.h"
 #include "../../plugins/all-games/all_games.c"
+#include "fakeindex.h"
 
 struct MosaicEntry {
 	char path[512];
@@ -62,6 +62,8 @@ static int fakeSelectIndex(int i) {
 	selected_row = i;
 	return 0;
 }
+static int reloads = 0;
+static void fakeReloadLists(void) { reloads++; }
 static int fakeRecentsCount(void) { return newest_recent ? 1 : 0; }
 static const char* fakeRecentPath(int i) { return i == 0 ? newest_recent : NULL; }
 
@@ -90,6 +92,9 @@ static const MosaicHost fake = {
 	.current_list = fakeCurrentList,
 	.selected_index = fakeSelectedIndex,
 	.select_index = fakeSelectIndex,
+	.reload_lists = fakeReloadLists,
+	.subscribe = fakeIndexSubscribe,
+	FAKE_INDEX_HOST,
 };
 
 static void touch(const char* path) {
@@ -110,39 +115,10 @@ static void freeList(MosaicList* list) {
 	free(list);
 }
 
-// Sets a folder's modification time, so a change shows (or doesn't)
-// whatever the file system's clock resolution.
-static void age(const char* path, long seconds) {
-	struct timeval times[2] = { { seconds, 0 }, { seconds, 0 } };
-	utimes(path, times);
-}
-
 ///////////////////////////////////////
 // the model
 
-static const char* cleaned(const char* file_name) {
-	static char out[AG_NAME_LEN];
-	AG_cleanName(file_name, out, sizeof(out));
-	return out;
-}
-
 static void testNames(void) {
-	CHECK_STR(cleaned("Tetris (World) (Rev 1).gb"), "Tetris");
-	CHECK_STR(cleaned("Legend of Zelda, The [!] (USA).sfc"), "Legend of Zelda, The");
-	CHECK_STR(cleaned("Celeste.p8.png"), "Celeste");
-	CHECK_STR(cleaned("(Hack) Mario (USA).gb"), "(Hack) Mario");
-	CHECK_STR(cleaned("(USA).gb"), "(USA)");
-	CHECK_STR(cleaned("Final Fantasy VII (USA)"), "Final Fantasy VII");
-	CHECK_STR(cleaned("Dr. Mario.gb"), "Dr. Mario");
-	CHECK_STR(cleaned("a.b"), "a.b"); // one letter isn't an extension
-	CHECK_STR(cleaned("Doom.wad.doom"), "Doom");
-	CHECK_STR(cleaned("Name   .gb"), "Name");
-
-	CHECK(AG_hidden(".Hidden.gb"));
-	CHECK(AG_hidden("Old.gb.disabled"));
-	CHECK(AG_hidden("map.txt"));
-	CHECK(!AG_hidden("Tetris.gb"));
-
 	char tag[32];
 	AG_emuTag("Game Boy (GB)", tag, sizeof(tag));
 	CHECK_STR(tag, "GB");
@@ -150,25 +126,6 @@ static void testNames(void) {
 	CHECK_STR(tag, "MD");
 	AG_emuTag("GBA", tag, sizeof(tag));
 	CHECK_STR(tag, "GBA");
-}
-
-static void testMap(void) {
-	AGMap map;
-	CHECK(AG_mapParse(&map, NULL) == 0);
-	CHECK(AG_mapGet(&map, "x") == NULL);
-	AG_mapFree(&map);
-	CHECK(AG_mapGet(NULL, "x") == NULL);
-
-	char* text = strdup("sf2.zip\tStreet Fighter II\r\nno tab here\nmslug.zip\tMetal Slug\n\nsf2.zip\tSF2\nempty.zip\t\nz.zip\tZed");
-	CHECK(AG_mapParse(&map, text) == 0);
-	CHECK(map.count == 3);
-	CHECK_STR(AG_mapGet(&map, "sf2.zip"), "SF2"); // the later line wins
-	CHECK_STR(AG_mapGet(&map, "mslug.zip"), "Metal Slug");
-	CHECK_STR(AG_mapGet(&map, "z.zip"), "Zed");
-	CHECK(AG_mapGet(&map, "empty.zip") == NULL);
-	CHECK(AG_mapGet(&map, "sf2") == NULL);
-	CHECK(AG_mapGet(&map, "no tab here") == NULL);
-	AG_mapFree(&map);
 }
 
 static void testPaths(void) {
@@ -212,16 +169,14 @@ static void testIndex(void) {
 		snprintf(path, sizeof(path), "/r/X/%03d", i);
 		CHECK(AG_indexAdd(&index, path, "Many", MOSAIC_ENTRY_ROM) == 0); // grows
 	}
-	CHECK(AG_indexAddFolder(&index, "/r/GB", 42) == 0);
 	CHECK(index.game_count == 204);
 	AG_indexSort(&index);
 	CHECK_STR(index.games[0].name, "Asteroids");
 	CHECK_STR(index.games[201].path, "/r/GB/a.gb"); // same name ignoring case: by path
 	CHECK_STR(index.games[202].path, "/r/GB/b.gb");
 	CHECK(index.games[203].type == MOSAIC_ENTRY_PAK);
-	CHECK(index.folders[0].mtime == 42);
 	AG_indexFree(&index);
-	CHECK(index.game_count == 0 && index.folder_count == 0 && index.games == NULL);
+	CHECK(index.game_count == 0 && index.games == NULL);
 }
 
 static void testCollisions(void) {
@@ -266,7 +221,6 @@ static void makeCard(void) {
 	touch(PS "/Crash (USA)/Crash (USA).m3u");
 	touch(PS "/Loose/Spyro.cue");
 	touch(ROMS "/Game Gear (GG)/Sonic.gg"); // no emulator
-	age(GBC, 1000000000);
 }
 
 static int indexOf(const MosaicList* list, const char* path) {
@@ -297,6 +251,7 @@ static MosaicList* listRoot(const MosaicPlugin* p, const char* extra) {
 
 static void testPlugin(void) {
 	makeCard();
+	fakeIndexDrop();
 	const MosaicPlugin* p = mosaic_plugin_get(&fake);
 	CHECK(p->size == sizeof(MosaicPlugin));
 	CHECK_STR(p->id, "all-games");
@@ -373,22 +328,35 @@ static void testPlugin(void) {
 	current = NULL;
 	newest_recent = NULL;
 
-	// a listing without changes doesn't scan again; a changed folder does
+	// a game added shows once the index has it, which reloads the lists
 	touch(GBC "/Unseen.gbc");
-	age(GBC, 1000000000);
 	MosaicList* again = listRoot(p, NULL);
 	CHECK(again && indexOf(again, GBC "/Unseen.gbc") < 0);
 	freeList(again);
-	age(GBC, 1000000100);
+	reloads = 0;
+	fakeIndexRebuild();
+	CHECK(reloads == 1);
 	again = listRoot(p, NULL);
 	CHECK(again && indexOf(again, GBC "/Unseen.gbc") >= 0);
 	freeList(again);
-	// so does a folder that's gone (and this listing has no Favorites)
-	CHECK(system("rm -rf '" PS "/Loose'") == 0);
+	// and a folder that's gone, with the game added (and these listings have no Favorites)
+	CHECK(system("rm -rf '" PS "/Loose' '" GBC "/Unseen.gbc'") == 0);
+	fakeIndexRebuild();
 	again = listRoot(p, NULL);
-	CHECK(again && again->count == count - 1 && indexOf(again, PS "/Loose/Spyro.cue") < 0);
+	CHECK(again && again->count == count - 2 && indexOf(again, PS "/Loose/Spyro.cue") < 0);
 	freeList(again);
 	freeList(root);
+
+	// stock's root until the index is ready
+	p->quit();
+	fakeIndexDrop();
+	fake_index_ready = 0;
+	CHECK(p->init(&fake) == 0);
+	CHECK(p->root_replace() == NULL);
+	fakeIndexRebuild();
+	again = listRoot(p, NULL);
+	CHECK(again && again->count == count - 2);
+	freeList(again);
 
 	// with tags off, names stay as the system's list shows them
 	p->quit();
@@ -423,19 +391,21 @@ static void testPlugin(void) {
 
 	// a card without games keeps stock's root
 	CHECK(system("rm -rf '" ROMS "' && mkdir -p '" GB "'") == 0);
+	fakeIndexDrop();
 	CHECK(p->init(&fake) == 0);
 	CHECK(p->root_replace() == NULL);
 	CHECK(p->sort_compare(fakeEntryNew(GB "/a.gb", MOSAIC_ENTRY_ROM, "a"), fakeEntryNew(CARD "/Favorites", MOSAIC_ENTRY_DIR, "F"), CARD) == 0);
 	p->quit();
 	CHECK(system("rm -rf '" ROMS "'") == 0);
+	fakeIndexDrop();
 	CHECK(p->init(&fake) == 0);
 	CHECK(p->root_replace() == NULL);
 	p->quit();
+	fakeIndexDrop();
 }
 
 int main(void) {
 	testNames();
-	testMap();
 	testPaths();
 	testIndex();
 	testCollisions();

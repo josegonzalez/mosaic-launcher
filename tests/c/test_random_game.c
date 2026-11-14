@@ -6,6 +6,7 @@
 #include "fakeproviders.h"
 #include "fakesets.h"
 #include "../../plugins/random-game/random_game.c"
+#include "fakeindex.h"
 
 struct MosaicEntry {
 	char path[1024];
@@ -156,6 +157,8 @@ static MosaicHost fake = {
 	.set_list = fakeSetListCall,
 	.set_names = fakeSetNames,
 	.is_filtered = fakeFiltered,
+	.subscribe = fakeIndexSubscribe,
+	FAKE_INDEX_HOST,
 };
 
 static void writeText(const char* path, const char* text) {
@@ -241,23 +244,6 @@ static void testSystems(void) {
 	CHECK(RG_systemOf(&lib, "/r", "/Collections") == -1);
 	RG_free(&lib);
 	CHECK(lib.count == 0);
-}
-
-static void testNames(void) {
-	CHECK(RG_hiddenName(".Hidden.gb"));
-	CHECK(RG_hiddenName("Old.gb.disabled"));
-	CHECK(RG_hiddenName("map.txt"));
-	CHECK(!RG_hiddenName("Tetris.gb"));
-
-	char name[64];
-	const char* map = "Secret.gb\t.Secret\r\nTetris.gb\tTetris DX\nTetris\tNot this\n";
-	CHECK(RG_mapLookup(map, "Secret.gb", name, sizeof(name)));
-	CHECK_STR(name, ".Secret");
-	CHECK(RG_mapLookup(map, "Tetris.gb", name, sizeof(name)));
-	CHECK_STR(name, "Tetris DX");
-	CHECK(!RG_mapLookup(map, "Tetris.g", name, sizeof(name)));
-	CHECK(!RG_mapLookup(map, "Kirby.gb", name, sizeof(name)));
-	CHECK(!RG_mapLookup("", "Kirby.gb", name, sizeof(name)));
 }
 
 static void testSets(void) {
@@ -723,6 +709,35 @@ static void testFrom(void) {
 	fake_set_count = 0;
 }
 
+// Nothing to pick, and no root row, until the card index is ready; then
+// the lists reload with it.
+static void testIndexReady(void) {
+	fakeIndexDrop();
+	fake_index_ready = 0;
+	cfg_root[0] = '\0';
+	start();
+	MosaicList* root = fakeListNew();
+	plugin.root_entries(root);
+	CHECK(root->count == 0);
+	freeList(root);
+	CHECK(!canPickAll(NULL, NULL));
+	fakeIndexRebuild();
+	root = fakeListNew();
+	plugin.root_entries(root);
+	CHECK(root->count == 1);
+	freeList(root);
+	CHECK(canPickAll(NULL, NULL));
+	// a game added shows once the index has it
+	writeText(GB "/Added.gb", "");
+	fakeIndexRebuild();
+	scan();
+	int found = 0;
+	for (int i = 0; i < library.count; i++) found |= !strcmp(library.games[i].path, GB "/Added.gb");
+	CHECK(found);
+	unlink(GB "/Added.gb");
+	fakeIndexRebuild();
+}
+
 static void testOldLauncher(void) {
 	fake.size = offsetof(MosaicHost, open_path);
 	start();
@@ -832,7 +847,6 @@ static void testUnplayedOnly(void) {
 int main(void) {
 	makeCard();
 	testSystems();
-	testNames();
 	testSets();
 	testPlayed();
 	testWeights();
@@ -844,6 +858,7 @@ int main(void) {
 	testTile();
 	testFrom();
 	testUnplayedOnly();
+	testIndexReady();
 	testOldLauncher();
 	quit();
 	CHECK_DONE();

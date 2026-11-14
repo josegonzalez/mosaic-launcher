@@ -22,16 +22,16 @@
 // from a Pick from tile on the quick menu (the "from_tile" setting), a
 // game list button (the "from_button" setting), or an FN button.
 //
-// The card is scanned once per launcher start, the first time a pick or
-// the root needs it, the way stock lists it: dot files, .disabled and
-// map.txt names left out, and only systems with an emulator. A folder with
-// a .cue or .m3u named after itself is one game, launched as opening it
-// would.
+// The games come from the launcher's card index (index_count and the
+// rest), as stock lists them: dot files, .disabled and map.txt names left
+// out, only systems with an emulator, three folders deep. A folder with a
+// .cue or .m3u named after itself is one game, launched as opening it
+// would. They're listed again each time the index changes
+// (launcher.index_ready); until it's first ready there's nothing to pick.
 //
 // Opening the root row shows the picked game and launches it on the next
 // frame; if a plugin cancels the launch it stays there to try again.
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,7 +43,7 @@
 
 #define ID "random-game"
 #define FOLDER_NAME "Random game"
-#define MAX_DEPTH 3   // subfolders below a system folder that are scanned
+#define MAX_DEPTH 3   // subfolders below a system folder picked from
 #define MAX_RECENTS 64 // more than the game switcher keeps
 
 static const MosaicHost* host;
@@ -77,118 +77,40 @@ static int exists(const char* path) {
 	return stat(path, &st) == 0;
 }
 
-static int isDir(const char* path) {
-	struct stat st;
-	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
-}
-
-static int endsWith(const char* s, const char* suffix) {
-	size_t a = strlen(s), b = strlen(suffix);
-	return a >= b && !strcmp(s + a - b, suffix);
-}
-
 static int isOn(const char* key, const char* fallback) {
 	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
 
-static char* readFile(const char* path) {
-	FILE* f = fopen(path, "r");
-	if (!f) return NULL;
-	fseek(f, 0, SEEK_END);
-	long size = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	char* text = size >= 0 ? malloc((size_t)size + 1) : NULL;
-	if (text) text[fread(text, 1, (size_t)size, f)] = '\0';
-	fclose(f);
-	return text;
-}
-
-// True when a name is hidden in its folder, by name or by map.txt.
-static int hiddenIn(const char* map, const char* name) {
-	if (RG_hiddenName(name)) return 1;
-	char alias[256];
-	return map && RG_mapLookup(map, name, alias, sizeof(alias)) && RG_hiddenName(alias);
-}
-
 ///////////////////////////////////////
-// scanning
-
-// True when a system folder has an emulator, as stock checks before
-// listing it: the emulator is the tag in the folder's last parentheses.
-static int hasEmulator(const char* folder) {
-	char emu[256];
-	const char* open = strrchr(folder, '(');
-	if (snprintf(emu, sizeof(emu), "%s", open ? open + 1 : folder) >= (int)sizeof(emu)) return 0;
-	char* close = strchr(emu, ')');
-	if (open && close) *close = '\0';
-
-	char path[RG_PATH_LEN * 2];
-	if (snprintf(path, sizeof(path), "%s/.system/%s/paks/Emus/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-			&& exists(path)) return 1;
-	return snprintf(path, sizeof(path), "%s/Emus/%s/%s.pak/launch.sh", host->sdcard_path, host->platform, emu) < (int)sizeof(path)
-		&& exists(path);
-}
-
-// A folder that launches a game when opened: it holds a .cue or .m3u
-// named after itself.
-static int isGameFolder(const char* path, const char* name) {
-	char file[RG_PATH_LEN * 2];
-	if (snprintf(file, sizeof(file), "%s/%s.cue", path, name) < (int)sizeof(file) && exists(file)) return 1;
-	return snprintf(file, sizeof(file), "%s/%s.m3u", path, name) < (int)sizeof(file) && exists(file);
-}
-
-static void scanDir(const char* dir, const char* system, int depth) {
-	DIR* dh = opendir(dir);
-	if (!dh) return;
-
-	char map_path[RG_PATH_LEN + 16];
-	snprintf(map_path, sizeof(map_path), "%s/map.txt", dir);
-	char* map = readFile(map_path);
-
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (hiddenIn(map, dp->d_name)) continue;
-		char path[RG_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", dir, dp->d_name) >= (int)sizeof(path)) continue;
-
-		int type = MOSAIC_ENTRY_ROM;
-		if (isDir(path)) {
-			if (endsWith(dp->d_name, ".pak")) type = MOSAIC_ENTRY_PAK;
-			else if (isGameFolder(path, dp->d_name)) type = MOSAIC_ENTRY_DIR;
-			else {
-				if (depth < MAX_DEPTH) scanDir(path, system, depth + 1);
-				continue;
-			}
-		}
-		if (RG_add(&library, path, type, system) != 0) break;
-	}
-	closedir(dh);
-	free(map);
-}
+// the games, from the card index
 
 static void scan(void) {
 	if (scanned) return;
+	RG_free(&library);
+	RG_init(&library);
+	if (!MOSAIC_HOST_HAS(host, index_refresh) || host->index_count(NULL) == MOSAIC_INDEX_NOT_READY) return;
 	scanned = 1;
-
-	DIR* dh = opendir(roms_path);
-	if (!dh) return;
-	char map_path[RG_PATH_LEN + 16];
-	snprintf(map_path, sizeof(map_path), "%s/map.txt", roms_path);
-	char* map = readFile(map_path);
-
-	struct dirent* dp;
-	while ((dp = readdir(dh)) != NULL) {
-		if (hiddenIn(map, dp->d_name) || !hasEmulator(dp->d_name)) continue;
-		char path[RG_PATH_LEN];
-		if (snprintf(path, sizeof(path), "%s/%s", roms_path, dp->d_name) >= (int)sizeof(path)) continue;
-		if (isDir(path)) scanDir(path, dp->d_name, 0);
+	int count = host->index_count(NULL);
+	for (int i = 0; i < count; i++) {
+		MosaicIndexEntry e = { .size = sizeof(e) };
+		if (host->index_entry(NULL, i, &e) != 0) break;
+		if (e.kind != MOSAIC_INDEX_GAME || !e.emulator || e.depth > MAX_DEPTH) continue;
+		if (RG_add(&library, e.path, e.type, e.system) != 0) break;
 	}
-	closedir(dh);
-	free(map);
 
 	char message[96];
 	snprintf(message, sizeof(message), "%d games in %d systems", library.count, library.system_count);
 	say(message);
+}
+
+// The index changed: list the games again when next asked, and the root,
+// whose row shows only while there's a game.
+static void indexReady(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	scanned = 0;
+	if (MOSAIC_HOST_HAS(host, reload_lists)) host->reload_lists();
 }
 
 ///////////////////////////////////////
@@ -473,6 +395,11 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, open_path)) {
 		say("this launcher can't open games for plugins; nothing to do");
 		return 0;
+	}
+	if (!MOSAIC_HOST_HAS(host, index_refresh)) say("this launcher has no card index; there's nothing to pick");
+	else {
+		host->subscribe("launcher.index_ready", indexReady, NULL);
+		host->index_count(NULL); // starts reading the card, so it's ready by the first pick
 	}
 	if (host->register_action("random-game.pick", "RANDOM", 0, canPick, pickHere, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "random-game.pick") != 0) {

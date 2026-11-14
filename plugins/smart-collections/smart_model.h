@@ -35,10 +35,6 @@ void SM_catalogAddBuiltin(SMCatalog* catalog);
 // names holding a slash are skipped. Returns how many were added.
 int SM_catalogAddList(SMCatalog* catalog, const char* list);
 
-// The name stock shows for a file or folder name: no extensions (1 to 4
-// letters each), nothing from the first ( or [ on, no trailing spaces.
-void SM_cleanName(const char* file_name, char* out, size_t size);
-
 // Lowercase ASCII words separated by single spaces: punctuation splits
 // words, "é" counts as "e", other non-ASCII bytes stay as they are.
 void SM_normalize(const char* in, char* out, size_t size);
@@ -50,12 +46,8 @@ int SM_hasKeyword(const char* title, const char* keyword);
 // True when a normalized title belongs to the franchise.
 int SM_inFranchise(const SMFranchise* franchise, const char* title);
 
-// The alias a map.txt gives a file name, or 0. map holds the whole file:
-// one "file name<tab>alias" per line.
-int SM_mapLookup(const char* map, const char* file_name, char* out, size_t size);
-
 ///////////////////////////////////////
-// the games a scan found, grouped by franchise
+// the games the card index lists, grouped by franchise
 
 typedef struct SMGame {
 	char* path;
