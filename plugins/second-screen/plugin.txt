@@ -7,3 +7,11 @@ description=Shows the selected game in a second window. It's experimental and on
 # experimental: no NextUI device has a second display, so this shows the selection in a second window on the desktop build, and declines to start on devices
 # the second window's size, width by height
 setting.size=choice|Window size|640x480|480x320,640x480,800x480,480x640
+# under the name: the fields metadata-band shows under a game's art, from its .info sidecar
+setting.details=toggle|Game details|on
+# under the details: the play time caption playtime-captions shows on a game's row
+setting.caption=toggle|Play time caption|on
+# under the name: whether a game is a favorite (from the favorites plugin) and its tags (from the tags plugin)
+setting.marks=toggle|Favorite and tag marks|on
+# at the bottom: what the music plugin plays
+setting.music=toggle|Now playing|on

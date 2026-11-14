@@ -1,7 +1,8 @@
 // The second screen's model: where things go on the companion frame, how
-// the name wraps, which .info lines show, the window size setting and the
-// frame file the plugin hands the display program. No SDL, so the plugin,
-// the display program and the unit test all build it.
+// the name wraps, what the panel beside or under the art shows, the window
+// size setting and the frame file the plugin hands the display program.
+// No SDL, so the plugin, the display program and the unit test all build
+// it.
 
 #ifndef SS_MODEL_H
 #define SS_MODEL_H
@@ -57,19 +58,61 @@ MosaicRect SS_fit(int src_w, int src_h, MosaicRect box);
 typedef int (*SSMeasure)(const char* text, void* data);
 int SS_wrap(const char* text, int max_width, int max_lines, SSMeasure measure, void* data, char lines[][SS_LINE_SIZE]);
 
-// The .info keys the frame shows, in order, with their labels.
-enum { SS_YEAR, SS_GENRE, SS_PUBLISHER, SS_DEVELOPER, SS_PLAYERS, SS_INFO_COUNT };
-const char* SS_infoKey(int field);
-const char* SS_infoLabel(int field);
+// What the panel beside or under the art shows, each piece on unless its
+// setting (details, caption, marks, music) is "off". A piece whose owner
+// is off doesn't show either, as nothing answers for it.
+typedef struct SSShow {
+	int details; // metadata-band's fields, from its info.format
+	int caption; // playtime-captions' caption, from its captions.text
+	int marks;   // favorite and tag marks, from favorites' and tags' sets
+	int music;   // what music plays, from music's music.now
+} SSShow;
+typedef const char* (*SSSetting)(const char* key, const char* fallback);
+void SS_showFrom(SSSetting get, SSShow* out);
 
-// A raw .info value tidied: spaces trimmed, and a year written as a date
-// (1994-11-21) cut to its four digits. Returns 1 when something's left.
-int SS_clean(int field, const char* raw, char* out, size_t size);
+// The label for an .info key info.format replies with, such as "Year" for
+// year, or NULL for a key the panel doesn't show.
+const char* SS_infoLabel(const char* key);
 
-// "<label>: <value>" for each field get finds (get writes the raw value
-// and returns 1, or 0 for none), up to max lines. Returns the lines written.
-typedef int (*SSInfoGet)(const char* key, char* out, size_t size, void* data);
-int SS_infoLines(SSInfoGet get, void* data, char lines[][SS_LINE_SIZE], int max);
+// "<label>: <value>" for each field in an info.format reply (count=, then
+// <key>=<value> for each field with a value, in metadata-band's order,
+// then line=), up to max lines. Returns the lines written.
+#define SS_INFO_MAX 5
+int SS_infoLines(const char* reply, char lines[][SS_LINE_SIZE], int max);
+
+// Adds a set's tag to list, the tags joined with ", ", when the set is a
+// tags:<name> one. Returns 1 when it was added.
+int SS_tagAdd(char* list, size_t size, const char* set_name);
+
+// The marks line: "Favorite", "Tags: <tags>", both joined with " · ", or
+// "" for neither. Returns 1 when there's a mark.
+int SS_marks(int favorite, const char* tags, char* out, size_t size);
+
+// What the panel has for an entry, as the plugin gathered it on the
+// launcher's thread: NULL or "" for a piece nobody answered for.
+typedef struct SSPieces {
+	int empty;           // an empty folder
+	int type;            // an enum MosaicEntryType
+	const char* info;    // info.format's reply
+	const char* caption; // captions.text's text=
+	int favorite;        // in the favorites set
+	const char* tags;    // the tags it has, joined with ", "
+	const char* music;   // music.now's line=
+} SSPieces;
+
+// The panel's rows under the name, in order, and the now playing line
+// kept for the bottom of the frame ("" for none).
+enum { SS_ROW_KIND, SS_ROW_MARKS, SS_ROW_INFO, SS_ROW_CAPTION };
+#define SS_ROWS_MAX (3 + SS_INFO_MAX)
+typedef struct SSPanel {
+	struct {
+		int style; // an SS_ROW_*
+		char text[SS_LINE_SIZE];
+	} rows[SS_ROWS_MAX];
+	int count;
+	char music[SS_LINE_SIZE];
+} SSPanel;
+void SS_panel(const SSShow* show, const SSPieces* pieces, SSPanel* out);
 
 // What an entry is (an enum MosaicEntryType), for the frame: "Game",
 // "Folder", "Pak", or "" for anything else.

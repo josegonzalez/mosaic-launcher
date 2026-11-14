@@ -1,7 +1,16 @@
-// The second screen: mirrors the game list's selection, its name, art and
-// a few .info fields, on a second display. No NextUI device has one, so
-// only the desktop build shows it, in a second window, and on devices
-// the plugin declines to start.
+// The second screen: mirrors the game list's selection, its name and art,
+// on a second display. No NextUI device has one, so only the desktop
+// build shows it, in a second window, and on devices the plugin declines
+// to start.
+//
+// A panel beside or under the art shows what other plugins know of the
+// entry: metadata-band's fields (its info.format), playtime-captions'
+// caption (captions.text), favorites' and tags' marks (their entry sets)
+// and, at the bottom, what music plays (music.now). Each is asked on the
+// launcher's thread, when the selection changes, a set changes
+// (launcher.set_changed) or, for music, once a second, and drawn into the
+// frame, so the display program only ever gets pixels. A piece whose
+// owner is off, or whose setting is, doesn't show.
 //
 // The window belongs to second-screen-display, a small SDL2 program
 // beside plugin.so that the plugin starts, so nothing about the
@@ -40,12 +49,14 @@
 #define DISPLAY_PROGRAM "second-screen-display"
 #define ART_WAIT_MS 2000   // how long a frame waits for art still loading
 #define READ_BUDGET_NS 4000000L // reading the frame back, per tick
+#define MUSIC_MS 1000      // how often to ask what music plays
 
 extern char** environ;
 
 static const MosaicHost* host;
 static int frame_w = 640, frame_h = 480;
 static SSLayout layout;
+static SSShow show;
 
 static pid_t display_pid = -1;
 static int display_fd = -1; // our end of the display program's stdin
@@ -63,9 +74,16 @@ static struct {
 	char path[1024];
 	char name[SS_LINE_SIZE];
 	int type;
-	char info[SS_INFO_COUNT][SS_LINE_SIZE];
-	int info_count;
+	char info[MOSAIC_CALL_MAX]; // info.format's reply
+	char caption[SS_LINE_SIZE];
+	int favorite;
+	char tags[SS_LINE_SIZE];
 } want;
+static int have_want = 0; // want has an entry or an empty folder to redraw
+
+// what music plays, music.now's line, and when it was last asked
+static char music[SS_LINE_SIZE];
+static unsigned long music_at = 0;
 
 // reading the frame back
 static struct {
@@ -74,6 +92,7 @@ static struct {
 	int ticks;
 	long ns;
 	char summary[SS_LINE_SIZE + 256];
+	char panel[3 * SS_LINE_SIZE + 64];
 } reading;
 
 // Fixed text, translated in this plugin's id's context.
@@ -253,18 +272,51 @@ static int displayGone(void) {
 	return 1;
 }
 
-static int infoGet(const char* key, char* out, size_t size, void* data) {
-	return host->entry_info((const MosaicEntry*)data, key, out, size) == 1;
-}
-
 static int measure(const char* text, void* data) {
 	return host->text_width(*(const int*)data, text);
+}
+
+// Another plugin's service, by its name: 1 with its reply in out, or 0
+// (out empty) when nobody provides it or it failed.
+static int ask(const char* name, const char* args, char* out, size_t size) {
+	out[0] = '\0';
+	if (!MOSAIC_HOST_HAS(host, call) || host->call(name, args, out, size) < 0) {
+		out[0] = '\0';
+		return 0;
+	}
+	return 1;
+}
+
+static void addTag(const char* name, void* data) {
+	(void)data;
+	if (!strncmp(name, "tags:", 5) && host->set_has(name, want.path) == 1) SS_tagAdd(want.tags, sizeof(want.tags), name);
+}
+
+// The favorite and tag marks for want's entry. A set nobody registered,
+// as when its plugin is off, has nothing in it.
+static void readMarks(void) {
+	want.favorite = 0;
+	want.tags[0] = '\0';
+	if (!show.marks || want.empty || !want.path[0] || !MOSAIC_HOST_HAS(host, set_names)) return;
+	want.favorite = host->set_has("favorites", want.path) == 1;
+	host->set_names(addTag, NULL);
+}
+
+// What music plays, "" for nothing.
+static void readMusic(char* out, size_t size) {
+	char reply[MOSAIC_CALL_MAX];
+	out[0] = '\0';
+	if (show.music && ask("music.now", NULL, reply, sizeof(reply)) && host->event_value(reply, "line", out, size) < 0)
+		out[0] = '\0';
 }
 
 static int selectionChanged(const MosaicEntry* entry) {
 	if (display_pid <= 0) return 0;
 	memset(&want, 0, sizeof(want));
 	want.pending = 1;
+	have_want = 1;
+	readMusic(music, sizeof(music));
+	music_at = 0;
 	if (!entry) {
 		want.empty = 1;
 		return 0;
@@ -274,8 +326,31 @@ static int selectionChanged(const MosaicEntry* entry) {
 	snprintf(want.path, sizeof(want.path), "%s", path ? path : "");
 	snprintf(want.name, sizeof(want.name), "%s", name ? name : "");
 	want.type = host->entry_type(entry);
-	want.info_count = SS_infoLines(infoGet, (void*)entry, want.info, SS_INFO_COUNT);
+	if (!want.path[0]) return 0;
+	char args[1200];
+	snprintf(args, sizeof(args), "path=%s\n", want.path);
+	if (show.details) ask("info.format", args, want.info, sizeof(want.info));
+	if (show.caption) {
+		char reply[MOSAIC_CALL_MAX];
+		snprintf(args, sizeof(args), "path=%s\nwidth=%i\n", want.path, layout.text.w);
+		if (ask("captions.text", args, reply, sizeof(reply))
+			&& host->event_value(reply, "text", want.caption, sizeof(want.caption)) < 0)
+			want.caption[0] = '\0';
+	}
+	readMarks();
 	return 0;
+}
+
+// A set changed: the marks are asked again, and the frame redrawn.
+static void setChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)data;
+	char set[256];
+	if (!have_want || !show.marks || host->event_value(payload, "name", set, sizeof(set)) < 0) return;
+	if (strcmp(set, "favorites") != 0 && strncmp(set, "tags:", 5) != 0) return;
+	readMarks();
+	want.pending = 1;
+	want.since = 0;
 }
 
 static MosaicColor theme(int index, unsigned int fallback, unsigned char alpha) {
@@ -304,32 +379,60 @@ static int compose(const MosaicSurface* img) {
 		host->fill_round_rect(frame, &layout.art, layout.margin / 2, theme(MOSAIC_COLOR_ACCENT, 0x808080, 48));
 	}
 
+	SSPieces pieces = { want.empty, want.type, want.info, want.caption, want.favorite, want.tags, music };
+	SSPanel panel;
+	SS_panel(&show, &pieces, &panel);
+
 	MosaicColor ink = theme(MOSAIC_COLOR_LIST_TEXT, 0xffffff, 255);
-	MosaicColor accent = theme(MOSAIC_COLOR_ACCENT, 0xffffff, 255);
+	MosaicColor colors[] = {
+		[SS_ROW_KIND] = theme(MOSAIC_COLOR_ACCENT, 0xffffff, 255),
+		[SS_ROW_MARKS] = theme(MOSAIC_COLOR_ACCENT, 0xffffff, 255),
+		[SS_ROW_INFO] = ink,
+		[SS_ROW_CAPTION] = theme(MOSAIC_COLOR_HINT, 0xffffff, 255),
+	};
 	const MosaicRect* t = &layout.text;
 	int bottom = t->y + t->h;
 	int y = t->y;
 	int title_font = MOSAIC_FONT_LARGE, small_font = MOSAIC_FONT_TINY;
 	int title_h = host->text_height(title_font), small_h = host->text_height(small_font);
 	if (title_h <= 0 || small_h <= 0) return -1;
+	// what music plays takes the column's last line
+	if (panel.music[0]) {
+		bottom -= small_h;
+		if (bottom >= t->y && host->draw_text(frame, small_font, panel.music, t->x, bottom, colors[SS_ROW_CAPTION], t->w) < 0)
+			return -1;
+		bottom -= small_h / 2;
+	}
 
 	char lines[SS_TITLE_LINES][SS_LINE_SIZE];
 	int count = SS_wrap(want.empty ? tr("Empty folder") : want.name, t->w, SS_TITLE_LINES, measure, &title_font, lines);
 	for (int i = 0; i < count && y + title_h <= bottom; i++, y += title_h)
 		if (host->draw_text(frame, title_font, lines[i], t->x, y, ink, t->w) < 0) return -1;
 	y += small_h / 2;
-	const char* kind = want.empty ? "" : SS_kindLabel(want.type);
-	if (kind[0] && y + small_h <= bottom) {
-		if (host->draw_text(frame, small_font, tr(kind), t->x, y, accent, t->w) < 0) return -1;
-		y += small_h + small_h / 2;
-	}
 	int shown = 0;
-	for (int i = 0; i < want.info_count && y + small_h <= bottom; i++, y += small_h, shown++)
-		if (host->draw_text(frame, small_font, want.info[i], t->x, y, ink, t->w) < 0) return -1;
+	const char* kind = "no kind";
+	const char* marks = "";
+	const char* caption = "";
+	for (int i = 0; i < panel.count && y + small_h <= bottom; i++) {
+		int style = panel.rows[i].style;
+		// a gap after the kind, before the rest
+		if (style != SS_ROW_KIND && i > 0 && panel.rows[i - 1].style == SS_ROW_KIND) {
+			y += small_h / 2;
+			if (y + small_h > bottom) break;
+		}
+		if (host->draw_text(frame, small_font, panel.rows[i].text, t->x, y, colors[style], t->w) < 0) return -1;
+		y += small_h;
+		if (style == SS_ROW_KIND) kind = SS_kindLabel(want.type);
+		else if (style == SS_ROW_MARKS) marks = panel.rows[i].text;
+		else if (style == SS_ROW_INFO) shown++;
+		else caption = panel.rows[i].text;
+	}
 
 	snprintf(reading.summary, sizeof(reading.summary), "%s: %s, %i title line%s, %s, %i info line%s",
-		want.empty ? "an empty folder" : want.name, art_note, count, count == 1 ? "" : "s",
-		kind[0] ? kind : "no kind", shown, shown == 1 ? "" : "s");
+		want.empty ? "an empty folder" : want.name, art_note, count, count == 1 ? "" : "s", kind, shown,
+		shown == 1 ? "" : "s");
+	snprintf(reading.panel, sizeof(reading.panel), "marks \"%s\", caption \"%s\", music \"%s\"", marks, caption,
+		panel.music);
 	return 0;
 }
 
@@ -397,6 +500,20 @@ static void readBack(void) {
 	writeFrame();
 	say("frame %u: %s, read in %li ms over %i tick%s", frame_number, reading.summary, reading.ns / 1000000L,
 		reading.ticks, reading.ticks == 1 ? "" : "s");
+	say("frame %u panel: %s", frame_number, reading.panel);
+}
+
+// Asks what music plays once a second, and redraws the frame when it's
+// changed.
+static void pollMusic(unsigned long now) {
+	if (!show.music || !have_want || (music_at && now - music_at < MUSIC_MS)) return;
+	music_at = now ? now : 1;
+	char line[SS_LINE_SIZE];
+	readMusic(line, sizeof(line));
+	if (!strcmp(line, music)) return;
+	snprintf(music, sizeof(music), "%s", line);
+	want.pending = 1;
+	want.since = 0;
 }
 
 static void tick(unsigned long now) {
@@ -405,6 +522,7 @@ static void tick(unsigned long now) {
 		readBack();
 		return;
 	}
+	pollMusic(now);
 	if (!want.pending) return;
 	if (!want.since) want.since = now ? now : 1;
 	const MosaicSurface* img;
@@ -443,7 +561,7 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	if (!MOSAIC_HOST_HAS(host, selection_settle_ms) || !MOSAIC_HOST_HAS(host, draw_text)
-		|| !MOSAIC_HOST_HAS(host, entry_info) || !MOSAIC_HOST_HAS(host, theme_color)) {
+		|| !MOSAIC_HOST_HAS(host, theme_color)) {
 		say("this launcher can't draw the frame or say when the selection changes, so the second screen doesn't start");
 		return 1;
 	}
@@ -453,6 +571,7 @@ static int init(const MosaicHost* h) {
 		SS_parseSize(SS_SIZE_DEFAULT, &frame_w, &frame_h);
 	}
 	SS_layout(frame_w, frame_h, &layout);
+	SS_showFrom(host->cfg_get, &show);
 
 	char dir[768], program[800];
 	if (!ownDir(dir, sizeof(dir)) || snprintf(program, sizeof(program), "%s/" DISPLAY_PROGRAM, dir) >= (int)sizeof(program)
@@ -472,12 +591,18 @@ static int init(const MosaicHost* h) {
 	}
 	memset(&want, 0, sizeof(want));
 	memset(&reading, 0, sizeof(reading));
+	have_want = 0;
+	music[0] = '\0';
+	music_at = 0;
 	if (!openDisplay(program)) {
 		free(pixels);
 		pixels = NULL;
 		return 1;
 	}
+	if (show.marks && MOSAIC_HOST_HAS(host, set_names)) host->subscribe("launcher.set_changed", setChanged, NULL);
 	say("showing the selection in a %ix%i window, experimental, frames in %s", frame_w, frame_h, frame_path);
+	say("details %s, caption %s, marks %s, music %s", show.details ? "on" : "off", show.caption ? "on" : "off",
+		show.marks ? "on" : "off", show.music ? "on" : "off");
 	return 0;
 }
 

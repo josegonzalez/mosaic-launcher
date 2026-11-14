@@ -28,6 +28,10 @@
 #                           (600 by default, before stock starts scrolling
 #                           a long selected name), eg. an animation's middle
 #   args <arg>...           passed to nextui.elf, eg. --settings plugins
+#   window                  saves second-screen's window in place of the
+#                           launcher's frame, at the window's size: the
+#                           newest frame its display program saved to
+#                           $MOSAIC_SECOND_SCREEN_SHOT
 #   shot <name>             starts the launcher and saves that frame as
 #                           plugins/<id>/docs/<name>.png, <id> being the file's
 #
@@ -191,6 +195,7 @@ begin() {
 	keys=""
 	keep_after=600
 	elf_args=""
+	window_shot=0
 }
 
 on() { turned_on="$turned_on $*"; }
@@ -225,6 +230,24 @@ docs_dir() {
 }
 after() { keep_after="$1"; }
 args() { elf_args="$*"; }
+window() { window_shot=1; }
+
+# window_frame <dir>: the newest frame-<n>.bmp second-screen's display
+# program saved in dir, or nothing
+window_frame() {
+	newest=""
+	best=-1
+	for bmp in "$1"/frame-*.bmp; do
+		[ -f "$bmp" ] || continue
+		n=${bmp##*/frame-}
+		n=${n%.bmp}
+		if [ "$n" -gt "$best" ]; then
+			best=$n
+			newest=$bmp
+		fi
+	done
+	echo "$newest"
+}
 
 # shot <name>: runs the launcher until presser is done, and keeps the frame
 # shown "after" milliseconds after the last press as plugins/<id>/docs/<name>.png
@@ -233,7 +256,12 @@ shot() {
 	log="$WORK/logs/$plugin-$1.log"
 	frame="$WORK/frames/$plugin-$1"
 	mkdir -p "$(dirname "$out")" "$WORK/logs" "$WORK/frames"
-	rm -f "$frame.bmp" "$frame.txt"
+	rm -rf "$frame.bmp" "$frame.txt" "$frame-window"
+	shot_dir=""
+	if [ "$window_shot" -eq 1 ]; then
+		shot_dir="$frame-window"
+		mkdir -p "$shot_dir"
+	fi
 	plugins_txt >"$STATE/plugins.txt"
 	# shellcheck disable=SC2086 # elf_args is split on purpose
 	(
@@ -242,6 +270,7 @@ shot() {
 			SDCARD_PATH="$CARD" SYSTEM_PATH="$CARD/.system/desktop" PLATFORM=desktop \
 			MOSAIC_LAUNCHER_PAK_DIR="$ROOT/pak" MOSAIC_LAUNCHER_RUN_DIR="$WORK/run" SDL_AUDIODRIVER=dummy \
 			PRESSER_KEYS="wait $keys" PRESSER_STEP=450 PRESSER_FRAME="$frame" PRESSER_SHOT="$keep_after"
+		[ -n "$shot_dir" ] && export MOSAIC_SECOND_SCREEN_SHOT="$shot_dir"
 		exec "$ELF" $elf_args
 	) >"$log" 2>&1 &
 	pid=$!
@@ -266,12 +295,22 @@ shot() {
 	if grep -qF "[INFO] cmd: " "$log"; then
 		rm -f /tmp/next /tmp/mosaic-launcher-launched /tmp/mosaic-launcher-home
 	fi
-	if [ ! -s "$frame.bmp" ]; then
+	from="$frame.bmp"
+	size=640x480
+	if [ -n "$shot_dir" ]; then
+		# the window's size, which a HiDPI display may have saved larger
+		from=$(window_frame "$shot_dir")
+		size=$(sed -n 's/.*plugin second-screen: showing the selection in a \([0-9]*x[0-9]*\) window.*/\1/p' "$log" | head -n 1)
+		if [ -z "$from" ] || [ -z "$size" ]; then
+			fail "$plugin $1: second-screen's window saved no frame; log in $log"
+			return
+		fi
+	elif [ ! -s "$from" ]; then
 		fail "$plugin $1: no frame saved; log in $log"
 		return
 	fi
 	# 256 colours without dithering keeps the UI's flat colours exact and the files small
-	"$MAGICK" "$frame.bmp" -alpha off -resize '640x480!' -dither None -colors 256 -strip \
+	"$MAGICK" "$from" -alpha off -resize "$size!" -dither None -colors 256 -strip \
 		-define png:exclude-chunks=date,time -define png:compression-level=9 "PNG8:$out" \
 		|| fail "$plugin $1: converting the frame"
 	count=$((count + 1))

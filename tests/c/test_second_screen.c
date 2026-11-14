@@ -1,6 +1,6 @@
 // The second screen's model: the platforms with a second display, the size
-// setting, the frame's layout, fitting art, wrapping the name, the .info
-// lines and the frame file's header.
+// setting, the frame's layout, fitting art, wrapping the name, the
+// panel and the frame file's header.
 
 #include "check.h"
 #include "words.h"
@@ -18,24 +18,25 @@ static int rectIs(MosaicRect r, int x, int y, int w, int h) {
 	return 0;
 }
 
-// a fake .info: key=value pairs separated by newlines
-static int infoGet(const char* key, char* out, size_t size, void* data) {
-	const char* p = (const char*)data;
+// settings for SS_showFrom: key=value pairs separated by newlines
+static const char* settings = "";
+static const char* setting(const char* key, const char* fallback) {
+	static char value[32];
 	size_t klen = strlen(key);
-	while (p && *p) {
+	for (const char* p = settings; p && *p;) {
 		const char* eol = strchr(p, '\n');
 		size_t n = eol ? (size_t)(eol - p) : strlen(p);
 		if (n > klen && !strncmp(p, key, klen) && p[klen] == '=') {
-			size_t v = n - klen - 1;
-			if (v >= size) v = size - 1;
-			memcpy(out, p + klen + 1, v);
-			out[v] = '\0';
-			return 1;
+			snprintf(value, sizeof(value), "%.*s", (int)(n - klen - 1), p + klen + 1);
+			return value;
 		}
 		p = eol ? eol + 1 : NULL;
 	}
-	out[0] = '\0';
-	return 0;
+	return fallback;
+}
+
+static void showAll(SSShow* show) {
+	show->details = show->caption = show->marks = show->music = 1;
 }
 
 int main(void) {
@@ -143,52 +144,138 @@ int main(void) {
 	CHECK(strlen(lines[0]) == SS_LINE_SIZE - 1);
 	CHECK(strlen(lines[1]) == SS_LINE_SIZE - 1);
 
-	// .info keys and labels
-	CHECK_STR(SS_infoKey(SS_YEAR), "year");
-	CHECK_STR(SS_infoKey(SS_PLAYERS), "players");
-	CHECK_STR(SS_infoLabel(SS_GENRE), "Genre");
-	CHECK(SS_infoKey(-1) == NULL && SS_infoKey(SS_INFO_COUNT) == NULL && SS_infoLabel(SS_INFO_COUNT) == NULL);
+	// the settings: every piece on unless it's off
+	SSShow show;
+	settings = "";
+	SS_showFrom(setting, &show);
+	CHECK(show.details && show.caption && show.marks && show.music);
+	settings = "details=off\nmusic=off\ncaption=on";
+	SS_showFrom(setting, &show);
+	CHECK(!show.details && show.caption && show.marks && !show.music);
+	settings = "caption=off\nmarks=off";
+	SS_showFrom(setting, &show);
+	CHECK(show.details && !show.caption && !show.marks && show.music);
+	SS_showFrom(NULL, &show);
+	CHECK(show.details && show.caption && show.marks && show.music);
 
-	// tidying values
-	char v[16];
-	CHECK(SS_clean(SS_YEAR, "1994-11-21", v, sizeof(v)));
-	CHECK_STR(v, "1994");
-	CHECK(SS_clean(SS_YEAR, " 1994 ", v, sizeof(v)));
-	CHECK_STR(v, "1994");
-	CHECK(SS_clean(SS_YEAR, "199x-01", v, sizeof(v)));
-	CHECK_STR(v, "199x-01");
-	CHECK(SS_clean(SS_GENRE, "1994-11-21", v, sizeof(v)));
-	CHECK_STR(v, "1994-11-21");
-	CHECK(SS_clean(SS_GENRE, "\t Puzzle \r", v, sizeof(v)));
-	CHECK_STR(v, "Puzzle");
-	CHECK(SS_clean(SS_PUBLISHER, "A Very Long Publisher Name", v, sizeof(v)));
-	CHECK_STR(v, "A Very Long Pub");
-	CHECK(!SS_clean(SS_GENRE, "   ", v, sizeof(v)));
-	CHECK_STR(v, "");
-	CHECK(!SS_clean(SS_GENRE, NULL, v, sizeof(v)));
+	// labels for info.format's keys
+	CHECK_STR(SS_infoLabel("year"), "Year");
+	CHECK_STR(SS_infoLabel("players"), "Players");
+	CHECK(SS_infoLabel("count") == NULL && SS_infoLabel("line") == NULL && SS_infoLabel("tier") == NULL);
+	CHECK(SS_infoLabel(NULL) == NULL);
 
-	// the lines, in the frame's order, leaving out empty and missing keys
-	char info[SS_INFO_COUNT][SS_LINE_SIZE];
-	CHECK(SS_infoLines(infoGet, "publisher=Nintendo\nyear=1994-11-21\ngenre= \ntier=3\nplayers=2", info, SS_INFO_COUNT) == 3);
-	CHECK_STR(info[0], "Year: 1994");
-	CHECK_STR(info[1], "Publisher: Nintendo");
-	CHECK_STR(info[2], "Players: 2");
-	CHECK(SS_infoLines(infoGet, "year=2001\ngenre=Racing\npublisher=P\ndeveloper=D\nplayers=4", info, 2) == 2);
-	CHECK_STR(info[1], "Genre: Racing");
-	CHECK(SS_infoLines(infoGet, "tier=3", info, SS_INFO_COUNT) == 0);
-	CHECK(SS_infoLines(infoGet, "", info, SS_INFO_COUNT) == 0);
-	CHECK(SS_infoLines(NULL, "", info, SS_INFO_COUNT) == 0);
+	// info.format's reply as lines, in its order, leaving out count, line
+	// and keys without a label or a value
+	char info[SS_INFO_MAX][SS_LINE_SIZE];
+	CHECK(SS_infoLines("count=3\npublisher=Nintendo\nyear=1994\ngenre=Platformer\n"
+		"line=Nintendo \xc2\xb7 1994 \xc2\xb7 Platformer", info, SS_INFO_MAX) == 3);
+	CHECK_STR(info[0], "Publisher: Nintendo");
+	CHECK_STR(info[1], "Year: 1994");
+	CHECK_STR(info[2], "Genre: Platformer");
+	CHECK(SS_infoLines("count=2\nyear=2001\ntier=3\ngenre=\ndeveloper=A=B\nline=x", info, SS_INFO_MAX) == 2);
+	CHECK_STR(info[0], "Year: 2001");
+	CHECK_STR(info[1], "Developer: A=B");
+	CHECK(SS_infoLines("count=2\nyear=2001\ngenre=Racing", info, 1) == 1);
+	CHECK(SS_infoLines("year=2001", info, SS_INFO_MAX) == 1);
+	CHECK(SS_infoLines("count=0\nline=", info, SS_INFO_MAX) == 0);
+	CHECK(SS_infoLines("", info, SS_INFO_MAX) == 0);
+	CHECK(SS_infoLines(NULL, info, SS_INFO_MAX) == 0);
 	// in the words it's given, then English again
-	static const char* const words[] = { "Year", "A\xc3\xb1o", NULL };
+	static const char* const words[] = { "Year", "A\xc3\xb1o", "Favorite", "Favorito", "Tags: %s", "Etiquetas: %s", NULL };
 	fake_words = words;
 	SSWords set = { fakeTr, fakePlural };
 	SS_setWords(&set);
-	CHECK(SS_infoLines(infoGet, "year=1994\nplayers=2", info, SS_INFO_COUNT) == 2);
+	CHECK(SS_infoLines("count=2\nyear=1994\nplayers=2", info, SS_INFO_MAX) == 2);
 	CHECK_STR(info[0], "A\xc3\xb1o: 1994");
 	CHECK_STR(info[1], "Players: 2");
+	char marks[SS_LINE_SIZE];
+	CHECK(SS_marks(1, "RPG", marks, sizeof(marks)));
+	CHECK_STR(marks, "Favorito \xc2\xb7 Etiquetas: RPG");
 	SS_setWords(NULL);
-	CHECK(SS_infoLines(infoGet, "year=1994", info, SS_INFO_COUNT) == 1);
+	CHECK(SS_infoLines("year=1994", info, SS_INFO_MAX) == 1);
 	CHECK_STR(info[0], "Year: 1994");
+
+	// tags from the sets an entry is in, joined
+	char tags[32] = "";
+	CHECK(SS_tagAdd(tags, sizeof(tags), "tags:RPG"));
+	CHECK(!SS_tagAdd(tags, sizeof(tags), "favorites"));
+	CHECK(!SS_tagAdd(tags, sizeof(tags), "smart:New"));
+	CHECK(!SS_tagAdd(tags, sizeof(tags), "tags:"));
+	CHECK(SS_tagAdd(tags, sizeof(tags), "tags:Co-op"));
+	CHECK_STR(tags, "RPG, Co-op");
+	// one that doesn't fit is left out whole
+	CHECK(!SS_tagAdd(tags, sizeof(tags), "tags:A very long tag name"));
+	CHECK_STR(tags, "RPG, Co-op");
+	CHECK(!SS_tagAdd(NULL, 4, "tags:RPG") && !SS_tagAdd(tags, sizeof(tags), NULL));
+
+	// the marks line
+	CHECK(SS_marks(1, "", marks, sizeof(marks)));
+	CHECK_STR(marks, "Favorite");
+	CHECK(SS_marks(0, "RPG, Co-op", marks, sizeof(marks)));
+	CHECK_STR(marks, "Tags: RPG, Co-op");
+	CHECK(SS_marks(1, "RPG", marks, sizeof(marks)));
+	CHECK_STR(marks, "Favorite \xc2\xb7 Tags: RPG");
+	CHECK(!SS_marks(0, "", marks, sizeof(marks)));
+	CHECK_STR(marks, "");
+	CHECK(!SS_marks(0, NULL, marks, sizeof(marks)));
+
+	// the panel: kind, marks, fields and caption under the name, and what
+	// music plays for the bottom
+	SSPanel panel;
+	SSPieces pieces = { 0, MOSAIC_ENTRY_ROM, "count=2\nyear=1994\npublisher=Nintendo\nline=1994 \xc2\xb7 Nintendo",
+		"2h 5m \xc2\xb7 yesterday", 1, "RPG", "Song - Artist" };
+	showAll(&show);
+	SS_panel(&show, &pieces, &panel);
+	CHECK(panel.count == 5);
+	CHECK(panel.rows[0].style == SS_ROW_KIND);
+	CHECK_STR(panel.rows[0].text, "Game");
+	CHECK(panel.rows[1].style == SS_ROW_MARKS);
+	CHECK_STR(panel.rows[1].text, "Favorite \xc2\xb7 Tags: RPG");
+	CHECK(panel.rows[2].style == SS_ROW_INFO && panel.rows[3].style == SS_ROW_INFO);
+	CHECK_STR(panel.rows[2].text, "Year: 1994");
+	CHECK_STR(panel.rows[3].text, "Publisher: Nintendo");
+	CHECK(panel.rows[4].style == SS_ROW_CAPTION);
+	CHECK_STR(panel.rows[4].text, "2h 5m \xc2\xb7 yesterday");
+	CHECK_STR(panel.music, "Song - Artist");
+	// each setting off leaves its piece out
+	show.details = 0;
+	SS_panel(&show, &pieces, &panel);
+	CHECK(panel.count == 3 && panel.rows[2].style == SS_ROW_CAPTION);
+	show.details = 1;
+	show.marks = 0;
+	SS_panel(&show, &pieces, &panel);
+	CHECK(panel.count == 4 && panel.rows[1].style == SS_ROW_INFO);
+	show.marks = 1;
+	show.caption = 0;
+	SS_panel(&show, &pieces, &panel);
+	CHECK(panel.count == 4 && panel.rows[3].style == SS_ROW_INFO);
+	show.caption = 1;
+	show.music = 0;
+	SS_panel(&show, &pieces, &panel);
+	CHECK(panel.count == 5 && !panel.music[0]);
+	// an owner that's off answers nothing, so its piece doesn't show
+	showAll(&show);
+	SSPieces bare = { 0, MOSAIC_ENTRY_ROM, NULL, NULL, 0, NULL, NULL };
+	SS_panel(&show, &bare, &panel);
+	CHECK(panel.count == 1 && panel.rows[0].style == SS_ROW_KIND && !panel.music[0]);
+	bare.info = "count=0\nline=";
+	bare.caption = "";
+	bare.tags = "";
+	bare.music = "";
+	SS_panel(&show, &bare, &panel);
+	CHECK(panel.count == 1 && !panel.music[0]);
+	// an empty folder has no rows, but music still shows
+	SSPieces empty = pieces;
+	empty.empty = 1;
+	SS_panel(&show, &empty, &panel);
+	CHECK(panel.count == 0);
+	CHECK_STR(panel.music, "Song - Artist");
+	// an entry of another kind has no kind row
+	bare.type = MOSAIC_ENTRY_TOGGLE;
+	SS_panel(&show, &bare, &panel);
+	CHECK(panel.count == 0);
+	SS_panel(NULL, &pieces, &panel);
+	CHECK(panel.count == 0 && !panel.music[0]);
 
 	// what an entry is
 	CHECK_STR(SS_kindLabel(MOSAIC_ENTRY_ROM), "Game");

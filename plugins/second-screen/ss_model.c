@@ -122,44 +122,92 @@ int SS_wrap(const char* text, int max_width, int max_lines, SSMeasure measure, v
 	return count;
 }
 
-static const char* const keys[SS_INFO_COUNT] = { "year", "genre", "publisher", "developer", "players" };
-static const char* const labels[SS_INFO_COUNT] = { TR_MARK("Year"), TR_MARK("Genre"), TR_MARK("Publisher"),
+void SS_showFrom(SSSetting get, SSShow* out) {
+	if (!out) return;
+	static const char* const keys[] = { "details", "caption", "marks", "music" };
+	int* on[] = { &out->details, &out->caption, &out->marks, &out->music };
+	for (int i = 0; i < 4; i++) {
+		const char* value = get ? get(keys[i], "on") : "on";
+		*on[i] = !value || strcmp(value, "off") != 0;
+	}
+}
+
+static const char* const info_keys[] = { "year", "genre", "publisher", "developer", "players" };
+static const char* const info_labels[] = { TR_MARK("Year"), TR_MARK("Genre"), TR_MARK("Publisher"),
 	TR_MARK("Developer"), TR_MARK("Players") };
 
-const char* SS_infoKey(int field) {
-	return field >= 0 && field < SS_INFO_COUNT ? keys[field] : NULL;
+const char* SS_infoLabel(const char* key) {
+	for (int i = 0; key && i < SS_INFO_MAX; i++)
+		if (!strcmp(key, info_keys[i])) return info_labels[i];
+	return NULL;
 }
 
-const char* SS_infoLabel(int field) {
-	return field >= 0 && field < SS_INFO_COUNT ? labels[field] : NULL;
-}
-
-int SS_clean(int field, const char* raw, char* out, size_t size) {
-	if (!out || !size) return 0;
-	out[0] = '\0';
-	if (!raw) return 0;
-	while (*raw == ' ' || *raw == '\t') raw++;
-	size_t n = strlen(raw);
-	while (n && (raw[n - 1] == ' ' || raw[n - 1] == '\t' || raw[n - 1] == '\r')) n--;
-	if (field == SS_YEAR && n > 4 && isdigit((unsigned char)raw[0]) && isdigit((unsigned char)raw[1])
-		&& isdigit((unsigned char)raw[2]) && isdigit((unsigned char)raw[3]) && raw[4] == '-') n = 4;
-	if (n >= size) n = size - 1;
-	memcpy(out, raw, n);
-	out[n] = '\0';
-	return n > 0;
-}
-
-int SS_infoLines(SSInfoGet get, void* data, char lines[][SS_LINE_SIZE], int max) {
-	if (!get || !lines) return 0;
+int SS_infoLines(const char* reply, char lines[][SS_LINE_SIZE], int max) {
+	if (!reply || !lines) return 0;
 	int count = 0;
-	for (int f = 0; f < SS_INFO_COUNT && count < max; f++) {
-		// room left in a line for the label
-		char raw[SS_LINE_SIZE], value[SS_LINE_SIZE - 16];
-		if (get(keys[f], raw, sizeof(raw), data) != 1) continue;
-		if (!SS_clean(f, raw, value, sizeof(value))) continue;
-		snprintf(lines[count++], SS_LINE_SIZE, "%s: %s", tr(labels[f]), value);
+	const char* p = reply;
+	while (*p && count < max) {
+		const char* eol = strchr(p, '\n');
+		size_t n = eol ? (size_t)(eol - p) : strlen(p);
+		const char* eq = memchr(p, '=', n);
+		char key[32];
+		size_t k = eq ? (size_t)(eq - p) : 0;
+		if (k > 0 && k < sizeof(key)) {
+			memcpy(key, p, k);
+			key[k] = '\0';
+			const char* label = SS_infoLabel(key);
+			int v = (int)(n - k - 1);
+			if (label && v > 0) snprintf(lines[count++], SS_LINE_SIZE, "%s: %.*s", tr(label), v, eq + 1);
+		}
+		p = eol ? eol + 1 : p + n;
 	}
 	return count;
+}
+
+int SS_tagAdd(char* list, size_t size, const char* set_name) {
+	if (!list || !size || !set_name || strncmp(set_name, "tags:", 5) != 0 || !set_name[5]) return 0;
+	size_t used = strlen(list);
+	int n = snprintf(list + used, size - used, "%s%s", used ? ", " : "", set_name + 5);
+	if (n < 0 || (size_t)n >= size - used) {
+		list[used] = '\0';
+		return 0;
+	}
+	return 1;
+}
+
+int SS_marks(int favorite, const char* tags, char* out, size_t size) {
+	if (!out || !size) return 0;
+	out[0] = '\0';
+	char tagged[SS_LINE_SIZE] = "";
+	if (tags && tags[0]) snprintf(tagged, sizeof(tagged), tr("Tags: %s"), tags);
+	if (favorite && tagged[0]) snprintf(out, size, "%s \xc2\xb7 %s", tr("Favorite"), tagged);
+	else snprintf(out, size, "%s", favorite ? tr("Favorite") : tagged);
+	return out[0] != '\0';
+}
+
+static void addRow(SSPanel* out, int style, const char* text) {
+	if (out->count >= SS_ROWS_MAX || !text || !text[0]) return;
+	out->rows[out->count].style = style;
+	snprintf(out->rows[out->count].text, SS_LINE_SIZE, "%s", text);
+	out->count++;
+}
+
+void SS_panel(const SSShow* show, const SSPieces* pieces, SSPanel* out) {
+	if (!out) return;
+	memset(out, 0, sizeof(*out));
+	if (!show || !pieces) return;
+	if (show->music && pieces->music) snprintf(out->music, sizeof(out->music), "%s", pieces->music);
+	if (pieces->empty) return;
+	const char* kind = SS_kindLabel(pieces->type);
+	if (kind[0]) addRow(out, SS_ROW_KIND, tr(kind));
+	char marks[SS_LINE_SIZE];
+	if (show->marks && SS_marks(pieces->favorite, pieces->tags, marks, sizeof(marks))) addRow(out, SS_ROW_MARKS, marks);
+	if (show->details) {
+		char lines[SS_INFO_MAX][SS_LINE_SIZE];
+		int count = SS_infoLines(pieces->info, lines, SS_INFO_MAX);
+		for (int i = 0; i < count; i++) addRow(out, SS_ROW_INFO, lines[i]);
+	}
+	if (show->caption) addRow(out, SS_ROW_CAPTION, pieces->caption);
 }
 
 const char* SS_kindLabel(int type) {

@@ -27,17 +27,32 @@ msgstr "Desarrollador"
 msgid "Empty folder"
 msgstr "Carpeta vacía"
 
+msgid "Favorite"
+msgstr "Favorito"
+
+msgid "Favorite and tag marks"
+msgstr "Marcas de favorito y etiquetas"
+
 msgid "Folder"
 msgstr "Carpeta"
 
 msgid "Game"
 msgstr "Juego"
 
+msgid "Game details"
+msgstr "Detalles del juego"
+
 msgid "Genre"
 msgstr "Género"
 
+msgid "Now playing"
+msgstr "Reproduciendo"
+
 msgid "Pak"
 msgstr "Pak"
+
+msgid "Play time caption"
+msgstr "Leyenda de tiempo de juego"
 
 msgid "Players"
 msgstr "Jugadores"
@@ -50,6 +65,9 @@ msgstr "Segunda pantalla (experimental, solo escritorio)"
 
 msgid "Shows the selected game in a second window. It's experimental and only works on the desktop build."
 msgstr "Muestra el juego seleccionado en una segunda ventana. Es experimental y solo funciona en la versión de escritorio."
+
+msgid "Tags: %s"
+msgstr "Etiquetas: %s"
 
 msgid "Window size"
 msgstr "Tamaño de la ventana"

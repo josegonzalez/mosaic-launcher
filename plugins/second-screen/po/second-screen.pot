@@ -39,6 +39,14 @@ msgid "Empty folder"
 msgstr ""
 
 #: ss_model.c
+msgid "Favorite"
+msgstr ""
+
+#: plugin.txt
+msgid "Favorite and tag marks"
+msgstr ""
+
+#: ss_model.c
 msgid "Folder"
 msgstr ""
 
@@ -46,12 +54,24 @@ msgstr ""
 msgid "Game"
 msgstr ""
 
+#: plugin.txt
+msgid "Game details"
+msgstr ""
+
 #: ss_model.c
 msgid "Genre"
 msgstr ""
 
+#: plugin.txt
+msgid "Now playing"
+msgstr ""
+
 #: ss_model.c
 msgid "Pak"
+msgstr ""
+
+#: plugin.txt
+msgid "Play time caption"
 msgstr ""
 
 #: ss_model.c
@@ -68,6 +88,11 @@ msgstr ""
 
 #: plugin.txt
 msgid "Shows the selected game in a second window. It's experimental and only works on the desktop build."
+msgstr ""
+
+#: ss_model.c
+#, c-format
+msgid "Tags: %s"
 msgstr ""
 
 #: plugin.txt

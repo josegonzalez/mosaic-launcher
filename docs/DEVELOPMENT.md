@@ -111,6 +111,7 @@ shot with-row-badges
 | `cfg <id> <key=value>...` | Adds the plugin's settings to its `<id>.cfg` |
 | `press "<keys>"` | presser's keys, 450 ms apart after a wait for the launcher to start: a, b, x, y, start, select, menu, l1, r1, up, down, left, right or wait, and keys joined by `+` are pressed together, held for `/<ms>`, such as `select+start/1500` |
 | `after <ms>` | Keeps the frame this long after the last press, such as partway through an animation |
+| `window` | Saves second-screen's window in place of the launcher's frame, at the window's size: the newest frame its display program saved to `MOSAIC_SECOND_SCREEN_SHOT`, so give it time with `after` |
 | `shot <name>` | Starts the launcher and saves `plugins/<id>/docs/<name>.png` |
 
 A block can also change the card under `$CARD`, or the launcher's state under `$STATE`, before its shot, or export variables for a device's sample values in place of the computer's: `MOSAIC_LAUNCHER_WIFI_FAKE` for Wi-Fi, and `tests/screenshots/device.c`'s, a library preloaded beside presser, for the IP address, storage, memory and uptime (see `system-info.sh`). On the first screen of the sample card the rows are Recently Played, Collections, Game Boy, Game Boy Color, Nintendo Entertainment System, then plugins' rows and Tools, and Collections has Favorites and Homebrew, which lists all six games. Under a layout plugin, right steps through the entries in order. A plugin's only quick menu tile is the last one, so `menu left` selects it.

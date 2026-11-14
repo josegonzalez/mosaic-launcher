@@ -3,9 +3,11 @@
 
 # the bundled second-screen shows the selection in a second window, drawn
 # by its own second-screen-display program: clipper opens a folder and
-# moves from Apple (green art and a .info sidecar) to Banana (neither),
-# and the program saves each frame it shows, read back from its window,
-# to $MOSAIC_SECOND_SCREEN_SHOT, so the art's middle can be checked there.
+# moves from Apple (green art and a .info sidecar, whose fields show only
+# with metadata-band, which 870-second-screen-interop.sh checks) to Banana
+# (neither), and the program saves each frame it shows, read back from its
+# window, to $MOSAIC_SECOND_SCREEN_SHOT, so the art's middle can be checked
+# there.
 # The program logs to its own file, not the launcher's log, and it's
 # started without the launcher's preloaded presser (which presses nothing
 # here) or any of its other open files.
@@ -102,7 +104,7 @@ expect "showing the selection in a 640x480 window, experimental, frames in /tmp/
 grep -qF "presser: " "$log" || fail "presser wasn't preloaded into the launcher"
 ss_display "$log"
 grep -qF "second-screen-display: opened a 640x480 window with " "$SS_LOG" || fail "the display didn't open its window"
-ss_check Apple "art 8x8 at 24,98 284x284, 1 title line, Game, 3 info lines" 166 240 "0 255 0"
+ss_check Apple "art 8x8 at 24,98 284x284, 1 title line, Game, 0 info lines" 166 240 "0 255 0"
 ss_check Banana "no art, 1 title line, Game, 0 info lines" 166 240 "not 0 255 0"
 grep -qF "plugins: second-screen" "$log" && fail "the launcher turned second-screen off: $(grep -F "plugins: second-screen" "$log")"
 grep -qE "plugin second-screen: (couldn't|can't)" "$log" && fail "second-screen failed: $(grep -E "plugin second-screen: (couldn't|can't)" "$log")"
@@ -122,7 +124,7 @@ log="$WORK/second-screen-tall.log"
 expect "showing the selection in a 480x640 window, experimental"
 ss_display "$log"
 grep -qF "second-screen-display: opened a 480x640 window with " "$SS_LOG" || fail "the display didn't open its tall window"
-ss_check Apple "art 8x8 at 98,24 284x284, 1 title line, Game, 3 info lines" 240 166 "0 255 0"
+ss_check Apple "art 8x8 at 98,24 284x284, 1 title line, Game, 0 info lines" 240 166 "0 255 0"
 
 rm -rf "$WORK/plugins/clipper.plugin" "$WORK/plugins/second-screen.plugin" "$SS_DIR" "$SS_SHOTS" "$SS_LOG" \
 	"$STATE/clipper.cfg" "$STATE/second-screen.cfg" "$STATE/plugins.txt"
