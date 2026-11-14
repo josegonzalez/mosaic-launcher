@@ -6,27 +6,30 @@
 // and games a plugin's filter hides, such as the hidden plugin's, are left
 // out (is_filtered).
 //
-// It keeps its own idle time, from input_filter, which sees every button
-// on every screen: any button down, another screen showing, or the device
-// waking starts the count again. It opens only over the game list or the
-// home slot's screen.
+// It's an ambient screen (register_ambient): the launcher keeps the idle
+// time and opens it over the game list, home or a later ambient screen, in
+// the user's order of ambient screens, once wants says the idle setting's
+// time has passed. An ambient screen earlier in the order, such as the
+// charging screen, takes over from it.
 //
 // Any button closes it, back to the list or home, and is taken until it's
-// let go, so that press doesn't also act on the screen under it. The power button is left to
-// the launcher, so it still sleeps; waking closes the screen.
+// let go, so that press doesn't also act on the screen under it, except X
+// while the music plugin has a track, which plays or pauses it
+// (music.toggle) and stays. What music plays shows dim in the bottom left
+// corner while it has a track. The power button is left to the launcher,
+// so it still sleeps; waking closes the screen.
+//
+// The videos source is the games source with the games' clips: for a
+// game with one, video-previews' video.play opens its own screen over this
+// one and plays it, with this screen's clock and what music plays, until
+// the next image, and a game without one shows its art. Without
+// video-previews it's the games source.
 //
 // It never holds off sleep. Stock's PWR_update counts idle time from the
 // last frame with a button held (or the device charging, on HDMI or with
 // auto-sleep held off), never from redraws, so the screen timeout turns
 // the screen off and sleeps on time while this screen shows and animates,
 // and the suspend timeout runs from there as usual.
-//
-// It gives way to charging-screen: while the device charges and
-// charging-screen is loaded with its idle setting on, this
-// screen doesn't open, so charging-screen's opens instead. Neither opens
-// over the other, since both open only over the game list or home. For the tests
-// only, MOSAIC_CHARGING_SCREEN_FAKE, charging-screen's test battery, is
-// read in place of the battery.
 //
 // Images come from art_load, decoded off the main thread into the
 // launcher's art cache, and each is copied once with surface_scale to fit
@@ -45,20 +48,14 @@
 
 #define ID "screensaver"
 #define SCREEN_ID "screensaver.main"
-#define CHARGING_ID "charging-screen"
-#define FAKE_ENV "MOSAIC_CHARGING_SCREEN_FAKE"
-#define FAKE_READ_MS 200
-#define CHECK_MS 1000    // how often to look at the clock and charging
+#define CHECK_MS 1000    // how often to look at the clock and music
 #define CLOCK_ALPHA 110  // the clock is drawn this dim
+#define LINE_MAX 512     // the now playing line
+#define LINE_ALPHA 200   // and its alpha, on its dark pill
 #define ENTRIES_MAX 128  // games made entries for art, at most (entries can't be freed)
 #define GAMES_MAX 64     // recent and favorite games looked at, at most
 
 static const MosaicHost* host;
-
-// Another plugin's setting, when it marks it public, else fallback.
-static const char* publicSetting(const char* id, const char* key, const char* fallback) {
-	return MOSAIC_HOST_HAS(host, cfg_read) ? host->cfg_read(id, key, fallback) : fallback;
-}
 
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
@@ -74,24 +71,25 @@ static int effect = SS_EFFECT_FADE;
 static int clock_mode = SS_CLOCK_OFF;
 static unsigned long interval_ms = SS_INTERVAL_DEFAULT_MS;
 static char folder[SS_PATH_MAX];
-static int favorites_on = 0, charging_on = 0;
+static unsigned long idle_ms = SS_IDLE_DEFAULT_MS;
+static int favorites_on = 0;
 
 // when it opens and closes
-static SsIdle idle;
 static SsFilter filter;
 static int showing = 0;
-static int activity = 0;      // a button was down since the last tick
-static int close_pressed = 0; // a button closed it
-static int resumed = 0;       // the device woke since the last tick
-static int refused = 0;       // open_screen was refused; logged once
-static int yielding = 0;      // charging-screen's screen comes first; logged when it starts
+static int close_pressed = 0;  // a button closed it
+static int toggle_pressed = 0; // X played or paused music
+static int resumed = 0;        // the device woke since the last tick
+static unsigned long opened_idle = 0; // the idle time wants opened it after
 static unsigned long last_now = 0;
 static unsigned long next_check = 0;
 
-// the battery, only to give way to charging-screen
-static int charging = -1;
-static const char* fake_path = NULL;
-static unsigned long next_fake = 0;
+// the music plugin's now playing line, "" without a track
+static char want_music[LINE_MAX], shown_music[LINE_MAX];
+
+// the videos source: video-previews plays the image's game's clip
+static int clip_due = 0;     // look for the image showing's clip at the next tick
+static int clip_playing = 0; // video-previews' screen shows a clip
 
 // the images
 static SsPool pool;
@@ -116,45 +114,12 @@ static void say(const char* message) {
 	host->log(ID, message);
 }
 
-static char* readFile(const char* path) {
-	FILE* f = fopen(path, "r");
-	if (!f) return NULL;
-	size_t cap = 4096, len = 0;
-	char* text = malloc(cap);
-	while (text) {
-		size_t n = fread(text + len, 1, cap - len - 1, f);
-		len += n;
-		if (len < cap - 1) break;
-		if (cap >= 1 << 20) break;
-		cap *= 2;
-		char* grown = realloc(text, cap);
-		if (!grown) {
-			free(text);
-			text = NULL;
-		}
-		else text = grown;
-	}
-	fclose(f);
-	if (text) text[len] = '\0';
-	return text;
-}
-
-static void readCharging(unsigned long now) {
-	if (!fake_path) {
-		charging = host->is_charging();
-		return;
-	}
-	if (now < next_fake) return;
-	next_fake = now + FAKE_READ_MS;
-	charging = -1;
-	char* text = readFile(fake_path);
-	int level = -1;
-	if (text && !SS_parseFake(text, &level, &charging)) charging = -1;
-	free(text);
-}
-
-static int chargingWins(void) {
-	return SS_chargingWins(charging_on, publicSetting(CHARGING_ID, "idle", "60"), charging);
+// What music plays, from the music plugin's music.now, or "".
+static void musicLine(char* out, size_t size) {
+	out[0] = '\0';
+	char reply[MOSAIC_CALL_MAX];
+	if (!MOSAIC_HOST_HAS(host, call) || host->call("music.now", NULL, reply, sizeof(reply)) < 0) return;
+	if (host->event_value(reply, "line", out, size) < 0) out[0] = '\0';
 }
 
 ///////////////////////////////////////
@@ -183,12 +148,12 @@ static void addGame(const char* path) {
 	if (!entry) return;
 	char file[SS_PATH_MAX];
 	if (art == SS_ART_SCREENSHOT) {
-		if (host->art_find(entry, MOSAIC_ART_SCREENSHOT, file, sizeof(file)) == 1) SS_poolAdd(&pool, file);
+		if (host->art_find(entry, MOSAIC_ART_SCREENSHOT, file, sizeof(file)) == 1) SS_poolAddGame(&pool, file, path);
 		return;
 	}
 	if (host->art_find(entry, MOSAIC_ART_BOX, file, sizeof(file)) == 1
 		|| host->art_find(entry, MOSAIC_ART_THUMBNAIL, file, sizeof(file)) == 1) {
-		SS_poolAdd(&pool, file);
+		SS_poolAddGame(&pool, file, path);
 	}
 }
 
@@ -222,7 +187,7 @@ static void addGames(void) {
 
 static void buildPool(void) {
 	SS_poolClear(&pool);
-	if (source == SS_SOURCE_GAMES) addGames();
+	if (source == SS_SOURCE_GAMES || source == SS_SOURCE_VIDEOS) addGames();
 	else if (source == SS_SOURCE_SCREENSHOTS) {
 		char dir[SS_PATH_MAX];
 		snprintf(dir, sizeof(dir), "%s/Screenshots", host->sdcard_path);
@@ -300,21 +265,39 @@ static void loadImages(unsigned long now) {
 ///////////////////////////////////////
 // the screen
 
+static void wantedClock(void);
+
 static int screenEnter(void* data) {
 	(void)data;
 	showing = 1;
-	close_pressed = 0;
-	shown_clock[0] = '\0';
+	close_pressed = toggle_pressed = 0;
+	shown_clock[0] = shown_music[0] = '\0';
+	clip_playing = 0;
+	clip_due = source == SS_SOURCE_VIDEOS;
+	buildPool();
+	SsCycle_init(&cycle, interval_ms, SS_changeMs(interval_ms));
+	cycle.current = SS_startIndex(&pool, last_shown[0] ? last_shown : NULL);
+	wantedClock();
+	musicLine(want_music, sizeof(want_music));
+	next_check = last_now + CHECK_MS;
+	char message[SS_PATH_MAX + 96];
+	if (pool.count) {
+		snprintf(message, sizeof(message), "opened after %lus idle: %d image%s from %s", opened_idle / 1000, pool.count,
+			pool.count == 1 ? "" : "s", SS_sourceName(source));
+	}
+	else snprintf(message, sizeof(message), "opened after %lus idle: no images from %s", opened_idle / 1000, SS_sourceName(source));
+	say(message);
+	loadImages(last_now);
 	return 0;
 }
 
 static void screenExit(void* data) {
 	(void)data;
 	showing = 0;
-	close_pressed = 0;
+	close_pressed = toggle_pressed = 0;
+	clip_due = clip_playing = 0;
 	freeCopy(&shown_copy);
 	freeCopy(&next_copy);
-	SsIdle_reset(&idle, last_now);
 }
 
 // buttons are handled in input_filter, so they never reach the screen
@@ -364,17 +347,39 @@ static int screenRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 	}
 	else drawCopy(screen, &area, &shown_copy, 0, 255);
 
+	int scale = host->screen_scale();
+	if (scale < 1) scale = 1;
+	int margin = 8 * scale;
+	int rgb = host->theme_color(MOSAIC_COLOR_MAIN);
+	MosaicColor dim = mosaic_color(rgb < 0 ? 0xFFFFFF : (unsigned int)rgb, CLOCK_ALPHA);
+	int clock_w = 0;
 	if (want_clock[0]) {
-		int scale = host->screen_scale();
-		if (scale < 1) scale = 1;
-		int margin = 8 * scale;
-		int w = host->text_width(MOSAIC_FONT_LARGE, want_clock);
+		clock_w = host->text_width(MOSAIC_FONT_LARGE, want_clock);
 		int h = host->text_height(MOSAIC_FONT_LARGE);
-		int rgb = host->theme_color(MOSAIC_COLOR_MAIN);
-		host->draw_text(screen, MOSAIC_FONT_LARGE, want_clock, area.x + area.w - w - margin, area.y + area.h - h - margin,
-			mosaic_color(rgb < 0 ? 0xFFFFFF : (unsigned int)rgb, CLOCK_ALPHA), 0);
+		host->draw_text(screen, MOSAIC_FONT_LARGE, want_clock, area.x + area.w - clock_w - margin, area.y + area.h - h - margin,
+			dim, 0);
+	}
+	// what music plays, in the bottom left corner, left of the clock
+	if (want_music[0]) {
+		char cut[LINE_MAX];
+		int room = area.w - 3 * margin - clock_w;
+		int w = room > 0 ? host->text_truncate(MOSAIC_FONT_SMALL, want_music, room, cut, sizeof(cut)) : 0;
+		if (w > 0) {
+			// on a dark pill, so it reads over bright art
+			int h = host->text_height(MOSAIC_FONT_SMALL);
+			MosaicRect pill = { area.x + margin / 2, area.y + area.h - h - margin - margin / 2, w + margin, h + margin };
+			host->fill_round_rect(screen, &pill, pill.h / 2, mosaic_color(0x000000, 200));
+			host->draw_text(screen, MOSAIC_FONT_SMALL, cut, area.x + margin, area.y + area.h - h - margin,
+				mosaic_color(rgb < 0 ? 0xFFFFFF : (unsigned int)rgb, LINE_ALPHA), 0);
+		}
+	}
+	if (strcmp(want_music, shown_music)) {
+		char message[LINE_MAX + 16];
+		snprintf(message, sizeof(message), "music: %s", want_music[0] ? want_music : "none");
+		say(message);
 	}
 	snprintf(shown_clock, sizeof(shown_clock), "%s", want_clock);
+	snprintf(shown_music, sizeof(shown_music), "%s", want_music);
 	return 0;
 }
 
@@ -388,99 +393,101 @@ static int screenAnimating(void* data) {
 
 static int inputFilter(const MosaicInput* input, unsigned int* consumed) {
 	if (!supported) return 0;
-	if (input->pressed | input->held | input->released) activity = 1;
-	int shut = 0;
-	*consumed = SsFilter_frame(&filter, showing, input->pressed, input->held, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER),
-		&shut);
+	int shut = 0, toggled = 0;
+	unsigned int toggle = showing && want_music[0] ? MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_X) : 0;
+	*consumed = SsFilter_frame(&filter, showing, input->pressed, input->held, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER), toggle,
+		&shut, &toggled);
 	if (shut) close_pressed = 1;
+	if (toggled) toggle_pressed = 1;
 	return 0;
 }
 
-// Where it opens over: the game list or home.
-static const char* homeScreen(void) {
-	return MOSAIC_HOST_HAS(host, home_screen) ? host->home_screen() : NULL;
-}
-static int onIdleScreen(void) {
-	return SS_idleScreen(host->current_screen(), homeScreen());
+static int wantsToShow(unsigned long idle, void* data) {
+	(void)data;
+	if (!SS_wants(idle, idle_ms)) return 0;
+	opened_idle = idle;
+	return 1;
 }
 
 static void closeScreen(const char* why) {
 	if (host->close_screen(SCREEN_ID) == 0) say(why);
 }
 
-static void openScreen(unsigned long now) {
-	unsigned long waited = now - idle.last_input;
-	const char* over = strcmp(host->current_screen(), "gamelist") ? "home" : "the list";
-	buildPool();
-	SsCycle_init(&cycle, interval_ms, SS_changeMs(interval_ms));
-	cycle.current = SS_startIndex(&pool, last_shown[0] ? last_shown : NULL);
-	wantedClock();
-	next_check = now + CHECK_MS;
-	if (host->open_screen(SCREEN_ID) != 0) {
-		if (!refused++) say("couldn't open the screen; trying again after the next idle time");
-		SsIdle_reset(&idle, now);
-		return;
-	}
-	char message[SS_PATH_MAX + 96];
-	if (pool.count) {
-		snprintf(message, sizeof(message), "opened after %lus idle on %s: %d image%s from %s", waited / 1000, over,
-			pool.count, pool.count == 1 ? "" : "s", SS_sourceName(source));
-	}
-	else {
-		snprintf(message, sizeof(message), "opened after %lus idle on %s: no images from %s", waited / 1000, over,
-			SS_sourceName(source));
-	}
+// X: plays or pauses music, staying open.
+static void toggleMusic(void) {
+	char reply[MOSAIC_CALL_MAX], state[16] = "";
+	if (host->call("music.toggle", NULL, reply, sizeof(reply)) >= 0) host->event_value(reply, "state", state, sizeof(state));
+	char message[64];
+	snprintf(message, sizeof(message), "X: music %s", state[0] ? state : "didn't answer");
 	say(message);
-	loadImages(now);
+	musicLine(want_music, sizeof(want_music));
+	if (strcmp(want_music, shown_music)) host->request_redraw();
+}
+
+// The videos source: video-previews plays the clip of the image showing's
+// game over this screen, or shows none for an image without a clip.
+static void showClip(void) {
+	const char* game = cycle.current >= 0 ? pool.games[cycle.current] : "";
+	if (!game[0] && !clip_playing) return;
+	if (!MOSAIC_HOST_HAS(host, call) || !host->has_capability("video.play")) return;
+	char args[SS_PATH_MAX + 32], reply[MOSAIC_CALL_MAX], playing[8] = "";
+	snprintf(args, sizeof(args), "path=%s\nclock=%s\n", game, SS_clockName(clock_mode));
+	if (host->call("video.play", args, reply, sizeof(reply)) >= 0) host->event_value(reply, "playing", playing, sizeof(playing));
+	int now_playing = !strcmp(playing, "1");
+	char message[SS_PATH_MAX + 64];
+	if (now_playing) {
+		snprintf(message, sizeof(message), "playing the clip of %s", SS_baseName(game));
+		say(message);
+	}
+	else if (clip_playing) say("no clip for this image");
+	clip_playing = now_playing;
 }
 
 static void tick(unsigned long now) {
 	if (!supported) return;
 	last_now = now;
-	readCharging(now);
-	if (activity || resumed) {
-		activity = 0;
-		SsIdle_reset(&idle, now);
-	}
-
-	if (showing) {
-		if (resumed) closeScreen("closed: the device woke");
-		else if (close_pressed) closeScreen("closed by a button");
-		else {
-			loadImages(now);
-			int was_next = cycle.next;
-			int step = SsCycle_step(&cycle, now, next_copy.surface && next_copy.index == cycle.next);
-			if (step == SS_STEP_START) {
-				char message[SS_PATH_MAX + 64];
-				snprintf(message, sizeof(message), "%s to %d of %d", effect == SS_EFFECT_SLIDE ? "sliding" : "fading",
-					was_next + 1, pool.count);
-				say(message);
-			}
-			else if (step == SS_STEP_DONE) {
-				// the next copy is now the one showing
-				Copy old = shown_copy;
-				shown_copy = next_copy;
-				next_copy = old;
-				freeCopy(&next_copy);
-				logShowing();
-				host->request_redraw();
-			}
-			if (now >= next_check) {
-				next_check = now + CHECK_MS;
-				wantedClock();
-				if (strcmp(want_clock, shown_clock)) host->request_redraw();
-			}
-		}
+	if (!showing) {
 		resumed = 0;
 		return;
 	}
+	if (resumed) closeScreen("closed: the device woke");
+	else if (close_pressed) closeScreen("closed by a button");
+	else {
+		if (toggle_pressed) {
+			toggle_pressed = 0;
+			toggleMusic();
+		}
+		loadImages(now);
+		if (clip_due && cycle.current >= 0 && shown_copy.surface) {
+			clip_due = 0;
+			showClip();
+		}
+		int was_next = cycle.next;
+		int step = SsCycle_step(&cycle, now, next_copy.surface && next_copy.index == cycle.next);
+		if (step == SS_STEP_START) {
+			char message[SS_PATH_MAX + 64];
+			snprintf(message, sizeof(message), "%s to %d of %d", effect == SS_EFFECT_SLIDE ? "sliding" : "fading",
+				was_next + 1, pool.count);
+			say(message);
+		}
+		else if (step == SS_STEP_DONE) {
+			// the next copy is now the one showing
+			Copy old = shown_copy;
+			shown_copy = next_copy;
+			next_copy = old;
+			freeCopy(&next_copy);
+			logShowing();
+			host->request_redraw();
+			if (source == SS_SOURCE_VIDEOS) clip_due = 1;
+		}
+		if (now >= next_check) {
+			next_check = now + CHECK_MS;
+			wantedClock();
+			musicLine(want_music, sizeof(want_music));
+			if (strcmp(want_clock, shown_clock) || strcmp(want_music, shown_music)) host->request_redraw();
+		}
+	}
 	resumed = 0;
-
-	int yield = chargingWins();
-	if (yield && !yielding) say("waiting: charging-screen's screen comes first while charging");
-	yielding = yield;
-	if (!SsIdle_due(&idle, now, onIdleScreen(), yield)) return;
-	openScreen(now);
 }
 
 static void afterResume(void) {
@@ -497,25 +504,22 @@ static int init(const MosaicHost* h) {
 	static const SSWords words = { tr, NULL };
 	SS_setWords(&words);
 	supported = 0;
-	showing = activity = close_pressed = resumed = refused = yielding = 0;
+	showing = close_pressed = toggle_pressed = resumed = clip_due = clip_playing = 0;
+	want_music[0] = shown_music[0] = '\0';
 	filter = (SsFilter){0};
 	last_shown[0] = '\0';
 	entry_count = 0;
-	if (!MOSAIC_HOST_HAS(host, open_screen) || !MOSAIC_HOST_HAS(host, hold_switch) || !MOSAIC_HOST_HAS(host, blit_alpha)
-		|| !MOSAIC_HOST_HAS(host, art_get) || !MOSAIC_HOST_HAS(host, is_charging)) {
-		say("unsupported: this launcher has no plugin screens, input filters or art cache");
+	if (!MOSAIC_HOST_HAS(host, register_ambient)) {
+		say("unsupported: this launcher has no ambient screens");
 		return 0;
 	}
-	fake_path = getenv(FAKE_ENV);
-	if (fake_path && !fake_path[0]) fake_path = NULL;
 
-	unsigned long idle_ms = SS_parseIdle(host->cfg_get("idle", "30"));
+	idle_ms = SS_parseIdle(host->cfg_get("idle", "30"));
 	source = SS_parseSource(host->cfg_get("source", "games"));
 	art = SS_parseArt(host->cfg_get("art", "box"));
 	effect = SS_parseEffect(host->cfg_get("effect", "fade"));
 	clock_mode = SS_parseClock(host->cfg_get("clock", "off"));
 	interval_ms = SS_parseInterval(host->cfg_get("interval", "10"));
-	SsIdle_init(&idle, idle_ms);
 	if (!idle_ms) {
 		say("idle is off, so the screen never opens");
 		return 0;
@@ -525,9 +529,8 @@ static int init(const MosaicHost* h) {
 		say("the folder setting isn't a folder on the card, so there are no images");
 	}
 
-	// both load before it, as its optional= asks
+	// it loads before it, as its optional= asks
 	favorites_on = SS_pluginLoaded(host, "favorites");
-	charging_on = SS_pluginLoaded(host, CHARGING_ID);
 
 	MosaicScreenHooks hooks = {
 		.size = sizeof(hooks),
@@ -538,17 +541,16 @@ static int init(const MosaicHost* h) {
 		.render = screenRender,
 		.animating = screenAnimating,
 	};
-	if (host->register_screen(SCREEN_ID, &hooks) != 0) {
+	if (host->register_screen(SCREEN_ID, &hooks) != 0 || host->register_ambient(SCREEN_ID, wantsToShow, NULL) != 0) {
 		say("couldn't register the screen");
 		return 0;
 	}
 	supported = 1;
 	char message[SS_PATH_MAX + 160];
-	snprintf(message, sizeof(message), "opens after %lus idle on the list or home: %s%s, every %lus, %s, clock %s%s",
+	snprintf(message, sizeof(message), "opens after %lus idle on the list or home: %s%s, every %lus, %s, clock %s",
 		idle_ms / 1000, SS_sourceName(source),
-		source == SS_SOURCE_GAMES ? (art == SS_ART_SCREENSHOT ? " (screenshots)" : " (box art)") : "",
-		interval_ms / 1000, effect == SS_EFFECT_SLIDE ? "slide" : "fade", SS_clockName(clock_mode),
-		charging_on ? ", after charging-screen while charging" : "");
+		source == SS_SOURCE_GAMES || source == SS_SOURCE_VIDEOS ? (art == SS_ART_SCREENSHOT ? " (screenshots)" : " (box art)") : "",
+		interval_ms / 1000, effect == SS_EFFECT_SLIDE ? "slide" : "fade", SS_clockName(clock_mode));
 	say(message);
 	if (source == SS_SOURCE_FOLDER && folder[0]) {
 		snprintf(message, sizeof(message), "folder %s", folder);

@@ -1,7 +1,7 @@
 // The music plugin's model: which files are tracks and how they sort,
 // listing a folder, the queue with shuffle and repeat, its resume file,
 // the socket protocol's commands and status line, and the plugin's pill
-// timing, unlock press and folder browsing; and its tag readers.
+// timing and folder browsing; and its tag readers.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -577,22 +577,6 @@ static void testOverlay(void) {
 	CHECK(MuOverlay_visible(&restored, 204000));
 }
 
-static void testUnlock(void) {
-	const unsigned int SEL = 1u << 9, START = 1u << 8, A = 1u;
-	MuUnlock u = { 0 };
-	CHECK(!MuUnlock_frame(&u, START, START, SEL, START, 0));    // START alone
-	CHECK(!MuUnlock_frame(&u, SEL, SEL, SEL, START, 100));      // SELECT, then
-	CHECK(MuUnlock_frame(&u, START, START, SEL, START, 900));   // START within a second
-	CHECK(!MuUnlock_frame(&u, START, START, SEL, START, 950));  // used up
-	CHECK(!MuUnlock_frame(&u, SEL, SEL, SEL, START, 2000));
-	CHECK(!MuUnlock_frame(&u, START, START, SEL, START, 3001)); // too late
-	CHECK(!MuUnlock_frame(&u, SEL, SEL, SEL, START, 4000));
-	CHECK(!MuUnlock_frame(&u, A, A, SEL, START, 4100));         // another button in between
-	CHECK(!MuUnlock_frame(&u, START, START, SEL, START, 4200));
-	CHECK(MuUnlock_frame(&u, START, START | SEL, SEL, START, 9000)); // START while SELECT is held
-	CHECK(MuUnlock_frame(&u, START | SEL, START | SEL, SEL, START, 9500)); // both at once
-}
-
 static void testList(void) {
 	CHECK(MU_move(0, 5, 1, 1) == 1);
 	CHECK(MU_move(4, 5, 1, 1) == 0);  // round on a press
@@ -1072,7 +1056,6 @@ int main(void) {
 	testCommands();
 	testStatus();
 	testOverlay();
-	testUnlock();
 	testList();
 	testPaths();
 	testTagText();

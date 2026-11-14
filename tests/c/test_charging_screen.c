@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "check.h"
 #include "words.h"
+#include "fakeproviders.h"
 #include "../../plugins/charging-screen/charging_screen.c"
 
 #define BIT MOSAIC_BUTTON_BIT
@@ -32,82 +33,66 @@ static void testSettings(void) {
 	CHECK(CS_parseClock(NULL) == CS_CLOCK_24H);
 }
 
-static void testIdle(void) {
-	CsIdle idle;
-	CsIdle_init(&idle, 30000);
-	// the first look starts the count
-	CHECK(!CsIdle_due(&idle, 100000, 1, 1));
-	CHECK(!CsIdle_due(&idle, 129999, 1, 1));
-	CHECK(CsIdle_due(&idle, 130000, 1, 1));
-	CHECK(CsIdle_due(&idle, 200000, 1, 1));
-
-	// a button starts it again
-	CsIdle_reset(&idle, 200000);
-	CHECK(!CsIdle_due(&idle, 220000, 1, 1));
-	CHECK(CsIdle_due(&idle, 230000, 1, 1));
-
-	// not charging, or off the list, starts it again too
-	CHECK(!CsIdle_due(&idle, 240000, 0, 1));
-	CHECK(!CsIdle_due(&idle, 269999, 1, 1));
-	CHECK(CsIdle_due(&idle, 270000, 1, 1));
-	CHECK(!CsIdle_due(&idle, 280000, 1, 0));
-	CHECK(!CsIdle_due(&idle, 300000, 1, 1));
-	CHECK(CsIdle_due(&idle, 310000, 1, 1));
-	// no battery
-	CHECK(!CsIdle_due(&idle, 320000, -1, 1));
-	CHECK(!CsIdle_due(&idle, 349999, 1, 1));
-
-	// off never opens
-	CsIdle_init(&idle, 0);
-	CHECK(!CsIdle_due(&idle, 0, 1, 1));
-	CHECK(!CsIdle_due(&idle, 10000000, 1, 1));
-}
-
-static void testIdleScreen(void) {
-	CHECK(CS_idleScreen("gamelist", NULL));
-	CHECK(CS_idleScreen("gamelist", "home.main"));
-	CHECK(CS_idleScreen("home.main", "home.main"));
-	CHECK(!CS_idleScreen("home.main", NULL)); // no home, or it failed
-	CHECK(!CS_idleScreen("home.main", ""));
-	CHECK(!CS_idleScreen("home.other", "home.main"));
-	CHECK(!CS_idleScreen("quickmenu", "home.main"));
-	CHECK(!CS_idleScreen("switcher", NULL));
-	CHECK(!CS_idleScreen("dialog", NULL));
-	CHECK(!CS_idleScreen(NULL, "home.main"));
+static void testWants(void) {
+	CHECK(!CS_wants(29999, 30000, 1));
+	CHECK(CS_wants(30000, 30000, 1));
+	CHECK(CS_wants(100000, 30000, 1));
+	CHECK(!CS_wants(100000, 30000, 0));  // not charging
+	CHECK(!CS_wants(100000, 30000, -1)); // no battery
+	CHECK(!CS_wants(100000, 0, 1));      // off
 }
 
 static void testFilter(void) {
 	CsFilter f = {0};
-	int shut = 0;
+	int shut = 0, toggled = 0;
 	unsigned int a = BIT(MOSAIC_BUTTON_A), x = BIT(MOSAIC_BUTTON_X);
 
 	// closed: nothing is taken
-	CHECK(CsFilter_frame(&f, 0, a, a, 0, POWER, &shut) == 0);
+	CHECK(CsFilter_frame(&f, 0, a, a, 0, POWER, 0, &shut, &toggled) == 0);
 	CHECK(!shut);
-	CHECK(CsFilter_frame(&f, 0, 0, 0, a, POWER, &shut) == 0);
+	CHECK(CsFilter_frame(&f, 0, 0, 0, a, POWER, 0, &shut, &toggled) == 0);
 
 	// open: a press closes it and is taken until it's let go
-	CHECK(CsFilter_frame(&f, 1, 0, 0, 0, POWER, &shut) == 0);
+	CHECK(CsFilter_frame(&f, 1, 0, 0, 0, POWER, 0, &shut, &toggled) == 0);
 	CHECK(!shut);
-	CHECK(CsFilter_frame(&f, 1, x, x, 0, POWER, &shut) == ~POWER);
-	CHECK(shut);
-	CHECK(CsFilter_frame(&f, 0, 0, x, 0, POWER, &shut) == ~POWER);
+	CHECK(CsFilter_frame(&f, 1, x, x, 0, POWER, 0, &shut, &toggled) == ~POWER);
+	CHECK(shut && !toggled);
+	CHECK(CsFilter_frame(&f, 0, 0, x, 0, POWER, 0, &shut, &toggled) == ~POWER);
 	CHECK(!shut);
-	CHECK(CsFilter_frame(&f, 0, 0, 0, x, POWER, &shut) == ~POWER); // its release too
-	CHECK(CsFilter_frame(&f, 0, 0, 0, 0, POWER, &shut) == 0);
+	CHECK(CsFilter_frame(&f, 0, 0, 0, x, POWER, 0, &shut, &toggled) == ~POWER); // its release too
+	CHECK(CsFilter_frame(&f, 0, 0, 0, 0, POWER, 0, &shut, &toggled) == 0);
 
 	// a press and release in one frame
-	CHECK(CsFilter_frame(&f, 1, a, 0, a, POWER, &shut) == ~POWER);
+	CHECK(CsFilter_frame(&f, 1, a, 0, a, POWER, 0, &shut, &toggled) == ~POWER);
 	CHECK(shut);
-	CHECK(CsFilter_frame(&f, 0, a, a, 0, POWER, &shut) == 0);
+	CHECK(CsFilter_frame(&f, 0, a, a, 0, POWER, 0, &shut, &toggled) == 0);
 
 	// the power button is the launcher's
-	CHECK(CsFilter_frame(&f, 1, POWER, POWER, 0, POWER, &shut) == 0);
+	CHECK(CsFilter_frame(&f, 1, POWER, POWER, 0, POWER, 0, &shut, &toggled) == 0);
 	CHECK(!shut);
 	// a button held over the power press is still let go of first
-	CHECK(CsFilter_frame(&f, 1, a, a | POWER, 0, POWER, &shut) == ~POWER);
-	CHECK(CsFilter_frame(&f, 0, 0, POWER, a, POWER, &shut) == ~POWER);
-	CHECK(CsFilter_frame(&f, 0, 0, POWER, 0, POWER, &shut) == 0);
+	CHECK(CsFilter_frame(&f, 1, a, a | POWER, 0, POWER, 0, &shut, &toggled) == ~POWER);
+	CHECK(CsFilter_frame(&f, 0, 0, POWER, a, POWER, 0, &shut, &toggled) == ~POWER);
+	CHECK(CsFilter_frame(&f, 0, 0, POWER, 0, POWER, 0, &shut, &toggled) == 0);
+
+	// with music's toggle, X alone plays or pauses and stays open, taken
+	// until it's let go; X with another button still closes
+	CHECK(CsFilter_frame(&f, 1, x, x, 0, POWER, x, &shut, &toggled) == ~POWER);
+	CHECK(toggled && !shut);
+	CHECK(CsFilter_frame(&f, 1, 0, x, 0, POWER, x, &shut, &toggled) == ~POWER);
+	CHECK(!toggled && !shut);
+	CHECK(CsFilter_frame(&f, 1, 0, 0, x, POWER, x, &shut, &toggled) == ~POWER);
+	CHECK(CsFilter_frame(&f, 1, 0, 0, 0, POWER, x, &shut, &toggled) == 0);
+	CHECK(CsFilter_frame(&f, 1, x | a, x | a, 0, POWER, x, &shut, &toggled) == ~POWER);
+	CHECK(shut && !toggled);
+	CHECK(CsFilter_frame(&f, 0, 0, 0, x | a, POWER, x, &shut, &toggled) == ~POWER);
+	CHECK(CsFilter_frame(&f, 1, a, a, 0, POWER, x, &shut, &toggled) == ~POWER);
+	CHECK(shut && !toggled);
+	CHECK(CsFilter_frame(&f, 0, 0, 0, a, POWER, x, &shut, &toggled) == ~POWER);
+	// X with power held is X alone
+	CHECK(CsFilter_frame(&f, 1, x, x | POWER, 0, POWER, x, &shut, &toggled) == ~POWER);
+	CHECK(toggled && !shut);
+	CHECK(CsFilter_frame(&f, 1, 0, 0, x, POWER, x, &shut, &toggled) == ~POWER);
 }
 
 static void testFormat(void) {
@@ -176,15 +161,23 @@ static void testFormat(void) {
 // a fake host
 
 static char last_log[256];
+static char logs[4096];
 static char cfg_idle[16] = "30";
 static int fake_level = 73, fake_charging = 1;
 static MosaicScreenHooks screen;
-static int registered = 0, is_open = 0, redraws = 0, opens = 0, open_result = 0;
-static const char* top = "gamelist";
-static const char* home = NULL;
+static int registered = 0, is_open = 0, redraws = 0, opens = 0;
+static int (*ambient_wants)(unsigned long idle_ms, void* data) = NULL;
 
 static void fakeLog(const char* id, const char* message) {
+	(void)id;
 	snprintf(last_log, sizeof(last_log), "%s", message);
+	size_t used = strlen(logs);
+	snprintf(logs + used, sizeof(logs) - used, "%s\n", message);
+}
+static int logged(const char* message) {
+	char line[300];
+	snprintf(line, sizeof(line), "%s\n", message);
+	return strstr(logs, line) != NULL;
 }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "idle")) return cfg_idle;
@@ -200,9 +193,16 @@ static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
 	registered = 1;
 	return 0;
 }
+static int fakeRegisterAmbient(const char* id, int (*wants)(unsigned long idle_ms, void* data), void* data) {
+	(void)data;
+	CHECK_STR(id, SCREEN_ID);
+	CHECK(registered);
+	ambient_wants = wants;
+	return 0;
+}
 static int fakeOpen(const char* id) {
 	CHECK_STR(id, SCREEN_ID);
-	if (open_result || is_open) return -1;
+	if (is_open) return -1;
 	if (screen.enter(screen.data) != 0) return -1;
 	is_open = 1;
 	opens++;
@@ -215,8 +215,7 @@ static int fakeClose(const char* id) {
 	screen.exit(screen.data);
 	return 0;
 }
-static const char* fakeCurrent(void) { return is_open ? SCREEN_ID : top; }
-static const char* fakeHome(void) { return home; }
+static const char* fakeCurrent(void) { return is_open ? SCREEN_ID : "gamelist"; }
 static void fakeRedraw(void) { redraws++; }
 static int fakeScale(void) { return 3; }
 static int fakeSwitch(void) { return -1; }
@@ -230,12 +229,38 @@ static int fakeRound(MosaicSurface* s, const MosaicRect* r, int radius, MosaicCo
 }
 static int fakeWidth(int font, const char* text) { (void)font; return 10 * (int)strlen(text); }
 static int fakeHeight(int font) { (void)font; return 30; }
-static char drawn[4][32];
+static int fakeTruncate(int font, const char* text, int max, char* out, size_t size) {
+	(void)font; (void)max;
+	snprintf(out, size, "%s", text);
+	return 10 * (int)strlen(out);
+}
+static char drawn[4][64];
 static int drawn_count = 0;
 static int fakeDraw(MosaicSurface* s, int font, const char* text, int x, int y, MosaicColor c, int max) {
 	(void)s; (void)font; (void)x; (void)y; (void)max;
 	CHECK(c.a == DIM);
 	if (drawn_count < 4) snprintf(drawn[drawn_count++], sizeof(drawn[0]), "%s", text);
+	return 0;
+}
+
+// the music plugin's services
+static const char* music_state = "stopped";
+static int toggles = 0;
+static int musicNow(const char* name, const char* args, char* out, size_t size) {
+	(void)name; (void)args;
+	if (!strcmp(music_state, "stopped")) snprintf(out, size, "state=stopped\ntitle=\nartist=\nline=\n");
+	else {
+		snprintf(out, size, "state=%s\ntitle=Song\nartist=\nline=%s: Song\n", music_state,
+			!strcmp(music_state, "playing") ? "Playing" : "Paused");
+	}
+	return 0;
+}
+static int musicToggle(const char* name, const char* args, char* out, size_t size) {
+	(void)name; (void)args;
+	toggles++;
+	if (!strcmp(music_state, "playing")) music_state = "paused";
+	else if (!strcmp(music_state, "paused")) music_state = "playing";
+	snprintf(out, size, "state=%s\n", music_state);
 	return 0;
 }
 
@@ -254,13 +279,16 @@ static MosaicHost fakeHost(void) {
 		.fill_round_rect = fakeRound,
 		.text_width = fakeWidth,
 		.text_height = fakeHeight,
+		.text_truncate = fakeTruncate,
 		.draw_text = fakeDraw,
 		.register_screen = fakeRegister,
 		.open_screen = fakeOpen,
 		.close_screen = fakeClose,
 		.current_screen = fakeCurrent,
 		.hold_switch = fakeSwitch,
-		.home_screen = fakeHome,
+		.event_value = fakeEventValue,
+		.call = fakeCall,
+		.register_ambient = fakeRegisterAmbient,
 	};
 }
 
@@ -268,11 +296,13 @@ static MosaicInput buttons(unsigned int pressed, unsigned int held, unsigned int
 	return (MosaicInput){ sizeof(MosaicInput), pressed, pressed, released, held };
 }
 
-// one frame: the filter, then tick, as the launcher calls them
-static unsigned int frame(unsigned long now, MosaicInput input) {
+// one frame: the filter, then tick, then the launcher's ambient check
+// with idle_ms
+static unsigned int frame(unsigned long now, unsigned long idle_ms, MosaicInput input) {
 	unsigned int consumed = 0;
 	CHECK(plugin.input_filter(&input, &consumed) == 0);
 	plugin.tick(now);
+	if (!is_open && ambient_wants && ambient_wants(idle_ms, NULL)) fakeOpen(SCREEN_ID);
 	return consumed;
 }
 
@@ -283,34 +313,36 @@ static void testPlugin(void) {
 	fake_charging = -1;
 	CHECK(plugin.init(&host_table) == 0);
 	CHECK_STR(last_log, "unsupported on desktop: there's no battery, so the screen never opens");
-	CHECK(!registered);
-	frame(0, buttons(0, 0, 0));
-	frame(100000, buttons(0, 0, 0));
-	CHECK(opens == 0);
+	CHECK(!registered && !ambient_wants);
 
 	// off: inert too
 	fake_charging = 1;
 	snprintf(cfg_idle, sizeof(cfg_idle), "off");
 	CHECK(plugin.init(&host_table) == 0);
 	CHECK_STR(last_log, "idle is off, so the screen never opens");
-	CHECK(!registered);
+	CHECK(!registered && !ambient_wants);
 
+	// a launcher without ambient screens
 	snprintf(cfg_idle, sizeof(cfg_idle), "30");
+	host_table.size = offsetof(MosaicHost, register_ambient);
 	CHECK(plugin.init(&host_table) == 0);
-	CHECK(registered);
+	CHECK_STR(last_log, "unsupported: this launcher has no ambient screens");
+	CHECK(!registered);
+	host_table.size = sizeof(MosaicHost);
+
+	CHECK(plugin.init(&host_table) == 0);
+	CHECK(registered && ambient_wants);
 	CHECK_STR(last_log, "opens after 30s idle on the list or home while charging, clock off");
 
-	unsigned int a = BIT(MOSAIC_BUTTON_A);
-	frame(1000, buttons(0, 0, 0));
-	frame(20000, buttons(a, a, 0)); // a press starts the count again
-	frame(20100, buttons(0, 0, a));
-	frame(50000, buttons(0, 0, 0));
+	// the launcher's idle time, while charging
+	frame(1000, 1000, buttons(0, 0, 0));
+	frame(29000, 29999, buttons(0, 0, 0));
 	CHECK(opens == 0);
-	frame(50100, buttons(0, 0, 0));
+	frame(30000, 30000, buttons(0, 0, 0));
 	CHECK(opens == 1);
-	CHECK_STR(last_log, "opened after 30s idle on the list: 73%, Charging");
+	CHECK_STR(last_log, "opened after 30s idle: 73%, Charging");
 
-	// what it draws
+	// what it draws, without music
 	MosaicScreenView view = { sizeof(view), { 0, 0, 1024, 768 }, { 0 }, { 0 }, SCREEN_ID };
 	CHECK(screen.render(NULL, &view, screen.data) == 0);
 	CHECK(drawn_count == 2);
@@ -323,11 +355,11 @@ static void testPlugin(void) {
 
 	// drawn again only when it changes
 	redraws = 0;
-	frame(52000, buttons(0, 0, 0));
+	frame(32000, 0, buttons(0, 0, 0));
 	CHECK(redraws == 0);
 	fake_level = 100;
-	frame(53000, buttons(0, 0, 0));
-	frame(54000, buttons(0, 0, 0));
+	frame(33000, 0, buttons(0, 0, 0));
+	frame(34000, 0, buttons(0, 0, 0));
 	CHECK(redraws >= 1);
 	drawn_count = 0;
 	CHECK(screen.render(NULL, &view, screen.data) == 0);
@@ -335,100 +367,95 @@ static void testPlugin(void) {
 	CHECK_STR(drawn[1], "Charged");
 	CHECK(bar_w > bar_73);
 	redraws = 0;
-	frame(56000, buttons(0, 0, 0));
+	frame(36000, 0, buttons(0, 0, 0));
 	CHECK(redraws == 0);
 
-	// a press closes it and is taken until it's let go
-	unsigned int x = BIT(MOSAIC_BUTTON_X);
-	CHECK(frame(57000, buttons(x, x, 0)) == ~POWER);
+	// a press closes it and is taken until it's let go: X too, with the
+	// music plugin off
+	unsigned int a = BIT(MOSAIC_BUTTON_A), x = BIT(MOSAIC_BUTTON_X);
+	CHECK(frame(37000, 0, buttons(x, x, 0)) == ~POWER);
 	CHECK(!is_open);
 	CHECK_STR(last_log, "closed by a button");
-	CHECK(frame(57050, buttons(0, x, 0)) == ~POWER);
-	CHECK(frame(57100, buttons(0, 0, x)) == ~POWER);
-	CHECK(frame(57150, buttons(0, 0, 0)) == 0);
-	CHECK(frame(57200, buttons(a, a, 0)) == 0); // the list's again
+	CHECK(frame(37050, 0, buttons(0, x, 0)) == ~POWER);
+	CHECK(frame(37100, 0, buttons(0, 0, x)) == ~POWER);
+	CHECK(frame(37150, 0, buttons(0, 0, 0)) == 0);
+	CHECK(frame(37200, 0, buttons(a, a, 0)) == 0); // the list's again
 
-	// opens again after the idle time, and closes when unplugged
-	frame(87100, buttons(0, 0, 0));
-	CHECK(opens == 1);
-	frame(87200, buttons(0, 0, 0));
+	// closes when unplugged, and isn't wanted unplugged
+	frame(70000, 30000, buttons(0, 0, 0));
 	CHECK(opens == 2);
 	fake_charging = 0;
-	frame(88000, buttons(0, 0, 0));
+	frame(71000, 0, buttons(0, 0, 0));
 	CHECK(!is_open);
 	CHECK_STR(last_log, "closed: not charging");
+	frame(200000, 100000, buttons(0, 0, 0));
+	CHECK(opens == 2);
 	fake_charging = 1;
-	frame(100000, buttons(0, 0, 0));
-	CHECK(opens == 2); // the count started when it closed
-	frame(118100, buttons(0, 0, 0));
-	CHECK(opens == 3);
 
 	// the power button is left to the launcher, and waking closes it
-	CHECK(frame(119000, buttons(POWER, POWER, 0)) == 0);
+	frame(201000, 30000, buttons(0, 0, 0));
+	CHECK(opens == 3);
+	CHECK(frame(202000, 0, buttons(POWER, POWER, 0)) == 0);
 	CHECK(is_open);
 	plugin.after_resume();
-	frame(119100, buttons(0, 0, 0));
+	frame(202100, 0, buttons(0, 0, 0));
 	CHECK(!is_open);
 	CHECK_STR(last_log, "closed: the device woke");
 
-	// only over the game list
-	top = "quickmenu";
-	frame(200000, buttons(0, 0, 0));
-	CHECK(opens == 3);
-	top = "gamelist";
-	frame(200100, buttons(0, 0, 0));
-	frame(229999, buttons(0, 0, 0));
-	CHECK(opens == 3);
-	frame(230000, buttons(0, 0, 0));
+	// with the music plugin on but nothing playing, X still closes it
+	fakeProvide("music.now", musicNow);
+	fakeProvide("music.toggle", musicToggle);
+	frame(300000, 30000, buttons(0, 0, 0));
 	CHECK(opens == 4);
-	fakeClose(SCREEN_ID); // closed some other way, such as the quick menu over it
-	frame(230200, buttons(0, 0, 0));
-	CHECK(opens == 4);
-
-	// a refused open is logged once and waits another idle time
-	open_result = -1;
-	frame(260200, buttons(0, 0, 0));
-	CHECK_STR(last_log, "couldn't open the screen; trying again after the next idle time");
-	last_log[0] = '\0';
-	frame(290200, buttons(0, 0, 0));
-	CHECK_STR(last_log, "");
-	open_result = 0;
-	frame(320200, buttons(0, 0, 0));
-	CHECK(opens == 5);
-	fakeClose(SCREEN_ID);
-
-	// over home too, but not over another plugin's screen
-	top = "home.main";
-	frame(400000, buttons(0, 0, 0)); // home isn't the list, so the count starts
-	frame(500000, buttons(0, 0, 0));
-	CHECK(opens == 5);
-	home = "home.main";
-	frame(500100, buttons(0, 0, 0));
-	frame(529999, buttons(0, 0, 0));
-	CHECK(opens == 5);
-	frame(530000, buttons(0, 0, 0));
-	CHECK(opens == 6);
-	CHECK_STR(last_log, "opened after 30s idle on home: 100%, Charged");
-	CHECK(frame(531000, buttons(a, a, 0)) == ~POWER); // home doesn't get it
+	CHECK(frame(301000, 0, buttons(x, x, 0)) == ~POWER);
 	CHECK(!is_open);
-	top = "other.screen";
-	frame(600000, buttons(0, 0, 0));
-	frame(700000, buttons(0, 0, 0));
-	CHECK(opens == 6);
-	// an older launcher without home_screen: the list only
-	top = "home.main";
-	host_table.size = offsetof(MosaicHost, home_screen);
-	frame(800000, buttons(0, 0, 0));
-	frame(900000, buttons(0, 0, 0));
-	CHECK(opens == 6);
-	top = "gamelist";
-	home = NULL;
+	CHECK(toggles == 0);
+	frame(301100, 0, buttons(0, 0, x));
+
+	// with a track, the now playing line shows at the bottom, and X plays
+	// or pauses it without closing
+	music_state = "playing";
+	frame(400000, 30000, buttons(0, 0, 0));
+	CHECK(opens == 5);
+	drawn_count = 0;
+	CHECK(screen.render(NULL, &view, screen.data) == 0);
+	CHECK(drawn_count == 3);
+	CHECK_STR(drawn[2], "Playing: Song");
+	CHECK(logged("music: Playing: Song"));
+	redraws = 0;
+	CHECK(frame(401000, 0, buttons(x, x, 0)) == ~POWER);
+	CHECK(is_open);
+	CHECK(toggles == 1);
+	CHECK_STR(last_log, "X: music paused");
+	CHECK(redraws == 1);
+	CHECK(frame(401050, 0, buttons(0, x, 0)) == ~POWER);
+	CHECK(frame(401100, 0, buttons(0, 0, x)) == ~POWER);
+	CHECK(frame(401150, 0, buttons(0, 0, 0)) == 0);
+	drawn_count = 0;
+	CHECK(screen.render(NULL, &view, screen.data) == 0);
+	CHECK_STR(drawn[2], "Paused: Song");
+	CHECK(frame(402000, 0, buttons(x, x, 0)) == ~POWER);
+	CHECK(is_open);
+	CHECK_STR(last_log, "X: music playing");
+	frame(402100, 0, buttons(0, 0, x));
+	// a change from elsewhere is picked up within a second
+	music_state = "stopped";
+	redraws = 0;
+	frame(403500, 0, buttons(0, 0, 0));
+	CHECK(redraws == 1);
+	drawn_count = 0;
+	CHECK(screen.render(NULL, &view, screen.data) == 0);
+	CHECK(drawn_count == 2);
+	CHECK(logged("music: none"));
+	// and then X closes it again
+	CHECK(frame(404000, 0, buttons(x, x, 0)) == ~POWER);
+	CHECK(!is_open);
+	CHECK(toggles == 2);
 }
 
 int main(void) {
 	testSettings();
-	testIdle();
-	testIdleScreen();
+	testWants();
 	testFilter();
 	testFormat();
 	testPlugin();

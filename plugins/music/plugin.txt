@@ -3,6 +3,8 @@ name=Music
 api=1
 category=Extras
 summary=A music player that keeps playing while you play a game.
+# what plays, and play or pause, for other plugins such as the screensaver
+provides=music.now,music.toggle,music.pause,music.play
 # the folder on the card the player lists, with its folders; MP3, FLAC and WAV files
 setting.folder=text|Music folder|Music
 # pause the music before a game or pak and play on after it, or keep it playing through it

@@ -56,6 +56,42 @@ static void testSettings(void) {
 	CHECK(VP_parseToggle(NULL, 0) == 0);
 }
 
+static void testSaver(void) {
+	CHECK(VP_parseClock("24h") == VP_CLOCK_24H);
+	CHECK(VP_parseClock("12h") == VP_CLOCK_12H);
+	CHECK(VP_parseClock("off") == VP_CLOCK_OFF);
+	CHECK(VP_parseClock("analog") == VP_CLOCK_OFF);
+	CHECK(VP_parseClock(NULL) == VP_CLOCK_OFF);
+	char out[16];
+	VP_formatClock(9, 5, VP_CLOCK_24H, "AM", "PM", out, sizeof(out));
+	CHECK_STR(out, "09:05");
+	VP_formatClock(21, 7, VP_CLOCK_12H, "AM", "PM", out, sizeof(out));
+	CHECK_STR(out, "9:07 PM");
+	VP_formatClock(0, 0, VP_CLOCK_12H, "a. m.", "p. m.", out, sizeof(out));
+	CHECK_STR(out, "12:00 a. m.");
+	VP_formatClock(9, 5, VP_CLOCK_OFF, "AM", "PM", out, sizeof(out));
+	CHECK_STR(out, "");
+	VP_formatClock(24, 0, VP_CLOCK_24H, "AM", "PM", out, sizeof(out));
+	CHECK_STR(out, "");
+
+	// music plays on after a clip only when the clip paused it
+	VpMusic m = { 0 };
+	VpMusic_paused(&m, 0); // it wasn't playing
+	CHECK(!VpMusic_resume(&m));
+	VpMusic_paused(&m, 1);
+	VpMusic_seen(&m, "paused");
+	CHECK(VpMusic_resume(&m));
+	CHECK(!VpMusic_resume(&m)); // once
+	// played on by something else, such as X on the screensaver
+	VpMusic_paused(&m, 1);
+	VpMusic_seen(&m, "playing");
+	CHECK(!VpMusic_resume(&m));
+	// not after a sleep
+	VpMusic_paused(&m, 1);
+	VpMusic_forget(&m);
+	CHECK(!VpMusic_resume(&m));
+}
+
 static void testArm(void) {
 	VpArm arm;
 	VP_disarm(&arm);
@@ -272,6 +308,7 @@ int main(void) {
 	testClipPath();
 	testDirAndLibs();
 	testSettings();
+	testSaver();
 	testArm();
 	testClock();
 	testPace();

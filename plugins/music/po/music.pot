@@ -38,10 +38,6 @@ msgstr ""
 msgid "Lock screen"
 msgstr ""
 
-#: music.c
-msgid "Locked: SELECT then START to unlock"
-msgstr ""
-
 #: music.c plugin.txt
 msgid "Music"
 msgstr ""
@@ -110,6 +106,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "SELECT"
+msgstr ""
+
+#: music.c
+msgid "Set a lock chord on the Launcher page"
 msgstr ""
 
 #: music.c plugin.txt

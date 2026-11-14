@@ -39,42 +39,28 @@ int CS_parseClock(const char* setting);
 ///////////////////////////////////////
 // When it opens and closes
 
-typedef struct CsIdle {
-	unsigned long idle_ms;    // how long idle on the list before it opens, 0 for never
-	unsigned long last_input; // when a button was last down, or the list last wasn't showing
-	int started;              // last_input has been set
-} CsIdle;
-
-void CsIdle_init(CsIdle* idle, unsigned long idle_ms);
-
-// Something happened that isn't idling on the list: a button was down, the
-// device woke, another screen showed or the screen just closed.
-void CsIdle_reset(CsIdle* idle, unsigned long now);
-
-// 1 when the screen should open now: it's on (idle_ms above 0), the device
-// is charging (charging 1, as is_charging returns it), the list or home has
-// been showing (on_list), and nothing has happened for idle_ms. The first
-// call starts the count.
-int CsIdle_due(CsIdle* idle, unsigned long now, int charging, int on_list);
-
-// Where the screen opens over: 1 for current, as current_screen returns it,
-// being the game list or home, the home slot's screen as home_screen
-// returns it (NULL without one). The quick menu, the game switcher and other
-// plugins' screens are what the user was looking at.
-int CS_idleScreen(const char* current, const char* home);
+// The ambient screen's wants: 1 when the launcher should open it, with the
+// idle setting on (setting_ms above 0), the device charging (charging 1, as
+// is_charging returns it) and idle_ms, the launcher's idle time, at least
+// the setting. The launcher asks only over the game list, home or a later
+// ambient screen.
+int CS_wants(unsigned long idle_ms, unsigned long setting_ms, int charging);
 
 // Which buttons the screen takes while it shows and until they're let go
 // after it closes, so the press that closes it doesn't also act on the
 // screen under it.
 typedef struct CsFilter {
-	int swallowing; // a press closed the screen and its buttons aren't all up yet
+	int swallowing; // a press took the screen's buttons and they aren't all up yet
 } CsFilter;
 
 // One frame's buttons, as MOSAIC_BUTTON_BIT masks. keep is what's never
-// taken (the power button, so sleep still works). Sets *close to 1 when a
-// press should close the open screen, and returns the buttons to take.
+// taken (the power button, so sleep still works), and toggle the button
+// that plays or pauses music in place of closing the screen (X while music
+// has a track), or 0. Sets *close to 1 when a press should close the open
+// screen, or *toggled to 1 when it was toggle alone, and returns the
+// buttons to take.
 unsigned int CsFilter_frame(CsFilter* f, int open, unsigned int pressed, unsigned int held,
-	unsigned int released, unsigned int keep, int* close);
+	unsigned int released, unsigned int keep, unsigned int toggle, int* close, int* toggled);
 
 ///////////////////////////////////////
 // What it shows

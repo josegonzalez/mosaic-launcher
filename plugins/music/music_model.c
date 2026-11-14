@@ -653,19 +653,3 @@ int MU_window(int selected, int count, int rows, int first) {
 	if (first > count - rows) first = count - rows;
 	return first < 0 ? 0 : first;
 }
-
-int MuUnlock_frame(MuUnlock* unlock, unsigned int pressed, unsigned int held, unsigned int select_bit,
-	unsigned int start_bit, unsigned long now) {
-	if (pressed & start_bit) {
-		int ok = (held & select_bit) || (unlock->armed && now - unlock->select_at <= MU_UNLOCK_MS);
-		unlock->armed = 0;
-		if (ok) return 1;
-	}
-	if (pressed & select_bit) {
-		unlock->armed = 1;
-		unlock->select_at = now;
-	} else if (pressed & ~start_bit) {
-		unlock->armed = 0;
-	}
-	return 0;
-}

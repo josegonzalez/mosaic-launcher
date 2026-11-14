@@ -12,3 +12,11 @@ printf 'lock_chord=select+start\n' >"$STATE/settings.txt"
 args --settings
 press "down down down down"
 shot settings
+
+# the Ambient screens page, with charging-screen and the screensaver on
+begin
+on charging-screen screensaver
+printf 'lock_chord=select+start\n' >"$STATE/settings.txt"
+args --settings
+press "down down down down a"
+shot ambient

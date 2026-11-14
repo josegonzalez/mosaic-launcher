@@ -10,10 +10,15 @@
 // and closes it from the music folder. X pauses or plays on, L1 and R1 go
 // to the previous and next track, L2 and R2 seek 10 seconds, SELECT turns
 // shuffle on or off and START steps repeat through off, all and one (both
-// saved as settings). Y opens music.lock, a full screen with the clock and
-// the track, which takes every button but power until SELECT then START.
-// The music.open action opens the player, from a quick menu tile or a
-// game list button; music.lock and music.toggle are there for FN buttons.
+// saved as settings). Y locks the launcher's lock (host->lock) and closes
+// the player, so the lock screen shows over the list. The music.open
+// action opens the player, from a quick menu tile or a game list button;
+// music.lock and music.toggle are there for FN buttons.
+//
+// On the launcher's lock screen it adds what's playing (lock_text) and X
+// for play or pause (lock_button). Other plugins, such as the screensaver, read what's
+// playing and play or pause it through its services: music.now,
+// music.toggle, music.pause and music.play.
 //
 // Over the other screens a now playing pill shows at the bottom for a few
 // seconds after a track starts (the overlay setting). While music plays it
@@ -58,7 +63,6 @@
 
 #define ID "music"
 #define PLAYER_ID ID ".player"
-#define LOCK_ID ID ".lock"
 #define OPEN_ACTION ID ".open"
 #define LOCK_ACTION ID ".lock"
 #define TOGGLE_ACTION ID ".toggle"
@@ -72,7 +76,6 @@
 #define POLL_PLAYING_MS 1000 // while something plays or is paused
 #define POLL_IDLE_MS 5000    // while the daemon runs with nothing queued
 #define SEEK_MS 10000
-#define DIM 140 // the lock screen's alpha over black
 #define ART_DIR "/tmp/mosaic-music-art" // embedded cover art, written out for art_load
 
 extern char** environ;
@@ -105,11 +108,6 @@ static MuList list;
 static int selected = 0, first_row = 0, visible_rows = 1;
 static int player_open = 0;
 static char logged_view[MU_PATH_MAX + MU_NAME_MAX + 64];
-
-// the lock screen
-static int lock_open = 0, unlock_due = 0;
-static MuUnlock unlock;
-static char lock_clock[16];
 
 // Tags are read on a thread of their own, so a big folder doesn't hold up
 // a frame: the listing's track titles one at a time, and the playing
@@ -156,6 +154,14 @@ static void say(const char* format, ...) {
 	vsnprintf(text, sizeof(text), format, args);
 	va_end(args);
 	host->log(ID, text);
+}
+
+static int lockNow(void);
+
+// 1 while the launcher's lock screen, where lock_text shows, is on top.
+static int lockShowing(void) {
+	const char* screen = MOSAIC_HOST_HAS(host, register_ambient) ? host->current_screen() : NULL;
+	return screen && !strcmp(screen, "lock");
 }
 
 ///////////////////////////////////////
@@ -254,7 +260,7 @@ static void askStatus(unsigned long now) {
 	}
 	logNowPlaying();
 	if (MuOverlay_update(&overlay, &st, now)) overlay_shown = 0;
-	unsigned long wait = player_open || lock_open ? POLL_SCREEN_MS
+	unsigned long wait = player_open || lockShowing() ? POLL_SCREEN_MS
 		: !daemon_up ? 0
 		: st.state != MU_STOPPED ? POLL_PLAYING_MS
 		: POLL_IDLE_MS;
@@ -862,57 +868,28 @@ static int playerRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 	return 0;
 }
 
-static int lockRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
-	(void)data;
-	const MosaicRect area = view->area;
-	int s = scale();
-	int large = host->text_height(MOSAIC_FONT_LARGE), small = host->text_height(MOSAIC_FONT_SMALL);
-	host->fill_rect(screen, &area, mosaic_color(0x000000, 255));
-	MosaicColor fg = themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF, DIM);
-	MosaicColor hint = themeColor(MOSAIC_COLOR_HINT, 0x999999, DIM);
-	MosaicRect box = { area.x + 10 * s, area.y, area.w - 20 * s, area.h };
-	int y = area.y + area.h / 2 - large * 2;
-	// the cover art above the clock, dim, when there's room for it
-	int art_size = y - 10 * s - (area.y + 10 * s);
-	if (art_size > area.w / 3) art_size = area.w / 3;
-	if (st.state != MU_STOPPED && art_size >= 32 * s) {
-		const MosaicSurface* art = nowArt(art_size);
-		MosaicRect at = { area.x + (area.w - art_size) / 2, y - 10 * s - art_size, art_size, art_size };
-		if (art && MOSAIC_HOST_HAS(host, blit_alpha)) host->blit_alpha(screen, art, NULL, &at, DIM);
-		else if (art) host->blit(screen, art, NULL, &at);
-	}
-	textCentred(screen, MOSAIC_FONT_LARGE, lock_clock, &box, y, fg);
-	y += large * 2;
-	if (st.state != MU_STOPPED) {
-		char title[MU_TAG_TEXT_MAX], line[256];
-		nowTitle(title, sizeof(title));
-		textCentred(screen, MOSAIC_FONT_LARGE, title, &box, y, fg);
-		y += large + 4 * s;
-		const char* artist = nowArtist();
-		if (artist[0]) {
-			textCentred(screen, MOSAIC_FONT_SMALL, artist, &box, y, fg);
-			y += small + 4 * s;
-		}
-		stateLine(line, sizeof(line));
-		textCentred(screen, MOSAIC_FONT_SMALL, line, &box, y, hint);
-	}
-	textCentred(screen, MOSAIC_FONT_SMALL, tr("Locked: SELECT then START to unlock"), &box,
-		area.y + area.h - 10 * s - small, hint);
-	return 0;
+// "Playing: <title> - <artist>", as the pill and other plugins show it, or
+// "" with nothing playing or paused.
+static void nowLine(char* out, size_t size) {
+	out[0] = '\0';
+	if (st.state == MU_STOPPED) return;
+	char title[MU_TAG_TEXT_MAX];
+	nowTitle(title, sizeof(title));
+	const char* artist = nowArtist();
+	snprintf(out, size, "%s: %s%s%s", st.state == MU_PLAYING ? tr("Playing") : tr("Paused"), title, artist[0] ? " - " : "",
+		artist);
 }
 
 static int overlayRender(MosaicSurface* surface, const MosaicScreenView* view) {
 	if (!MuOverlay_visible(&overlay, last_now)) return 0;
-	if (view->screen && (!strcmp(view->screen, PLAYER_ID) || !strcmp(view->screen, LOCK_ID))) return 0;
+	// the lock screen shows what's playing already, through lockText
+	if (view->screen && (!strcmp(view->screen, PLAYER_ID) || !strcmp(view->screen, "lock"))) return 0;
 	const MosaicRect area = view->area;
 	int s = scale();
 	int pad = 10 * s, pill = 30 * s;
 	int h = host->text_height(MOSAIC_FONT_SMALL);
-	char title[MU_TAG_TEXT_MAX], text[2 * MU_TAG_TEXT_MAX + 16], cut[sizeof(text)];
-	nowTitle(title, sizeof(title));
-	const char* artist = nowArtist();
-	snprintf(text, sizeof(text), "%s: %s%s%s", st.state == MU_PLAYING ? tr("Playing") : tr("Paused"), title, artist[0] ? " - " : "",
-		artist);
+	char text[2 * MU_TAG_TEXT_MAX + 16], cut[sizeof(text)];
+	nowLine(text, sizeof(text));
 	int w = host->text_truncate(MOSAIC_FONT_SMALL, text, area.w / 2 - 2 * pad, cut, sizeof(cut));
 	if (w <= 0) return 0;
 	MosaicRect rect = { area.x + (area.w - w - 2 * pad) / 2, area.y + area.h - pad - pill, w + 2 * pad, pill };
@@ -997,7 +974,8 @@ static int playerInput(const MosaicInput* in, void* data) {
 			if (MU_childPath(dir, list.items[selected].name, path, sizeof(path))) playPath(path);
 		}
 	} else if (PRESSED(Y)) {
-		if (host->open_screen(LOCK_ID) != 0) say("couldn't open the lock screen");
+		// back to the list, where the lock screen shows
+		if (lockNow() == 0) return MOSAIC_SCREEN_CLOSE;
 	} else if (PRESSED(L1)) {
 		command(MU_CMD_PREV, NULL);
 	} else if (PRESSED(R1)) {
@@ -1039,44 +1017,32 @@ static int playerAnimating(void* data) {
 }
 
 ///////////////////////////////////////
-// the lock screen
+// the launcher's lock
 
-static void clockText(char* out, size_t size) {
-	time_t t = time(NULL);
-	struct tm local;
-	if (localtime_r(&t, &local)) strftime(out, size, "%H:%M", &local);
-	else out[0] = '\0';
+// Locks the launcher's lock, as its chord does. Returns 0, or -1 when it
+// can't, as with the chord off, which a toast says.
+static int lockNow(void) {
+	if (!MOSAIC_HOST_HAS(host, register_ambient)) {
+		say("this launcher has no lock");
+		return -1;
+	}
+	if (host->lock() == 0) {
+		say("locked");
+		return 0;
+	}
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(tr("Set a lock chord on the Launcher page"));
+	return -1;
 }
 
-static int lockEnter(void* data) {
-	(void)data;
-	lock_open = 1;
-	unlock_due = 0;
-	memset(&unlock, 0, sizeof(unlock));
-	clockText(lock_clock, sizeof(lock_clock));
-	askStatus(last_now);
-	say("locked");
-	return 0;
-}
-
-static void lockExit(void* data) {
-	(void)data;
-	lock_open = 0;
-	unlock_due = 0;
-}
-
-// every button is taken in input_filter while it shows
-static int lockInput(const MosaicInput* in, void* data) {
-	(void)in;
-	(void)data;
-	return MOSAIC_SCREEN_STAY;
-}
-
-static int inputFilter(const MosaicInput* in, unsigned int* consumed) {
-	if (!lock_open) return 0;
-	unsigned int select_bit = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_SELECT), start_bit = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_START);
-	if (MuUnlock_frame(&unlock, in->pressed, in->held, select_bit, start_bit, last_now)) unlock_due = 1;
-	*consumed = ~MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER);
+// What's playing on the lock screen: the title and artist, then whether
+// it plays, where it is and the shuffle and repeat.
+static int lockText(char* out, size_t size) {
+	if (st.state == MU_STOPPED) return 0;
+	char title[MU_TAG_TEXT_MAX], line[256];
+	nowTitle(title, sizeof(title));
+	const char* artist = nowArtist();
+	stateLine(line, sizeof(line));
+	snprintf(out, size, "%s%s%s\n%s", title, artist[0] ? " - " : "", artist, line);
 	return 0;
 }
 
@@ -1095,10 +1061,17 @@ static void openPlayer(const char* path, void* data) {
 	if (host->open_screen(PLAYER_ID) != 0) say("couldn't open the player");
 }
 
-static void openLock(const char* path, void* data) {
+// play or pause: while there's a track
+static int hasTrack(const char* path, void* data) {
 	(void)path;
 	(void)data;
-	if (host->open_screen(LOCK_ID) != 0) say("couldn't open the lock screen");
+	return st.state != MU_STOPPED;
+}
+
+static void lockAction(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	lockNow();
 }
 
 static void togglePlaying(const char* path, void* data) {
@@ -1107,6 +1080,68 @@ static void togglePlaying(const char* path, void* data) {
 	if (!daemon_up) askStatus(last_now);
 	if (st.state == MU_STOPPED) say("nothing to pause or play on");
 	else playOrPause();
+}
+
+///////////////////////////////////////
+// services
+
+static const char* stateWord(void) {
+	return st.state == MU_PLAYING ? "playing" : st.state == MU_PAUSED ? "paused" : "stopped";
+}
+
+// music.now: state=playing, paused or stopped, the track's title and
+// artist, and line, the now playing line ("" when stopped).
+static int provideNow(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	char title[MU_TAG_TEXT_MAX] = "", line[2 * MU_TAG_TEXT_MAX + 16];
+	if (st.state != MU_STOPPED) nowTitle(title, sizeof(title));
+	nowLine(line, sizeof(line));
+	snprintf(out, size, "state=%s\ntitle=%s\nartist=%s\nline=%s\n", stateWord(), title,
+		st.state != MU_STOPPED ? nowArtist() : "", line);
+	return 0;
+}
+
+// music.toggle: plays or pauses while there's a track; state= says what
+// it's doing after.
+static int provideToggle(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	if (!daemon_up) askStatus(last_now);
+	if (st.state != MU_STOPPED) {
+		say("%s for another plugin", st.state == MU_PLAYING ? "pausing" : "playing on");
+		playOrPause();
+	}
+	snprintf(out, size, "state=%s\n", stateWord());
+	return 0;
+}
+
+// music.pause: pauses what's playing; paused=1 when it was playing.
+static int providePause(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	if (!daemon_up) askStatus(last_now);
+	int was = daemon_up && st.state == MU_PLAYING;
+	if (was) {
+		say("pausing for another plugin");
+		command(MU_CMD_PAUSE, NULL);
+	}
+	snprintf(out, size, "paused=%i\nstate=%s\n", was && st.state == MU_PAUSED, stateWord());
+	return 0;
+}
+
+// music.play: plays on what's paused; state= says what it's doing after.
+static int providePlay(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	if (!daemon_up) askStatus(last_now);
+	if (st.state == MU_PAUSED) {
+		say("playing on for another plugin");
+		if (restored && !daemon_up) playRestored();
+		else command(MU_CMD_RESUME, NULL);
+	}
+	snprintf(out, size, "state=%s\n", stateWord());
+	return 0;
 }
 
 ///////////////////////////////////////
@@ -1130,25 +1165,13 @@ static void tick(unsigned long now) {
 		snprintf(track, sizeof(track), "%s", st.track);
 		askStatus(now);
 		int changed = st.state != state || strcmp(st.track, track) != 0;
-		if (changed || ((player_open || lock_open) && st.pos_ms / 1000 != pos / 1000)) host->request_redraw();
+		if (changed || ((player_open || lockShowing()) && st.pos_ms / 1000 != pos / 1000)) host->request_redraw();
 		if (was_visible != MuOverlay_visible(&overlay, now)) host->request_redraw();
 	} else if (overlay_shown && !MuOverlay_visible(&overlay, now)) {
 		overlay_shown = 0;
 		host->request_redraw();
 	}
 	if (updateTags()) host->request_redraw();
-	if (lock_open) {
-		char clock[16];
-		clockText(clock, sizeof(clock));
-		if (strcmp(clock, lock_clock) != 0) {
-			snprintf(lock_clock, sizeof(lock_clock), "%s", clock);
-			host->request_redraw();
-		}
-		if (unlock_due) {
-			unlock_due = 0;
-			if (host->close_screen(LOCK_ID) == 0) say("unlocked");
-		}
-	}
 	int want_awake = awake && st.state == MU_PLAYING;
 	if (want_awake != awake_held && MOSAIC_HOST_HAS(host, inhibit_sleep)) {
 		awake_held = want_awake;
@@ -1205,7 +1228,7 @@ static int init(const MosaicHost* h) {
 	daemon_up = 0;
 	memset(&st, 0, sizeof(st));
 	MU_listInit(&list);
-	player_open = lock_open = unlock_due = awake_held = 0;
+	player_open = awake_held = 0;
 	next_poll = last_now = 0;
 	logged_now[0] = logged_view[0] = '\0';
 	np_asked[0] = np_track[0] = np_title[0] = np_artist[0] = np_art[0] = '\0';
@@ -1256,24 +1279,24 @@ static int init(const MosaicHost* h) {
 		.render = playerRender,
 		.animating = playerAnimating,
 	};
-	static const MosaicScreenHooks lock = {
-		.size = sizeof(MosaicScreenHooks),
-		.flags = MOSAIC_SCREEN_FULL,
-		.enter = lockEnter,
-		.exit = lockExit,
-		.input = lockInput,
-		.render = lockRender,
-		.animating = playerAnimating,
-	};
-	if (host->register_screen(PLAYER_ID, &player) != 0 || host->register_screen(LOCK_ID, &lock) != 0) {
-		say("couldn't register its screens");
+	if (host->register_screen(PLAYER_ID, &player) != 0) {
+		say("couldn't register its screen");
 		return 1;
 	}
 	if (host->register_action(OPEN_ACTION, "Music", 0, alwaysAvailable, openPlayer, NULL) != 0
-		|| host->register_action(LOCK_ACTION, "Lock screen", 0, alwaysAvailable, openLock, NULL) != 0
-		|| host->register_action(TOGGLE_ACTION, "Play or pause music", 0, alwaysAvailable, togglePlaying, NULL) != 0) {
+		|| host->register_action(LOCK_ACTION, "Lock screen", 0, alwaysAvailable, lockAction, NULL) != 0
+		|| host->register_action(TOGGLE_ACTION, "Play or pause music", 0, hasTrack, togglePlaying, NULL) != 0) {
 		say("couldn't register its actions");
 		return 1;
+	}
+	// play or pause on the launcher's lock screen
+	if (MOSAIC_HOST_HAS(host, register_ambient) && host->lock_button(MOSAIC_BUTTON_X, TOGGLE_ACTION) != 0) {
+		say("couldn't put X on the lock screen");
+	}
+	if (MOSAIC_HOST_HAS(host, call)
+		&& (host->provide("music.now", provideNow) != 0 || host->provide("music.toggle", provideToggle) != 0
+			|| host->provide("music.pause", providePause) != 0 || host->provide("music.play", providePlay) != 0)) {
+		say("couldn't provide its services");
 	}
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
 		&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(OPEN_ACTION, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
@@ -1331,7 +1354,7 @@ static const MosaicPlugin plugin = {
 	.before_sleep = beforeSleep,
 	.after_resume = afterResume,
 	.before_poweroff = beforePoweroff,
-	.input_filter = inputFilter,
+	.lock_text = lockText,
 	.overlay_render = overlayRender,
 };
 

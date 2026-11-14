@@ -27,9 +27,6 @@ msgstr "L2"
 msgid "Lock screen"
 msgstr "Bloquear pantalla"
 
-msgid "Locked: SELECT then START to unlock"
-msgstr "Bloqueado: SELECT y luego START para desbloquear"
-
 msgid "Music"
 msgstr "Música"
 
@@ -82,6 +79,9 @@ msgstr "Reanudar tras apagar"
 
 msgid "SELECT"
 msgstr "SELECT"
+
+msgid "Set a lock chord on the Launcher page"
+msgstr "Elige una combinación de bloqueo en la página Launcher"
 
 msgid "Shuffle"
 msgstr "Aleatorio"

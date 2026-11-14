@@ -47,36 +47,18 @@ int CS_parseClock(const char* setting) {
 ///////////////////////////////////////
 // When it opens and closes
 
-void CsIdle_init(CsIdle* idle, unsigned long idle_ms) {
-	*idle = (CsIdle){0};
-	idle->idle_ms = idle_ms;
-}
-
-void CsIdle_reset(CsIdle* idle, unsigned long now) {
-	idle->last_input = now;
-	idle->started = 1;
-}
-
-int CsIdle_due(CsIdle* idle, unsigned long now, int charging, int on_list) {
-	if (!idle->started || !on_list || charging != 1) {
-		CsIdle_reset(idle, now);
-		return 0;
-	}
-	if (!idle->idle_ms) return 0;
-	return now - idle->last_input >= idle->idle_ms;
-}
-
-int CS_idleScreen(const char* current, const char* home) {
-	if (!current) return 0;
-	return !strcmp(current, "gamelist") || (home && home[0] && !strcmp(current, home));
+int CS_wants(unsigned long idle_ms, unsigned long setting_ms, int charging) {
+	return setting_ms > 0 && charging == 1 && idle_ms >= setting_ms;
 }
 
 unsigned int CsFilter_frame(CsFilter* f, int open, unsigned int pressed, unsigned int held,
-	unsigned int released, unsigned int keep, int* close) {
+	unsigned int released, unsigned int keep, unsigned int toggle, int* close, int* toggled) {
 	(void)released;
 	*close = 0;
+	*toggled = 0;
 	if (open && (pressed & ~keep)) {
-		*close = 1;
+		if (toggle && (pressed & ~keep) == toggle) *toggled = 1;
+		else *close = 1;
 		f->swallowing = 1;
 	}
 	if (!f->swallowing) return 0;

@@ -6,9 +6,7 @@
 # the first image to the second and skips the broken one, screener's A
 # closes it without opening the selected folder, it opens again and B
 # closes it. It opens and closes the same over screener's home screen.
-# Then with charging-screen on and its test battery charging,
-# it waits while charging-screen's screen opens and closes, and opens once
-# unplugger unplugs the battery
+# 840-ambient-interop.sh has it with charging-screen
 SS_DIR="$CARD/Screensaver Case"
 mkdir -p "$SS_DIR"
 cp "$ROOT/tests/plugins/peeker/art.png" "$SS_DIR/a.png"
@@ -27,7 +25,7 @@ run_launcher "$log" "plugin screener: done" || fail "the launcher exited early w
 WAIT=$ss_wait
 expect "opens after 1s idle on the list or home: folder, every 1s, slide, clock 24h"
 expect "folder $SS_DIR"
-expect "opened after 1s idle on the list: 3 images from folder"
+expect "opened after 1s idle: 3 images from folder"
 expect "showing 1 of 3: a.png"
 expect "sliding to 2 of 3"
 expect "showing 2 of 3: b.png"
@@ -51,7 +49,7 @@ log="$WORK/screensaver-home.log"
 WAIT=$((WAIT + 10))
 run_launcher "$log" "plugin screener: done" || fail "the launcher exited early with screensaver over home"
 WAIT=$ss_wait
-expect "opened after 1s idle on home: 3 images from folder"
+expect "opened after 1s idle: 3 images from folder"
 expect "closed by a button"
 grep -qF "plugin screener: home screener.main" "$log" || fail "screener.main wasn't the home screen"
 seen | grep -Eq '^screener\.main screensaver\.main screener\.main ' \
@@ -60,28 +58,6 @@ grep -qF "plugin screener: input screener.main" "$log" && fail "screensaver's cl
 if [ -f "$WORK/screensaver-home-left.saved" ]; then mv "$WORK/screensaver-home-left.saved" "$HOME_LEFT"; else rm -f "$HOME_LEFT"; fi
 build_plugin screener 'id=screener\nname=Screener\napi=1\nslots=transition\n'
 
-# charging-screen comes first while charging
-CS_FAKE="$WORK/charging-screen.fake"
-printf '73 1\n' >"$CS_FAKE"
-printf 'charging-screen=on\n' >"$STATE/plugins.txt"
-printf 'idle=2\n' >"$STATE/charging-screen.cfg"
-make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" charging-screen >/dev/null || fail "building charging-screen"
-build_plugin unplugger 'id=unplugger\nname=Unplugger\napi=1\n'
-printf 'steps=wait,wait,wait,wait,wait,wait,wait,a,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait\n' \
-	>"$STATE/screener.cfg"
-export MOSAIC_CHARGING_SCREEN_FAKE="$CS_FAKE"
-log="$WORK/screensaver-charging.log"
-WAIT=$((WAIT + 10))
-run_launcher "$log" "plugin screener: done" || fail "the launcher exited early with screensaver and charging-screen"
-WAIT=$ss_wait
-unset MOSAIC_CHARGING_SCREEN_FAKE
-expect "opens after 1s idle on the list or home: folder, every 1s, slide, clock 24h, after charging-screen while charging"
-expect "waiting: charging-screen's screen comes first while charging"
-expect "opened after 1s idle on the list: 3 images from folder"
-grep -qF "plugin unplugger: unplugged" "$log" || fail "unplugger didn't unplug"
-seen | grep -Eq '^gamelist charging-screen\.main gamelist charging-screen\.main gamelist screensaver\.main ' \
-	|| fail "screensaver didn't wait for charging-screen: $(seen)"
-rm -rf "$SS_DIR" "$WORK/plugins/screensaver.plugin" "$WORK/plugins/charging-screen.plugin" \
-	"$WORK/plugins/screener.plugin" "$WORK/plugins/unplugger.plugin" "$STATE/screener.cfg" "$STATE/screensaver.cfg" \
-	"$STATE/charging-screen.cfg" "$STATE/plugins.txt" "$CS_FAKE"
+rm -rf "$SS_DIR" "$WORK/plugins/screensaver.plugin" "$WORK/plugins/screener.plugin" "$STATE/screener.cfg" \
+	"$STATE/screensaver.cfg"
 case_log=""

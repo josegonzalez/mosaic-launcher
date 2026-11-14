@@ -3,12 +3,14 @@ name=Screensaver
 api=1
 category=Extras
 summary=Cycles through images when the game list sits idle.
-# loads after favorites and charging-screen, which it asks about as it starts
-optional=favorites,charging-screen
+# loads after favorites, which it asks about as it starts
+optional=favorites
+# the screen the launcher opens in the Launcher page's order of ambient screens
+ambient=screensaver.main
 # how long the game list or home is left alone before the screensaver shows
 setting.idle=choice|Show after idle (seconds)|30|off,15,30,45,60,120,300,600
-# where the images come from: recent and favorite games' art, the Screenshots folder, or the folder setting's folder
-setting.source=choice|Images|games|games,screenshots,folder
+# where the images come from: recent and favorite games' art, the Screenshots folder, the folder setting's folder, or the games' art with their clips played through video-previews
+setting.source=choice|Images|games|games,screenshots,folder,videos
 # which of the games' art: box art (else the thumbnail) or screenshots
 setting.art=choice|Game art|box|box,screenshot
 # a folder on the card, for the folder source

@@ -55,6 +55,35 @@ int VP_parseDelayMs(const char* text, int fallback);
 // A setting's toggle: "on" or "1" is on, "off" or "0" off, else fallback.
 int VP_parseToggle(const char* text, int fallback);
 
+// The screensaver's clock, as its clock setting names it: "24h", "12h", or
+// off for anything else.
+enum VpClockMode {
+	VP_CLOCK_OFF,
+	VP_CLOCK_24H,
+	VP_CLOCK_12H,
+};
+int VP_parseClock(const char* text);
+// "09:05" in 24h, "9:05 AM" in 12h with am and pm for the AM and PM, or ""
+// with the clock off or a bad time.
+void VP_formatClock(int hour, int minute, int mode, const char* am, const char* pm, char* out, size_t size);
+
+// Music paused for a screensaver clip, played on once the clip ends only
+// when the clip paused it: not when it wasn't playing, when something else
+// played it on in between, or after a sleep, which music doesn't play on
+// from either.
+typedef struct VpMusic {
+	int paused; // the clip paused it, and it's still paused
+} VpMusic;
+// After asking music to pause: paused is 1 when it was playing and paused.
+void VpMusic_paused(VpMusic* m, int paused);
+// Music's state now, as music.now says it ("playing", "paused" or
+// "stopped"): playing means something else played it on.
+void VpMusic_seen(VpMusic* m, const char* state);
+// The device goes to sleep: music isn't played on after it.
+void VpMusic_forget(VpMusic* m);
+// The clip ended: 1 when music should play on, once.
+int VpMusic_resume(VpMusic* m);
+
 // When the selected game's clip is due: armed with the game and its clip
 // once the selection settles, due delay_ms later, and after a refusal
 // (art_replace returning -1, such as off the game list) due again later,

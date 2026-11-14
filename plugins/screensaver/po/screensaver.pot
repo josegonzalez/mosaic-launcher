@@ -133,3 +133,7 @@ msgstr ""
 #: plugin.txt
 msgid "slide"
 msgstr ""
+
+#: plugin.txt
+msgid "videos"
+msgstr ""

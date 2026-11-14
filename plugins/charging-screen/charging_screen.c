@@ -1,18 +1,21 @@
 // Charging screen: while the device charges and the game list or home has
 // been left alone for the idle setting's time, a full screen with the
 // battery level, whether it's charging or charged, and the clock, drawn dim
-// on black.
+// on black, and what music plays, while the music plugin has a track.
 //
-// It keeps its own idle time, from input_filter, which sees every button
-// on every screen: any button down, another screen showing, or the device
-// waking starts the count again. It opens only over the game list or the
-// home slot's screen. It's drawn only when what it shows changes, the
-// level, the state or the clock's minute, never animating.
+// It's an ambient screen (register_ambient): the launcher keeps the idle
+// time and opens it over the game list, home or a later ambient screen,
+// such as the screensaver, in the user's order of ambient screens, once
+// wants says the device charges and the idle time has passed. It's drawn
+// only when what it shows changes, the level, the state, the clock's minute
+// or what music plays, never animating.
 //
 // Any button closes it, back to the list or home, and is taken until it's
-// let go, so that press doesn't also act on the screen under it. The power
-// button is left to the launcher, so it still sleeps; waking closes the
-// screen. It closes by itself when the device stops charging.
+// let go, so that press doesn't also act on the screen under it, except X
+// while music has a track, which plays or pauses it (music.toggle) and
+// stays. The power button is left to the launcher, so it still sleeps;
+// waking closes the screen. It closes by itself when the device stops
+// charging.
 //
 // It never holds off sleep. Stock's launcher already never turns the
 // screen off or sleeps on its own while charging (PWR_update counts
@@ -37,17 +40,18 @@
 #define FAKE_READ_MS 200
 #define CHECK_MS 1000 // how often to look at the clock while it shows
 #define DIM 110       // alpha of everything drawn over the black
+#define LINE_MAX 512  // the now playing line
 
 static const MosaicHost* host;
 static int supported = 0;
 static int clock_mode = CS_CLOCK_24H;
-static CsIdle idle;
+static unsigned long idle_ms = CS_IDLE_DEFAULT_MS;
+static unsigned long opened_idle = 0; // the idle time wants opened it after
 static CsFilter filter;
 static int showing = 0;
-static int activity = 0;       // a button was down since the last tick
 static int close_pressed = 0;  // a button closed it
+static int toggle_pressed = 0; // X played or paused music
 static int resumed = 0;        // the device woke since the last tick
-static int refused = 0;        // open_screen was refused; logged once
 static unsigned long last_now = 0;
 static unsigned long next_check = 0;
 
@@ -61,6 +65,8 @@ static char shown_level[8], shown_clock[16];
 static const char* shown_state = "";
 static char want_level[8], want_clock[16];
 static const char* want_state = "";
+// the music plugin's now playing line, "" without a track
+static char shown_music[LINE_MAX], want_music[LINE_MAX];
 
 // Fixed text, translated in this plugin's id's context.
 static const char* tr(const char* text) {
@@ -90,6 +96,14 @@ static void readBattery(unsigned long now) {
 	if (!CS_parseFake(text, &level, &charging)) level = charging = -1;
 }
 
+// What music plays, from the music plugin's music.now, or "".
+static void musicLine(char* out, size_t size) {
+	out[0] = '\0';
+	char reply[MOSAIC_CALL_MAX];
+	if (!MOSAIC_HOST_HAS(host, call) || host->call("music.now", NULL, reply, sizeof(reply)) < 0) return;
+	if (host->event_value(reply, "line", out, size) < 0) out[0] = '\0';
+}
+
 static void wanted(void) {
 	CS_formatLevel(level, want_level, sizeof(want_level));
 	want_state = tr(CS_stateLabel(level));
@@ -99,10 +113,12 @@ static void wanted(void) {
 		CS_formatClock(local.tm_hour, local.tm_min, clock_mode, want_clock, sizeof(want_clock));
 	}
 	else want_clock[0] = '\0';
+	musicLine(want_music, sizeof(want_music));
 }
 
 static int changed(void) {
-	return strcmp(want_level, shown_level) || strcmp(want_state, shown_state) || strcmp(want_clock, shown_clock);
+	return strcmp(want_level, shown_level) || strcmp(want_state, shown_state) || strcmp(want_clock, shown_clock)
+		|| strcmp(want_music, shown_music);
 }
 
 ///////////////////////////////////////
@@ -111,17 +127,22 @@ static int changed(void) {
 static int screenEnter(void* data) {
 	(void)data;
 	showing = 1;
-	close_pressed = 0;
-	shown_level[0] = shown_clock[0] = '\0';
+	close_pressed = toggle_pressed = 0;
+	shown_level[0] = shown_clock[0] = shown_music[0] = '\0';
 	shown_state = "";
+	wanted();
+	next_check = last_now + CHECK_MS;
+	char message[96];
+	snprintf(message, sizeof(message), "opened after %lus idle: %s, %s", opened_idle / 1000,
+		want_level[0] ? want_level : "no level", want_state);
+	say(message);
 	return 0;
 }
 
 static void screenExit(void* data) {
 	(void)data;
 	showing = 0;
-	close_pressed = 0;
-	CsIdle_reset(&idle, last_now);
+	close_pressed = toggle_pressed = 0;
 }
 
 // buttons are handled in input_filter, so they never reach the screen
@@ -181,6 +202,22 @@ static int screenRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 	int w = host->text_width(MOSAIC_FONT_SMALL, want_state);
 	host->draw_text(screen, MOSAIC_FONT_SMALL, want_state, area.x + (area.w - w) / 2, y, hint, 0);
 
+	// what music plays, at the bottom
+	if (want_music[0]) {
+		int margin = 10 * scale;
+		char cut[LINE_MAX];
+		int mw = host->text_truncate(MOSAIC_FONT_SMALL, want_music, area.w - 2 * margin, cut, sizeof(cut));
+		if (mw > 0) {
+			host->draw_text(screen, MOSAIC_FONT_SMALL, cut, area.x + (area.w - mw) / 2, area.y + area.h - margin - small,
+				hint, 0);
+		}
+	}
+	if (strcmp(want_music, shown_music)) {
+		char message[LINE_MAX + 16];
+		snprintf(message, sizeof(message), "music: %s", want_music[0] ? want_music : "none");
+		say(message);
+	}
+
 	if (strcmp(want_level, shown_level) || strcmp(want_state, shown_state)) {
 		char message[96];
 		snprintf(message, sizeof(message), "drew %s, %s", want_level[0] ? want_level : "no level", want_state);
@@ -188,6 +225,7 @@ static int screenRender(MosaicSurface* screen, const MosaicScreenView* view, voi
 	}
 	snprintf(shown_level, sizeof(shown_level), "%s", want_level);
 	snprintf(shown_clock, sizeof(shown_clock), "%s", want_clock);
+	snprintf(shown_music, sizeof(shown_music), "%s", want_music);
 	shown_state = want_state;
 	return 0;
 }
@@ -202,63 +240,56 @@ static int screenAnimating(void* data) {
 
 static int inputFilter(const MosaicInput* input, unsigned int* consumed) {
 	if (!supported) return 0;
-	if (input->pressed | input->held | input->released) activity = 1;
-	int shut = 0;
+	int shut = 0, toggled = 0;
+	unsigned int toggle = showing && want_music[0] ? MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_X) : 0;
 	*consumed = CsFilter_frame(&filter, showing, input->pressed, input->held, input->released,
-		MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER), &shut);
+		MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER), toggle, &shut, &toggled);
 	if (shut) close_pressed = 1;
+	if (toggled) toggle_pressed = 1;
 	return 0;
 }
 
-// Where it opens over: the game list or home.
-static const char* homeScreen(void) {
-	return MOSAIC_HOST_HAS(host, home_screen) ? host->home_screen() : NULL;
-}
-static int onIdleScreen(void) {
-	return CS_idleScreen(host->current_screen(), homeScreen());
+static int wantsToShow(unsigned long idle, void* data) {
+	(void)data;
+	if (!CS_wants(idle, idle_ms, charging)) return 0;
+	opened_idle = idle;
+	return 1;
 }
 
 static void closeScreen(const char* why) {
 	if (host->close_screen(SCREEN_ID) == 0) say(why);
 }
 
+// X: plays or pauses music, staying open.
+static void toggleMusic(void) {
+	char reply[MOSAIC_CALL_MAX], state[16] = "";
+	if (host->call("music.toggle", NULL, reply, sizeof(reply)) >= 0) host->event_value(reply, "state", state, sizeof(state));
+	char message[64];
+	snprintf(message, sizeof(message), "X: music %s", state[0] ? state : "didn't answer");
+	say(message);
+	wanted();
+	if (changed()) host->request_redraw();
+}
+
 static void tick(unsigned long now) {
 	if (!supported) return;
 	last_now = now;
 	readBattery(now);
-	if (activity || resumed) {
-		activity = 0;
-		CsIdle_reset(&idle, now);
-	}
-
 	if (showing) {
 		if (resumed) closeScreen("closed: the device woke");
 		else if (close_pressed) closeScreen("closed by a button");
 		else if (charging != 1) closeScreen("closed: not charging");
+		else if (toggle_pressed) {
+			toggle_pressed = 0;
+			toggleMusic();
+		}
 		else if (now >= next_check) {
 			next_check = now + CHECK_MS;
 			wanted();
 			if (changed()) host->request_redraw();
 		}
-		resumed = 0;
-		return;
 	}
 	resumed = 0;
-
-	if (!CsIdle_due(&idle, now, charging, onIdleScreen())) return;
-	unsigned long waited = now - idle.last_input;
-	const char* over = strcmp(host->current_screen(), "gamelist") ? "home" : "the list";
-	wanted();
-	next_check = now + CHECK_MS;
-	if (host->open_screen(SCREEN_ID) != 0) {
-		if (!refused++) say("couldn't open the screen; trying again after the next idle time");
-		CsIdle_reset(&idle, now);
-		return;
-	}
-	char message[96];
-	snprintf(message, sizeof(message), "opened after %lus idle on %s: %s, %s", waited / 1000, over,
-		want_level[0] ? want_level : "no level", want_state);
-	say(message);
 }
 
 static void afterResume(void) {
@@ -270,11 +301,11 @@ static int init(const MosaicHost* h) {
 	static const CSWords words = { tr, NULL };
 	CS_setWords(&words);
 	supported = 0;
-	showing = activity = close_pressed = resumed = refused = 0;
+	showing = close_pressed = toggle_pressed = resumed = 0;
+	want_music[0] = shown_music[0] = '\0';
 	filter = (CsFilter){0};
-	if (!MOSAIC_HOST_HAS(host, open_screen) || !MOSAIC_HOST_HAS(host, hold_switch) || !MOSAIC_HOST_HAS(host, draw_text)
-		|| !MOSAIC_HOST_HAS(host, is_charging)) {
-		say("unsupported: this launcher has no plugin screens or input filters");
+	if (!MOSAIC_HOST_HAS(host, register_ambient)) {
+		say("unsupported: this launcher has no ambient screens");
 		return 0;
 	}
 	fake_path = getenv(FAKE_ENV);
@@ -284,9 +315,8 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 
-	unsigned long idle_ms = CS_parseIdle(host->cfg_get("idle", "60"));
+	idle_ms = CS_parseIdle(host->cfg_get("idle", "60"));
 	clock_mode = CS_parseClock(host->cfg_get("clock", "24h"));
-	CsIdle_init(&idle, idle_ms);
 	if (!idle_ms) {
 		say("idle is off, so the screen never opens");
 		return 0;
@@ -301,7 +331,7 @@ static int init(const MosaicHost* h) {
 		.render = screenRender,
 		.animating = screenAnimating,
 	};
-	if (host->register_screen(SCREEN_ID, &hooks) != 0) {
+	if (host->register_screen(SCREEN_ID, &hooks) != 0 || host->register_ambient(SCREEN_ID, wantsToShow, NULL) != 0) {
 		say("couldn't register the screen");
 		return 0;
 	}

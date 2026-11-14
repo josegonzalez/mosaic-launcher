@@ -3,7 +3,9 @@ name=Video previews
 api=1
 category=Looks
 summary=Plays a short clip of the selected game in place of its thumbnail.
+# video.play, the screensaver's videos source
+provides=video.play
 # seconds the selection rests on a game before its clip in <rom dir>/.videos/<rom name>.mp4 plays
 setting.delay=choice|Play after (seconds)|2|1,2,3,5
-# the clip's sound, at the system's volume
+# the clip's sound, at the system's volume; on the screensaver, music pauses while a clip plays
 setting.sound=toggle|Sound|on

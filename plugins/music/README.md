@@ -23,12 +23,13 @@ It lists the folder's folders, then its tracks, in file name order with numbers 
 | **L2** and **R2** | Seek 10 seconds |
 | **SELECT** | Turns shuffle on or off |
 | **START** | Steps repeat through off, all and one |
-| **Y** | Opens the lock screen |
+| **Y** | Locks the launcher, as its lock chord does, and closes the player, so the lock screen shows over the list. It needs a Lock chord set on the Launcher page, and says so without one |
 
 Shuffle and repeat are kept as the Shuffle and Repeat settings.
 
-- **Lock screen** (also `action:music.lock`): the clock and the track, dim on black, with the cover art dim above the clock where there's room and the artist under the title. It takes every button but power until **SELECT** and then **START** within a second.
+- **On the launcher's lock screen:** under the time, the track's title and artist, and whether it plays, where it is and the shuffle and repeat. **X** plays or pauses, while there's a track. `action:music.lock` locks the launcher, as Y on the player does.
 - **Play and pause from anywhere:** `action:music.toggle` pauses or plays on, from an [FN button](../../docs/glossary.md#fn-button) for example.
+- **On the screensaver and the charging screen:** what plays shows there, and **X** plays or pauses it without closing them (see [`screensaver`](../screensaver/README.md) and [`charging-screen`](../charging-screen/README.md)). With the screensaver's videos source, music pauses while a clip plays and plays on after it.
 - **Now playing pill:** over the game list, quick menu, switcher and other plugin screens, a pill with the title and artist shows at the bottom for the Now playing pill setting's seconds after a track starts or plays on.
 
 ### Cover art
@@ -55,6 +56,10 @@ A track playing.
 
 ![A track playing](docs/playing.png)
 
+Locked from the player with Y, on the launcher's lock screen, with a Lock chord set on the Launcher page.
+
+![Locked from the player, on the launcher's lock screen](docs/lock.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
@@ -75,7 +80,13 @@ The player is in two parts: `musicd`, a daemon that ships beside the plugin's `p
 
 - The plugin starts `musicd` by its path, in a session of its own, the first time something is played. It talks to it over a Unix socket, `/tmp/mosaic-music.sock`, and its pid is in `/tmp/mosaic-music.pid`. It logs to `.userdata/<platform>/logs/music.txt`, and exits by itself after 10 minutes stopped. A power-off quits it, by the socket or else by its pid.
 - It plays through SDL's audio, decoded with the dr_libs decoders in `vendor/dr_libs`.
-- Registers the actions `music.open`, `music.lock` and `music.toggle`; `button` follows `music.open`. Registers a quick menu tile.
+- Registers the actions `music.open`, `music.lock` and `music.toggle`, which is available while there's a track; `button` follows `music.open`. Registers a quick menu tile.
+- Adds to the launcher's lock screen: its lines with `lock_text`, and `music.toggle` on X with `lock_button`. `music.lock` calls the launcher's `lock`.
+- Provides these services, listed in its `provides=`, each answering from what it last heard from the daemon:
+  - `music.now`: `state` (`playing`, `paused` or `stopped`), `title`, `artist` and `line`, the now playing line as the pill shows it ("Playing: <title> - <artist>"), empty when stopped
+  - `music.toggle`: plays or pauses while there's a track, answering `state` after
+  - `music.pause`: pauses what plays, answering `paused=1` when it was playing, and `state`
+  - `music.play`: plays on what's paused, answering `state`
 - An embedded picture is written to `/tmp/mosaic-music-art/` (a folder of the user's own, with each file made with `O_EXCL` and `O_NOFOLLOW` and renamed into place, only the playing track's kept) for the launcher to load with `art_load`, and scaled once for where it's drawn.
 - Tags are read on a thread of the plugin's own, one track at a time, so a big folder doesn't hold up a frame: names show until titles come in.
 - Tag files are treated as untrusted:

@@ -61,6 +61,44 @@ int VP_parseToggle(const char* text, int fallback) {
 }
 
 ///////////////////////////////////////
+// the screensaver's clock and music
+
+int VP_parseClock(const char* text) {
+	if (text && !strcmp(text, "24h")) return VP_CLOCK_24H;
+	if (text && !strcmp(text, "12h")) return VP_CLOCK_12H;
+	return VP_CLOCK_OFF;
+}
+
+void VP_formatClock(int hour, int minute, int mode, const char* am, const char* pm, char* out, size_t size) {
+	if (!size) return;
+	out[0] = '\0';
+	if (mode == VP_CLOCK_OFF || hour < 0 || hour > 23 || minute < 0 || minute > 59) return;
+	if (mode == VP_CLOCK_12H) {
+		int h = hour % 12;
+		snprintf(out, size, "%d:%02d %s", h ? h : 12, minute, hour < 12 ? am : pm);
+	}
+	else snprintf(out, size, "%02d:%02d", hour, minute);
+}
+
+void VpMusic_paused(VpMusic* m, int paused) {
+	if (paused) m->paused = 1;
+}
+
+void VpMusic_seen(VpMusic* m, const char* state) {
+	if (state && !strcmp(state, "playing")) m->paused = 0;
+}
+
+void VpMusic_forget(VpMusic* m) {
+	m->paused = 0;
+}
+
+int VpMusic_resume(VpMusic* m) {
+	int was = m->paused;
+	m->paused = 0;
+	return was;
+}
+
+///////////////////////////////////////
 // when a clip is due
 
 void VP_arm(VpArm* arm, const char* rom, const char* clip, unsigned long now, unsigned long delay_ms) {

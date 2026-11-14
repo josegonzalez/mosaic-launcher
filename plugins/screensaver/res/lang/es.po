@@ -98,3 +98,6 @@ msgstr "capturas"
 
 msgid "slide"
 msgstr "deslizar"
+
+msgid "videos"
+msgstr "vídeos"

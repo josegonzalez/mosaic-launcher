@@ -44,9 +44,10 @@ enum SsSource {
 	SS_SOURCE_GAMES,       // recent and favorite games' art
 	SS_SOURCE_SCREENSHOTS, // the card's Screenshots folder
 	SS_SOURCE_FOLDER,      // the folder setting's folder
+	SS_SOURCE_VIDEOS,      // as games, playing the games' clips through video-previews
 };
 
-// "games", "screenshots" or "folder", or games for anything else.
+// "games", "screenshots", "folder" or "videos", or games for anything else.
 int SS_parseSource(const char* setting);
 const char* SS_sourceName(int source);
 
@@ -88,55 +89,32 @@ int SS_folderPath(const char* sdcard, const char* setting, char* out, size_t siz
 ///////////////////////////////////////
 // When it opens and closes
 
-typedef struct SsIdle {
-	unsigned long idle_ms;    // how long idle on the list before it opens, 0 for never
-	unsigned long last_input; // when a button was last down, or it last couldn't open
-	int started;              // last_input has been set
-} SsIdle;
-
-void SsIdle_init(SsIdle* idle, unsigned long idle_ms);
-
-// Something happened that isn't idling on the list: a button was down, the
-// device woke, another screen showed or the screen just closed.
-void SsIdle_reset(SsIdle* idle, unsigned long now);
-
-// 1 when the screen should open now: it's on (idle_ms above 0), the list
-// or home has been showing (on_list) and not given up to the charging
-// screen (yield 0), and nothing has happened for idle_ms. The first call
-// starts the count, and so does any call off them or yielding.
-int SsIdle_due(SsIdle* idle, unsigned long now, int on_list, int yield);
-
-// Where the screen opens over: 1 for current, as current_screen returns it,
-// being the game list or home, the home slot's screen as home_screen
-// returns it (NULL without one). The quick menu, the game switcher and other
-// plugins' screens are what the user was looking at.
-int SS_idleScreen(const char* current, const char* home);
-
-// 1 when charging-screen's screen would show in its place: charging-screen
-// is on (plugin_on), its idle setting isn't off, and the device charges
-// (charging 1, as is_charging returns it).
-int SS_chargingWins(int plugin_on, const char* charging_idle, int charging);
+// The ambient screen's wants: 1 when the launcher should open it, with the
+// idle setting on (setting_ms above 0) and idle_ms, the launcher's idle
+// time, at least the setting. The launcher asks only over the game list,
+// home or a later ambient screen, so the user's order of ambient screens
+// decides whether the charging screen comes first.
+int SS_wants(unsigned long idle_ms, unsigned long setting_ms);
 
 // 1 when the plugin id is loaded, as host->plugin_loaded says, or 0 on a
 // launcher without it.
 int SS_pluginLoaded(const MosaicHost* host, const char* id);
 
-// Parses "<level> <charging>", such as "73 1", as charging-screen's
-// test-only battery file holds it. Returns 1, or 0 when it isn't that.
-int SS_parseFake(const char* text, int* level, int* charging);
-
 // Which buttons the screen takes while it shows and until they're let go
 // after it closes, so the press that closes it doesn't also act on the
 // screen under it.
 typedef struct SsFilter {
-	int swallowing; // a press closed the screen and its buttons aren't all up yet
+	int swallowing; // a press took the screen's buttons and they aren't all up yet
 } SsFilter;
 
 // One frame's buttons, as MOSAIC_BUTTON_BIT masks. keep is what's never
-// taken (the power button, so sleep still works). Sets *close to 1 when a
-// press should close the open screen, and returns the buttons to take.
+// taken (the power button, so sleep still works), and toggle the button
+// that plays or pauses music in place of closing the screen (X while music
+// has a track), or 0. Sets *close to 1 when a press should close the open
+// screen, or *toggled to 1 when it was toggle alone, and returns the
+// buttons to take.
 unsigned int SsFilter_frame(SsFilter* f, int open, unsigned int pressed, unsigned int held, unsigned int keep,
-	int* close);
+	unsigned int toggle, int* close, int* toggled);
 
 ///////////////////////////////////////
 // The images
@@ -147,6 +125,7 @@ unsigned int SsFilter_frame(SsFilter* f, int open, unsigned int pressed, unsigne
 
 typedef struct SsPool {
 	char paths[SS_POOL_MAX][SS_PATH_MAX];
+	char games[SS_POOL_MAX][SS_PATH_MAX]; // the game an image is art of, or ""
 	unsigned char bad[SS_POOL_MAX]; // 1 when it couldn't be loaded, so it's skipped
 	int count;
 } SsPool;
@@ -156,6 +135,9 @@ void SS_poolClear(SsPool* pool);
 // Adds path, unless it's empty, too long, already there or the pool is
 // full. Returns 1 when added.
 int SS_poolAdd(SsPool* pool, const char* path);
+// The same, for a game's art: game is the game's full path (NULL or "" for
+// none), kept beside the image for its clip. Too long a game isn't added.
+int SS_poolAddGame(SsPool* pool, const char* path, const char* game);
 
 // The index of path, or -1.
 int SS_poolFind(const SsPool* pool, const char* path);

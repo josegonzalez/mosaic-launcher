@@ -58,12 +58,14 @@ unsigned long SS_changeMs(unsigned long interval_ms) {
 int SS_parseSource(const char* setting) {
 	if (setting && !strcmp(setting, "screenshots")) return SS_SOURCE_SCREENSHOTS;
 	if (setting && !strcmp(setting, "folder")) return SS_SOURCE_FOLDER;
+	if (setting && !strcmp(setting, "videos")) return SS_SOURCE_VIDEOS;
 	return SS_SOURCE_GAMES;
 }
 
 const char* SS_sourceName(int source) {
 	if (source == SS_SOURCE_SCREENSHOTS) return "screenshots";
 	if (source == SS_SOURCE_FOLDER) return "folder";
+	if (source == SS_SOURCE_VIDEOS) return "videos";
 	return "games";
 }
 
@@ -132,59 +134,21 @@ int SS_folderPath(const char* sdcard, const char* setting, char* out, size_t siz
 ///////////////////////////////////////
 // When it opens and closes
 
-void SsIdle_init(SsIdle* idle, unsigned long idle_ms) {
-	*idle = (SsIdle){0};
-	idle->idle_ms = idle_ms;
-}
-
-void SsIdle_reset(SsIdle* idle, unsigned long now) {
-	idle->last_input = now;
-	idle->started = 1;
-}
-
-int SsIdle_due(SsIdle* idle, unsigned long now, int on_list, int yield) {
-	if (!idle->started || !on_list || yield) {
-		SsIdle_reset(idle, now);
-		return 0;
-	}
-	if (!idle->idle_ms) return 0;
-	return now - idle->last_input >= idle->idle_ms;
-}
-
-int SS_idleScreen(const char* current, const char* home) {
-	if (!current) return 0;
-	return !strcmp(current, "gamelist") || (home && home[0] && !strcmp(current, home));
-}
-
-int SS_chargingWins(int plugin_on, const char* charging_idle, int charging) {
-	if (!plugin_on || charging != 1) return 0;
-	// charging-screen's own reading: off or 0 turns it off, anything else
-	// is a time (its default when it isn't one)
-	const char* s = skipSpaces(charging_idle ? charging_idle : "");
-	if (!strncmp(s, "off", 3) && !*skipSpaces(s + 3)) return 0;
-	return parseSeconds(s) != 0;
+int SS_wants(unsigned long idle_ms, unsigned long setting_ms) {
+	return setting_ms > 0 && idle_ms >= setting_ms;
 }
 
 int SS_pluginLoaded(const MosaicHost* host, const char* id) {
 	return host && id && id[0] && MOSAIC_HOST_HAS(host, plugin_loaded) && host->plugin_loaded(id);
 }
 
-int SS_parseFake(const char* text, int* level, int* charging) {
-	if (!text) return 0;
-	int l, c;
-	char extra;
-	if (sscanf(text, " %d %d %c", &l, &c, &extra) != 2) return 0;
-	if (c != 0 && c != 1) return 0;
-	*level = l;
-	*charging = c;
-	return 1;
-}
-
 unsigned int SsFilter_frame(SsFilter* f, int open, unsigned int pressed, unsigned int held, unsigned int keep,
-	int* close) {
+	unsigned int toggle, int* close, int* toggled) {
 	*close = 0;
+	*toggled = 0;
 	if (open && (pressed & ~keep)) {
-		*close = 1;
+		if (toggle && (pressed & ~keep) == toggle) *toggled = 1;
+		else *close = 1;
 		f->swallowing = 1;
 	}
 	if (!f->swallowing) return 0;
@@ -209,9 +173,15 @@ int SS_poolFind(const SsPool* pool, const char* path) {
 }
 
 int SS_poolAdd(SsPool* pool, const char* path) {
+	return SS_poolAddGame(pool, path, NULL);
+}
+
+int SS_poolAddGame(SsPool* pool, const char* path, const char* game) {
 	if (!path || !path[0] || strlen(path) >= SS_PATH_MAX || pool->count >= SS_POOL_MAX) return 0;
+	if (game && strlen(game) >= SS_PATH_MAX) return 0;
 	if (SS_poolFind(pool, path) >= 0) return 0;
 	snprintf(pool->paths[pool->count], SS_PATH_MAX, "%s", path);
+	snprintf(pool->games[pool->count], SS_PATH_MAX, "%s", game ? game : "");
 	pool->bad[pool->count] = 0;
 	pool->count++;
 	return 1;

@@ -21,6 +21,12 @@ msgstr "3"
 msgid "5"
 msgstr "5"
 
+msgid "AM"
+msgstr "a. m."
+
+msgid "PM"
+msgstr "p. m."
+
 msgid "Play after (seconds)"
 msgstr "Reproducir tras (segundos)"
 

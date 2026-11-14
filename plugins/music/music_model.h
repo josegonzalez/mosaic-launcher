@@ -3,8 +3,8 @@
 // how they sort, listing a folder, the play queue with shuffle and repeat,
 // the file it's saved in to resume after a power-off, the socket
 // protocol's commands and status line, and the plugin's own
-// small state machines (the now playing pill's timing, the lock screen's
-// unlock press, browsing up and down folders).
+// small state machines (the now playing pill's timing, browsing up and
+// down folders).
 
 #ifndef MUSIC_MODEL_H
 #define MUSIC_MODEL_H
@@ -241,17 +241,5 @@ void MuOverlay_show(MuOverlay* overlay, const MuStatus* status, unsigned long no
 // the first row in view that keeps it in view, rows at a time.
 int MU_move(int selected, int count, int delta, int wrap);
 int MU_window(int selected, int count, int rows, int first);
-
-// The lock screen's unlock: START pressed within MU_UNLOCK_MS of SELECT,
-// or while SELECT is held.
-#define MU_UNLOCK_MS 1000
-typedef struct MuUnlock {
-	int armed;
-	unsigned long select_at;
-} MuUnlock;
-
-// Returns 1 on the frame that unlocks.
-int MuUnlock_frame(MuUnlock* unlock, unsigned int pressed, unsigned int held, unsigned int select_bit,
-	unsigned int start_bit, unsigned long now);
 
 #endif

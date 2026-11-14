@@ -5,8 +5,9 @@
 # the player opens from its button and lists the music folder (folders
 # first, no dot files or other files), A opens a folder and plays a track,
 # which starts the daemon; X pauses and plays on, R1 goes to the next
-# track; Y locks, the lock screen takes A, and SELECT then START unlocks;
-# B backs out to the list, where the now playing pill shows. The daemon
+# track; B goes back up, and Y locks the launcher's lock and closes the
+# player, the lock screen takes A, and the lock's chord unlocks, back on
+# the list, where the now playing pill shows. The daemon
 # plays on after the launcher stops, pauses for a pak's launch and plays on
 # when the launcher comes back, and quits before a power-off, saving the
 # queue and the track's place; the next start shows that paused, on the
@@ -102,13 +103,15 @@ fi
 make -s -C "$ROOT/plugins" music ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building music"
 printf 'music=on\n' >"$STATE/plugins.txt"
 printf 'button=Y\noverlay=10\n' >"$STATE/music.cfg"
+[ -f "$STATE/settings.txt" ] && cp "$STATE/settings.txt" "$MU_WORK/settings.txt.saved"
+printf 'lock_chord=select+start\n' >"$STATE/settings.txt"
 SDL_AUDIODRIVER=dummy
 export SDL_AUDIODRIVER
 plugin=music
 
 # the player, the daemon starting, pause, next, the lock screen and the pill
 log="$WORK/music.log"
-PRESSER_KEYS="y a a wait wait x wait x r1 wait y a select start wait b b wait wait wait wait"
+PRESSER_KEYS="y a a wait wait x wait x r1 wait b y a select+start/1500 wait wait wait wait wait"
 PRESSER_LOG="$MU_WORK/player.texts" SMOKE_PRELOAD="$PRESSER"
 export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
 run_launcher "$log" "presser: done" || fail "the launcher exited early with music"
@@ -123,12 +126,12 @@ expect "now: 01 One, playing of 0:40"
 expect "now: 01 One, paused of 0:40"
 expect "now: 02 Two, playing of 0:40"
 expect "locked"
-expect "unlocked"
+grep -qF "lock: unlocked by the chord" "$log" || fail "the lock's chord didn't unlock"
 expect "pill over gamelist: Playing: 02 Two"
 [ "$(grep -c "plugin music: playing " "$log")" = 1 ] || fail "the lock screen's A reached the player: $(grep "plugin music: playing " "$log")"
 [ "$(grep -c "plugin music: showing $MU_DIR: 1 of 2, Album/" "$log")" = 2 ] \
 	|| fail "B didn't go back up to the music folder with Album selected"
-grep -qF "Locked: SELECT then START to unlock" "$MU_WORK/player.texts" || fail "the lock screen didn't show"
+grep -qF "Hold SELECT+START to unlock" "$MU_WORK/player.texts" || fail "the lock screen didn't show"
 # untagged tracks keep their file names, with the folder's cover
 expect "tags of $MU_ALBUM/01 One.wav: title \"\", artist \"\", art $MU_ALBUM/cover.png"
 expect "showing the art $MU_ALBUM/cover.png"
@@ -257,6 +260,7 @@ for f in next last.txt; do
 	if [ -f "$MU_WORK/$f.saved" ]; then cp "$MU_WORK/$f.saved" "/tmp/$f"; else rm -f "/tmp/$f"; fi
 done
 rm -f /tmp/mosaic-launcher-launched "$MU_LOG"
+if [ -f "$MU_WORK/settings.txt.saved" ]; then cp "$MU_WORK/settings.txt.saved" "$STATE/settings.txt"; else rm -f "$STATE/settings.txt"; fi
 rm -rf /tmp/mosaic-music-art
 rm -rf "$MU_WORK" "$PRESSER" "$WORK/plugins/music.plugin" "$WORK/plugins/screener.plugin" "$WORK/plugins/powerer.plugin" \
 	"$STATE/music.cfg" "$STATE/powerer.cfg" "$STATE/plugins.txt" "$STATE/music"

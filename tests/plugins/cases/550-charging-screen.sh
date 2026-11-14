@@ -2,7 +2,8 @@
 # shard: 3
 
 # the bundled charging-screen: on desktop, with no battery, it loads and
-# does nothing. With the test battery charging and idle=1, it opens over
+# does nothing. With the test battery charging and idle=1, the launcher
+# opens it as an ambient screen over
 # the list a second after start, screener's A closes it without opening
 # the selected folder, it opens again, and unplugger's unplug closes it.
 # Then the same over screener's home screen, whose A would open a dialog
@@ -24,7 +25,7 @@ log="$WORK/charging-screen.log"
 run_launcher "$log" "plugin screener: done" || fail "the launcher exited early with charging-screen"
 unset MOSAIC_CHARGING_SCREEN_FAKE
 expect "opens after 1s idle on the list or home while charging, clock 24h, with the test battery"
-expect "opened after 1s idle on the list: 73%, Charging"
+expect "opened after 1s idle: 73%, Charging"
 expect "drew 73%, Charging"
 expect "closed by a button"
 expect "closed: not charging"
@@ -45,7 +46,7 @@ export MOSAIC_CHARGING_SCREEN_FAKE="$CS_FAKE"
 log="$WORK/charging-screen-home.log"
 run_launcher "$log" "plugin screener: done" || fail "the launcher exited early with charging-screen over home"
 unset MOSAIC_CHARGING_SCREEN_FAKE
-expect "opened after 1s idle on home: 73%, Charging"
+expect "opened after 1s idle: 73%, Charging"
 expect "closed by a button"
 expect "closed: not charging"
 grep -qF "plugin screener: home screener.main" "$log" || fail "screener.main wasn't the home screen"
