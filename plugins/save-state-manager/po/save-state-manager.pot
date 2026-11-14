@@ -60,11 +60,19 @@ msgid "R2"
 msgstr ""
 
 #: save_state_manager.c
+msgid "Restore from server"
+msgstr ""
+
+#: save_state_manager.c
 msgid "SAVE STATES"
 msgstr ""
 
 #: plugin.txt
 msgid "SELECT"
+msgstr ""
+
+#: save_state_manager.c
+msgid "SYNCED"
 msgstr ""
 
 #: save_state_manager.c
@@ -86,6 +94,10 @@ msgstr ""
 #: state_model.c
 #, c-format
 msgid "Slot %d"
+msgstr ""
+
+#: save_state_manager.c
+msgid "Synced"
 msgstr ""
 
 #: plugin.txt

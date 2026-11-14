@@ -32,8 +32,11 @@
 // play time ("2h 15m played"). While playtime-limit has a daily limit
 // set, its limit.left service gives the Stats tab a Time left today row,
 // with the time left of today's limit; with no limit, or without
-// playtime-limit, there's no row. Up and down scroll the Stats tab when
-// its rows don't fit, and a heading never shows as its last row.
+// playtime-limit, there's no row. While romm is loaded and has downloaded
+// games still on the card, its romm.downloads service gives the Stats tab
+// a Recently downloaded section of the last few, read as the screen
+// opens. Up and down scroll the Stats tab when its rows don't fit, and a
+// heading never shows as its last row.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -53,6 +56,7 @@
 #define CARTS_MAX 256
 #define ENTRIES_MAX 512
 #define MOST_PLAYED_MAX 5
+#define DOWNLOADS_MAX 3
 #define ROWS_MAX (RECENTS_MAX + PINNED_MAX + 8)
 
 static const MosaicHost* host;
@@ -83,6 +87,9 @@ static Item pinned[PINNED_MAX];
 static int pinned_count = 0;
 static Item carts[CARTS_MAX];
 static int cart_count = 0;
+static Item downloads[DOWNLOADS_MAX]; // romm's, newest first
+static long long downloaded_at[DOWNLOADS_MAX];
+static int download_count = 0;
 
 // The rows of the last list drawn, for what A opens. NULL item for Games.
 typedef struct Row {
@@ -274,6 +281,59 @@ static void loadCarts(void) {
 	for (int i = 0; i < cart_count; i++) carts[i].entry = entryFor(carts[i].path, carts[i].type);
 }
 
+// A service's reply, or 0 when nobody provides it or it can't answer.
+static int ask(const char* name, const char* args, char* reply, size_t size) {
+	reply[0] = '\0';
+	return MOSAIC_HOST_HAS(host, call) && host->call(name, args, reply, size) >= 0;
+}
+
+static long long replyNumber(const char* reply, const char* key, long long fallback) {
+	char text[32];
+	if (host->event_value(reply, key, text, sizeof(text)) <= 0) return fallback;
+	char* end;
+	long long v = strtoll(text, &end, 10);
+	return end == text || *end ? fallback : v;
+}
+
+// the games romm downloaded last, from its romm.downloads service
+static void loadDownloads(void) {
+	download_count = 0;
+	char args[32], reply[MOSAIC_CALL_MAX];
+	snprintf(args, sizeof(args), "count=%i", DOWNLOADS_MAX);
+	if (!ask("romm.downloads", args, reply, sizeof(reply))) return;
+	int n = (int)replyNumber(reply, "count", 0);
+	for (int i = 0; i < n && download_count < DOWNLOADS_MAX; i++) {
+		char key[32], path[MAX_PATH_LEN];
+		snprintf(key, sizeof(key), "path.%i", i);
+		int len = host->event_value(reply, key, path, sizeof(path));
+		if (len <= 0 || len >= (int)sizeof(path) || !exists(path) || filtered(path)) continue;
+		Item* item = &downloads[download_count];
+		memset(item, 0, sizeof(*item));
+		snprintf(item->path, sizeof(item->path), "%s", path);
+		item->recent = -1;
+		item->available = 1;
+		item->type = MOSAIC_ENTRY_ROM;
+		item->entry = entryFor(item->path, item->type);
+		const char* name = item->entry ? host->entry_name(item->entry) : NULL;
+		if (name && name[0]) snprintf(item->name, sizeof(item->name), "%s", name);
+		else baseName(item->path, item->name, sizeof(item->name));
+		snprintf(key, sizeof(key), "at.%i", i);
+		downloaded_at[download_count] = replyNumber(reply, key, 0);
+		download_count++;
+	}
+}
+
+// days from when to now by the local calendar
+static int daysSince(long long when) {
+	time_t now = time(NULL), then = (time_t)when;
+	struct tm a, b;
+	if (when <= 0 || !localtime_r(&now, &a) || !localtime_r(&then, &b)) return 0;
+	a.tm_hour = b.tm_hour = 12;
+	a.tm_min = b.tm_min = a.tm_sec = b.tm_sec = 0;
+	a.tm_isdst = b.tm_isdst = -1;
+	return (int)((mktime(&a) - mktime(&b) + 43200) / 86400);
+}
+
 ///////////////////////////////////////
 // opening things
 
@@ -458,20 +518,6 @@ static int historyKnown(void) {
 	return host->play_time_today() >= 0;
 }
 
-// A service's reply, or 0 when nobody provides it or it can't answer.
-static int ask(const char* name, const char* args, char* reply, size_t size) {
-	reply[0] = '\0';
-	return MOSAIC_HOST_HAS(host, call) && host->call(name, args, reply, size) >= 0;
-}
-
-static long long replyNumber(const char* reply, const char* key, long long fallback) {
-	char text[32];
-	if (host->event_value(reply, key, text, sizeof(text)) <= 0) return fallback;
-	char* end;
-	long long v = strtoll(text, &end, 10);
-	return end == text || *end ? fallback : v;
-}
-
 // playtime-captions' caption for the game at path, fitted to width in the
 // small font, from its captions.text service. 1 when it answered (out may
 // be "" for no caption), 0 without it.
@@ -633,6 +679,13 @@ static void drawStats(MosaicSurface* screen, const HDLayout* layout) {
 		} else {
 			snprintf(row->right, sizeof(row->right), "%s", played);
 		}
+	}
+	// romm's, while it has downloaded games still on the card
+	if (download_count) addRow(tr("RECENTLY DOWNLOADED"), NULL)->header = 1;
+	for (int i = 0; i < download_count; i++) {
+		row = addRow(downloads[i].name, &downloads[i]);
+		if (!row) break;
+		HD_daysAgo(daysSince(downloaded_at[i]), row->right, sizeof(row->right));
 	}
 	drawRows(screen, &layout->content, -1, &stats_first);
 }
@@ -899,6 +952,8 @@ static int enter(void* data) {
 	loadRecents();
 	if (mode == HD_MODE_RETROACHIEVEMENTS || (mode == HD_MODE_DASHBOARD && pinned_on)) loadPinned();
 	if (mode == HD_MODE_PICO8) loadCarts();
+	download_count = 0;
+	if (mode == HD_MODE_DASHBOARD && stats_on) loadDownloads();
 	tab_count = HD_tabs(pinned_on, favorites_loaded, stats_on, tabs);
 	tab = tabs[HD_tabIndex(tabs, tab_count, tab)];
 	if (home_focus >= recent_count - 1) home_focus = HD_FOCUS_CONTINUE;
@@ -908,9 +963,9 @@ static int enter(void* data) {
 	shown_caption[0] = '\x01'; // logged again on the first frame
 	shown_left[0] = '\x01';
 	char message[256];
-	snprintf(message, sizeof(message), "home: mode %s, tab %s of %i, recents %i, pinned %i, carts %i, history %s",
+	snprintf(message, sizeof(message), "home: mode %s, tab %s of %i, recents %i, pinned %i, carts %i, history %s, downloads %i",
 		HD_modeName(mode), HD_tabLabel(tab), tab_count, recent_count, pinned_count, cart_count,
-		historyKnown() ? "on" : "unknown");
+		historyKnown() ? "on" : "unknown", download_count);
 	say(message);
 	return 0;
 }

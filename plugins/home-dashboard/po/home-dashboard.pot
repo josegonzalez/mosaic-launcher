@@ -15,6 +15,13 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
+#: home_model.c
+#, c-format
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] ""
+msgstr[1] ""
+
 #: home_dashboard.c
 #, c-format
 msgid "%i game"
@@ -136,6 +143,10 @@ msgid "Played today"
 msgstr ""
 
 #: home_dashboard.c
+msgid "RECENTLY DOWNLOADED"
+msgstr ""
+
+#: home_dashboard.c
 msgid "Recently played"
 msgstr ""
 
@@ -151,8 +162,16 @@ msgstr ""
 msgid "Time left today"
 msgstr ""
 
+#: home_model.c
+msgid "Today"
+msgstr ""
+
 #: plugin.txt
 msgid "Top shelf"
+msgstr ""
+
+#: home_model.c
+msgid "Yesterday"
 msgstr ""
 
 #: plugin.txt

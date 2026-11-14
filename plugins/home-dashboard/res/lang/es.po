@@ -128,3 +128,18 @@ msgstr "%s de %s"
 
 msgid "Time left today"
 msgstr "Tiempo restante hoy"
+
+#, c-format
+msgid "%i day ago"
+msgid_plural "%i days ago"
+msgstr[0] "hace %i día"
+msgstr[1] "hace %i días"
+
+msgid "RECENTLY DOWNLOADED"
+msgstr "DESCARGADOS HACE POCO"
+
+msgid "Today"
+msgstr "Hoy"
+
+msgid "Yesterday"
+msgstr "Ayer"

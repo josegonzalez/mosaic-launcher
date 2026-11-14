@@ -87,7 +87,8 @@ int GM_weekOf(int day) {
 ///////////////////////////////////////
 // the state
 
-static const char* const quest_ids[GM_QUESTS] = { "play", "games", "fresh", "revisit", "week_days", "week_hours" };
+static const char* const quest_ids[GM_QUESTS] = { "play", "games", "fresh", "revisit", "download", "week_days",
+	"week_hours" };
 
 const char* GM_questId(int quest) {
 	return quest >= 0 && quest < GM_QUESTS ? quest_ids[quest] : NULL;
@@ -167,6 +168,11 @@ void GM_launch(GMState* state, int day, const char* path, int fresh, int revisit
 	d->games++;
 }
 
+void GM_download(GMState* state, int day) {
+	GMDay* d = dayFor(state, day);
+	if (d) d->downloads++;
+}
+
 void GM_play(GMState* state, time_t start, long long seconds) {
 	if (seconds < 1 || seconds > GM_SESSION_MAX) return;
 	long long at = (long long)start, end = at + seconds;
@@ -202,7 +208,7 @@ int GM_format(const GMState* state, char* out, size_t size) {
 	}
 	for (int i = 0; i < state->day_count; i++) {
 		const GMDay* d = &state->days[i];
-		PUT("day=%i %lld %i %i %i %i\n", d->day, d->seconds, d->launches, d->games, d->fresh, d->revisits);
+		PUT("day=%i %lld %i %i %i %i %i\n", d->day, d->seconds, d->launches, d->games, d->fresh, d->revisits, d->downloads);
 	}
 	if (state->games_day >= 0) {
 		PUT("games=%i", state->games_day);
@@ -222,7 +228,7 @@ int GM_parse(GMState* state, const char* text) {
 		if (len < sizeof(buf)) {
 			memcpy(buf, line, len);
 			buf[len] = '\0';
-			int a, b, c, d, e;
+			int a, b, c, d, e, f = 0;
 			long long s;
 			char id[32];
 			if (sscanf(buf, "best=%i", &a) == 1 && a >= 0) {
@@ -243,10 +249,11 @@ int GM_parse(GMState* state, const char* text) {
 				for (int i = 0; i < GM_QUESTS; i++) {
 					if (strcmp(id, quest_ids[i]) == 0) state->left_out[i] = a;
 				}
-			} else if (sscanf(buf, "day=%i %lld %i %i %i %i", &a, &s, &b, &c, &d, &e) == 6) {
+			} else if (sscanf(buf, "day=%i %lld %i %i %i %i %i", &a, &s, &b, &c, &d, &e, &f) >= 6) {
+				// a day from before downloads were counted has six numbers
 				GMDay* day = dayFor(state, a);
-				if (day && s >= 0 && b >= 0 && c >= 0 && d >= 0 && e >= 0) {
-					*day = (GMDay){ a, s, b, c, d, e };
+				if (day && s >= 0 && b >= 0 && c >= 0 && d >= 0 && e >= 0 && f >= 0) {
+					*day = (GMDay){ a, s, b, c, d, e, f };
 				}
 			} else if (strncmp(buf, "games=", 6) == 0) {
 				char* p = buf + 6;
@@ -350,6 +357,7 @@ void GM_progress(const GMState* state, int today, const long long* played, int d
 	out[GM_Q_GAMES] = (GMProgress){ d ? d->games : 0, targets->daily_games, 0 };
 	out[GM_Q_FRESH] = (GMProgress){ d ? d->fresh : 0, 1, 0 };
 	out[GM_Q_REVISIT] = (GMProgress){ d ? d->revisits : 0, 1, 0 };
+	out[GM_Q_DOWNLOAD] = (GMProgress){ d ? d->downloads : 0, 1, 0 };
 	out[GM_Q_WEEK_DAYS] = (GMProgress){ week_days, targets->week_days, 0 };
 	out[GM_Q_WEEK_HOURS] = (GMProgress){ week_s / 60, (long long)targets->week_hours * 60, 0 };
 	for (int i = 0; i < GM_QUESTS; i++) {
@@ -384,7 +392,7 @@ int GM_pick(GMState* state, int today, const GMProgress* progress, long long lef
 }
 
 int GM_running(const GMState* state, int today, int quest) {
-	return quest >= 0 && quest < GM_QUESTS && state->left_out[quest] != GM_period(quest, today);
+	return quest >= 0 && quest < GM_QUESTS && !state->off[quest] && state->left_out[quest] != GM_period(quest, today);
 }
 
 int GM_settle(GMState* state, int today, const GMProgress* progress, int streak, int newly[GM_QUESTS]) {
@@ -431,6 +439,9 @@ void GM_title(int quest, const GMTargets* targets, char* out, size_t size) {
 		break;
 	case GM_Q_REVISIT:
 		snprintf(out, size, tr("Go back to a game you haven't played in %i days"), GM_REVISIT_DAYS);
+		break;
+	case GM_Q_DOWNLOAD:
+		snprintf(out, size, "%s", tr("Download a game from RomM"));
 		break;
 	case GM_Q_WEEK_DAYS:
 		n = targets->week_days;

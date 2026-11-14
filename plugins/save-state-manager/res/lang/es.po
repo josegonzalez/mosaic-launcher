@@ -70,3 +70,12 @@ msgstr "Y"
 
 msgid "none"
 msgstr "ninguno"
+
+msgid "Restore from server"
+msgstr "Restaurar del servidor"
+
+msgid "SYNCED"
+msgstr "SINCRONIZADO"
+
+msgid "Synced"
+msgstr "Sincronizado"

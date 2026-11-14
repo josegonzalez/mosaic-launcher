@@ -1191,6 +1191,122 @@ static void testLive(void) {
 	RN_free(&call);
 }
 
+static int keepAllBut(const char* path) {
+	return strcmp(path, "/gone.gb") != 0;
+}
+
+// what's synced and downloaded: lines, lists kept newest first, replies
+static void testSynced(void) {
+	RMSynced e;
+	CHECK(RM_syncedParse("down\t1700000000\t20\t1699999999\t/sd/.userdata/shared/GB-gambatte/A.gb.st1\r", &e) == 0);
+	CHECK(e.down == 1 && e.at == 1700000000 && e.size == 20 && e.mtime == 1699999999);
+	CHECK_STR(e.path, "/sd/.userdata/shared/GB-gambatte/A.gb.st1");
+	CHECK(RM_syncedParse("up\t1\t2\t3\t/p", &e) == 0 && e.down == 0);
+	CHECK(RM_syncedParse("sideways\t1\t2\t3\t/p", &e) != 0);
+	CHECK(RM_syncedParse("up\t1\t2\t/p", &e) != 0);
+	CHECK(RM_syncedParse("up\t1\t-2\t3\t/p", &e) != 0);
+	CHECK(RM_syncedParse("up\t1\t2\t3\t", &e) != 0);
+	char line[RM_PATH_MAX + 128];
+	CHECK(RM_syncedParse("up\t1\t2\t3\t/p", &e) == 0);
+	CHECK(RM_syncedFormat(&e, line, sizeof(line)) > 0);
+	CHECK_STR(line, "up\t1\t2\t3\t/p\n");
+	snprintf(e.path, sizeof(e.path), "/a\nb");
+	CHECK(RM_syncedFormat(&e, line, sizeof(line)) < 0);
+
+	RMSynced list[3];
+	int count = 0;
+	const char* paths[] = { "/a", "/b", "/c", "/d" };
+	for (int i = 0; i < 4; i++) {
+		memset(&e, 0, sizeof(e));
+		e.at = i;
+		snprintf(e.path, sizeof(e.path), "%s", paths[i]);
+		count = RM_syncedPut(list, count, 3, &e);
+	}
+	CHECK(count == 3);
+	CHECK_STR(list[0].path, "/d");
+	CHECK_STR(list[2].path, "/b"); // /a, the oldest, went
+	memset(&e, 0, sizeof(e));
+	e.at = 9;
+	e.down = 1;
+	snprintf(e.path, sizeof(e.path), "/b");
+	count = RM_syncedPut(list, count, 3, &e);
+	CHECK(count == 3);
+	CHECK_STR(list[0].path, "/b");
+	CHECK_STR(list[1].path, "/d");
+	CHECK_STR(list[2].path, "/c");
+	CHECK(RM_syncedFind(list, count, "/b") == &list[0]);
+	CHECK(RM_syncedFind(list, count, "/a") == NULL);
+
+	char reply[256];
+	CHECK(RM_syncedReply(1, 0, NULL, -1, 0, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\n");
+	list[0].size = 20;
+	list[0].mtime = 30;
+	CHECK(RM_syncedReply(1, 1, &list[0], 20, 30, 1, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsynced=1\nhow=download\nat=9\ngame=1\n");
+	// changed since, gone, or never synced
+	CHECK(RM_syncedReply(1, 1, &list[0], 21, 30, 1, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsynced=0\ngame=1\n");
+	CHECK(RM_syncedReply(1, 1, &list[0], 20, 31, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsynced=0\ngame=0\n");
+	CHECK(RM_syncedReply(0, 1, &list[0], -1, 0, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=0\nsynced=0\ngame=0\n");
+	CHECK(RM_syncedReply(0, 1, NULL, 20, 30, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=0\nsynced=0\ngame=0\n");
+	CHECK(RM_syncedReply(1, 1, &list[0], 20, 30, 1, reply, 10) < 0);
+
+	RMDownload d;
+	CHECK(RM_downloadParse("1700000000\t/sd/Roms/Game Boy (GB)/A.gb\tA Game\n", &d) == 0);
+	CHECK(d.at == 1700000000);
+	CHECK_STR(d.path, "/sd/Roms/Game Boy (GB)/A.gb");
+	CHECK_STR(d.name, "A Game");
+	CHECK(RM_downloadParse("1\t/p\t", &d) != 0);
+	CHECK(RM_downloadParse("1\t\tname", &d) != 0);
+	CHECK(RM_downloadParse("x\t/p\tname", &d) != 0);
+	CHECK(RM_downloadParse("1700000000\t/sd/Roms/Game Boy (GB)/A.gb\tA Game", &d) == 0);
+	CHECK(RM_downloadFormat(&d, line, sizeof(line)) > 0);
+	CHECK_STR(line, "1700000000\t/sd/Roms/Game Boy (GB)/A.gb\tA Game\n");
+
+	RMDownload log[2];
+	count = 0;
+	const char* games[] = { "/gone.gb", "/one.gb", "/two.gb" };
+	for (int i = 0; i < 3; i++) {
+		memset(&d, 0, sizeof(d));
+		d.at = 100 + i;
+		snprintf(d.path, sizeof(d.path), "%s", games[i]);
+		snprintf(d.name, sizeof(d.name), "Game %d", i);
+		count = RM_downloadPut(log, count, 2, &d);
+	}
+	CHECK(count == 2);
+	CHECK_STR(log[0].path, "/two.gb");
+	CHECK_STR(log[1].path, "/one.gb");
+	char big[4096];
+	CHECK(RM_downloadsReply(log, count, 5, NULL, big, sizeof(big)) > 0);
+	CHECK_STR(big, "count=2\npath.0=/two.gb\nname.0=Game 2\nat.0=102\npath.1=/one.gb\nname.1=Game 1\nat.1=101\n");
+	CHECK(RM_downloadsReply(log, count, 1, NULL, big, sizeof(big)) > 0);
+	CHECK_STR(big, "count=1\npath.0=/two.gb\nname.0=Game 2\nat.0=102\n");
+	// the ones gone from the card are left out
+	snprintf(log[0].path, sizeof(log[0].path), "/gone.gb");
+	CHECK(RM_downloadsReply(log, count, 5, keepAllBut, big, sizeof(big)) > 0);
+	CHECK_STR(big, "count=1\npath.0=/one.gb\nname.0=Game 1\nat.0=101\n");
+	CHECK(RM_downloadsReply(log, 0, 5, NULL, big, sizeof(big)) > 0);
+	CHECK_STR(big, "count=0\n");
+	// as many as fit
+	CHECK(RM_downloadsReply(log, count, 5, NULL, big, 80) > 0);
+	CHECK_STR(big, "count=1\npath.0=/gone.gb\nname.0=Game 2\nat.0=102\n");
+
+	char payload[1100];
+	CHECK(RM_downloadPayload(&log[1], payload, sizeof(payload)) > 0);
+	CHECK_STR(payload, "path=/one.gb\nname=Game 1");
+	memset(&d, 0, sizeof(d));
+	memset(d.path, 'p', 1000);
+	snprintf(d.name, sizeof(d.name), "%s", "A long name that doesn't fit");
+	CHECK(RM_downloadPayload(&d, payload, sizeof(payload)) == 1005);
+	CHECK(strstr(payload, "name=") == NULL);
+	memset(d.path, 'p', 1020);
+	CHECK(RM_downloadPayload(&d, payload, sizeof(payload)) < 0);
+}
+
 int main(void) {
 	signal(SIGPIPE, SIG_IGN);
 	char dir[] = "/tmp/romm-test-XXXXXX";
@@ -1203,6 +1319,7 @@ int main(void) {
 	testZipChecks();
 	testDiscs();
 	testStates();
+	testSynced();
 	testUnpack(dir);
 	testClient(dir);
 	testLive();

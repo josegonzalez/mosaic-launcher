@@ -14,6 +14,7 @@ Turn on **Gamification** in Launcher > Plugins ([how](../../docs/plugins.md#turn
 | Daily games | Midnight | Play a number of different games (3 by default) |
 | New game | Midnight | Start a game never played before |
 | Old game | Midnight | Go back to a game not played for 30 days |
+| RomM | Midnight | Download a game from RomM, only while [`romm`](../romm/README.md) is on with a server set |
 | Days a week | Monday | Play on a number of days (5 by default) |
 | Weekly play | Monday | Play for a number of hours (5 by default) |
 
@@ -26,6 +27,10 @@ A game counts as never played as [`row-badges`](../row-badges/README.md#what-cou
 ### With a play time limit
 
 While [`playtime-limit`](../playtime-limit/README.md) has a daily limit set, the quests are picked for their day or week with the time left in mind. The first time the plugin looks in a new day or week, a play time quest that still needs more play than is left is left out until the next day or week, and doesn't show on the Quests screen: Daily play against today's time left, and Weekly play against today's time left and the daily limit for each day left in the week. Quests already picked keep running, whatever the time left is later. Without playtime-limit, or with no limit set, every quest runs.
+
+### With RomM
+
+The RomM quest shows only while [`romm`](../romm/README.md) is on and has a server set. Each game it downloads counts towards it on the day it finishes, whether or not the quest shows, and a toast says so when that completes it.
 
 ## How to use
 
@@ -52,6 +57,10 @@ With playtime-limit's daily limit set to 45 minutes and Daily play set to 60, on
 
 ![With playtime-limit's daily limit set to 45 minutes and Daily play set to 60, on a Friday: both play time quests left out](docs/with-playtime-limit.png)
 
+With romm set up: the RomM quest, done today, scrolled down to it.
+
+![With romm set up: the RomM quest, done today, scrolled down to it](docs/with-romm.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
@@ -70,6 +79,7 @@ With playtime-limit's daily limit set to 45 minutes and Daily play set to 60, on
 - Registers the `gamification.open` action, which the `button` setting follows, and a quick menu tile.
 - Works from the launch and return hooks, and reads stock's play tracker.
 - Asks `row-badges`' `games.played` service whether a launch is of a game never played, falling back to the play tracker without it, and `playtime-limit`'s `limit.left` service for the time left when it picks the quests. Without `limit.left` every quest runs.
+- Subscribes to `romm`'s `romm.download_done` event for the RomM quest, which it offers while `romm`'s `romm.synced` service answers `server=1`.
 - Keeps its state in `.userdata/<platform>/launcher/gamification/state.txt`.
 
 ## Credits

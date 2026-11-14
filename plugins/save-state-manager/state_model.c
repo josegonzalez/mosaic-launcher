@@ -274,6 +274,23 @@ int SM_stateFiles(const SMCard* card, const SMGame* game, int slot, char out[][S
 	return stateFilesIn(game, &folders, slot, out, max, NULL);
 }
 
+int SM_newestFile(const SMCard* card, const SMGame* game, int slot, char* out, size_t size) {
+	static char files[SM_MAX_FILES][SM_PATH_MAX];
+	int n = SM_stateFiles(card, game, slot, files, SM_MAX_FILES);
+	int pick = -1;
+	time_t newest = 0;
+	for (int i = 0; i < n; i++) {
+		struct stat st;
+		if (lstat(files[i], &st) != 0) continue;
+		if (pick < 0 || st.st_mtime > newest) {
+			pick = i;
+			newest = st.st_mtime;
+		}
+	}
+	snprintf(out, size, "%s", pick >= 0 ? files[pick] : "");
+	return pick >= 0;
+}
+
 // The name a file in .minui/<tag> is about: <name>.txt (the last slot),
 // <name>.<slot>.bmp (a preview) or <name>.<slot>.txt (the disc), the
 // second reading kept in other when both fit. Returns how many.

@@ -10,6 +10,14 @@
 // saves and states on the server, newest first, and restores one after a
 // confirm, keeping a copy of the local file first.
 //
+// Other plugins hear from it without the network: the romm.synced service
+// says whether a server is set and whether a file is the one it last
+// uploaded or restored, unchanged since (by its size and modification
+// time, kept in synced.txt), and whether a path is a game from RomM;
+// romm.downloads lists the games last downloaded (downloads.txt), and
+// romm.download_done is published as each download finishes. None of
+// them gives out the server's address, user or password.
+//
 // Network work runs one job at a time on a thread of its own; the main
 // thread only starts jobs and takes their results in tick. Lists are kept
 // in .userdata/<platform>/launcher/romm/ so folders open at once, and
@@ -274,6 +282,7 @@ typedef struct Job {
 	char game[RM_NAME_MAX];
 	char unpack[RM_PATH_MAX];
 	char md5[33];
+	long long file_size, file_mtime; // an upload's file as it was when queued
 	long long expect;
 	// what came of it
 	int ok;
@@ -826,6 +835,104 @@ static int findRom(const char* path, Found* out) {
 }
 
 ///////////////////////////////////////
+// what was synced and downloaded, kept in synced.txt and downloads.txt
+// and in memory, so the services answer without the network or a read
+
+static RMSynced synced[RM_SYNCED_MAX];
+static int synced_count = 0;
+static RMDownload downloads[RM_DOWNLOADS_MAX];
+static int download_count = 0;
+
+static int fileStat(const char* path, long long* size, long long* mtime) {
+	struct stat st;
+	if (lstat(path, &st) != 0 || !S_ISREG(st.st_mode)) return -1;
+	*size = (long long)st.st_size;
+	*mtime = (long long)st.st_mtime;
+	return 0;
+}
+
+static void syncedLoad(void) {
+	synced_count = 0;
+	char file[RM_PATH_MAX];
+	put(file, sizeof(file), "%s/synced.txt", data_dir);
+	char* text = readFile(file, 4 * 1024 * 1024, NULL);
+	char* save = NULL;
+	for (char* line = text ? strtok_r(text, "\n", &save) : NULL; line && synced_count < RM_SYNCED_MAX;
+			line = strtok_r(NULL, "\n", &save)) {
+		if (RM_syncedParse(line, &synced[synced_count]) == 0) synced_count++;
+	}
+	free(text);
+}
+
+static void syncedSave(void) {
+	char file[RM_PATH_MAX];
+	put(file, sizeof(file), "%s/synced.txt", data_dir);
+	size_t cap = (size_t)synced_count * (RM_PATH_MAX + 96) + 1;
+	char* out = malloc(cap);
+	if (!out) return;
+	size_t used = 0;
+	for (int i = 0; i < synced_count; i++) {
+		int n = RM_syncedFormat(&synced[i], out + used, cap - used);
+		if (n > 0) used += (size_t)n;
+	}
+	writeFile(file, out, used);
+	free(out);
+}
+
+// Notes that path was just uploaded (down 0) or restored (down 1), as it
+// was at size and mtime
+static void syncedNote(const char* path, int down, long long size, long long mtime) {
+	RMSynced e = { 0 };
+	e.down = down;
+	e.at = (long long)time(NULL);
+	e.size = size;
+	e.mtime = mtime;
+	put(e.path, sizeof(e.path), "%s", path);
+	synced_count = RM_syncedPut(synced, synced_count, RM_SYNCED_MAX, &e);
+	syncedSave();
+}
+
+static void downloadsLoad(void) {
+	download_count = 0;
+	char file[RM_PATH_MAX];
+	put(file, sizeof(file), "%s/downloads.txt", data_dir);
+	char* text = readFile(file, 256 * 1024, NULL);
+	char* save = NULL;
+	for (char* line = text ? strtok_r(text, "\n", &save) : NULL; line && download_count < RM_DOWNLOADS_MAX;
+			line = strtok_r(NULL, "\n", &save)) {
+		if (RM_downloadParse(line, &downloads[download_count]) == 0) download_count++;
+	}
+	free(text);
+}
+
+// Logs a finished download, keeps the log, and tells other plugins
+static void downloadNote(const char* path, const char* name) {
+	RMDownload d = { 0 };
+	d.at = (long long)time(NULL);
+	put(d.path, sizeof(d.path), "%s", path);
+	const char* slash = strrchr(path, '/');
+	cleanText(name && name[0] ? name : slash ? slash + 1 : path, d.name, sizeof(d.name));
+	for (char* p = d.name; *p; p++) {
+		if (*p == '\t') *p = ' ';
+	}
+	download_count = RM_downloadPut(downloads, download_count, RM_DOWNLOADS_MAX, &d);
+	char file[RM_PATH_MAX];
+	put(file, sizeof(file), "%s/downloads.txt", data_dir);
+	static char text[RM_DOWNLOADS_MAX * (RM_PATH_MAX + RM_NAME_MAX + 32)];
+	size_t used = 0;
+	for (int i = 0; i < download_count; i++) {
+		int n = RM_downloadFormat(&downloads[i], text + used, sizeof(text) - used);
+		if (n > 0) used += (size_t)n;
+	}
+	writeFile(file, text, used);
+	char payload[1024];
+	if (MOSAIC_HOST_HAS(host, publish) && RM_downloadPayload(&d, payload, sizeof(payload)) >= 0
+			&& host->publish(ID ".download_done", payload) != 0) {
+		say("couldn't publish romm.download_done");
+	}
+}
+
+///////////////////////////////////////
 // games from RomM and their saves
 
 #define RECORDS_MAX 4096
@@ -933,6 +1040,12 @@ static void syncSave(int quiet) {
 	}
 	if (!strcmp(md5, record.value)) {
 		sayf("save for %s unchanged", baseName(record.path));
+		// the same as the server's, even if it was written again
+		const RMSynced* known = RM_syncedFind(synced, synced_count, save);
+		long long size, mtime;
+		if (known && fileStat(save, &size, &mtime) == 0 && (known->size != size || known->mtime != mtime)) {
+			syncedNote(save, known->down, size, mtime);
+		}
 		unlink(file);
 		return;
 	}
@@ -946,6 +1059,7 @@ static void syncSave(int quiet) {
 	put(j->tag, sizeof(j->tag), "%s", record.tag);
 	put(j->name, sizeof(j->name), "%s", record.path);
 	put(j->md5, sizeof(j->md5), "%s", md5);
+	if (fileStat(save, &j->file_size, &j->file_mtime) != 0) j->file_size = -1;
 	if (jobAdd(j) == 0) sayf("uploading %s for rom %d", j->file, j->rom_id);
 }
 
@@ -1563,6 +1677,8 @@ static void backupThenPlace(Job* j) {
 	sayf("restored %s %d to %s, backup %s", j->asset_kind == RM_ASSET_SAVE ? "save" : "state", j->asset_id, j->path,
 		backup[0] ? backup : "none (nothing there)");
 	toast(tr("RomM: restored"));
+	long long size, mtime;
+	if (fileStat(j->path, &size, &mtime) == 0) syncedNote(j->path, 1, size, mtime);
 	if (j->asset_kind == RM_ASSET_SAVE) {
 		RMRecord r;
 		if (recordFind(j->name, &r)) {
@@ -1614,6 +1730,7 @@ static void finished(Job* j) {
 			gameKey(j->path, r.path, sizeof(r.path));
 			recordPut(&r);
 			statusWrite("done", j->expect > 0 ? j->expect / 1024 : 0, j->expect > 0 ? j->expect / 1024 : 0, j->name);
+			downloadNote(j->path, j->name);
 			put(launch_after, sizeof(launch_after), "%s", j->path);
 		} else if (j->cancel) {
 			statusClear();
@@ -1633,6 +1750,7 @@ static void finished(Job* j) {
 				put(r.value, sizeof(r.value), "%s", j->md5);
 				recordPut(&r);
 			}
+			if (j->file_size >= 0) syncedNote(j->path, 0, j->file_size, j->file_mtime);
 			if (!strcmp(pending_path, j->name)) {
 				char file[RM_PATH_MAX];
 				put(file, sizeof(file), "%s/pending.txt", data_dir);
@@ -1845,6 +1963,45 @@ static void tick(unsigned long now) {
 }
 
 ///////////////////////////////////////
+// services
+
+// romm.synced: with no path, server=<1 when a server is set>; with
+// path=<a file>, also whether it's the file the plugin last uploaded or
+// restored there, unchanged since, and game=<1 when path is a game from
+// RomM, which romm.flashback opens for>. Nothing about the server but
+// whether it's set, and never the network.
+static int provideSynced(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[RM_PATH_MAX];
+	int len = host->event_value(args, "path", path, sizeof(path));
+	if (len >= (int)sizeof(path)) return -1;
+	if (len <= 0) return RM_syncedReply(configured, 0, NULL, -1, 0, 0, out, size) < 0 ? -1 : 0;
+	long long file_size = -1, mtime = 0;
+	if (fileStat(path, &file_size, &mtime) != 0) file_size = -1;
+	RMRecord r;
+	int game = configured && gameAt(path, &r);
+	const RMSynced* entry = configured ? RM_syncedFind(synced, synced_count, path) : NULL;
+	return RM_syncedReply(configured, 1, entry, file_size, mtime, game, out, size) < 0 ? -1 : 0;
+}
+
+static int stillThere(const char* path) {
+	struct stat st;
+	return stat(path, &st) == 0;
+}
+
+// romm.downloads: optionally count=<n> (5 by default), the games last
+// downloaded that are still on the card, newest first
+static int provideDownloads(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char text[16];
+	int want = 5;
+	if (host->event_value(args, "count", text, sizeof(text)) > 0) want = atoi(text);
+	if (want < 0) want = 0;
+	if (want > RM_DOWNLOADS_MAX) want = RM_DOWNLOADS_MAX;
+	return RM_downloadsReply(downloads, configured ? download_count : 0, want, stillThere, out, size) < 0 ? -1 : 0;
+}
+
+///////////////////////////////////////
 // starting and stopping
 
 // partial downloads and unpacks a run stopped in the middle of (a launch or power off)
@@ -1893,6 +2050,12 @@ static int init(const MosaicHost* h) {
 	put(status_path, sizeof(status_path), "%s/launcher/status.d/romm.status", host->userdata_path);
 	memset(&fb, 0, sizeof(fb));
 	loadSettings();
+	syncedLoad();
+	downloadsLoad();
+	if (MOSAIC_HOST_HAS(host, call)) {
+		if (host->provide("romm.synced", provideSynced) != 0) say("couldn't provide romm.synced");
+		if (host->provide("romm.downloads", provideDownloads) != 0) say("couldn't provide romm.downloads");
+	}
 	if (!configured) return 0;
 	makeDirs(data_dir);
 	removeLeftovers();

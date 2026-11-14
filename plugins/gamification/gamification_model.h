@@ -59,6 +59,7 @@ typedef struct GMDay {
 	int games;         // different games launched
 	int fresh;         // launches of games never played before
 	int revisits;      // launches of games not played for GM_REVISIT_DAYS
+	int downloads;     // games downloaded from RomM
 } GMDay;
 
 // The quests, in the order the screen lists them.
@@ -67,6 +68,7 @@ enum GMQuest {
 	GM_Q_GAMES,       // today: play daily_games different games
 	GM_Q_FRESH,       // today: start a game never played before
 	GM_Q_REVISIT,     // today: go back to a game not played for GM_REVISIT_DAYS
+	GM_Q_DOWNLOAD,    // today: download a game from RomM, offered only while romm can
 	GM_Q_WEEK_DAYS,   // this week: play on week_days days
 	GM_Q_WEEK_HOURS,  // this week: play for week_hours
 	GM_QUESTS,
@@ -84,6 +86,7 @@ typedef struct GMState {
 	int cheered;         // the day the streak was last cheered, -1 for never
 	int picked[GM_QUESTS];   // the day or week each quest was last picked for, -1 for never
 	int left_out[GM_QUESTS]; // the day or week each quest was left out of, -1 for never
+	int off[GM_QUESTS];      // 1 for a quest not offered now, such as the RomM one without romm; not saved
 } GMState;
 
 void GM_init(GMState* state);
@@ -94,6 +97,9 @@ const GMDay* GM_day(const GMState* state, int day);
 // Counts a launch of the game at path on day: fresh when it was never
 // played before, revisit when it hadn't been for GM_REVISIT_DAYS.
 void GM_launch(GMState* state, int day, const char* path, int fresh, int revisit);
+
+// Counts a game downloaded from RomM on day.
+void GM_download(GMState* state, int day);
 
 // Adds seconds of play from start, split between the local days it spans.
 // Nothing for seconds outside 1 to GM_SESSION_MAX.
@@ -190,7 +196,8 @@ long long GM_weekLeft(int today, long long left_today, int limit_minutes);
 int GM_pick(GMState* state, int today, const GMProgress* progress, long long left_today, long long left_week,
 	int left[GM_QUESTS], int* left_count);
 
-// 1 when quest runs on today: it wasn't left out of its day or week.
+// 1 when quest runs on today: it's offered and wasn't left out of its day
+// or week.
 int GM_running(const GMState* state, int today, int quest);
 
 // Marks quests that are done and weren't yet for their day or week as
@@ -203,7 +210,8 @@ int GM_settle(GMState* state, int today, const GMProgress* progress, int streak,
 
 // "Play for 30 minutes today", "Play 3 different games today", "Start a
 // game you've never played", "Go back to a game you haven't played in 30
-// days", "Play on 5 days this week", "Play for 5 hours this week".
+// days", "Download a game from RomM", "Play on 5 days this week", "Play
+// for 5 hours this week".
 void GM_title(int quest, const GMTargets* targets, char* out, size_t size);
 
 // A quest's right side: "Done", "12 / 30m", "1 / 3", "2h 5m / 5h".

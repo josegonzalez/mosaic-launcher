@@ -26,6 +26,14 @@
 // a state> and, with any, slot=, label=, saved=<Unix time> and
 // preview=<its preview's path, or empty>.
 //
+// While romm is loaded, its romm.synced service says which states it last
+// restored from or uploaded to the server, unchanged since, and those
+// slots get a SYNCED mark, asked as a game's states are read rather than
+// as they're drawn. A game opened from the game list that romm knows, with
+// a server set, also gets a Restore from server cell after its slots,
+// which runs romm.flashback on the game; its states are read again when
+// the screen shows after it. Without romm there's neither.
+//
 // Resuming from a chosen slot is left out: the launcher only resumes from
 // the slot minarch last used, and this plugin doesn't write minarch's
 // files to change it.
@@ -68,6 +76,9 @@ static struct {
 	int slot;
 } pending; // the state the confirm is about
 static char shown[SM_NAME_MAX * 2 + 128];
+static char game_path[SM_PATH_MAX]; // the entry the single game was opened for
+static int restore = 0;             // 1 when the single game has a Restore from server cell
+static int rescan = 0;              // 1 after Flashback opened, to read the states again
 
 static void forget(void);
 
@@ -86,6 +97,41 @@ static SMGame* current(void) {
 	if (!all) return &single;
 	if (game_sel < 0 || game_sel >= list.count) return NULL;
 	return &list.games[game_sel];
+}
+
+// how many cells the slots view has: the slots, and Restore from server
+static int slotCells(const SMGame* game) {
+	return (game ? game->count : 0) + (!all && restore ? 1 : 0);
+}
+
+// 1 when the slots view's selection is the Restore from server cell
+static int onRestore(const SMGame* game) {
+	return !all && restore && view == SM_VIEW_SLOTS && game && slot_sel == game->count;
+}
+
+///////////////////////////////////////
+// romm
+
+// romm.synced's answer for path, into reply; 0 without romm
+static int askRomm(const char* path, char* reply, size_t size) {
+	char args[SM_PATH_MAX + 8];
+	snprintf(args, sizeof(args), "path=%s", path);
+	reply[0] = '\0';
+	return MOSAIC_HOST_HAS(host, call) && host->call("romm.synced", args, reply, size) >= 0;
+}
+
+static int replyIs(const char* reply, const char* key) {
+	char value[8];
+	return host->event_value(reply, key, value, sizeof(value)) > 0 && !strcmp(value, "1");
+}
+
+// Marks game's slots whose newest state file romm last synced.
+static void markSynced(const SMCard* c, SMGame* game) {
+	for (int i = 0; i < game->count; i++) {
+		char file[SM_PATH_MAX], reply[256];
+		game->slots[i].synced = SM_newestFile(c, game, game->slots[i].slot, file, sizeof(file))
+			&& askRomm(file, reply, sizeof(reply)) && replyIs(reply, "synced");
+	}
 }
 
 ///////////////////////////////////////
@@ -193,6 +239,10 @@ static void slotTitle(const SMGame* game, const SMSlot* slot, int with_date, cha
 	SM_date(slot->saved, date, sizeof(date));
 	if (with_date && date[0]) snprintf(out, size, "%s \xc2\xb7 %s \xc2\xb7 %s", game->display, label, date);
 	else snprintf(out, size, "%s \xc2\xb7 %s", game->display, label);
+	if (slot->synced) {
+		size_t used = strlen(out);
+		snprintf(out + used, size - used, " \xc2\xb7 %s", tr("Synced"));
+	}
 }
 
 // the newest slot with a preview, for a game's cell
@@ -252,6 +302,14 @@ static int renderGrid(MosaicSurface* screen, const MosaicScreenView* v, const Mo
 		host->fill_rect(screen, &box, card_color);
 		char top[SM_NAME_MAX], bottom[64];
 		const char* preview = NULL;
+		if (view == SM_VIEW_SLOTS && i >= game->count) {
+			// Restore from server, after the slots
+			centred(screen, MOSAIC_FONT_SMALL, "RomM", &box, ink);
+			MosaicColor color = i == selected ? ring : ink;
+			host->draw_text(screen, MOSAIC_FONT_SMALL, tr("Restore from server"), cell.x, box.y + box.h + 2 * scale, color,
+				cell.w);
+			continue;
+		}
 		if (view == SM_VIEW_GAMES) {
 			const SMGame* g = &list.games[i];
 			const SMSlot* cover = coverOf(g);
@@ -267,6 +325,22 @@ static int renderGrid(MosaicSurface* screen, const MosaicScreenView* v, const Mo
 		int got = drawPreview(screen, preview, &box, NULL, thumbs, THUMB_COPIES);
 		if (got > 0) drawn++;
 		if (got < 0) centred(screen, MOSAIC_FONT_SMALL, tr("No preview"), &box, ink);
+		if (view == SM_VIEW_SLOTS && game->slots[i].synced) {
+			// synced to RomM, in the preview's top right: labelled where
+			// there's room, else a dot (the title says it in full)
+			const char* mark = tr("SYNCED");
+			int pad = 4 * scale;
+			int mark_h = host->text_height(MOSAIC_FONT_TINY) + 2 * scale;
+			int mark_w = host->text_width(MOSAIC_FONT_TINY, mark) + 2 * pad;
+			int labelled = mark_w <= box.w / 2;
+			if (!labelled) mark_w = mark_h = 6 * scale;
+			MosaicRect pill = { box.x + box.w - mark_w - scale, box.y + scale, mark_w, mark_h };
+			host->fill_round_rect(screen, &pill, mark_h / 2, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257));
+			if (labelled) {
+				host->draw_text(screen, MOSAIC_FONT_TINY, mark, pill.x + pad, pill.y + scale,
+					themeColor(MOSAIC_COLOR_HINT, 0xFFFFFF), mark_w - 2 * pad);
+			}
+		}
 		MosaicColor color = i == selected ? ring : ink;
 		host->draw_text(screen, MOSAIC_FONT_SMALL, top, cell.x, box.y + box.h + 2 * scale, color, cell.w);
 		host->draw_text(screen, MOSAIC_FONT_SMALL, bottom, cell.x, box.y + box.h + 2 * scale + line_h, color, cell.w);
@@ -278,6 +352,10 @@ static void hints(MosaicSurface* screen, int count) {
 	MosaicHint left[2], right[2];
 	int left_count = 0, right_count = 0;
 	SM_hints(view, count, can_delete, left, &left_count, right, &right_count);
+	if (onRestore(current())) {
+		right[0] = (MosaicHint){ MOSAIC_BUTTON_A, "RESTORE" };
+		right_count = 1;
+	}
 	if (left_count) host->draw_hints(screen, MOSAIC_HINTS_LEFT, left, left_count, NULL);
 	if (right_count) host->draw_hints(screen, MOSAIC_HINTS_RIGHT, right, right_count, NULL);
 }
@@ -292,6 +370,8 @@ static void logShown(int shown_view, int got) {
 			snprintf(line, sizeof(line), "games %i of %i: %s, %i states", game_sel, list.count, game->display,
 				game->count);
 		}
+	} else if (onRestore(game)) {
+		snprintf(line, sizeof(line), "slots %i of %i: %s, restore from server", slot_sel, slotCells(game), game->display);
 	} else if (!game || game->count <= 0) {
 		snprintf(line, sizeof(line), "no save states");
 	} else {
@@ -303,8 +383,8 @@ static void logShown(int shown_view, int got) {
 			snprintf(line, sizeof(line), "view %i of %i: %s, %s, %s, preview %s", slot_sel, game->count, game->display,
 				label, date, got > 0 ? "drawn" : got == 0 ? "loading" : "none");
 		} else {
-			snprintf(line, sizeof(line), "slots %i of %i: %s, %s, %s, %i columns", slot_sel, game->count,
-				game->display, label, date, cols);
+			snprintf(line, sizeof(line), "slots %i of %i: %s, %s, %s, %i columns%s", slot_sel, slotCells(game),
+				game->display, label, date, cols, s->synced ? ", synced" : "");
 		}
 	}
 	if (strcmp(line, shown) == 0) return;
@@ -380,6 +460,8 @@ static int enter(void* data) {
 	slot_sel = slot_row = 0;
 	game_sel = game_row = 0;
 	deleted = 0;
+	rescan = 0;
+	if (all) restore = 0;
 	shown[0] = '\0';
 	char message[SM_NAME_MAX + 256];
 	if (all) {
@@ -389,7 +471,12 @@ static int enter(void* data) {
 	} else {
 		view = SM_VIEW_SLOTS;
 		int count = SM_gameScan(&card, &single);
-		snprintf(message, sizeof(message), "%s: %i save states", single.display, count);
+		markSynced(&card, &single);
+		char reply[256];
+		restore = askRomm(game_path, reply, sizeof(reply)) && replyIs(reply, "server") && replyIs(reply, "game")
+			&& MOSAIC_HOST_HAS(host, run_action);
+		snprintf(message, sizeof(message), "%s: %i save states%s", single.display, count,
+			restore ? ", restore from server" : "");
 	}
 	say(message);
 	return 0;
@@ -409,9 +496,17 @@ static int input(const MosaicInput* in, void* data) {
 	unsigned int bit_a = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_A), bit_b = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B);
 	unsigned int bit_y = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_Y);
 	SMGame* game = current();
-	int count = view == SM_VIEW_GAMES ? list.count : game ? game->count : 0;
+	int count = view == SM_VIEW_GAMES ? list.count : view == SM_VIEW_SLOTS ? slotCells(game) : game ? game->count : 0;
 	int* selected = view == SM_VIEW_GAMES ? &game_sel : &slot_sel;
 	int before = *selected, was = view;
+
+	if ((in->pressed & bit_a) && onRestore(game)) {
+		// romm's Flashback for the game, over this screen
+		rescan = 1;
+		if (host->run_action("romm.flashback", game_path) != 0) say("couldn't open romm's Flashback");
+		return MOSAIC_SCREEN_STAY;
+	}
+	if ((in->pressed & bit_y) && onRestore(game)) return MOSAIC_SCREEN_STAY;
 
 	if (in->pressed & bit_b) {
 		if (view == SM_VIEW_FULL) view = SM_VIEW_SLOTS;
@@ -421,6 +516,7 @@ static int input(const MosaicInput* in, void* data) {
 		if (view == SM_VIEW_GAMES) {
 			slot_sel = slot_row = 0;
 			view = SM_VIEW_SLOTS;
+			if (game) markSynced(&card, game);
 		} else {
 			view = SM_VIEW_FULL;
 		}
@@ -451,11 +547,20 @@ static int input(const MosaicInput* in, void* data) {
 static int render(MosaicSurface* screen, const MosaicScreenView* v, void* data) {
 	(void)data;
 	frame++;
+	if (rescan && !strcmp(host->current_screen(), SCREEN_ID)) {
+		// back from Flashback, which may have restored a state
+		rescan = 0;
+		SM_gameScan(&card, &single);
+		markSynced(&card, &single);
+		forget();
+		deleted = 1; // so the list sees the change too
+	}
 	MosaicRect hole = SM_hole(&v->status, &v->header);
 	if (game_sel >= list.count) game_sel = list.count > 0 ? list.count - 1 : 0;
 	SMGame* game = current();
-	if (game && slot_sel >= game->count) slot_sel = game->count > 0 ? game->count - 1 : 0;
-	int count = view == SM_VIEW_GAMES ? list.count : game ? game->count : 0;
+	int cells = view == SM_VIEW_SLOTS ? slotCells(game) : game ? game->count : 0;
+	if (game && slot_sel >= cells) slot_sel = cells > 0 ? cells - 1 : 0;
+	int count = view == SM_VIEW_GAMES ? list.count : cells;
 	int got = -1, shown_view = view;
 	fillAround(screen, &v->area, &hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
 	if (count <= 0) {
@@ -466,14 +571,17 @@ static int render(MosaicSurface* screen, const MosaicScreenView* v, void* data) 
 		title(screen, v, &hole, game ? game->display : tr("Save states"));
 	} else if (view == SM_VIEW_SLOTS) {
 		got = renderGrid(screen, v, &hole, count, slot_sel, &slot_row);
-		if (got < 0) shown_view = SM_VIEW_FULL; // too small for a grid: the full view stands in
-		else {
+		if (got < 0 && !onRestore(game) && game->count > 0) shown_view = SM_VIEW_FULL; // too small for a grid: the full view stands in
+		else if (onRestore(game)) {
+			title(screen, v, &hole, tr("Restore from server"));
+		}
+		else if (got >= 0) {
 			char text[SM_NAME_MAX + 256];
 			slotTitle(game, &game->slots[slot_sel], 0, text, sizeof(text));
 			title(screen, v, &hole, text);
 		}
 	}
-	if (count > 0 && shown_view == SM_VIEW_FULL) got = renderFull(screen, v, &hole, game);
+	if (count > 0 && shown_view == SM_VIEW_FULL && game && slot_sel < game->count) got = renderFull(screen, v, &hole, game);
 	hints(screen, count);
 	logShown(shown_view, got);
 	return 0;
@@ -558,6 +666,8 @@ static void openGame(const char* path, void* data) {
 		say("the selected entry isn't a game");
 		return;
 	}
+	const MosaicEntry* entry = host->selected_entry();
+	snprintf(game_path, sizeof(game_path), "%s", entry && host->entry_path(entry) ? host->entry_path(entry) : "");
 	all = 0;
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the save states screen");
 }

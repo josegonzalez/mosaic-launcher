@@ -322,4 +322,63 @@ typedef struct RMRecord {
 int RM_recordParse(const char* line, RMRecord* out);
 int RM_recordFormat(const RMRecord* record, char* out, size_t size);
 
+///////////////////////////////////////
+// The files the plugin last moved to or from the server, for the
+// romm.synced service, one line each:
+// "<up|down>\t<when>\t<size>\t<mtime>\t<path>", newest first, one per path.
+
+#define RM_SYNCED_MAX 256
+
+typedef struct RMSynced {
+	int down;        // 1 for a file restored from the server, 0 for one uploaded
+	long long at;    // when, as a Unix time
+	long long size;  // the file's size and modification time just after
+	long long mtime;
+	char path[RM_PATH_MAX];
+} RMSynced;
+
+// Parses one line. Returns 0, or -1 for a line that isn't one.
+int RM_syncedParse(const char* line, RMSynced* out);
+int RM_syncedFormat(const RMSynced* entry, char* out, size_t size);
+// Puts entry first in list, in place of any for the same path, keeping at
+// most max. Returns the new count.
+int RM_syncedPut(RMSynced* list, int count, int max, const RMSynced* entry);
+// The entry for path, or NULL.
+const RMSynced* RM_syncedFind(const RMSynced* list, int count, const char* path);
+// The romm.synced reply: server=<1 or 0>, and with asked set (a path was
+// asked about) synced=<1 or 0>, which is 1 when entry is set and the file
+// is still its size and mtime (size -1 for no file), with how=<upload or
+// download> and at=<Unix time> then, and game=<1 or 0>. Returns its
+// length, or -1 when it doesn't fit.
+int RM_syncedReply(int server, int asked, const RMSynced* entry, long long size, long long mtime, int game, char* out,
+	size_t out_size);
+
+///////////////////////////////////////
+// The games downloaded, for the romm.downloads service, one line each:
+// "<when>\t<path>\t<name>", newest first, one per path.
+
+#define RM_DOWNLOADS_MAX 20
+
+typedef struct RMDownload {
+	long long at;
+	char path[RM_PATH_MAX]; // the file the download launches
+	char name[RM_NAME_MAX]; // RomM's name for it
+} RMDownload;
+
+int RM_downloadParse(const char* line, RMDownload* out);
+int RM_downloadFormat(const RMDownload* entry, char* out, size_t size);
+// Puts entry first in list, in place of any for the same path, keeping at
+// most max. Returns the new count.
+int RM_downloadPut(RMDownload* list, int count, int max, const RMDownload* entry);
+// The romm.downloads reply for the first want of list (those whose path
+// keep says is still there, keep NULL for all): count=<n> and, for each
+// from 0, path.<i>=, name.<i>= and at.<i>=, as many as fit size. Returns
+// its length, or -1 when not even count fits.
+int RM_downloadsReply(const RMDownload* list, int count, int want, int (*keep)(const char* path), char* out,
+	size_t size);
+// The romm.download_done event's payload: path=<path> and name=<name>, or
+// path alone when both don't fit an event's 1023 bytes. Returns its
+// length, or -1 when the path alone doesn't fit.
+int RM_downloadPayload(const RMDownload* entry, char* out, size_t size);
+
 #endif

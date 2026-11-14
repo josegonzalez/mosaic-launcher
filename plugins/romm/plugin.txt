@@ -3,6 +3,8 @@ name=RomM
 api=1
 category=Network
 summary=Browses a RomM server's library, downloads games and backs up saves.
+# the romm.synced and romm.downloads services, and the romm.download_done event after a game downloads
+provides=romm.synced,romm.downloads,events.romm.download_done
 # the RomM server, eg. http://192.168.1.20:8080 or https://romm.home; http:// sends the login in clear text
 setting.url=text|Server|||protected
 # RomM user name; leave it empty to log in with an API token instead

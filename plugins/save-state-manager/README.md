@@ -19,6 +19,15 @@ A game's states are a grid in slot order, each with its preview, name and time. 
 | **B** | Goes back |
 | **Y** | Deletes the selected state after a confirm (Delete with Y) |
 
+### With RomM
+
+While [`romm`](../romm/README.md) is on with a server set:
+
+- A state romm restored from the server through Flashback shows a SYNCED mark on its preview (a dot where the cell is too small for the word), and Synced in the title when it's selected, until it changes on the card.
+- A game from RomM, opened from the game list, has a Restore from server cell after its states. **A** on it opens romm's Flashback for the game, and its states are read again when you come back.
+
+Without romm there's no mark and no cell.
+
 ### What delete removes
 
 - Its state files in every `.userdata/shared/<tag>-<core>` folder.
@@ -45,6 +54,10 @@ Every game with states, from the quick menu tile.
 
 ![Every game with states, from the quick menu tile](docs/all-games.png)
 
+With romm set up, on a game from RomM: Slot 1, which romm restored, marked synced, and Restore from server selected.
+
+![With romm set up: Slot 1 marked synced, and Restore from server selected](docs/with-romm.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
@@ -57,6 +70,7 @@ Every game with states, from the quick menu tile.
 
 - Provides the `states.last` service (`provides=states.last`): ask for a game or game folder's `path` and get a game's most recently saved state as the slot, its label, when it was saved and its preview (see [plugin-api.md](../../docs/plugin-api.md)).
 - Registers the actions `save-state-manager.game` and `save-state-manager.open`; `button` follows `save-state-manager.game`.
+- Asks `romm`'s `romm.synced` service about each slot's newest state file for the SYNCED mark, and about the game for the Restore from server cell, as a game's states are read, never while drawing. The cell runs `run_action("romm.flashback", <the game's path>)`.
 - Reads and deletes files in `.userdata/shared/<tag>-<core>` and `.userdata/shared/.minui/<tag>`.
 
 ## Credits

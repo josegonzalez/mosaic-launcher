@@ -131,6 +131,10 @@ msgstr ""
 msgid "Done"
 msgstr ""
 
+#: gamification_model.c
+msgid "Download a game from RomM"
+msgstr ""
+
 #: plugin.txt
 msgid "Gamification"
 msgstr ""

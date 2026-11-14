@@ -23,6 +23,11 @@ static const char* tr(const char* text) {
 	return words.tr ? words.tr(text) : text;
 }
 
+static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
+	if (words.tr_plural) return words.tr_plural(singular, plural, n);
+	return n == 1 ? singular : plural;
+}
+
 static const char* const mode_names[] = { "dashboard", "minui", "retroachievements", "pico8" };
 
 int HD_modeOf(const char* name) {
@@ -144,6 +149,12 @@ int HD_timeLeft(const char* state, int limit, int granted, long long left, char*
 	HD_duration(((long long)limit + (granted > 0 ? granted : 0)) * 60, of, sizeof(of));
 	snprintf(out, size, tr("%s of %s"), shown, of);
 	return 1;
+}
+
+void HD_daysAgo(int days, char* out, size_t size) {
+	if (days <= 0) snprintf(out, size, "%s", tr("Today"));
+	else if (days == 1) snprintf(out, size, "%s", tr("Yesterday"));
+	else snprintf(out, size, trPlural("%i day ago", "%i days ago", (unsigned long)days), days);
 }
 
 void HD_achievementLine(int unlocked, int total, int points_unlocked, int points, char* out, size_t size) {

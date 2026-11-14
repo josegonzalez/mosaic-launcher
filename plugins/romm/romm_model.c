@@ -1381,3 +1381,133 @@ int RM_recordFormat(const RMRecord* r, char* out, size_t size) {
 	int n = snprintf(out, size, "%d\t%s\t%s\t%s\n", r->rom_id, r->tag, r->value[0] ? r->value : "-", r->path);
 	return n < 0 || (size_t)n >= size ? -1 : n;
 }
+
+///////////////////////////////////////
+// synced files and downloads
+
+// the field after *p up to the next tab, as a number; advances *p past it
+static int tabNumber(const char** p, long long* out) {
+	char* end = NULL;
+	long long v = strtoll(*p, &end, 10);
+	if (end == *p || *end != '\t') return -1;
+	*out = v;
+	*p = end + 1;
+	return 0;
+}
+
+static int lineEnd(const char* p, char* out, size_t size) {
+	size_t len = strcspn(p, "\r\n");
+	if (!len || len >= size) return -1;
+	memcpy(out, p, len);
+	out[len] = '\0';
+	return 0;
+}
+
+int RM_syncedParse(const char* line, RMSynced* out) {
+	memset(out, 0, sizeof(*out));
+	if (!strncmp(line, "down\t", 5)) out->down = 1;
+	else if (strncmp(line, "up\t", 3) != 0) return -1;
+	const char* p = line + (out->down ? 5 : 3);
+	if (tabNumber(&p, &out->at) != 0 || tabNumber(&p, &out->size) != 0 || tabNumber(&p, &out->mtime) != 0) return -1;
+	if (out->size < 0) return -1;
+	return lineEnd(p, out->path, sizeof(out->path));
+}
+
+int RM_syncedFormat(const RMSynced* e, char* out, size_t size) {
+	if (!e->path[0] || strpbrk(e->path, "\t\r\n")) return -1;
+	int n = snprintf(out, size, "%s\t%lld\t%lld\t%lld\t%s\n", e->down ? "down" : "up", e->at, e->size, e->mtime, e->path);
+	return n < 0 || (size_t)n >= size ? -1 : n;
+}
+
+int RM_syncedPut(RMSynced* list, int count, int max, const RMSynced* entry) {
+	if (max <= 0) return 0;
+	int at = count;
+	for (int i = 0; i < count; i++) {
+		if (!strcmp(list[i].path, entry->path)) at = i;
+	}
+	if (at == count && count >= max) at = max - 1; // the oldest goes
+	else if (at == count) count++;
+	memmove(&list[1], &list[0], (size_t)at * sizeof(RMSynced));
+	list[0] = *entry;
+	return count;
+}
+
+const RMSynced* RM_syncedFind(const RMSynced* list, int count, const char* path) {
+	for (int i = 0; path && i < count; i++) {
+		if (!strcmp(list[i].path, path)) return &list[i];
+	}
+	return NULL;
+}
+
+int RM_syncedReply(int server, int asked, const RMSynced* entry, long long size, long long mtime, int game, char* out,
+	size_t out_size) {
+	int n;
+	if (!asked) {
+		n = snprintf(out, out_size, "server=%d\n", server ? 1 : 0);
+	} else if (entry && size >= 0 && entry->size == size && entry->mtime == mtime) {
+		n = snprintf(out, out_size, "server=%d\nsynced=1\nhow=%s\nat=%lld\ngame=%d\n", server ? 1 : 0,
+			entry->down ? "download" : "upload", entry->at, game ? 1 : 0);
+	} else {
+		n = snprintf(out, out_size, "server=%d\nsynced=0\ngame=%d\n", server ? 1 : 0, game ? 1 : 0);
+	}
+	return n < 0 || (size_t)n >= out_size ? -1 : n;
+}
+
+int RM_downloadParse(const char* line, RMDownload* out) {
+	memset(out, 0, sizeof(*out));
+	const char* p = line;
+	if (tabNumber(&p, &out->at) != 0) return -1;
+	const char* tab = strchr(p, '\t');
+	if (!tab || tab == p || (size_t)(tab - p) >= sizeof(out->path)) return -1;
+	memcpy(out->path, p, (size_t)(tab - p));
+	return lineEnd(tab + 1, out->name, sizeof(out->name));
+}
+
+int RM_downloadFormat(const RMDownload* e, char* out, size_t size) {
+	if (!e->path[0] || !e->name[0] || strpbrk(e->path, "\t\r\n") || strpbrk(e->name, "\t\r\n")) return -1;
+	int n = snprintf(out, size, "%lld\t%s\t%s\n", e->at, e->path, e->name);
+	return n < 0 || (size_t)n >= size ? -1 : n;
+}
+
+int RM_downloadPut(RMDownload* list, int count, int max, const RMDownload* entry) {
+	if (max <= 0) return 0;
+	int at = count;
+	for (int i = 0; i < count; i++) {
+		if (!strcmp(list[i].path, entry->path)) at = i;
+	}
+	if (at == count && count >= max) at = max - 1;
+	else if (at == count) count++;
+	memmove(&list[1], &list[0], (size_t)at * sizeof(RMDownload));
+	list[0] = *entry;
+	return count;
+}
+
+int RM_downloadsReply(const RMDownload* list, int count, int want, int (*keep)(const char* path), char* out,
+	size_t size) {
+	// count goes first, so the entries are written after room for it
+	char head[32];
+	int shown = 0;
+	size_t used = 0;
+	static char body[4096];
+	body[0] = '\0';
+	for (int i = 0; i < count && shown < want; i++) {
+		if (keep && !keep(list[i].path)) continue;
+		char part[RM_PATH_MAX + RM_NAME_MAX + 96];
+		int n = snprintf(part, sizeof(part), "path.%d=%s\nname.%d=%s\nat.%d=%lld\n", shown, list[i].path, shown,
+			list[i].name, shown, list[i].at);
+		if (n < 0 || (size_t)n >= sizeof(part) || used + (size_t)n + sizeof(head) >= size || used + (size_t)n >= sizeof(body)) break;
+		memcpy(body + used, part, (size_t)n + 1);
+		used += (size_t)n;
+		shown++;
+	}
+	int n = snprintf(out, size, "count=%d\n%s", shown, body);
+	return n < 0 || (size_t)n >= size ? -1 : n;
+}
+
+int RM_downloadPayload(const RMDownload* e, char* out, size_t size) {
+	size_t room = size < 1024 ? size : 1024;
+	int n = snprintf(out, room, "path=%s\nname=%s", e->path, e->name);
+	if (n >= 0 && (size_t)n < room) return n;
+	n = snprintf(out, room, "path=%s", e->path);
+	return n < 0 || (size_t)n >= room ? -1 : n;
+}

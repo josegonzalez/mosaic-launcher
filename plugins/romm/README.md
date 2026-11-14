@@ -47,6 +47,8 @@ Press **Y** on a game from RomM (the Flashback button setting picks another, sha
 | **X** | Fetches the list again |
 | **B** | Goes back |
 
+With [`save-state-manager`](../save-state-manager/README.md) on, a state Flashback restored shows a SYNCED mark there until it changes, and a game from RomM gets a Restore from server cell after its states, which opens Flashback. Each finished download counts towards [`gamification`](../gamification/README.md)'s RomM quest and shows on [`home-dashboard`](../home-dashboard/README.md)'s Stats tab under Recently downloaded.
+
 A state in any of the layouts minarch writes (its own `.st0` to `.st9`, or RetroArch's `.state`, `.state1` to `.state9`, `.state.0` to `.state.9` and `.state.auto`) restores under the name minarch's State format setting gives it. It goes into `.userdata/shared/<tag>-<core>/` for the core the system's emulator pak runs, else the only state folder the system has, else the one named for the emulator the server recorded. A state in another layout, or with no way to tell its folder, can't be restored.
 
 ## Logging in and security
@@ -75,6 +77,10 @@ A state in any of the layouts minarch writes (its own `.st0` to `.st9`, or Retro
 ## For plugin authors
 
 - Another plugin can open a game's Flashback with `run_action("romm.flashback", <the game's full path>)`. The `button` setting follows the `romm.flashback` action.
+- Provides the `romm.synced` and `romm.downloads` services and publishes `romm.download_done` (`provides=romm.synced,romm.downloads,events.romm.download_done`); see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api). They answer from the files the plugin keeps, never the network, and say only whether a server is set, never its address, user or password:
+  - `romm.synced`: with no arguments, `server=1` while a server is set; with `path=<a file>`, also `synced=1` when it's the file last uploaded or restored, its size and modification time unchanged since (with `how=upload` or `download` and `at=<Unix time>`), and `game=1` when the path is a game from RomM that Flashback opens for. `save-state-manager` shows its SYNCED mark and Restore from server cell from it, and `gamification` offers its RomM quest while `server=1`.
+  - `romm.downloads`: optionally `count=<n>` (5 by default, up to 20) gives the games last downloaded that are still on the card, newest first, as `count=<n>` and `path.<i>=`, `name.<i>=` (RomM's name) and `at.<i>=<Unix time>` from 0. `home-dashboard`'s Stats tab lists them.
+  - `romm.download_done`, with `path=<the file it launches>` and `name=<RomM's name>`, as each download finishes, before the game launches.
 - Settings with the `protected` flag ask for the launcher's PIN; `password` is also `secret` (see [plugin-api.md](../../docs/plugin-api.md#plugintxt)).
 - Downloads a zip to a hidden temporary file, then checks every entry before anything is written. It refuses the whole zip for:
   - an absolute path, `..`, a backslash, a NUL or another character the card can't hold
@@ -83,7 +89,7 @@ A state in any of the layouts minarch writes (its own `.st0` to `.st9`, or Retro
   - an encrypted entry
   - sizes that don't add up: over 2048 entries, a file over 4 GB, 16 GB in all, more than the size RomM gave plus 64 KB, or an entry claiming to inflate past 1032 to 1
 - Files are written to temporary names in a hidden folder, never through a link, and the folder is moved into place only once every file is in. A cancel or error removes only what it made, and a folder or file of the game's name already on the card is never written over.
-- Writes `.userdata/<platform>/launcher/romm/` (lists) and `.userdata/<platform>/launcher/romm/backups/<tag>/`, and reads and writes `Saves/<tag>/` and `.userdata/shared/<tag>-<core>/`.
+- Writes `.userdata/<platform>/launcher/romm/` (lists, `games.txt` of the games from RomM, `synced.txt` of the files last uploaded or restored, and `downloads.txt` of the last 20 downloads) and `.userdata/<platform>/launcher/romm/backups/<tag>/`, and reads and writes `Saves/<tag>/` and `.userdata/shared/<tag>-<core>/`.
 
 ## Credits
 

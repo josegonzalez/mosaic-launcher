@@ -97,6 +97,7 @@ typedef struct SMSlot {
 	int files;         // how many state files it has (one per core folder)
 	int has_preview;   // 1 when its preview is a regular file
 	char preview[SM_PATH_MAX];
+	int synced;        // 1 when romm says its newest state file is the one it last synced; set by the plugin
 } SMSlot;
 
 typedef struct SMGame {
@@ -132,6 +133,10 @@ int SM_gameScan(const SMCard* card, SMGame* game);
 // The state files a slot of game has on the card, as SM_gameScan finds
 // them. Returns how many were written, at most max.
 int SM_stateFiles(const SMCard* card, const SMGame* game, int slot, char out[][SM_PATH_MAX], int max);
+
+// The newest of a slot's state files, by modification time, as
+// SM_stateFiles finds them. Returns 1, or 0 when it has none (writing "").
+int SM_newestFile(const SMCard* card, const SMGame* game, int slot, char* out, size_t size);
 
 // Deletes the slot at index from the card and from game: its state files,
 // its preview and its disc file, and the last-slot file only when it names

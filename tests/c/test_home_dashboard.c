@@ -149,6 +149,15 @@ static void testText(void) {
 	CHECK(HD_timeLeft("ok", 0, 0, 600, out, sizeof(out)) == 0);
 	CHECK(HD_timeLeft(NULL, 60, 0, 600, out, sizeof(out)) == 0);
 
+	HD_daysAgo(0, out, sizeof(out));
+	CHECK_STR(out, "Today");
+	HD_daysAgo(-2, out, sizeof(out));
+	CHECK_STR(out, "Today");
+	HD_daysAgo(1, out, sizeof(out));
+	CHECK_STR(out, "Yesterday");
+	HD_daysAgo(4, out, sizeof(out));
+	CHECK_STR(out, "4 days ago");
+
 	HD_achievementLine(12, 40, 150, 400, out, sizeof(out));
 	CHECK_STR(out, "12/40 \xc2\xb7 150/400 points");
 	HD_achievementLine(3, 12, 0, 0, out, sizeof(out));
@@ -628,6 +637,58 @@ static void testServices(void) {
 	fake.event_value = NULL;
 }
 
+// romm's romm.downloads: Tetris today, a game no longer on the card, a
+// hidden one and Zelda three days ago
+static char downloads_reply[2048];
+static int fakeDownloads(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char count[16];
+	CHECK(fakeEventValue(args, "count", count, sizeof(count)) > 0);
+	CHECK_STR(count, "3");
+	snprintf(out, size, "%s", downloads_reply);
+	return 0;
+}
+
+static void testDownloads(void) {
+	fake_provider_count = 0;
+	fake.call = NULL;
+	reset("dashboard");
+	CHECK(download_count == 0);
+	CHECK(strstr(logged, "history on, downloads 0") != NULL);
+	long long now = (long long)time(NULL);
+	snprintf(downloads_reply, sizeof(downloads_reply),
+		"count=4\npath.0=%s\nname.0=Tetris\nat.0=%lld\npath.1=%s\nname.1=Gone\nat.1=%lld\n"
+		"path.2=%s\nname.2=Hidden\nat.2=%lld\npath.3=%s\nname.3=Zelda\nat.3=%lld\n",
+		TEST_SDCARD_PATH "/Roms/GB/Tetris.gb", now, TEST_SDCARD_PATH "/Roms/GB/Gone.gb", now,
+		TEST_SDCARD_PATH "/Roms/GB/Hidden.gb", now, TEST_SDCARD_PATH "/Roms/NES/Zelda.nes", now - 3 * 86400);
+	writeFile(TEST_SDCARD_PATH "/Roms/GB/Hidden.gb", "");
+	hidden_path = TEST_SDCARD_PATH "/Roms/GB/Hidden.gb";
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	fakeProvide("romm.downloads", fakeDownloads);
+	logged[0] = '\0';
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(download_count == 2);
+	CHECK_STR(downloads[0].name, "Tetris");
+	CHECK_STR(downloads[1].name, "Zelda");
+	CHECK(daysSince(downloaded_at[0]) == 0 && daysSince(downloaded_at[1]) == 3);
+	CHECK(strstr(logged, "history on, downloads 2") != NULL);
+	// none downloaded: no section
+	snprintf(downloads_reply, sizeof(downloads_reply), "count=0\n");
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(download_count == 0);
+	// only on the dashboard's Stats tab
+	download_count = 1;
+	snprintf(downloads_reply, sizeof(downloads_reply), "count=1\npath.0=%s\nname.0=Tetris\nat.0=%lld\n",
+		TEST_SDCARD_PATH "/Roms/GB/Tetris.gb", now);
+	reset("minui");
+	CHECK(download_count == 0);
+	hidden_path = "";
+	fake_provider_count = 0;
+	fake.call = NULL;
+	fake.event_value = NULL;
+}
+
 int main(void) {
 	CHECK(system("rm -rf '" TEST_SDCARD_PATH "'") == 0);
 	testModes();
@@ -643,5 +704,6 @@ int main(void) {
 	testLayout();
 	testPlugin();
 	testServices();
+	testDownloads();
 	CHECK_DONE();
 }

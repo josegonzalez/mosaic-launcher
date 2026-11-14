@@ -94,6 +94,10 @@ void HD_playedLine(long long seconds, char* out, size_t size);
 // limit is set and the history is known (state ok, warn or up), or
 // returns 0 (writing "").
 int HD_timeLeft(const char* state, int limit, int granted, long long left, char* out, size_t size);
+// When something happened, days days ago by the local calendar: "Today",
+// "Yesterday" or "3 days ago"; "Today" for less than 0, as from a clock
+// that went back.
+void HD_daysAgo(int days, char* out, size_t size);
 // RetroAchievements progress: "12/40 · 150/400 points", or "12/40" when
 // there are no points. "" with no total.
 void HD_achievementLine(int unlocked, int total, int points_unlocked, int points, char* out, size_t size);

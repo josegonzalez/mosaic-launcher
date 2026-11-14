@@ -178,3 +178,6 @@ msgstr "Y"
 
 msgid "none"
 msgstr "ninguno"
+
+msgid "Download a game from RomM"
+msgstr "Descarga un juego de RomM"

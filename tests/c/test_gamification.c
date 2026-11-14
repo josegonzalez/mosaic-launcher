@@ -138,7 +138,7 @@ static void testFormat(void) {
 	int len = GM_format(&s, text, sizeof(text));
 	CHECK(len == (int)strlen(text));
 	CHECK(strstr(text, "best=4\ncompleted=9\ncheered=201\ndone=games 201\ndone=week_hours 29\n"
-		"day=201 1234 2 2 0 1\nday=200 0 1 1 1 0\ngames=201 ") == text);
+		"day=201 1234 2 2 0 1 0\nday=200 0 1 1 1 0 0\ngames=201 ") == text);
 
 	GMState back;
 	GM_init(&back);
@@ -169,6 +169,18 @@ static void testFormat(void) {
 	CHECK(junk.games_day == 7 && junk.game_count == 0);
 	GM_parse(&junk, "");
 	CHECK(junk.best_streak == 2);
+
+	// downloads: a day's seventh number, and none on a day from before them
+	GMState dl;
+	GM_init(&dl);
+	GM_download(&dl, 9);
+	GM_download(&dl, 9);
+	CHECK(GM_format(&dl, text, sizeof(text)) > 0);
+	CHECK(strstr(text, "day=9 0 0 0 0 0 2\n") != NULL);
+	GM_init(&dl);
+	GM_parse(&dl, "day=9 0 0 0 0 0 2\nday=8 60 1 1 0 0\nday=7 60 1 1 0 0 -1\n");
+	CHECK(GM_day(&dl, 9)->downloads == 2 && GM_day(&dl, 8)->downloads == 0 && GM_day(&dl, 8)->seconds == 60);
+	CHECK(GM_day(&dl, 7)->downloads == 0 && GM_day(&dl, 7)->seconds == 0); // refused
 }
 
 static void testLaunchLine(void) {
@@ -234,6 +246,7 @@ static void testProgress(void) {
 	CHECK(p[GM_Q_GAMES].value == 2 && p[GM_Q_GAMES].target == 3 && !p[GM_Q_GAMES].done);
 	CHECK(p[GM_Q_FRESH].value == 1 && p[GM_Q_FRESH].done);
 	CHECK(p[GM_Q_REVISIT].value == 0 && !p[GM_Q_REVISIT].done); // that was yesterday
+	CHECK(p[GM_Q_DOWNLOAD].value == 0 && p[GM_Q_DOWNLOAD].target == 1 && !p[GM_Q_DOWNLOAD].done);
 	// Monday to Wednesday: the Sunday before (played[3]) is last week's
 	CHECK(p[GM_Q_WEEK_DAYS].value == 2 && p[GM_Q_WEEK_DAYS].target == 5 && !p[GM_Q_WEEK_DAYS].done);
 	CHECK(p[GM_Q_WEEK_HOURS].value == 151 && p[GM_Q_WEEK_HOURS].target == 300 && !p[GM_Q_WEEK_HOURS].done);
@@ -263,6 +276,20 @@ static void testProgress(void) {
 	CHECK(GM_settle(&s, 10, p, 0, newly) == 0); // still the same week
 	CHECK(GM_settle(&s, 11, p, 0, newly) == 1); // a Monday
 	CHECK(s.completed == 8);
+
+	// the RomM quest: a download does it, but only while it's offered
+	GMState r;
+	GM_init(&r);
+	GM_download(&r, 6);
+	GM_progress(&r, 6, played, 10, &TARGETS, p);
+	CHECK(p[GM_Q_DOWNLOAD].value == 1 && p[GM_Q_DOWNLOAD].done);
+	r.off[GM_Q_DOWNLOAD] = 1;
+	CHECK(!GM_running(&r, 6, GM_Q_DOWNLOAD) && GM_running(&r, 6, GM_Q_PLAY));
+	CHECK(GM_settle(&r, 6, p, 0, newly) == 1 && newly[0] == GM_Q_PLAY); // not the download
+	CHECK(r.done[GM_Q_DOWNLOAD] == -1);
+	r.off[GM_Q_DOWNLOAD] = 0;
+	CHECK(GM_settle(&r, 6, p, 0, newly) == 1 && newly[0] == GM_Q_DOWNLOAD);
+	CHECK(r.done[GM_Q_DOWNLOAD] == 6 && r.completed == 2);
 }
 
 // Picking the quests against a play time limit.
@@ -304,11 +331,11 @@ static void testPickQuests(void) {
 
 	// the next day the daily quests are picked again, and with no time
 	// left the weekly ones, picked this week, keep running
-	CHECK(GM_pick(&s, 7, p, 0, GM_weekLeft(7, 0, 60), left, &count) == 4);
+	CHECK(GM_pick(&s, 7, p, 0, GM_weekLeft(7, 0, 60), left, &count) == 5);
 	CHECK(count == 1 && left[0] == GM_Q_PLAY);
 	CHECK(GM_running(&s, 7, GM_Q_WEEK_HOURS));
 	// the day after, with no limit: every daily one runs
-	CHECK(GM_pick(&s, 8, p, -1, -1, left, &count) == 4 && count == 0);
+	CHECK(GM_pick(&s, 8, p, -1, -1, left, &count) == 5 && count == 0);
 	CHECK(GM_running(&s, 8, GM_Q_PLAY));
 
 	// a new week with no time: the weekly play quest is left out, a done
@@ -367,6 +394,8 @@ static void testText(void) {
 	CHECK_STR(out, "Start a game you've never played");
 	GM_title(GM_Q_REVISIT, &TARGETS, out, sizeof(out));
 	CHECK_STR(out, "Go back to a game you haven't played in 30 days");
+	GM_title(GM_Q_DOWNLOAD, &TARGETS, out, sizeof(out));
+	CHECK_STR(out, "Download a game from RomM");
 	GM_title(GM_Q_WEEK_DAYS, &TARGETS, out, sizeof(out));
 	CHECK_STR(out, "Play on 5 days this week");
 	GM_title(GM_Q_WEEK_HOURS, &TARGETS, out, sizeof(out));
@@ -465,13 +494,13 @@ static void testWords(void) {
 }
 
 static void testLayout(void) {
-	CHECK(GM_scroll(0, -1, 3, GM_QUESTS) == 0);
-	CHECK(GM_scroll(0, 1, 3, GM_QUESTS) == 1);
-	CHECK(GM_scroll(3, 1, 3, GM_QUESTS) == 3); // the last page
-	CHECK(GM_scroll(7, 0, 3, GM_QUESTS) == 3);
-	CHECK(GM_scroll(2, 1, GM_QUESTS, GM_QUESTS) == 0); // all fit
-	CHECK(GM_scroll(2, 1, 0, GM_QUESTS) == 3);
-	CHECK(GM_scroll(5, 1, 0, GM_QUESTS) == 5);
+	CHECK(GM_scroll(0, -1, 3, 6) == 0);
+	CHECK(GM_scroll(0, 1, 3, 6) == 1);
+	CHECK(GM_scroll(3, 1, 3, 6) == 3); // the last page
+	CHECK(GM_scroll(7, 0, 3, 6) == 3);
+	CHECK(GM_scroll(2, 1, 6, 6) == 0); // all fit
+	CHECK(GM_scroll(2, 1, 0, 6) == 3);
+	CHECK(GM_scroll(5, 1, 0, 6) == 5);
 
 	CHECK(GM_barWidth(0, 30, 100) == 0);
 	CHECK(GM_barWidth(15, 30, 100) == 50);
@@ -947,7 +976,8 @@ static void testServices(void) {
 	draw();
 	CHECK(logged("showing No streak, Best 0 days \xc2\xb7 0 quests done; play 0/20 left out, games 0/3, fresh 0/1, revisit 0/1, "
 		"week_days 0/5, week_hours 0/300"));
-	CHECK(running_count == GM_QUESTS - 1 && running[0] == GM_Q_GAMES);
+	// the RomM quest isn't offered without romm
+	CHECK(running_count == GM_QUESTS - 2 && running[0] == GM_Q_GAMES);
 
 	// kept for the day, though there's more time now
 	limit_left = 7200;
@@ -983,12 +1013,86 @@ static void testServices(void) {
 	CHECK(registered.enter(NULL) == 0);
 	draw();
 	CHECK(logged("play 0/20, games"));
-	CHECK(running_count == GM_QUESTS);
+	CHECK(running_count == GM_QUESTS - 1);
 
 	fake_provider_count = 0;
 	played_answer = 1;
 	limit_left = 600;
 	fake_count = 0;
+}
+
+static int romm_server = 1;
+static int fakeRommSynced(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	snprintf(out, size, "server=%d\n", romm_server);
+	return 0;
+}
+
+static void (*download_done)(const char*, const char*, void*);
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	if (!strcmp(name, "romm.download_done")) download_done = on_event;
+	return 0;
+}
+
+static int fakeSetNames(void (*each)(const char*, void*), void* data) {
+	(void)each;
+	(void)data;
+	return 0;
+}
+
+static const MosaicPlugin* startWithRomm(void) {
+	setupHost();
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
+	fake_host.subscribe = fakeSubscribe;
+	fake_host.set_names = fakeSetNames;
+	tile_id[0] = '\0';
+	logs[0] = '\0';
+	download_done = NULL;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	return p;
+}
+
+static void testRomm(void) {
+	reset();
+	fake_wall = 1704880800;
+	fake_provider_count = 0;
+	fakeProvide("romm.synced", fakeRommSynced);
+	startWithRomm();
+	CHECK(download_done != NULL);
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(logged("revisit 0/1, download 0/1, week_days 0/5"));
+	CHECK(running_count == GM_QUESTS && running[4] == GM_Q_DOWNLOAD);
+	// a download completes it, with a toast
+	download_done("romm.download_done", "path=/card/Roms/GB/Tetris.gb\nname=Tetris", NULL);
+	CHECK(logged("download /card/Roms/GB/Tetris.gb"));
+	CHECK(logged("quest done: download (Download a game from RomM)"));
+	CHECK_STR(toast_text, "Quest done: Download a game from RomM");
+	CHECK(GM_day(&state, GM_dayOf(fake_wall))->downloads == 1);
+	// a second one the same day counts, without completing it again
+	toast_text[0] = '\0';
+	download_done("romm.download_done", "path=/card/Roms/GB/Zelda.gb", NULL);
+	CHECK(GM_day(&state, GM_dayOf(fake_wall))->downloads == 2 && toast_text[0] == '\0');
+	draw();
+	CHECK(logged("download 2/1 done"));
+
+	// romm without a server: not offered, and a download still counts
+	reset();
+	romm_server = 0;
+	startWithRomm();
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(logged("revisit 0/1, week_days 0/5"));
+	CHECK(running_count == GM_QUESTS - 1);
+	download_done("romm.download_done", "path=/card/Roms/GB/Tetris.gb", NULL);
+	CHECK(GM_day(&state, GM_dayOf(fake_wall))->downloads == 1 && toast_text[0] == '\0');
+	CHECK(state.done[GM_Q_DOWNLOAD] == -1);
+	romm_server = 1;
+	fake_provider_count = 0;
 }
 
 static void testScroll(void) {
@@ -1008,8 +1112,8 @@ static void testScroll(void) {
 	CHECK(press(MOSAIC_BUTTON_UP) == MOSAIC_SCREEN_STAY && first == 0 && redraws == 0);
 	CHECK(press(MOSAIC_BUTTON_DOWN) == MOSAIC_SCREEN_STAY && first == 1 && redraws == 1);
 	for (int i = 0; i < 10; i++) press(MOSAIC_BUTTON_DOWN);
-	CHECK(first == GM_QUESTS - 2);
-	CHECK(press(MOSAIC_BUTTON_UP) == MOSAIC_SCREEN_STAY && first == GM_QUESTS - 3);
+	CHECK(first == running_count - 2);
+	CHECK(press(MOSAIC_BUTTON_UP) == MOSAIC_SCREEN_STAY && first == running_count - 3);
 	// enter starts at the top again
 	CHECK(registered.enter(NULL) == 0 && first == 0);
 }
@@ -1032,6 +1136,7 @@ int main(void) {
 	testLaunches();
 	testNoTracker();
 	testServices();
+	testRomm();
 	testScroll();
 	CHECK_DONE();
 }

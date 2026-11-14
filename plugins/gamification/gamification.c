@@ -32,6 +32,12 @@
 // running, whatever the time left is later. Without playtime-limit, or
 // with no limit, every quest runs.
 //
+// The daily RomM quest, download a game from RomM, is offered only while
+// romm is loaded with a server set, as its romm.synced service says. romm
+// publishes romm.download_done when a download finishes, which counts
+// towards it on its day whether or not it's offered, and toasts it when
+// that completes it.
+//
 // The state is in .userdata/<platform>/launcher/gamification/state.txt.
 // The gamification.open action opens the screen, from a Quests tile on
 // the quick menu (the tile setting), a game list button (the button
@@ -239,9 +245,16 @@ static void pickQuests(void) {
 	}
 }
 
+// 1 while romm is loaded with a server set, so the RomM quest can be done
+static int rommReady(void) {
+	char reply[64];
+	return ask("romm.synced", NULL, reply, sizeof(reply)) && replyNumber(reply, "server", 0) == 1;
+}
+
 // Works out the streak and the quests' progress for now.
 static void refresh(void) {
 	today = GM_dayOf(wall_now());
+	state.off[GM_Q_DOWNLOAD] = !rommReady();
 	static long long tracker[GM_HISTORY_DAYS];
 	int known = MOSAIC_HOST_HAS(host, play_time_on);
 	for (int i = 0; i < GM_HISTORY_DAYS; i++) tracker[i] = known ? host->play_time_on(i) : MOSAIC_PLAY_UNKNOWN;
@@ -344,6 +357,27 @@ static void postReturn(void) {
 	if (toasts && MOSAIC_HOST_HAS(host, toast)) host->toast(text);
 }
 
+// romm.download_done: a game downloaded from RomM, for the RomM quest
+static void onDownload(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)data;
+	char path[GM_PATH_MAX], message[GM_PATH_MAX + 64];
+	if (host->event_value(payload, "path", path, sizeof(path)) <= 0) snprintf(path, sizeof(path), "?");
+	GM_download(&state, GM_dayOf(wall_now()));
+	save();
+	snprintf(message, sizeof(message), "download %s", path);
+	say(message);
+	refresh();
+	int newly[GM_QUESTS];
+	int n = settle(newly);
+	char text[512];
+	GM_toast(newly, n, &targets, streak, 0, text, sizeof(text));
+	if (!text[0]) return;
+	snprintf(message, sizeof(message), "toast: %s", text);
+	say(message);
+	if (toasts && MOSAIC_HOST_HAS(host, toast)) host->toast(text);
+}
+
 ///////////////////////////////////////
 // drawing
 
@@ -441,8 +475,10 @@ static void describe(char* out, size_t size) {
 	GM_streakText(streak, text, sizeof(text));
 	GM_summary(state.best_streak, state.completed, summary, sizeof(summary));
 	size_t used = (size_t)snprintf(out, size, "%s, %s;", text, summary);
+	int listed = 0;
 	for (int i = 0; i < GM_QUESTS && used < size; i++) {
-		used += (size_t)snprintf(out + used, size - used, "%s %s %lld/%lld%s", i ? "," : "", GM_questId(i), progress[i].value,
+		if (state.off[i]) continue; // not offered, such as the RomM quest without romm
+		used += (size_t)snprintf(out + used, size - used, "%s %s %lld/%lld%s", listed++ ? "," : "", GM_questId(i), progress[i].value,
 			progress[i].target, !GM_running(&state, today, i) ? " left out" : progress[i].done ? " done" : "");
 	}
 }
@@ -558,6 +594,9 @@ static int init(const MosaicHost* h) {
 		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, ACTION_ID) != 0) {
 			say("couldn't bind the quests button");
 		}
+	}
+	if (MOSAIC_HOST_HAS(host, set_names) && host->subscribe("romm.download_done", onDownload, NULL) != 0) {
+		say("couldn't subscribe to romm.download_done");
 	}
 	char message[160];
 	snprintf(message, sizeof(message), "quests: play %i minutes, %i games, %i days and %i hours a week; streak at %lld minutes",

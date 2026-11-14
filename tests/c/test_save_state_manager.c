@@ -945,6 +945,110 @@ static void testBounded(void) {
 	CHECK(live == 0);
 }
 
+// romm's romm.synced: slot 3's newest file (mgba's) is synced, and Tetris
+// is a game from RomM with a server set
+static int romm_game = 1;
+static int fakeRommSynced(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char path[SM_PATH_MAX];
+	if (fakeEventValue(args, "path", path, sizeof(path)) <= 0) snprintf(out, size, "server=1\n");
+	else if (!strcmp(path, SHARED "/GB-mgba/Tetris.gb.st2")) snprintf(out, size, "server=1\nsynced=1\nhow=download\nat=5\ngame=0\n");
+	else snprintf(out, size, "server=1\nsynced=0\ngame=%d\n", romm_game && !strcmp(path, GB_ROMS "/Tetris.gb"));
+	return 0;
+}
+
+static char ran_action[64], ran_path[SM_PATH_MAX];
+static int fakeRunAction(const char* id, const char* path) {
+	snprintf(ran_action, sizeof(ran_action), "%s", id);
+	snprintf(ran_path, sizeof(ran_path), "%s", path ? path : "");
+	return 0;
+}
+
+static const char* fakeCurrentScreen(void) {
+	return SCREEN_ID;
+}
+
+static void testRomm(void) {
+	makeCard();
+	SMGame game;
+	SM_cardInit(&card, CARD);
+	CHECK(SM_gameInit(&card, "GB", "Tetris.gb", NULL, GB_ROMS, &game) == 0);
+	char file[SM_PATH_MAX];
+	CHECK(SM_newestFile(&card, &game, 2, file, sizeof(file)) == 1);
+	CHECK_STR(file, SHARED "/GB-mgba/Tetris.gb.st2");
+	CHECK(SM_newestFile(&card, &game, 0, file, sizeof(file)) == 1);
+	CHECK_STR(file, SHARED "/GB-gambatte/Tetris.gb.st0");
+	CHECK(SM_newestFile(&card, &game, 5, file, sizeof(file)) == 0);
+	CHECK_STR(file, "");
+
+	fake_provider_count = 0;
+	fakeProvide("romm.synced", fakeRommSynced);
+	start();
+	fake_host.run_action = fakeRunAction;
+	fake_host.current_screen = fakeCurrentScreen;
+	selectGame(GB_ROMS "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM);
+	actions[actionIndex(GAME_ID)].run(NULL, NULL);
+	CHECK(registered.enter(NULL) == 0);
+	CHECK_STR(last_log, "Tetris: 3 save states, restore from server");
+	CHECK(!single.slots[0].synced && single.slots[1].synced && !single.slots[2].synced);
+	draw();
+	CHECK(press(MOSAIC_BUTTON_RIGHT) == MOSAIC_SCREEN_STAY);
+	draw();
+	CHECK(logStarts("slots 1 of 4: Tetris, Slot 3, "));
+	CHECK(strstr(last_log, ", synced") != NULL);
+	// the cell after the slots
+	press(MOSAIC_BUTTON_RIGHT);
+	press(MOSAIC_BUTTON_RIGHT);
+	draw();
+	CHECK_STR(last_log, "slots 3 of 4: Tetris, restore from server");
+	CHECK(hints_right_count == 1 && hints_right[0].button == MOSAIC_BUTTON_A);
+	CHECK_STR(hints_right[0].label, "RESTORE");
+	// Y doesn't delete it, and A runs Flashback on the game
+	confirm_text[0] = '\0';
+	press(MOSAIC_BUTTON_Y);
+	CHECK_STR(confirm_text, "");
+	CHECK(press(MOSAIC_BUTTON_A) == MOSAIC_SCREEN_STAY);
+	CHECK_STR(ran_action, "romm.flashback");
+	CHECK_STR(ran_path, GB_ROMS "/Tetris.gb");
+	CHECK(view == SM_VIEW_SLOTS);
+	// back from it, the states are read again
+	put(SHARED "/GB-gambatte/Tetris.gb.st4", "state", T0 + 600);
+	draw();
+	CHECK(single.count == 4 && rescan == 0);
+	registered.exit(NULL);
+
+	// a game romm doesn't know: no cell, still a mark
+	romm_game = 0;
+	CHECK(registered.enter(NULL) == 0);
+	CHECK_STR(last_log, "Tetris: 4 save states");
+	CHECK(single.slots[1].synced && single.slots[1].slot == 2);
+	romm_game = 1;
+	registered.exit(NULL);
+
+	// from the quick menu tile: marks once a game opens, never the cell
+	actions[actionIndex(OPEN_ID)].run(NULL, NULL);
+	CHECK(registered.enter(NULL) == 0);
+	for (int i = 0; i < list.count; i++) {
+		if (strcmp(list.games[i].name, "Tetris.gb") != 0) continue;
+		game_sel = i;
+		press(MOSAIC_BUTTON_A);
+		CHECK(list.games[i].slots[1].synced);
+		CHECK(slotCells(&list.games[i]) == list.games[i].count);
+	}
+	registered.exit(NULL);
+
+	// without romm: no marks and no cell
+	fake_provider_count = 0;
+	start();
+	selectGame(GB_ROMS "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM);
+	actions[actionIndex(GAME_ID)].run(NULL, NULL);
+	CHECK(registered.enter(NULL) == 0);
+	CHECK_STR(last_log, "Tetris: 4 save states");
+	for (int i = 0; i < single.count; i++) CHECK(!single.slots[i].synced);
+	CHECK(slotCells(&single) == 4);
+	registered.exit(NULL);
+}
+
 int main(void) {
 	setenv("TZ", "UTC", 1);
 	tzset();
@@ -962,6 +1066,7 @@ int main(void) {
 	testAllScreen();
 	testNoDelete();
 	testBounded();
+	testRomm();
 	CHECK(system("rm -rf '" CARD "'") == 0);
 	CHECK_DONE();
 }
