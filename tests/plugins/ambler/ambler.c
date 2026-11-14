@@ -155,12 +155,14 @@ static void tick(unsigned long now) {
 	const char* screen = host->current_screen();
 	unsigned long since = now - at;
 	switch (step) {
-	case WAIT_SECOND:
+	case WAIT_SECOND: {
 		if (strcmp(screen, SECOND)) break;
 		if (host->close_screen(SECOND) != 0) say("couldn't close " SECOND);
-		say("lock %i, locked %i", host->lock(), host->is_locked());
+		int rc = host->lock();
+		say("lock %i, locked %i", rc, host->is_locked());
 		next(WAIT_LOCK, now);
 		break;
+	}
 	case WAIT_LOCK:
 		if (strcmp(screen, "lock") || since < 300) break;
 		key(KEY_X, 1);
