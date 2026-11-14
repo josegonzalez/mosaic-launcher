@@ -42,6 +42,7 @@ With tags: Y on a collection opens Dismiss and Save as tag.
 - Provides the `smart:<name>` entry sets (`provides=sets.smart`), one per franchise, holding the games its collection lists, and none while it has too few games or is dismissed. They're announced as changed (`launcher.set_changed`) as a franchise is dismissed or brought back.
 - Registers the `smart-collections.dismiss`, `smart-collections.restore` and `smart-collections.save_tag` actions, all on Y. Save as tag shows only while a plugin offers the `tags.copy` service, which it calls with `tag=<name>` and `set=smart:<name>`.
 - Adds a root folder.
+- Groups the games in the launcher's card index (`index_count` and `index_entry`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), in systems with an emulator, two folders deep, without paks, by the names the index gives them. It asks for the index from `init` and groups them again on `launcher.index_ready`. Until the index is first ready there are no collections.
 
 ## Credits
 

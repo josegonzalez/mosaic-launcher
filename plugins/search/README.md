@@ -34,7 +34,7 @@ The best matches come first, each by name:
 
 Games are found as stock lists them, in every system with an emulator and up to three folders deep, with a folder holding a `.cue` or `.m3u` named after itself as one game. Games the [`hidden`](../hidden/README.md) plugin hides are left out.
 
-The card is scanned the first time a search needs it, and again only when a folder it read changes. The query is kept, so the folder lists the same results after the launcher restarts, and back from a game launched from them the results open again with it selected.
+The games come from the launcher's list of what's on the card, which it keeps up to date, so a game added or removed is found on its own. The query is kept, so the folder lists the same results after the launcher restarts, and back from a game launched from them the results open again with it selected.
 
 ## Screenshots
 
@@ -61,6 +61,7 @@ Results for "tobu".
 - Reads the `favorites` and `tags:<name>` entry sets for `fav:` and `tag:`, and searches again on `launcher.set_changed`.
 - Calls the `games.played` service for `unplayed`, from row-badges.
 - Games any plugin's filter hides, such as [`hidden`](../hidden/README.md)'s, are left out of the results.
+- Searches the games in the launcher's card index (`index_count` and `index_entry`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), in systems with an emulator, three folders deep. It asks for the index from `init` and searches again on `launcher.index_ready`. A search before the index is first ready finds nothing and says nothing, and runs again once it's ready.
 
 ## Credits
 

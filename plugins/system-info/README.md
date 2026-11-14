@@ -22,7 +22,7 @@ It shows:
 
 A value the platform doesn't have, such as the battery or `/proc` on desktop, shows "unavailable". While it shows, the values are read again once a second and the screen is redrawn only when one changes.
 
-Under the values, a graph shows the battery over the last 64 games [`battery-logger`](../battery-logger/README.md) logged, from `battery-logger.csv` and the `.old.csv` before it, back to back by play time with the time between games left out, or says there's no history yet. When the graph doesn't fit under the values, even at the smaller font, it has a page of its own: **A** moves to it and back, and **B** there goes back to the values.
+Under the values, a graph shows the battery over the last 64 games [`battery-logger`](../battery-logger/README.md) logged, back to back by play time with the time between games left out, or says there's no history yet, as it does while `battery-logger` is off. When the graph doesn't fit under the values, even at the smaller font, it has a page of its own: **A** moves to it and back, and **B** there goes back to the values.
 
 ## Screenshots
 
@@ -44,7 +44,8 @@ The System info tile on the quick menu (on by default).
 ## For plugin authors
 
 - Registers the `system-info.open` action, which the `button` setting follows, and a quick menu tile.
-- Reads `.system/version.txt`, `/proc`, and `battery-logger.csv` and `battery-logger.old.csv` in `.userdata/<platform>/launcher/`.
+- Reads `.system/version.txt` and `/proc`.
+- Draws the battery graph from `battery-logger`'s `battery.history` service (see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), asked as the screen opens. Without the service, as with `battery-logger` off, it says there's no battery history; it doesn't read `battery-logger`'s files.
 
 ## Credits
 

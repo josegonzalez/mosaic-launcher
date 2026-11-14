@@ -10,7 +10,7 @@ Turns the first screen into one list of every game on the card, from all systems
 - Games from different systems with the same name show their system's tag, such as "Tetris (GB)" and "Tetris (GBC)".
 - Until a game is on the card the first screen is stock's.
 
-The card is scanned once per start, and again only when a folder it read changes.
+The games come from the launcher's list of what's on the card, which it keeps up to date, so a game added or removed shows on its own. The first time the launcher starts with a card, the first screen is stock's for a moment while it reads the card.
 
 ## Turn it on
 
@@ -31,6 +31,7 @@ The first screen listing every game, with the default settings.
 ## For plugin authors
 
 - Owns the `root` slot (`slots=root`), so it conflicts with any other plugin that owns it.
+- Lists the games from the launcher's card index (`index_count` and `index_entry`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)): games in systems with an emulator, two folders deep. It asks for the index from `init` and lists the root again on `launcher.index_ready`. Until the index is first ready, as on the first start with a card the launcher hasn't read, the root is stock's. It reads nothing on the card itself.
 
 ## Credits
 

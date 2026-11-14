@@ -11,7 +11,7 @@ The Genres folder shows while the card has a genre. A genre folder is any folder
 - A genre lists the games from every system's folder together by name, and folders inside genre folders are merged the same way.
 - Games from different systems with the same name show their system's tag, such as "Tetris (GB)" and "Tetris (GBC)".
 
-The folders are read from the card each time a list opens.
+The folders come from the launcher's list of what's on the card, which it keeps up to date, so a folder added or removed shows on its own.
 
 ## Turn it on
 
@@ -42,7 +42,7 @@ Show the system set to always.
 ## For plugin authors
 
 - Adds a root folder, as other plugins do.
-- Reads the system folders; it writes nothing.
+- Reads the system folders and their genre folders from the launcher's card index (`index_count` and `index_entry`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), asking for it from `init` and listing again on `launcher.index_ready`. Until the index is first ready there are no genres. It writes nothing.
 
 ## Credits
 

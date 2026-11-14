@@ -54,6 +54,7 @@ With favorites and tags: the Pick from list.
 - Registers the `random-game.pick` action, the `random-game.tile` quick menu tile and the `random-game.from` action, which the `from_tile` and `from_button` settings follow.
 - Lists the sets with `set_names` and reads the one `from` names with `set_list`. A set nobody registered has no games.
 - Skips what `is_filtered` says is hidden.
+- Picks from the games in the launcher's card index (`index_count` and `index_entry`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), in systems with an emulator, three folders deep. It asks for the index from `init` and lists the games again on `launcher.index_ready`. Until the index is first ready there's nothing to pick and no root row.
 - Asks `row-badges`' `games.played` service whether each game it might pick was played, while Prefer unplayed games or Unplayed games only is on. Without it, as when row-badges is off, it counts the games in recents as played.
 
 ## Credits

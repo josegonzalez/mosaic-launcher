@@ -33,7 +33,7 @@ With another plugin that replaces launches earlier in load order than `emulator-
 ## For plugin authors
 
 - Works in the `pre_launch` hook, using `posix_fadvise(POSIX_FADV_WILLNEED)`.
-- Reads `launch.sh` of the emulator pak and the choice of `emulator-override` (its `emulator.choice` service) when that plugin is loaded.
+- Reads `launch.sh` of the emulator pak, the one `emulator-override`'s `emulator.choice` service gives for the game when it gives one that launches (see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)). Without the service, as with `emulator-override` off, it uses the system's own pak, which the game then launches with. It doesn't read `emulator-override`'s file.
 - Writes nothing.
 
 ## Credits

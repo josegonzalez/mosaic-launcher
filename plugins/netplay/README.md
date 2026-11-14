@@ -28,6 +28,7 @@ Once it can load, press **Y** on a game. A menu opens with Host a game or Join a
 - The game launches through its emulator pak's `launch.sh` with `--host --port <port>` or `--connect <address> --port <port>` before the game's path, each part single-quoted. Those arguments, and a `launch.sh` that passes what comes before the game to minarch, are assumptions to confirm once minarch has netplay.
 - Uses `replace_launch`. With another plugin that replaces launches, such as `emulator-override`, only the first of them in load order replaces a launch. When that's the other plugin, netplay's `replace_launch` is refused, so netplay cancels the launch and says so rather than letting it start without netplay. When it's `netplay`, the netplay launch uses the system's own pak and the other's `replace_launch` is refused.
 - Registers an action on **Y** and remembers the last address.
+- Offers netplay on a game the launcher's card index lists as a game file (`index_find`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), with its system's emulator tag from there; until the index is first ready, on any file in a system folder, with the tag from its path.
 
 ## Credits
 
