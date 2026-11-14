@@ -1,6 +1,7 @@
 // Unplugs charging-screen's test battery: the second time its screen
-// opens, it writes "<level> 0" to the file MOSAIC_CHARGING_SCREEN_FAKE
-// names, keeping the level, and logs "unplugged".
+// opens, once it has shown for 10 ticks so other plugins see it too, it
+// writes "<level> 0" to the file MOSAIC_CHARGING_SCREEN_FAKE names,
+// keeping the level, and logs "unplugged".
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,14 +11,18 @@
 #define ID "unplugger"
 
 static const MosaicHost* host;
-static int was_open = 0, opened = 0, done = 0;
+static int was_open = 0, opened = 0, open_ticks = 0, done = 0;
 
 static void tick(unsigned long now) {
 	(void)now;
 	int is_open = !strcmp(host->current_screen(), "charging-screen.main");
-	if (is_open && !was_open) opened++;
+	if (is_open && !was_open) {
+		opened++;
+		open_ticks = 0;
+	}
+	if (is_open) open_ticks++;
 	was_open = is_open;
-	if (done || opened < 2) return;
+	if (done || opened < 2 || open_ticks < 10) return;
 	done = 1;
 	const char* path = getenv("MOSAIC_CHARGING_SCREEN_FAKE");
 	FILE* f = path ? fopen(path, "r+") : NULL;

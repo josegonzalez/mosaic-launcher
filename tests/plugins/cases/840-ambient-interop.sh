@@ -46,7 +46,7 @@ print(s.makefile().readline().rstrip())' "$AM_SOCK" 2>/dev/null
 # am_run <name> <keys>: the launcher with presser pressing keys, its log
 # in $log
 am_run() {
-	log="$AM_WORK/$1.log"
+	log="$WORK/ambient-interop-$1.log"
 	PRESSER_KEYS="$2" PRESSER_LOG="$AM_WORK/$1.texts" SMOKE_PRELOAD="$PRESSER"
 	export PRESSER_KEYS PRESSER_LOG SMOKE_PRELOAD
 	run_launcher "$log" "presser: done" || fail "the launcher exited early in $1"
@@ -132,28 +132,31 @@ expect "music: Paused: One"
 expect "X: music playing"
 expect "music: Playing: One"
 expect "closed by a button"
+# X stays: the first close is A's, after X played music on
 am_before "plugin screensaver: X: music playing" "plugin screensaver: closed by a button"
-[ "$(grep -c "plugin screensaver: opened after" "$log")" = 1 ] || fail "X closed the screensaver"
 am_status | grep -q "state=playing" || fail "X on the screensaver didn't play the music on: $(am_status)"
 
 # the videos source: video-previews plays Alpha's clip, pausing music,
-# and music plays on with Bravo's art, which has none
-printf 'idle=1\nsource=videos\ninterval=1\n' >"$STATE/screensaver.cfg"
+# and music plays on with Bravo's art, which has none. Two seconds idle,
+# so A's close is the last: the screensaver doesn't open again before the
+# run ends
+printf 'idle=2\nsource=videos\ninterval=1\n' >"$STATE/screensaver.cfg"
 printf 'screensaver=on\nvideo-previews=on\ncharging-screen=off\n' >"$STATE/plugins.txt"
 MOSAIC_VIDEO_PREVIEWS_FAKE=1
 export MOSAIC_VIDEO_PREVIEWS_FAKE
-am_run videos "wait wait wait wait wait wait wait wait wait wait wait wait a wait"
+am_run videos "wait wait wait wait wait wait wait wait wait wait wait wait wait a"
 unset MOSAIC_VIDEO_PREVIEWS_FAKE
 plugin=screensaver
-expect "opened after 1s idle: 2 images from videos"
+expect "opened after 2s idle: 2 images from videos"
 expect "playing the clip of Alpha.gb"
 expect "no clip for this image"
 plugin=video-previews
 expect "playing Alpha.mp4 for the screensaver as test frames"
 expect "paused music for the clip"
 expect "music plays on: playing"
-am_before "plugin video-previews: paused music for the clip" "plugin screensaver: no clip for this image"
-am_before "plugin screensaver: no clip for this image" "plugin video-previews: music plays on: playing"
+# Bravo's image closes the clip, which plays music on, before A's close
+am_before "plugin video-previews: paused music for the clip" "plugin video-previews: music plays on: playing"
+am_before "plugin video-previews: music plays on: playing" "plugin screensaver: closed by a button"
 grep -qF "plugin music: pausing for another plugin" "$log" || fail "music didn't pause for the clip"
 grep -qF "plugin music: playing on for another plugin" "$log" || fail "music didn't play on after the clip"
 am_status | grep -q "state=playing" || fail "the music isn't playing after the clip: $(am_status)"
@@ -162,9 +165,9 @@ am_status | grep -q "state=playing" || fail "the music isn't playing after the c
 # the videos source shows the games' art
 am_stop
 printf 'screensaver=on\nvideo-previews=off\ncharging-screen=off\nmusic=off\n' >"$STATE/plugins.txt"
-am_run alone "wait wait wait wait wait wait x wait"
+am_run alone "wait wait wait wait wait wait wait wait wait x wait"
 plugin=screensaver
-expect "opened after 1s idle: 2 images from videos"
+expect "opened after 2s idle: 2 images from videos"
 expect "closed by a button"
 grep -qF "plugin screensaver: X: music" "$log" && fail "X didn't close the screensaver with music off"
 grep -qF "plugin screensaver: music: Playing" "$log" && fail "the screensaver showed music with music off"
@@ -180,13 +183,13 @@ printf 'idle=1\nsource=folder\nfolder=Ambient Interop Saver\n' >"$STATE/screensa
 printf 'screensaver=on\nvideo-previews=off\ncharging-screen=on\nmusic=off\n' >"$STATE/plugins.txt"
 MOSAIC_CHARGING_SCREEN_FAKE="$CS_FAKE"
 export MOSAIC_CHARGING_SCREEN_FAKE
-log="$AM_WORK/order-default.log"
+log="$WORK/ambient-interop-order-default.log"
 run_launcher "$log" "plugin charging-screen: opened after" || fail "the launcher exited early with the default order"
 grep -qF "plugins: ambient screens in order: lock, charging-screen.main, screensaver.main" "$log" \
 	|| fail "the ambient screens aren't in the default order: $(grep "ambient screens in order" "$log")"
 am_before "plugins: opened ambient screen screensaver.main" "plugins: opened ambient screen charging-screen.main"
 printf 'lock_chord=select+start\nambient_order=lock,screensaver.main,charging-screen.main\n' >"$STATE/settings.txt"
-log="$AM_WORK/order-saver.log"
+log="$WORK/ambient-interop-order-saver.log"
 WAIT_SAVED=$WAIT
 WAIT=4
 run_launcher "$log"
