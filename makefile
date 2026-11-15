@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop plugins-desktop screenshots plugins-device ffmpeg-device build-% devices pak test smoke test-plugins test-profiles lint pot drift clean
+.PHONY: all desktop run-desktop plugins-desktop screenshots plugins-device ffmpeg-device sync-tools-device build-% devices pak test smoke test-plugins test-profiles lint pot drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -98,8 +98,20 @@ ffmpeg-device:
 		ghcr.io/loveretro/tg5040-toolchain:latest \
 		/bin/bash -c 'cd /root/workspace && sh plugins/video-previews/ffmpeg/build.sh build/ffmpeg/aarch64'
 
+# The programs the sync plugin runs (rclone, Syncthing, rsync and
+# Dropbear's dbclient), from pinned downloads checked against
+# plugins/sync/tools/SHA256SUMS (stamped, so it's a no-op once done), for
+# plugins-device to put beside the plugin. Without them the plugin says
+# its tool isn't there.
+sync-tools-device:
+	@test -n "$(CONTAINER_RUNTIME)" || (echo "docker or podman is required" && exit 1)
+	$(CONTAINER_RUNTIME) run --rm -v $(CURDIR):/root/workspace \
+		ghcr.io/loveretro/tg5040-toolchain:latest \
+		/bin/bash -c 'cd /root/workspace && sh plugins/sync/tools/build.sh build/sync-tools/aarch64'
+
 devices: $(addprefix build-,$(PLATFORMS))
 	$(MAKE) ffmpeg-device
+	$(MAKE) sync-tools-device
 	$(MAKE) plugins-device
 
 ###########################################################
@@ -138,7 +150,7 @@ test-profiles: desktop plugins-desktop
 	./scripts/plugin-profiles.sh
 
 lint:
-	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh
+	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh plugins/sync/tools/build.sh
 	@# the cases set variables run.sh's helpers read, such as plugin and log, and read ones it sets
 	shellcheck -x -e SC2034,SC2153,SC2154 tests/plugins/cases/*.sh
 	shellcheck -x tests/screenshots/shots/*.sh

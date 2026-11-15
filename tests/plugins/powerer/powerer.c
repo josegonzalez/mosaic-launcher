@@ -4,6 +4,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "mosaic_plugin.h"
 
@@ -26,18 +27,32 @@ static void run(const char* path, void* data) {
 	(void)data;
 }
 
+// power=off or power=reboot powers off on the first tick, or with
+// delay=<ms>, on the first that long after it
+static void powerOff(unsigned long now) {
+	static unsigned long first = 0;
+	static int done = 0;
+	if (done) return;
+	if (!first) first = now ? now : 1;
+	if (now - first < (unsigned long)atol(host->cfg_get("delay", "0"))) return;
+	done = 1;
+	const char* power = host->cfg_get("power", "");
+	if (!strcmp(power, "off")) host->power_off(0);
+	else if (!strcmp(power, "reboot")) host->power_off(1);
+}
+
 static void tick(unsigned long now) {
-	(void)now;
 	static int ticked = 0;
-	if (ticked++) return;
+	if (ticked++) {
+		powerOff(now);
+		return;
+	}
 	say("bind declined %i, tile declined %i, tile own %i",
 		host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "decliner.act"),
 		host->quick_tile("decliner.act", MOSAIC_QUICK_TOP, NULL, NULL, NULL),
 		host->quick_tile(ID ".act", MOSAIC_QUICK_BOTTOM, NULL, NULL, NULL));
 	say("show_recents %i", host->show_recents());
-	const char* power = host->cfg_get("power", "");
-	if (!strcmp(power, "off")) host->power_off(0);
-	else if (!strcmp(power, "reboot")) host->power_off(1);
+	powerOff(now);
 }
 
 static void beforePoweroff(void) {

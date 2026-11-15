@@ -1,0 +1,268 @@
+# The sync plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: sync\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: sync.c
+#, c-format
+msgid " (%d changed on both sides, the older kept as .conflict)"
+msgid_plural " (%d changed on both sides, the older kept as .conflict)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: sync.c
+msgid "Conflicts"
+msgstr ""
+
+#: plugin.txt
+msgid "Keeps your saves and states in step with a cloud drive, a computer or another handheld, after each game and when the launcher starts. The newest copy wins."
+msgstr ""
+
+#: sync.c
+msgid "Last sync"
+msgstr ""
+
+#: plugin.txt
+msgid "Quick menu tile"
+msgstr ""
+
+#: sync.c
+msgid "SSH key"
+msgstr ""
+
+#: sync.c
+msgid "Status"
+msgstr ""
+
+#: plugin.txt sync.c
+msgid "Sync"
+msgstr ""
+
+#: plugin.txt
+msgid "Sync saves"
+msgstr ""
+
+#: plugin.txt
+msgid "Sync states"
+msgstr ""
+
+#: plugin.txt sync.c
+msgid "Sync with"
+msgstr ""
+
+#: sync.c
+#, c-format
+msgid "Sync: %d file sent"
+msgid_plural "Sync: %d files sent"
+msgstr[0] ""
+msgstr[1] ""
+
+#: sync.c
+#, c-format
+msgid "Sync: %d newer file fetched"
+msgid_plural "Sync: %d newer files fetched"
+msgstr[0] ""
+msgstr[1] ""
+
+#: sync.c
+#, c-format
+msgid "Sync: %d sent, %d fetched"
+msgstr ""
+
+#: sync.c
+#, c-format
+msgid "Sync: %s"
+msgstr ""
+
+#: sync.c
+#, c-format
+msgid "Sync: %s; it tries again next time"
+msgstr ""
+
+#: sync.c
+msgid "Sync: made an SSH key; add ssh_key.pub to the other device's authorized_keys"
+msgstr ""
+
+#: sync.c
+msgid "Sync: sending your saves to the other device"
+msgstr ""
+
+#: sync.c
+msgid "Sync: the other device has your saves"
+msgstr ""
+
+#: sync.c
+msgid "Sync: the other device isn't connected; Syncthing sends your saves when it is"
+msgstr ""
+
+#: sync.c
+msgid "Sync: up to date"
+msgstr ""
+
+#: plugin.txt
+msgid "Syncthing API key"
+msgstr ""
+
+#: plugin.txt
+msgid "Syncthing device ID"
+msgstr ""
+
+#: sync.c
+msgid "Syncthing is running"
+msgstr ""
+
+#: sync.c
+msgid "Syncthing isn't installed beside the plugin"
+msgstr ""
+
+#: sync.c
+msgid "This device"
+msgstr ""
+
+#: sync.c
+msgid "To"
+msgstr ""
+
+#: sync.c
+msgid "Wi-Fi is off"
+msgstr ""
+
+#: sync.c
+msgid "Wi-Fi isn't connected"
+msgstr ""
+
+#: sync.c
+msgid "Wi-Fi isn't ready yet"
+msgstr ""
+
+#: sync.c
+msgid "couldn't make Syncthing's API key"
+msgstr ""
+
+#: sync.c
+msgid "no other device set"
+msgstr ""
+
+#: sync.c
+msgid "no rclone remote set"
+msgstr ""
+
+#: sync.c
+msgid "no rclone.conf"
+msgstr ""
+
+#: sync.c
+msgid "no rsync folder set"
+msgstr ""
+
+#: sync.c
+msgid "not synced yet"
+msgstr ""
+
+#: sync.c
+msgid "nothing to sync: saves and states are both off"
+msgstr ""
+
+#: plugin.txt
+msgid "rclone"
+msgstr ""
+
+#: plugin.txt
+msgid "rclone config file"
+msgstr ""
+
+#: plugin.txt
+msgid "rclone config password"
+msgstr ""
+
+#: sync.c
+msgid "rclone isn't installed beside the plugin"
+msgstr ""
+
+#: plugin.txt
+msgid "rclone remote"
+msgstr ""
+
+#: plugin.txt
+msgid "rsync"
+msgstr ""
+
+#: plugin.txt
+msgid "rsync SSH key file"
+msgstr ""
+
+#: plugin.txt
+msgid "rsync SSH port"
+msgstr ""
+
+#: plugin.txt
+msgid "rsync folder"
+msgstr ""
+
+#: plugin.txt
+msgid "rsync host"
+msgstr ""
+
+#: sync.c
+msgid "rsync isn't installed beside the plugin"
+msgstr ""
+
+#: sync.c
+msgid "saves"
+msgstr ""
+
+#: sync.c
+msgid "saves and states"
+msgstr ""
+
+#: sync.c
+msgid "sending"
+msgstr ""
+
+#: sync.c
+msgid "starting..."
+msgstr ""
+
+#: sync.c
+msgid "states"
+msgstr ""
+
+#: sync.c
+msgid "syncing..."
+msgstr ""
+
+#: plugin.txt
+msgid "syncthing"
+msgstr ""
+
+#: sync.c
+msgid "the other device's ID isn't a Syncthing device ID"
+msgstr ""
+
+#: sync.c
+msgid "the rsync host isn't usable"
+msgstr ""
+
+#: sync.c
+msgid "there's no SSH client beside the plugin"
+msgstr ""
+
+#: sync.c
+msgid "up to date"
+msgstr ""
+
+#: sync.c
+msgid "waiting for the other device"
+msgstr ""

@@ -1,0 +1,202 @@
+# Spanish for the sync plugin, from po/sync.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, c-format
+msgid " (%d changed on both sides, the older kept as .conflict)"
+msgid_plural " (%d changed on both sides, the older kept as .conflict)"
+msgstr[0] " (%d cambió en los dos lados, el más antiguo guardado como .conflict)"
+msgstr[1] " (%d cambiaron en los dos lados, los más antiguos guardados como .conflict)"
+
+msgid "Conflicts"
+msgstr "Conflictos"
+
+msgid "Keeps your saves and states in step with a cloud drive, a computer or another handheld, after each game and when the launcher starts. The newest copy wins."
+msgstr "Mantiene tus partidas y estados al día con una nube, un ordenador u otra consola, tras cada juego y al iniciar el launcher. Gana la copia más reciente."
+
+msgid "Last sync"
+msgstr "Última sincronización"
+
+msgid "Quick menu tile"
+msgstr "Botón en el menú rápido"
+
+msgid "SSH key"
+msgstr "Clave SSH"
+
+msgid "Status"
+msgstr "Estado"
+
+msgid "Sync"
+msgstr "Sincronizar"
+
+msgid "Sync saves"
+msgstr "Sincronizar partidas"
+
+msgid "Sync states"
+msgstr "Sincronizar estados"
+
+msgid "Sync with"
+msgstr "Sincronizar con"
+
+#, c-format
+msgid "Sync: %d file sent"
+msgid_plural "Sync: %d files sent"
+msgstr[0] "Sincronizar: %d archivo enviado"
+msgstr[1] "Sincronizar: %d archivos enviados"
+
+#, c-format
+msgid "Sync: %d newer file fetched"
+msgid_plural "Sync: %d newer files fetched"
+msgstr[0] "Sincronizar: %d archivo más reciente recibido"
+msgstr[1] "Sincronizar: %d archivos más recientes recibidos"
+
+#, c-format
+msgid "Sync: %d sent, %d fetched"
+msgstr "Sincronizar: %d enviados, %d recibidos"
+
+#, c-format
+msgid "Sync: %s"
+msgstr "Sincronizar: %s"
+
+#, c-format
+msgid "Sync: %s; it tries again next time"
+msgstr "Sincronizar: %s; lo intenta de nuevo la próxima vez"
+
+msgid "Sync: made an SSH key; add ssh_key.pub to the other device's authorized_keys"
+msgstr "Sincronizar: se creó una clave SSH; añade ssh_key.pub a authorized_keys del otro dispositivo"
+
+msgid "Sync: sending your saves to the other device"
+msgstr "Sincronizar: enviando tus partidas al otro dispositivo"
+
+msgid "Sync: the other device has your saves"
+msgstr "Sincronizar: el otro dispositivo tiene tus partidas"
+
+msgid "Sync: the other device isn't connected; Syncthing sends your saves when it is"
+msgstr "Sincronizar: el otro dispositivo no está conectado; Syncthing envía tus partidas cuando lo esté"
+
+msgid "Sync: up to date"
+msgstr "Sincronizar: al día"
+
+msgid "Syncthing API key"
+msgstr "Clave de la API de Syncthing"
+
+msgid "Syncthing device ID"
+msgstr "ID de dispositivo de Syncthing"
+
+msgid "Syncthing is running"
+msgstr "Syncthing está en marcha"
+
+msgid "Syncthing isn't installed beside the plugin"
+msgstr "Syncthing no está instalado junto al plugin"
+
+msgid "This device"
+msgstr "Este dispositivo"
+
+msgid "To"
+msgstr "Destino"
+
+msgid "Wi-Fi is off"
+msgstr "el Wi-Fi está apagado"
+
+msgid "Wi-Fi isn't connected"
+msgstr "el Wi-Fi no está conectado"
+
+msgid "Wi-Fi isn't ready yet"
+msgstr "el Wi-Fi aún no está listo"
+
+msgid "couldn't make Syncthing's API key"
+msgstr "no se pudo crear la clave de la API de Syncthing"
+
+msgid "no other device set"
+msgstr "ningún otro dispositivo configurado"
+
+msgid "no rclone remote set"
+msgstr "ningún remoto de rclone configurado"
+
+msgid "no rclone.conf"
+msgstr "no hay rclone.conf"
+
+msgid "no rsync folder set"
+msgstr "ninguna carpeta de rsync configurada"
+
+msgid "not synced yet"
+msgstr "aún sin sincronizar"
+
+msgid "nothing to sync: saves and states are both off"
+msgstr "nada que sincronizar: partidas y estados están desactivados"
+
+msgid "rclone"
+msgstr "rclone"
+
+msgid "rclone config file"
+msgstr "Archivo de configuración de rclone"
+
+msgid "rclone config password"
+msgstr "Contraseña de la configuración de rclone"
+
+msgid "rclone isn't installed beside the plugin"
+msgstr "rclone no está instalado junto al plugin"
+
+msgid "rclone remote"
+msgstr "Remoto de rclone"
+
+msgid "rsync"
+msgstr "rsync"
+
+msgid "rsync SSH key file"
+msgstr "Archivo de clave SSH de rsync"
+
+msgid "rsync SSH port"
+msgstr "Puerto SSH de rsync"
+
+msgid "rsync folder"
+msgstr "Carpeta de rsync"
+
+msgid "rsync host"
+msgstr "Host de rsync"
+
+msgid "rsync isn't installed beside the plugin"
+msgstr "rsync no está instalado junto al plugin"
+
+msgid "saves"
+msgstr "partidas"
+
+msgid "saves and states"
+msgstr "partidas y estados"
+
+msgid "sending"
+msgstr "enviando"
+
+msgid "starting..."
+msgstr "iniciando..."
+
+msgid "states"
+msgstr "estados"
+
+msgid "syncing..."
+msgstr "sincronizando..."
+
+msgid "syncthing"
+msgstr "syncthing"
+
+msgid "the other device's ID isn't a Syncthing device ID"
+msgstr "el ID del otro dispositivo no es un ID de Syncthing"
+
+msgid "the rsync host isn't usable"
+msgstr "el host de rsync no es válido"
+
+msgid "there's no SSH client beside the plugin"
+msgstr "no hay cliente SSH junto al plugin"
+
+msgid "up to date"
+msgstr "al día"
+
+msgid "waiting for the other device"
+msgstr "esperando al otro dispositivo"

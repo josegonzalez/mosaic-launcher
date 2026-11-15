@@ -43,6 +43,36 @@ daemon alone. They're public domain or MIT No Attribution, at the user's
 option; their licence ships beside the daemon as dr_libs-LICENSE.txt in the
 plugin's lib folder.
 
+The bundled sync plugin runs these programs, which ship beside it in its
+lib folder with their licences, as programs of their own that it never
+links. `make sync-tools-device` (plugins/sync/tools/build.sh) downloads
+each at a pinned version and checks it against plugins/sync/tools/SHA256SUMS,
+whose SHA-256 sums are the ones each project publishes (rclone's
+SHA256SUMS, Syncthing's sha256sum.txt.asc and Dropbear's SHA256SUM.asc;
+rsync's tarball matches on download.samba.org and on its GitHub release,
+which is signed). The licence texts are in plugins/sync/tools/licenses.
+
+- rclone 1.75.2, rclone's own linux-arm64 build, unchanged, from
+  https://github.com/rclone/rclone/releases/tag/v1.75.2. MIT License
+  (rclone-COPYING).
+- Syncthing 2.1.7, Syncthing's own linux-arm64 build, unchanged, from
+  https://github.com/syncthing/syncthing/releases/tag/v2.1.7. Mozilla
+  Public License 2.0 (syncthing-LICENSE.txt); its source is at
+  https://github.com/syncthing/syncthing/tree/v2.1.7.
+- rsync 3.5.2, built from its release tarball,
+  https://download.samba.org/pub/rsync/src/rsync-3.5.2.tar.gz, unchanged,
+  with the options in plugins/sync/tools/build.sh, and with the popt it
+  includes (popt-COPYING, an MIT-style licence). rsync is under the GNU
+  General Public License, version 3 (rsync-COPYING). Its corresponding
+  source is that tarball, with that script for how it's built; it's also
+  at https://github.com/RsyncProject/rsync/releases/tag/v3.5.2.
+- Dropbear 2026.94's dbclient, dropbearkey and dropbearconvert, built from
+  its release tarball,
+  https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2,
+  unchanged, with the options in plugins/sync/tools/build.sh. MIT-style
+  licence, with libtomcrypt and libtommath in the public domain
+  (dropbear-LICENSE).
+
 ========================================================================
 rcheevos
 

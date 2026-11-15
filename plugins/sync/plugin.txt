@@ -1,0 +1,32 @@
+id=sync
+name=Sync
+api=1
+category=Network
+summary=Syncs saves and states with rclone, Syncthing or another device over rsync.
+description=Keeps your saves and states in step with a cloud drive, a computer or another handheld, after each game and when the launcher starts. The newest copy wins.
+# rclone, rsync over SSH, or Syncthing
+setting.backend=choice|Sync with|rclone|rclone,rsync,syncthing|protected
+# sync the Saves folder
+setting.saves=toggle|Sync saves|on
+# sync the cores' state folders in .userdata/shared
+setting.states=toggle|Sync states|on
+# rclone: the remote and folder, eg. gdrive:Mosaic, from rclone.conf
+setting.remote=text|rclone remote|||protected
+# rclone: its config file; empty for .userdata/<platform>/launcher/sync/rclone.conf
+setting.rclone_config=text|rclone config file|||protected
+# rclone: the password of an encrypted rclone.conf
+setting.rclone_pass=text|rclone config password|||protected,secret
+# rsync: user@host of the other device, or empty for a folder on this one
+setting.host=text|rsync host|||protected
+# rsync: the other device's SSH port
+setting.port=text|rsync SSH port|22||protected
+# rsync: a private key file with no passphrase; empty for .userdata/<platform>/launcher/sync/ssh_key
+setting.key=text|rsync SSH key file|||protected
+# rsync: the folder to sync with on the other device
+setting.path=text|rsync folder|||protected
+# Syncthing: the other device's ID, from its Syncthing
+setting.peer=text|Syncthing device ID|||protected
+# Syncthing: the key for its API on 127.0.0.1, made when it's empty
+setting.api_key=text|Syncthing API key|||protected,secret
+# a Sync tile on the quick menu
+setting.tile=toggle|Quick menu tile|on
