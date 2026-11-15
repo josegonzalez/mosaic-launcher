@@ -300,7 +300,7 @@ static int apply(const FPFolder* folder, int index) {
 	snprintf(active_key, sizeof(active_key), "%s", presets[index].key);
 	label(&presets[index], active_label, sizeof(active_label));
 
-	char message[LABEL_LEN + FP_PATH_LEN + 64];
+	char message[sizeof(active_key) + sizeof(active_label) + sizeof(active_dir) + 64]; // room for every field whole
 	snprintf(message, sizeof(message), "%s (%s): %d of %d games in %s", presets[index].key, active_label, kept, games, active_dir);
 	say(message);
 	reload();
