@@ -1449,18 +1449,22 @@ const RMSynced* RM_syncedFind(const RMSynced* list, int count, const char* path)
 	return NULL;
 }
 
-int RM_syncedReply(int server, int asked, const RMSynced* entry, long long size, long long mtime, int game, char* out,
-	size_t out_size) {
-	int n;
+int RM_syncedReply(int server, int uploads, int asked, const RMSynced* entry, long long size, long long mtime, int game,
+	char* out, size_t out_size) {
+	int n = snprintf(out, out_size, "server=%d\nsaves=%d\nstates=%d\n", server ? 1 : 0,
+		server && (uploads & RM_UPLOADS_SAVES) ? 1 : 0, server && (uploads & RM_UPLOADS_STATES) ? 1 : 0);
+	if (n < 0 || (size_t)n >= out_size) return -1;
+	int more = 0;
 	if (!asked) {
-		n = snprintf(out, out_size, "server=%d\n", server ? 1 : 0);
+		more = 0;
 	} else if (entry && size >= 0 && entry->size == size && entry->mtime == mtime) {
-		n = snprintf(out, out_size, "server=%d\nsynced=1\nhow=%s\nat=%lld\ngame=%d\n", server ? 1 : 0,
+		more = snprintf(out + n, out_size - (size_t)n, "synced=1\nhow=%s\nat=%lld\ngame=%d\n",
 			entry->down ? "download" : "upload", entry->at, game ? 1 : 0);
 	} else {
-		n = snprintf(out, out_size, "server=%d\nsynced=0\ngame=%d\n", server ? 1 : 0, game ? 1 : 0);
+		more = snprintf(out + n, out_size - (size_t)n, "synced=0\ngame=%d\n", game ? 1 : 0);
 	}
-	return n < 0 || (size_t)n >= out_size ? -1 : n;
+	if (more < 0 || (size_t)(n + more) >= out_size) return -1;
+	return n + more;
 }
 
 int RM_downloadParse(const char* line, RMDownload* out) {

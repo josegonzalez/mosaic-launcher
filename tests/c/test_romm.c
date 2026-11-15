@@ -1246,22 +1246,28 @@ static void testSynced(void) {
 	CHECK(RM_syncedFind(list, count, "/a") == NULL);
 
 	char reply[256];
-	CHECK(RM_syncedReply(1, 0, NULL, -1, 0, 0, reply, sizeof(reply)) > 0);
-	CHECK_STR(reply, "server=1\n");
+	CHECK(RM_syncedReply(1, RM_UPLOADS_SAVES, 0, NULL, -1, 0, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsaves=1\nstates=0\n");
+	CHECK(RM_syncedReply(1, RM_UPLOADS_SAVES | RM_UPLOADS_STATES, 0, NULL, -1, 0, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsaves=1\nstates=1\n");
+	// nothing uploads without a server
+	CHECK(RM_syncedReply(0, RM_UPLOADS_SAVES | RM_UPLOADS_STATES, 0, NULL, -1, 0, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=0\nsaves=0\nstates=0\n");
 	list[0].size = 20;
 	list[0].mtime = 30;
-	CHECK(RM_syncedReply(1, 1, &list[0], 20, 30, 1, reply, sizeof(reply)) > 0);
-	CHECK_STR(reply, "server=1\nsynced=1\nhow=download\nat=9\ngame=1\n");
+	CHECK(RM_syncedReply(1, RM_UPLOADS_SAVES, 1, &list[0], 20, 30, 1, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsaves=1\nstates=0\nsynced=1\nhow=download\nat=9\ngame=1\n");
 	// changed since, gone, or never synced
-	CHECK(RM_syncedReply(1, 1, &list[0], 21, 30, 1, reply, sizeof(reply)) > 0);
-	CHECK_STR(reply, "server=1\nsynced=0\ngame=1\n");
-	CHECK(RM_syncedReply(1, 1, &list[0], 20, 31, 0, reply, sizeof(reply)) > 0);
-	CHECK_STR(reply, "server=1\nsynced=0\ngame=0\n");
-	CHECK(RM_syncedReply(0, 1, &list[0], -1, 0, 0, reply, sizeof(reply)) > 0);
-	CHECK_STR(reply, "server=0\nsynced=0\ngame=0\n");
-	CHECK(RM_syncedReply(0, 1, NULL, 20, 30, 0, reply, sizeof(reply)) > 0);
-	CHECK_STR(reply, "server=0\nsynced=0\ngame=0\n");
-	CHECK(RM_syncedReply(1, 1, &list[0], 20, 30, 1, reply, 10) < 0);
+	CHECK(RM_syncedReply(1, RM_UPLOADS_SAVES, 1, &list[0], 21, 30, 1, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsaves=1\nstates=0\nsynced=0\ngame=1\n");
+	CHECK(RM_syncedReply(1, RM_UPLOADS_SAVES, 1, &list[0], 20, 31, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=1\nsaves=1\nstates=0\nsynced=0\ngame=0\n");
+	CHECK(RM_syncedReply(0, 0, 1, &list[0], -1, 0, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=0\nsaves=0\nstates=0\nsynced=0\ngame=0\n");
+	CHECK(RM_syncedReply(0, 0, 1, NULL, 20, 30, 0, reply, sizeof(reply)) > 0);
+	CHECK_STR(reply, "server=0\nsaves=0\nstates=0\nsynced=0\ngame=0\n");
+	CHECK(RM_syncedReply(1, 0, 1, &list[0], 20, 30, 1, reply, 10) < 0);
+	CHECK(RM_syncedReply(1, 0, 1, &list[0], 20, 30, 1, reply, 30) < 0);
 
 	RMDownload d;
 	CHECK(RM_downloadParse("1700000000\t/sd/Roms/Game Boy (GB)/A.gb\tA Game\n", &d) == 0);

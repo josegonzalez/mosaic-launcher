@@ -348,12 +348,16 @@ int RM_syncedFormat(const RMSynced* entry, char* out, size_t size);
 int RM_syncedPut(RMSynced* list, int count, int max, const RMSynced* entry);
 // The entry for path, or NULL.
 const RMSynced* RM_syncedFind(const RMSynced* list, int count, const char* path);
-// The romm.synced reply: server=<1 or 0>, and with asked set (a path was
-// asked about) synced=<1 or 0>, which is 1 when entry is set and the file
-// is still its size and mtime (size -1 for no file), with how=<upload or
-// download> and at=<Unix time> then, and game=<1 or 0>. Returns its
-// length, or -1 when it doesn't fit.
-int RM_syncedReply(int server, int asked, const RMSynced* entry, long long size, long long mtime, int game, char* out,
+// What romm uploads after a game, for the romm.synced reply's saves= and
+// states=
+enum { RM_UPLOADS_SAVES = 1, RM_UPLOADS_STATES = 2 };
+// The romm.synced reply: server=<1 or 0>, saves=<1 or 0> and states=<1 or
+// 0> (whether it uploads them, from uploads, 0 without a server), and
+// with asked set (a path was asked about) synced=<1 or 0>, which is 1 when
+// entry is set and the file is still its size and mtime (size -1 for no
+// file), with how=<upload or download> and at=<Unix time> then, and
+// game=<1 or 0>. Returns its length, or -1 when it doesn't fit.
+int RM_syncedReply(int server, int uploads, int asked, const RMSynced* entry, long long size, long long mtime, int game, char* out,
 	size_t out_size);
 
 ///////////////////////////////////////

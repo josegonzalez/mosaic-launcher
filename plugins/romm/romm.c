@@ -2073,7 +2073,8 @@ static void tick(unsigned long now) {
 ///////////////////////////////////////
 // services
 
-// romm.synced: with no path, server=<1 when a server is set>; with
+// romm.synced: with no path, server=<1 when a server is set> and
+// saves= and states=, whether it uploads them after a game; with
 // path=<a file>, also whether it's the file the plugin last uploaded or
 // restored there, unchanged since, and game=<1 when path is a game from
 // RomM, which romm.flashback opens for>. Nothing about the server but
@@ -2083,13 +2084,14 @@ static int provideSynced(const char* name, const char* args, char* out, size_t s
 	char path[RM_PATH_MAX];
 	int len = host->event_value(args, "path", path, sizeof(path));
 	if (len >= (int)sizeof(path)) return -1;
-	if (len <= 0) return RM_syncedReply(configured, 0, NULL, -1, 0, 0, out, size) < 0 ? -1 : 0;
+	int uploads = (sync_saves ? RM_UPLOADS_SAVES : 0) | (sync_states ? RM_UPLOADS_STATES : 0);
+	if (len <= 0) return RM_syncedReply(configured, uploads, 0, NULL, -1, 0, 0, out, size) < 0 ? -1 : 0;
 	long long file_size = -1, mtime = 0;
 	if (fileStat(path, &file_size, &mtime) != 0) file_size = -1;
 	RMRecord r;
 	int game = configured && gameAt(path, &r);
 	const RMSynced* entry = configured ? RM_syncedFind(synced, synced_count, path) : NULL;
-	return RM_syncedReply(configured, 1, entry, file_size, mtime, game, out, size) < 0 ? -1 : 0;
+	return RM_syncedReply(configured, uploads, 1, entry, file_size, mtime, game, out, size) < 0 ? -1 : 0;
 }
 
 static int stillThere(const char* path) {
