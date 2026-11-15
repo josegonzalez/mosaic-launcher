@@ -415,7 +415,7 @@ static int direntIsDir(const struct dirent* dp, const char* path) {
 	return S_ISDIR(st.st_mode) ? 1 : 0;
 }
 
-// The year, publisher and genre of a .info file listed in its folder's
+// The year, publisher, genre and players of a .info file listed in its folder's
 // .media.
 static void readInfo(Scan* scan, const Names* infos, const char* path, const char* file_name, IndexEntry* entry) {
 	if (!infos->count) return;
@@ -436,6 +436,7 @@ static void readInfo(Scan* scan, const Names* infos, const char* path, const cha
 	entry->year = addString(scan->sys, Info_get(info, "year"));
 	entry->publisher = addString(scan->sys, Info_get(info, "publisher"));
 	entry->genre = addString(scan->sys, Info_get(info, "genre"));
+	entry->players = addString(scan->sys, Info_get(info, "players"));
 	free(info);
 }
 
@@ -608,8 +609,8 @@ static int sameSystem(const IndexSystem* a, const IndexSystem* b) {
 		const IndexEntry* x = &a->entries[i];
 		const IndexEntry* y = &b->entries[i];
 		if (x->kind != y->kind || x->type != y->type || x->depth != y->depth) return 0;
-		const uint32_t xs[] = { x->path, x->launch, x->name, x->year, x->publisher, x->genre };
-		const uint32_t ys[] = { y->path, y->launch, y->name, y->year, y->publisher, y->genre };
+		const uint32_t xs[] = { x->path, x->launch, x->name, x->year, x->publisher, x->genre, x->players };
+		const uint32_t ys[] = { y->path, y->launch, y->name, y->year, y->publisher, y->genre, y->players };
 		for (size_t k = 0; k < sizeof(xs) / sizeof(xs[0]); k++) {
 			if (strcmp(Index_str(a, xs[k]), Index_str(b, ys[k])) != 0) return 0;
 		}
@@ -816,7 +817,8 @@ int Index_save(const CardIndex* index, const char* path) {
 		for (int k = 0; k < sys->count; k++) {
 			const IndexEntry* e = &sys->entries[k];
 			fprintf(f, "entry\t%d\t%d\t%d\t", e->kind, e->type, e->depth);
-			const uint32_t fields[] = { e->path, e->launch == e->path ? 0 : e->launch, e->name, e->year, e->publisher, e->genre };
+			const uint32_t fields[] = { e->path, e->launch == e->path ? 0 : e->launch, e->name, e->year, e->publisher, e->genre,
+				e->players };
 			for (size_t n = 0; n < sizeof(fields) / sizeof(fields[0]); n++) {
 				if (n) fputc('\t', f);
 				putEscaped(f, Index_str(sys, fields[n]));
@@ -906,9 +908,9 @@ static int loadSystem(CardIndex* index, IndexSystem* sys, char** at, char** f, i
 	}
 	for (long long i = 0; i < count; i++) {
 		char* line = nextLine(at);
-		char* g[10];
+		char* g[11];
 		long long kind, type, depth;
-		if (!line || fields(line, g, 10) != 10 || strcmp(g[0], "entry") != 0 || number(g[1], 0, 2, &kind) != 0
+		if (!line || fields(line, g, 11) != 11 || strcmp(g[0], "entry") != 0 || number(g[1], 0, 2, &kind) != 0
 				|| number(g[2], MOSAIC_ENTRY_DIR, MOSAIC_ENTRY_ROM, &type) != 0 || number(g[3], -1, INDEX_DEPTH_MAX, &depth) != 0
 				|| strncmp(g[4], prefix, prefix_len) != 0 || !g[6][0]) return -1;
 		// the system folder first, by itself, and every other entry inside it
@@ -926,8 +928,9 @@ static int loadSystem(CardIndex* index, IndexSystem* sys, char** at, char** f, i
 		e.year = addString(sys, g[7]);
 		e.publisher = addString(sys, g[8]);
 		e.genre = addString(sys, g[9]);
+		e.players = addString(sys, g[10]);
 		if (!e.path || !e.name || (g[5][0] && !e.launch) || (g[7][0] && !e.year) || (g[8][0] && !e.publisher)
-				|| (g[9][0] && !e.genre)) return -1;
+				|| (g[9][0] && !e.genre) || (g[10][0] && !e.players)) return -1;
 		// in order, as Index_find looks them up
 		if (sys->count && strcmp(Index_str(sys, sys->entries[sys->count - 1].path), g[4]) >= 0) return -1;
 		if (addEntry(sys, &e) != 0) return -1;

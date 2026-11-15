@@ -4,7 +4,7 @@
 // The card index without SDL or threads: every system folder in Roms,
 // every folder in them and every game, as stock lists them, with each
 // entry's name (its map.txt alias, else its tidied file name) and the
-// year, publisher and genre of its .info sidecar. It's built by reading
+// year, publisher, genre and players of its .info sidecar. It's built by reading
 // the card, reusing what an earlier index read of a system whose folders
 // haven't changed, and kept on the card as a text file, so the next start
 // only checks the folders' times. cardindex.c runs it on a thread of its
@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 #define INDEX_DEPTH_MAX 7 // folders inside a system folder that are read
-#define INDEX_FILE_VERSION 1
+#define INDEX_FILE_VERSION 2
 #define INDEX_UNSURE -2                 // a stamp that's always read again
 #define INDEX_RACY_NS 3000000000LL      // changes this recent may hide another (FAT keeps 2 s)
 
@@ -26,7 +26,7 @@ enum {
 
 // Offsets into the system's strings; 0 is "".
 typedef struct IndexEntry {
-	uint32_t path, launch, name, year, publisher, genre;
+	uint32_t path, launch, name, year, publisher, genre, players;
 	uint8_t kind;
 	uint8_t type;  // MOSAIC_ENTRY_*
 	int8_t depth;  // -1 for the system folder

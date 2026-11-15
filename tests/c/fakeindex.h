@@ -67,6 +67,7 @@ static void fakeIndexFill(const IndexEntry* e, const IndexSystem* sys, MosaicInd
 	out->year = Index_str(sys, e->year);
 	out->publisher = Index_str(sys, e->publisher);
 	out->genre = Index_str(sys, e->genre);
+	out->players = Index_str(sys, e->players);
 }
 
 static __attribute__((unused)) int fakeIndexCount(const char* system) {

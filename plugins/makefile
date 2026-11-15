@@ -45,7 +45,7 @@ all: $(PLUGINS)
 $(PLUGINS):
 	mkdir -p $(OUT)/$@.plugin/lib/$(ARCH)
 	cp $@/plugin.txt $(OUT)/$@.plugin/plugin.txt
-	$(CC) -shared -fPIC -std=gnu99 -O2 -Wall -Werror -I$(SDK) $(PLUGIN_CFLAGS) $(wildcard $@/*.c) $(PLUGIN_LIBS) \
+	$(CC) -shared -fPIC -std=gnu99 -O2 -Wall -Werror -I$(SDK) $(PLUGIN_CFLAGS) $(wildcard $@/*.c) $(PLUGIN_SRCS) $(PLUGIN_LIBS) \
 		-o $(OUT)/$@.plugin/lib/$(ARCH)/plugin.so
 	$(if $(PLUGIN_SHIP),cp $(PLUGIN_SHIP) $(OUT)/$@.plugin/lib/$(ARCH)/)
 	rm -rf $(OUT)/$@.plugin/res
@@ -55,5 +55,6 @@ clean:
 	rm -rf $(OUT)
 
 # A plugin that needs more than its own .c files (a vendored library, extra
-# flags) has a plugin.mk beside its plugin.txt with its target's rules.
+# flags, sources from elsewhere in PLUGIN_SRCS) has a plugin.mk beside its
+# plugin.txt with its target's rules.
 include $(wildcard */plugin.mk)

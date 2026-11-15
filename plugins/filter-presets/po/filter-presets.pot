@@ -1,0 +1,118 @@
+# The filter-presets plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: filter-presets\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: filter_presets.c
+#, c-format
+msgid "%d+ players"
+msgstr ""
+
+#: filter_presets.c
+#, c-format
+msgid "%s (%d)"
+msgstr ""
+
+#: filter_presets.c
+msgid "All games"
+msgstr ""
+
+#: filter_presets.c
+msgid "FILTER"
+msgstr ""
+
+#: filter_presets.c
+msgid "Favorites"
+msgstr ""
+
+#: filter_presets.c
+msgid "Filter"
+msgstr ""
+
+#: plugin.txt
+msgid "Filter presets"
+msgstr ""
+
+#: plugin.txt
+msgid "Filter tile on the quick menu"
+msgstr ""
+
+#: filter_presets.c
+#, c-format
+msgid "Genre: %s"
+msgstr ""
+
+#: filter_presets.c
+msgid "Has save"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: plugin.txt
+msgid "L2 and R2 filter the system or collection you're in to its unplayed games, favorites, games with a save, a genre or a player count, and the header shows the filter and how many games it shows."
+msgstr ""
+
+#: plugin.txt
+msgid "Next filter button"
+msgstr ""
+
+#: filter_presets.c
+msgid "No filter matches these games"
+msgstr ""
+
+#: filter_presets.c
+msgid "Open a system or collection to filter it"
+msgstr ""
+
+#: plugin.txt
+msgid "Previous filter button"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: filter_presets.c
+msgid "Unplayed"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "Your filter 1"
+msgstr ""
+
+#: plugin.txt
+msgid "Your filter 2"
+msgstr ""
+
+#: plugin.txt
+msgid "Your filter 3"
+msgstr ""
+
+#: plugin.txt
+msgid "Your filter 4"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""

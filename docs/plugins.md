@@ -63,6 +63,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [collate-subfolders](../plugins/collate-subfolders/README.md) - Merges same-named folders from a system's several folders into one.
 - [collections-plus](../plugins/collections-plus/README.md) - Puts your collections on the first screen in your order, with their art.
 - [favorites](../plugins/favorites/README.md) - Adds a Favorites folder and a button to add or remove favorites.
+- [filter-presets](../plugins/filter-presets/README.md) - Filters the game list you're in with L2 and R2, such as to unplayed games or favorites.
 - [focus-mode](../plugins/focus-mode/README.md) - Makes the first screen list only your favorites, or the games in a tag or collection.
 - [game-actions](../plugins/game-actions/README.md) - Renames, deletes or adds a game to a collection from one button.
 - [genre-view](../plugins/genre-view/README.md) - Gathers the same genre from every system into one Genres folder.

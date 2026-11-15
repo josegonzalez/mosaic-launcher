@@ -1,0 +1,16 @@
+id=filter-presets
+name=Filter presets
+api=1
+category=Library
+summary=Filters the game list you're in with L2 and R2, such as to unplayed games or favorites.
+description=L2 and R2 filter the system or collection you're in to its unplayed games, favorites, games with a save, a genre or a player count, and the header shows the filter and how many games it shows.
+# the presets L2 and R2 step through: Unplayed, Favorites, Has save, each genre and player count, then these
+setting.preset1=text|Your filter 1|
+setting.preset2=text|Your filter 2|
+setting.preset3=text|Your filter 3|
+setting.preset4=text|Your filter 4|
+# taken only when no other action has the button on the game list
+setting.prev_button=choice|Previous filter button|L2|none,Y,L2,R2,SELECT|button:filter-presets.prev
+setting.next_button=choice|Next filter button|R2|none,Y,L2,R2,SELECT|button:filter-presets.next
+# a Filter tile on the quick menu that lists the filters with how many games each shows
+setting.tile=toggle|Filter tile on the quick menu|on

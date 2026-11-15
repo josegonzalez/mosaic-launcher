@@ -71,7 +71,7 @@ static void makeCard(void) {
 	touch(GB "/Old.gb.disabled");
 	touch(GB "/Away.gb");
 	writeText(GB "/map.txt", "Kirby.gb\tKirby's Dream Land\nAway.gb\t.Away\nHacks\tROM Hacks\n");
-	writeText(GB "/.media/Tetris (World) (Rev 1).info", "year=1989\npublisher=Nintendo\ngenre=Puzzle\n");
+	writeText(GB "/.media/Tetris (World) (Rev 1).info", "year=1989\npublisher=Nintendo\ngenre=Puzzle\nplayers=1-2\n");
 	writeText(GB "/.media/Kirby.info", "genre=Platform\n");
 	touch(GB "/Hacks/Mario Hack.gb");
 	touch(GB "/Hacks/1/2/3/4/5/6/Seven.gb");
@@ -155,6 +155,7 @@ static void testBuild(void) {
 		CHECK_STR(Index_str(sys, e->year), "1989");
 		CHECK_STR(Index_str(sys, e->publisher), "Nintendo");
 		CHECK_STR(Index_str(sys, e->genre), "Puzzle");
+		CHECK_STR(Index_str(sys, e->players), "1-2");
 		CHECK(sys->emulator == 1);
 		CHECK_STR(sys->tag, "GB");
 	}
@@ -234,9 +235,9 @@ static int sameIndex(const CardIndex* a, const CardIndex* b) {
 		const IndexEntry* y = Index_at(b, NULL, i, &sb);
 		if (!x || !y || x->kind != y->kind || x->type != y->type || x->depth != y->depth || sa->emulator != sb->emulator
 				|| strcmp(sa->folder, sb->folder) != 0) return 0;
-		const uint32_t xs[] = { x->path, x->launch, x->name, x->year, x->publisher, x->genre };
-		const uint32_t ys[] = { y->path, y->launch, y->name, y->year, y->publisher, y->genre };
-		for (int k = 0; k < 6; k++) {
+		const uint32_t xs[] = { x->path, x->launch, x->name, x->year, x->publisher, x->genre, x->players };
+		const uint32_t ys[] = { y->path, y->launch, y->name, y->year, y->publisher, y->genre, y->players };
+		for (int k = 0; k < 7; k++) {
 			if (strcmp(Index_str(sa, xs[k]), Index_str(sb, ys[k])) != 0) return 0;
 		}
 	}
@@ -273,12 +274,12 @@ static void testFile(void) {
 			const char* from;
 			const char* to;
 		} edits[] = {
-			{ "another version", "mosaic-card-index\t1", "mosaic-card-index\t2" },
+			{ "another version", "mosaic-card-index\t2", "mosaic-card-index\t1" },
 			{ "not a number", "system\tGame Boy (GB)\t1\t", "system\tGame Boy (GB)\tx\t" },
 			{ "a bad escape", "Odd\\tName", "Odd\\qName" },
 			{ "an unknown kind", "entry\t2\t", "entry\t7\t" },
 			{ "a path outside its system", GBC "/Tetris DX.gbc", GB "/Tetris DX.gbc" },
-			{ "a missing field", "\tPuzzle\n", "\n" },
+			{ "a missing field", "\tPuzzle\t1-2\n", "\tPuzzle\n" },
 			{ "the wrong system count", "end\t4", "end\t5" },
 		};
 		for (size_t i = 0; i < sizeof(edits) / sizeof(edits[0]); i++) {
@@ -472,7 +473,7 @@ static void testWorker(void) {
 	CardIndex_quit();
 
 	// a corrupt file is read from the card instead
-	writeText(FILE_PATH, "mosaic-card-index\t1\nroms\tnope\n");
+	writeText(FILE_PATH, "mosaic-card-index\t2\nroms\tnope\n");
 	CardIndex_setup(CARD, "test", FILE_PATH, quietLog);
 	CHECK(CardIndex_get() == NULL);
 	CHECK(waitReady());

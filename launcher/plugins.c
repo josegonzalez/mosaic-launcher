@@ -438,6 +438,7 @@ static void indexFill(const IndexEntry* e, const IndexSystem* sys, MosaicIndexEn
 		.year = Index_str(sys, e->year),
 		.publisher = Index_str(sys, e->publisher),
 		.genre = Index_str(sys, e->genre),
+		.players = Index_str(sys, e->players),
 	};
 	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
 }

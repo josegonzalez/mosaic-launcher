@@ -436,6 +436,7 @@ typedef struct MosaicIndexEntry {
 	const char* year;      // from its .info sidecar (see entry_info), "" for none
 	const char* publisher; // the same
 	const char* genre;     // the same
+	const char* players;   // the same, such as "2" or "1-4"
 } MosaicIndexEntry;
 
 // How button hints are drawn, as stock's Settings app offers them (its

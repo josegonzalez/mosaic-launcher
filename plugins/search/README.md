@@ -62,6 +62,7 @@ Results for "tobu".
 - Calls the `games.played` service for `unplayed`, from row-badges.
 - Games any plugin's filter hides, such as [`hidden`](../hidden/README.md)'s, are left out of the results.
 - Searches the games in the launcher's card index (`index_count` and `index_entry`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), in systems with an emulator, three folders deep. It asks for the index from `init` and searches again on `launcher.index_ready`. A search before the index is first ready finds nothing and says nothing, and runs again once it's ready.
+- Its query parsing and matching, `search_model.c`, is built into [`filter-presets`](../filter-presets/README.md) too, for its presets written as queries.
 
 ## Credits
 

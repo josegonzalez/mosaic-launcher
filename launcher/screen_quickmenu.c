@@ -7,6 +7,9 @@ static int qm_col;
 static int qm_slot;
 static int qm_shift;
 static int qm_slots;
+// A went down on the quick menu, so its release opens the tile; a press
+// that closed a plugin's dialog over it doesn't, or the tile would open again
+static int qm_a_down;
 
 void QuickMenu_setup(void) {
 	qm_row = 0;
@@ -17,6 +20,7 @@ void QuickMenu_setup(void) {
 }
 
 void QuickMenu_enter(void) {
+	qm_a_down = 0;
 	qm_col = 0;
 	qm_row = 0;
 	qm_shift = 0;
@@ -48,6 +52,7 @@ static Entry* selectedTile(void) {
 
 void QuickMenu_handleInput(void) {
 	int qm_total = qm_row == 0 ? state.quick->count : state.quickActions->count;
+	if (PAD_justPressed(BTN_A)) qm_a_down = 1;
 
 	if (PAD_justPressed(BTN_B) || PAD_tappedMenu(now)) {
 		currentScreen = SCREEN_GAMELIST;
@@ -56,7 +61,8 @@ void QuickMenu_handleInput(void) {
 		// or to a plugin's home screen, when it opened over that
 		Plugins_homeBack();
 	}
-	else if (PAD_justReleased(BTN_A) && selectedTile()) {
+	else if (PAD_justReleased(BTN_A) && qm_a_down && selectedTile()) {
+		qm_a_down = 0;
 		Entry *selected = selectedTile();
 		Directory* was_top = state.top;
 		int was_depth = state.stack->count;
