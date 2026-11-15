@@ -1,7 +1,8 @@
 // The sync plugin's model, without SDL or the host: which files sync and
-// where they go on the remote, reading rclone's and rsync's listings,
-// the record of what was last in sync, deciding each file's step (newest
-// wins, the other side kept as a .conflict copy), what romm.synced's
+// where they go on the remote, reading rclone's listings, the record of
+// what was last in sync, deciding each file's step (newest wins, the
+// other side kept as a .conflict copy; a removal is synced, the file kept
+// as a .deleted copy), what romm.synced's
 // replies mean for a file, and the bits of Syncthing's REST API it reads
 // and writes.
 //
@@ -9,7 +10,7 @@
 // Saves/<tag>/<file> on the card and States/<tag>-<core>/<file> for
 // .userdata/shared/<tag>-<core>/<file>, where minarch keeps a core's
 // states. Only files directly in those folders sync; hidden files,
-// partial downloads and .conflict copies don't.
+// partial downloads and .conflict and .deleted copies don't.
 
 #ifndef SYNC_MODEL_H
 #define SYNC_MODEL_H
@@ -20,6 +21,7 @@
 #define SY_NAME_MAX 256
 #define SY_FILES_MAX 8192
 #define SY_CONFLICT ".conflict"
+#define SY_DELETED ".deleted"
 // mtimes this close are the same time: FAT keeps them to 2 seconds
 #define SY_SLACK 2
 
@@ -28,8 +30,11 @@ enum { SY_SAVE, SY_STATE };
 // What a file needs. UPLOAD_KEEP and DOWNLOAD_KEEP are a file changed on
 // both sides: the newer goes across, and the one it replaces is kept
 // beside it as <name>.conflict. SAME is a file found the same on both
-// sides with no record yet, so only the record changes.
-enum { SY_NONE, SY_SAME, SY_UPLOAD, SY_DOWNLOAD, SY_UPLOAD_KEEP, SY_DOWNLOAD_KEEP };
+// sides with no record yet, so only the record changes. DELETE_LOCAL and
+// DELETE_REMOTE are a file removed from the other side since the last
+// sync and unchanged on this one, which goes too, moved to
+// <name>.deleted beside it.
+enum { SY_NONE, SY_SAME, SY_UPLOAD, SY_DOWNLOAD, SY_UPLOAD_KEEP, SY_DOWNLOAD_KEEP, SY_DELETE_LOCAL, SY_DELETE_REMOTE };
 
 typedef struct SyFile {
 	char rel[SY_PATH_MAX];
@@ -49,8 +54,8 @@ typedef struct SyStep {
 	int action;
 } SyStep;
 
-// 1 when name is a file that syncs: not hidden, not a .conflict copy or a
-// partial download, no slash or control characters
+// 1 when name is a file that syncs: not hidden, not a .conflict or
+// .deleted copy or a partial download, no slash or control characters
 int Sy_syncable(const char* name);
 
 // 1 when name is a folder in .userdata/shared that holds a core's states,
@@ -93,20 +98,17 @@ long long Sy_utc(int year, int month, int day, int hour, int minute, int second)
 // -1 for a line that isn't a file that syncs.
 int Sy_parseRclone(const char* line, SyFile* out);
 
-// One line of `rsync -r --list-only`, run with TZ=UTC: "-rw-r--r--
-// 1,234 2026/11/15 10:00:00 Saves/GB/x.sav". Returns 0, or -1 for a
-// folder, a link or a line that isn't a file that syncs.
-int Sy_parseRsync(const char* line, SyFile* out);
-
 // The record of what was last in sync, one file a line:
 // lsize, lmtime, rsize, rmtime and rel, separated by tabs.
 int Sy_baseParse(const char* line, SyBase* out);
 int Sy_baseFormat(const SyBase* b, char* out, size_t size);
 
 // What a file needs, from how it is locally (l), on the remote (r) and
-// when it was last in sync (b), each NULL when there's none. A file
-// missing from one side is copied there: removing a file isn't synced.
-// With no record, two different files are a file changed on both sides.
+// when it was last in sync (b), each NULL when there's none. A file on
+// one side only is copied to the other, unless it's in the record: then
+// it was removed from the other side, and goes from this one too when
+// it's unchanged here since, or is copied back when it changed. With no
+// record, two different files are a file changed on both sides.
 int Sy_decide(const SyFile* l, const SyFile* r, const SyBase* b);
 
 // Sorts files or records by rel, for the lookups below.
@@ -122,9 +124,10 @@ int Sy_plan(const SyFile* local, int local_count, const SyFile* remote, int remo
 	int (*want)(const char* rel, void* data), void* data, SyStep* steps, int max);
 
 // The record after a run, into out (at most max): for a file want keeps,
-// whose step didn't fail (failed(rel, data) is 0) and that's now on both
-// sides, how it is on each from the lists made after the run; for every
-// other file, its old record, if it had one. All lists sorted. Returns
+// whose step didn't fail (failed(rel, data) is 0), how it is on each side
+// from the lists made after the run when it's on both, and nothing when
+// it isn't; for a failed step or a file want leaves out, its old record,
+// if it had one. All lists sorted. Returns
 // the count, sorted.
 int Sy_baseNext(const SyBase* old, int old_count, const SyFile* local, int local_count, const SyFile* remote, int remote_count,
 	int (*want)(const char* rel, void* data), int (*failed)(const char* rel, void* data), void* data, SyBase* out, int max);

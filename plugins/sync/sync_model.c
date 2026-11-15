@@ -18,7 +18,7 @@ int Sy_syncable(const char* name) {
 		if (*p == '/' || *p < 0x20 || *p == 0x7f) return 0;
 	}
 	if (strlen(name) >= SY_NAME_MAX) return 0;
-	return !endsWith(name, SY_CONFLICT) && !endsWith(name, ".part") && !endsWith(name, ".partial") && !endsWith(name, ".tmp");
+	return !endsWith(name, SY_CONFLICT) && !endsWith(name, SY_DELETED) && !endsWith(name, ".part") && !endsWith(name, ".partial") && !endsWith(name, ".tmp");
 }
 
 int Sy_stateDir(const char* name) {
@@ -187,31 +187,6 @@ int Sy_parseRclone(const char* line, SyFile* out) {
 	return setRel(out, line, (size_t)(tab1 - line));
 }
 
-int Sy_parseRsync(const char* line, SyFile* out) {
-	memset(out, 0, sizeof(*out));
-	size_t len = lineLength(line);
-	if (len < 10 || line[0] != '-') return -1;
-	const char* p = line + 10;
-	while (*p == ' ') p++;
-	long long size = 0;
-	int any = 0;
-	for (; *p && *p != ' '; p++) {
-		if (*p == ',' || *p == '.') continue;
-		if (!isdigit((unsigned char)*p) || size > (1LL << 50)) return -1;
-		size = size * 10 + (*p - '0');
-		any = 1;
-	}
-	if (!any || *p != ' ') return -1;
-	p++;
-	if ((size_t)(line + len - p) < 21) return -1;
-	long long mtime = parseTime(p, '/');
-	if (mtime < 0 || p[19] != ' ') return -1;
-	out->size = size;
-	out->mtime = mtime;
-	const char* rel = p + 20;
-	return setRel(out, rel, (size_t)(line + len - rel));
-}
-
 static int number(const char** p, long long* out) {
 	char* end;
 	long long v = strtoll(*p, &end, 10);
@@ -244,8 +219,10 @@ static long long gap(long long a, long long b) {
 
 int Sy_decide(const SyFile* l, const SyFile* r, const SyBase* b) {
 	if (!l && !r) return SY_NONE;
-	if (!r) return SY_UPLOAD;
-	if (!l) return SY_DOWNLOAD;
+	// on one side only: removed from the other since the last sync, so
+	// removed here too unless it changed since; or new, so copied
+	if (!r) return b && l->size == b->lsize && l->mtime == b->lmtime ? SY_DELETE_LOCAL : SY_UPLOAD;
+	if (!l) return b && r->size == b->rsize && r->mtime == b->rmtime ? SY_DELETE_REMOTE : SY_DOWNLOAD;
 	int alike = l->size == r->size && gap(l->mtime, r->mtime) <= SY_SLACK;
 	int local_changed = !b || l->size != b->lsize || l->mtime != b->lmtime;
 	int remote_changed = !b || r->size != b->rsize || r->mtime != b->rmtime;
@@ -349,12 +326,11 @@ int Sy_baseNext(const SyBase* old, int old_count, const SyFile* local, int local
 		n->rsize = r->size;
 		n->rmtime = r->mtime;
 	}
-	// and the rest of the old record as it was
+	// and the old record of files the run left out; a file it looked at
+	// and found on neither side, as after a removal, is dropped
 	for (int k = 0; k < old_count && count < max; k++) {
 		const char* r = old[k].rel;
-		int looked = (!want || want(r, data))
-			&& (Sy_findFile(local, local_count, r) || Sy_findFile(remote, remote_count, r));
-		if (!looked) out[count++] = old[k];
+		if (want && !want(r, data)) out[count++] = old[k];
 	}
 	Sy_sortBase(out, count);
 	return count;

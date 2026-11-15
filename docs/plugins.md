@@ -100,7 +100,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [bt-reconnect](../plugins/bt-reconnect/README.md) - Reconnects your last Bluetooth device at start and after sleep.
 - [netplay](../plugins/netplay/README.md) - Hosts or joins a game over the network, once NextUI has netplay.
 - [romm](../plugins/romm/README.md) - Browses a RomM server's library, downloads games and backs up saves.
-- [sync](../plugins/sync/README.md) - Syncs saves and states with rclone, Syncthing or another device over rsync.
+- [sync](../plugins/sync/README.md) - Syncs saves and states with a cloud drive through rclone, or with another device through Syncthing.
 
 ## Controls and setup
 

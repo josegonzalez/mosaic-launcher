@@ -1,21 +1,20 @@
 // Sync: keeps the card's saves and states in step with another place,
-// through one of three programs bundled beside the plugin:
+// through one of two programs bundled beside the plugin:
 //
 //   rclone     any remote rclone reaches, from the user's rclone.conf
-//   rsync      a folder on another device over SSH (Dropbear's dbclient),
-//              or a folder on this one
 //   Syncthing  another device running Syncthing, which does the syncing
 //              itself while the launcher is up
 //
-// With rclone or rsync, sync is two-way and the newest file wins: after a
-// game returns it syncs that game's saves and states, and as the launcher
+// With rclone, sync is two-way and the newest file wins: after a game
+// returns it syncs that game's saves and states, and as the launcher
 // starts (not back from a game) it syncs everything, pulling what's newer
 // on the remote. A file changed on both sides since the last sync keeps
-// the newer, and the other is kept beside it as <name>.conflict. Files
-// removed on one side aren't removed on the other. sync_model.c decides;
-// sync_run.c does the work on the plugin's one worker thread, which runs
-// one job at a time while the main thread only queues jobs and takes
-// their results in tick, with a toast for each.
+// the newer, and the other is kept beside it as <name>.conflict. A file
+// removed from one side since the last sync is removed from the other
+// too, moved to <name>.deleted there, unless it changed there since.
+// sync_model.c decides; sync_run.c does the work on the plugin's one
+// worker thread, which runs one job at a time while the main thread only
+// queues jobs and takes their results in tick, with a toast for each.
 //
 // With Syncthing, the plugin starts it as the launcher starts, with its
 // config and data in .userdata/<platform>/launcher/sync/syncthing, its
@@ -293,7 +292,7 @@ static void notConfigured(const char* why) {
 static void loadSettings(void) {
 	memset(&cfg, 0, sizeof(cfg));
 	const char* backend = host->cfg_get("backend", "rclone");
-	cfg.backend = !strcmp(backend, "rsync") ? SR_RSYNC : !strcmp(backend, "syncthing") ? SR_SYNCTHING : SR_RCLONE;
+	cfg.backend = !strcmp(backend, "syncthing") ? SR_SYNCTHING : SR_RCLONE;
 	cfg.saves = strcmp(host->cfg_get("saves", "on"), "off") != 0;
 	cfg.states = strcmp(host->cfg_get("states", "on"), "off") != 0;
 	put(cfg.sdcard, sizeof(cfg.sdcard), "%s", host->sdcard_path);
@@ -315,11 +314,6 @@ static void loadSettings(void) {
 	if (conf[0]) put(cfg.rclone_config, sizeof(cfg.rclone_config), "%s", conf);
 	else put(cfg.rclone_config, sizeof(cfg.rclone_config), "%s/rclone.conf", cfg.data_dir);
 	put(cfg.rclone_pass, sizeof(cfg.rclone_pass), "%s", host->cfg_get("rclone_pass", ""));
-	put(cfg.host, sizeof(cfg.host), "%s", host->cfg_get("host", ""));
-	cfg.port = atoi(host->cfg_get("port", "22"));
-	if (cfg.port < 1 || cfg.port > 65535) cfg.port = 22;
-	put(cfg.key, sizeof(cfg.key), "%s", host->cfg_get("key", ""));
-	put(cfg.path, sizeof(cfg.path), "%s", host->cfg_get("path", ""));
 	put(cfg.peer, sizeof(cfg.peer), "%s", host->cfg_get("peer", ""));
 	for (char* p = cfg.peer; *p; p++) {
 		if (*p >= 'a' && *p <= 'z') *p = (char)(*p - 'a' + 'A');
@@ -336,11 +330,6 @@ static void loadSettings(void) {
 		else if (stat(cfg.rclone_config, &st) != 0 && strchr(cfg.remote, ':') && cfg.remote[0] != '/') {
 			notConfigured(TR_MARK("no rclone.conf"));
 		}
-	} else if (cfg.backend == SR_RSYNC) {
-		if (!cfg.rsync[0]) notConfigured(TR_MARK("rsync isn't installed beside the plugin"));
-		else if (!cfg.path[0]) notConfigured(TR_MARK("no rsync folder set"));
-		else if (cfg.host[0] && !cfg.ssh[0]) notConfigured(TR_MARK("there's no SSH client beside the plugin"));
-		else if (cfg.host[0] && (strpbrk(cfg.host, " \"'") || cfg.host[0] == '-')) notConfigured(TR_MARK("the rsync host isn't usable"));
 	} else {
 		if (!cfg.syncthing[0]) notConfigured(TR_MARK("Syncthing isn't installed beside the plugin"));
 		else if (cfg.peer[0] && !Sy_deviceIdValid(cfg.peer)) notConfigured(TR_MARK("the other device's ID isn't a Syncthing device ID"));
@@ -358,7 +347,6 @@ static void loadSettings(void) {
 	if (configured) {
 		const char* what = cfg.saves && cfg.states ? "saves and states" : cfg.saves ? "saves" : "states";
 		if (cfg.backend == SR_RCLONE) sayf("rclone to %s, %s", cfg.remote, what);
-		else if (cfg.backend == SR_RSYNC) sayf("rsync to %s%s%s, %s", cfg.host, cfg.host[0] ? ":" : "", cfg.path, what);
 		else sayf("Syncthing with %s, %s", cfg.peer[0] ? cfg.peer : "no other device yet", what);
 	}
 }
@@ -457,13 +445,9 @@ static void finished(SrJob* job) {
 		host->request_redraw();
 		return;
 	}
-	sayf("synced%s: %d up, %d down, %d conflicts, %d failed%s%s", job->whole ? " everything" : "", job->up, job->down,
-		job->conflicts, job->failed, job->ok ? "" : ": ", job->ok ? "" : job->error);
+	sayf("synced%s: %d up, %d down, %d conflicts, %d removed, %d failed%s%s", job->whole ? " everything" : "", job->up, job->down,
+		job->conflicts, job->deleted, job->failed, job->ok ? "" : ": ", job->ok ? "" : job->error);
 	conflicts_total += job->conflicts;
-	if (job->key_made) {
-		sayf("made an SSH key, its public half in %s/ssh_key.pub", cfg.data_dir);
-		toast(tr("Sync: made an SSH key; add ssh_key.pub to the other device's authorized_keys"));
-	}
 	if (!job->ok) {
 		owe(1);
 		toastf(tr("Sync: %s; it tries again next time"), job->error);
@@ -474,7 +458,10 @@ static void finished(SrJob* job) {
 	if (job->whole) owe(0);
 	char message[512];
 	int moved = job->up + job->down;
-	if (!moved) {
+	if (!moved && job->deleted) {
+		put(message, sizeof(message), trPlural("Sync: %d file removed, as on the other side (kept as .deleted)",
+			"Sync: %d files removed, as on the other side (kept as .deleted)", (unsigned long)job->deleted), job->deleted);
+	} else if (!moved) {
 		put(message, sizeof(message), "%s", tr("Sync: up to date"));
 	} else if (job->up && job->down) {
 		put(message, sizeof(message), tr("Sync: %d sent, %d fetched"), job->up, job->down);
@@ -489,9 +476,14 @@ static void finished(SrJob* job) {
 		put(message + len, sizeof(message) - len, trPlural(" (%d changed on both sides, the older kept as .conflict)",
 			" (%d changed on both sides, the older kept as .conflict)", (unsigned long)job->conflicts), job->conflicts);
 	}
+	if (moved && job->deleted) {
+		size_t len = strlen(message);
+		put(message + len, sizeof(message) - len, trPlural(", %d removed (kept as .deleted)", ", %d removed (kept as .deleted)",
+			(unsigned long)job->deleted), job->deleted);
+	}
 	put(last_result, sizeof(last_result), "%s", message);
 	// quiet at the start when there was nothing to do
-	if (moved || !job->whole || job->conflicts) toast(message);
+	if (moved || job->deleted || !job->whole || job->conflicts) toast(message);
 	host->request_redraw();
 }
 
@@ -571,25 +563,13 @@ static void text(MosaicSurface* screen, int font, const char* s, int x, int y, i
 // on the value above it
 static int rows(const char* labels[ROWS_MAX], char values[ROWS_MAX][200]) {
 	int n = 0;
-	static const char* names[] = { "rclone", "rsync", "Syncthing" };
+	static const char* names[] = { "rclone", "Syncthing" };
 	labels[n] = TR_MARK("Sync with");
 	put(values[n++], 200, "%s: %s", names[cfg.backend],
 		tr(cfg.saves && cfg.states ? TR_MARK("saves and states") : cfg.saves ? TR_MARK("saves") : TR_MARK("states")));
 	labels[n] = TR_MARK("To");
 	if (cfg.backend == SR_RCLONE) put(values[n++], 200, "%s", cfg.remote[0] ? cfg.remote : "-");
-	else if (cfg.backend == SR_RSYNC) {
-		put(values[n++], 200, "%s%s%s", cfg.host, cfg.host[0] ? ":" : "", cfg.path[0] ? cfg.path : "-");
-	} else put(values[n++], 200, "%s", cfg.peer[0] ? cfg.peer : tr("no other device set"));
-	if (cfg.backend == SR_RSYNC && cfg.host[0]) {
-		labels[n] = TR_MARK("SSH key");
-		if (cfg.key[0]) put(values[n++], 200, "%s", cfg.key);
-		else {
-			// from the card's top, as it's found from a computer
-			size_t sd = strlen(cfg.sdcard);
-			const char* dir = !strncmp(cfg.data_dir, cfg.sdcard, sd) && cfg.data_dir[sd] == '/' ? cfg.data_dir + sd + 1 : cfg.data_dir;
-			put(values[n++], 200, "%s/ssh_key.pub", dir);
-		}
-	}
+	else put(values[n++], 200, "%s", cfg.peer[0] ? cfg.peer : tr("no other device set"));
 	if (cfg.backend == SR_SYNCTHING) {
 		// this device's ID in full, to type on the other: three groups a line
 		labels[n] = TR_MARK("This device");

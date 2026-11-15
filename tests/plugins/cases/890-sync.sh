@@ -3,10 +3,11 @@
 
 # sync with local stand-ins for the remote, each part run only where this
 # computer has the program: rclone through an alias remote to a folder,
-# rsync to a folder on this computer, and Syncthing on 127.0.0.1 with a
-# made-up other device. As the launcher starts it syncs everything both
-# ways; back from a game it syncs that game's files only; a file changed
-# on both sides keeps the newer and the other as .conflict. With Wi-Fi off
+# and Syncthing on 127.0.0.1 with a made-up other device. As the launcher
+# starts it syncs everything both ways; back from a game it syncs that
+# game's files only; a file changed on both sides keeps the newer and the
+# other as .conflict; a file removed from one side goes from the other as
+# .deleted, unless it changed there since. With Wi-Fi off
 # it says so and syncs everything at the next start. With romm set up and
 # uploading states, the state romm last uploaded is left to romm. The
 # card's files and /tmp's are put back afterwards.
@@ -86,7 +87,7 @@ if [ -x "$SY_LIB/rclone" ]; then
 	# only on the remote
 	printf 'remote only' >"$CLOUD/mosaic/Saves/GB/Remote Only (World).sav"
 	touch -t 202601010800 "$CLOUD/mosaic/Saves/GB/Remote Only (World).sav"
-	sy_run rclone-start "plugin sync: synced everything: 2 up, 1 down, 0 conflicts, 0 failed" \
+	sy_run rclone-start "plugin sync: synced everything: 2 up, 1 down, 0 conflicts, 0 removed, 0 failed" \
 		|| fail "the launcher exited early with rclone"
 	expect "rclone to fake:mosaic, saves and states"
 	expect "toast: Sync: 2 sent, 1 fetched"
@@ -94,7 +95,7 @@ if [ -x "$SY_LIB/rclone" ]; then
 	sy_has "$CLOUD/mosaic/States/GB-gambatte/Sync Test (World).gb.st0" "state one"
 	sy_has "$SY_SAVES/Remote Only (World).sav" "remote only"
 	# nothing to do the next time, and no toast for it
-	sy_run rclone-again "plugin sync: synced everything: 0 up, 0 down, 0 conflicts, 0 failed" \
+	sy_run rclone-again "plugin sync: synced everything: 0 up, 0 down, 0 conflicts, 0 removed, 0 failed" \
 		|| fail "the launcher exited early with rclone again"
 	grep -qF "toast: Sync: up to date" "$log" && fail "sync toasted at the start with nothing to do"
 
@@ -107,7 +108,7 @@ if [ -x "$SY_LIB/rclone" ]; then
 	touch -t 202601021100 "$CLOUD/mosaic/Saves/GB/Sync Test (World).sav"
 	printf 'other' >"$SY_OTHER"
 	sy_back
-	sy_run rclone-conflict "plugin sync: synced: 0 up, 1 down, 1 conflicts, 0 failed" || fail "the launcher exited early with a conflict"
+	sy_run rclone-conflict "plugin sync: synced: 0 up, 1 down, 1 conflicts, 0 removed, 0 failed" || fail "the launcher exited early with a conflict"
 	expect "back from $SY_GAME"
 	expect "syncing Sync Test (World)"
 	expect "toast: Sync: 1 newer file fetched (1 changed on both sides, the older kept as .conflict)"
@@ -122,7 +123,7 @@ if [ -x "$SY_LIB/rclone" ]; then
 	printf 'save older' >"$CLOUD/mosaic/Saves/GB/Sync Test (World).sav"
 	touch -t 202601030900 "$CLOUD/mosaic/Saves/GB/Sync Test (World).sav"
 	sy_back
-	sy_run rclone-newer "plugin sync: synced: 1 up, 0 down, 1 conflicts, 0 failed" || fail "the launcher exited early sending a newer save"
+	sy_run rclone-newer "plugin sync: synced: 1 up, 0 down, 1 conflicts, 0 removed, 0 failed" || fail "the launcher exited early sending a newer save"
 	sy_has "$CLOUD/mosaic/Saves/GB/Sync Test (World).sav" "save newer"
 	sy_has "$CLOUD/mosaic/Saves/GB/Sync Test (World).sav.conflict" "save older"
 
@@ -135,7 +136,7 @@ if [ -x "$SY_LIB/rclone" ]; then
 	unset MOSAIC_LAUNCHER_WIFI_FAKE
 	[ -f "$SY_STATE/pending.txt" ] || fail "sync didn't note a sync was owed"
 	sy_back
-	sy_run rclone-owed "plugin sync: synced everything: 1 up, 0 down, 0 conflicts, 0 failed" \
+	sy_run rclone-owed "plugin sync: synced everything: 1 up, 0 down, 0 conflicts, 0 removed, 0 failed" \
 		|| fail "the launcher exited early syncing what was owed"
 	sy_has "$CLOUD/mosaic/Saves/GB/Sync Other (World).sav" "other"
 	[ -f "$SY_STATE/pending.txt" ] && fail "sync kept owing a sync after it"
@@ -152,55 +153,44 @@ if [ -x "$SY_LIB/rclone" ]; then
 	mtime=$(python3 -I -c 'import os, sys; print(int(os.stat(sys.argv[1]).st_mtime))' "$SY_STATE_FILE")
 	printf 'up\t1\t%s\t%s\t%s\n' "$size" "$mtime" "$SY_STATE_FILE" >"$STATE/romm/synced.txt"
 	sy_on='romm=on\n'
-	sy_run romm "plugin sync: synced everything: 1 up, 0 down, 0 conflicts, 0 failed" || fail "the launcher exited early with romm"
+	sy_run romm "plugin sync: synced everything: 1 up, 0 down, 0 conflicts, 0 removed, 0 failed" || fail "the launcher exited early with romm"
 	sy_on=''
 	expect "leaving 1 files to romm"
 	sy_has "$CLOUD/mosaic/Saves/GB/Sync Test (World).sav" "save romm"
 	sy_has "$CLOUD/mosaic/States/GB-gambatte/Sync Test (World).gb.st0" "state one"
 	# without romm it goes
-	sy_run romm-off "plugin sync: synced everything: 1 up, 0 down, 0 conflicts, 0 failed" || fail "the launcher exited early without romm"
+	sy_run romm-off "plugin sync: synced everything: 1 up, 0 down, 0 conflicts, 0 removed, 0 failed" || fail "the launcher exited early without romm"
 	sy_has "$CLOUD/mosaic/States/GB-gambatte/Sync Test (World).gb.st0" "state romm"
 	rm -rf "$STATE/romm" "$STATE/romm.cfg"
+
+	# removed here since the last sync: it goes from the remote too, kept
+	# there as .deleted
+	R="$CLOUD/mosaic/Saves/GB"
+	rm "$SY_SAVES/Remote Only (World).sav"
+	sy_run removed-here "plugin sync: synced everything: 0 up, 0 down, 0 conflicts, 1 removed, 0 failed" \
+		|| fail "the launcher exited early with a file removed here"
+	expect "toast: Sync: 1 file removed, as on the other side (kept as .deleted)"
+	[ -f "$R/Remote Only (World).sav" ] && fail "the file removed here stayed on the remote"
+	sy_has "$R/Remote Only (World).sav.deleted" "remote only"
+	# removed from the remote: one goes from here, kept as .deleted; the
+	# other changed here since, so it goes back
+	rm "$R/Sync Other (World).sav" "$R/Sync Test (World).sav"
+	printf 'save changed' >"$SY_SAVE"
+	touch -t 202601061000 "$SY_SAVE"
+	sy_run removed-there "plugin sync: synced everything: 1 up, 0 down, 0 conflicts, 1 removed, 0 failed" \
+		|| fail "the launcher exited early with files removed from the remote"
+	expect "toast: Sync: 1 file sent, 1 removed (kept as .deleted)"
+	[ -f "$SY_OTHER" ] && fail "the file removed from the remote stayed here"
+	sy_has "$SY_OTHER.deleted" "other"
+	sy_has "$R/Sync Test (World).sav" "save changed"
+	# and nothing more to do after
+	sy_run removed-again "plugin sync: synced everything: 0 up, 0 down, 0 conflicts, 0 removed, 0 failed" \
+		|| fail "the launcher exited early after the removals"
 	for f in "$WORK"/sync-*.log "$SY_LOGS/sync.txt"; do
 		grep -qF "Pw-303-secret" "$f" && fail "the rclone password was logged in $(basename "$f")"
 	done
 else
 	echo "skipping sync's rclone part: no rclone here" >&2
-fi
-
-# rsync, to a folder on this computer
-if [ -x "$SY_LIB/rsync" ] && ! "$SY_LIB/rsync" --version 2>/dev/null | grep -q openrsync; then
-	rm -rf "$SY_STATE" "$CARD/Saves" "$SY_CORE"
-	mkdir -p "$SY_SAVES" "$SY_CORE"
-	PEER="$SY_WORK/peer"
-	mkdir -p "$PEER"
-	printf 'backend=rsync\npath=%s\n' "$PEER" >"$STATE/sync.cfg"
-	sy_files 202601010900
-	sy_run rsync-start "plugin sync: synced everything: 2 up, 0 down, 0 conflicts, 0 failed" \
-		|| fail "the launcher exited early with rsync"
-	expect "rsync to $PEER, saves and states"
-	sy_has "$PEER/Saves/GB/Sync Test (World).sav" "save one"
-	sy_has "$PEER/States/GB-gambatte/Sync Test (World).gb.st0" "state one"
-	# the times went across, so the next start has nothing to do
-	sy_run rsync-again "plugin sync: synced everything: 0 up, 0 down, 0 conflicts, 0 failed" \
-		|| fail "the launcher exited early with rsync again"
-	# changed on both sides, this one newer: it goes, and the other is kept
-	printf 'save newer' >"$SY_SAVE"
-	touch -t 202601031000 "$SY_SAVE"
-	printf 'save older' >"$PEER/Saves/GB/Sync Test (World).sav"
-	touch -t 202601030900 "$PEER/Saves/GB/Sync Test (World).sav"
-	sy_back
-	sy_run rsync-conflict "plugin sync: synced: 1 up, 0 down, 1 conflicts, 0 failed" || fail "the launcher exited early with rsync's conflict"
-	sy_has "$PEER/Saves/GB/Sync Test (World).sav" "save newer"
-	sy_has "$PEER/Saves/GB/Sync Test (World).sav.conflict" "save older"
-	# the other side's newer state comes back
-	printf 'state there' >"$PEER/States/GB-gambatte/Sync Test (World).gb.st0"
-	touch -t 202601051000 "$PEER/States/GB-gambatte/Sync Test (World).gb.st0"
-	sy_run rsync-pull "plugin sync: synced everything: 0 up, 1 down, 0 conflicts, 0 failed" \
-		|| fail "the launcher exited early pulling with rsync"
-	sy_has "$SY_STATE_FILE" "state there"
-else
-	echo "skipping sync's rsync part: no rsync here, or only openrsync" >&2
 fi
 
 # Syncthing, on 127.0.0.1 with a made-up other device: it starts with the

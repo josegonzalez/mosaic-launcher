@@ -1,5 +1,6 @@
 // sync's model: which files sync and where, the listings, the record,
-// newest wins with .conflict copies, and leaving romm's files to romm.
+// newest wins with .conflict copies, removals with .deleted copies, and
+// leaving romm's files to romm.
 
 #include <stdlib.h>
 
@@ -40,6 +41,7 @@ static void paths(void) {
 	CHECK(Sy_syncable("Pokemon Red (USA).sav"));
 	CHECK(!Sy_syncable(".hidden"));
 	CHECK(!Sy_syncable("a.sav.conflict"));
+	CHECK(!Sy_syncable("a.sav.deleted"));
 	CHECK(!Sy_syncable("a.sav.part"));
 	CHECK(!Sy_syncable("a.sav.tmp"));
 	CHECK(!Sy_syncable("a/b"));
@@ -116,17 +118,6 @@ static void listings(void) {
 	CHECK(Sy_parseRclone("Saves/a.sav\t1\t2026-11-15 10:00:00", &f) != 0);
 	CHECK(Sy_parseRclone("Saves/GB/a.sav.conflict\t1\t2026-11-15 10:00:00", &f) != 0);
 
-	// as rsync 3.5.2 lists them, after the plugin puts the folder in front
-	CHECK(Sy_parseRsync("-rw-r--r--         12,345 2026/11/15 10:00:00 Saves/GB/Pokemon Red (USA).sav", &f) == 0);
-	CHECK_STR(f.rel, "Saves/GB/Pokemon Red (USA).sav");
-	CHECK(f.size == 12345);
-	CHECK(f.mtime == 1794736800LL);
-	CHECK(Sy_parseRsync("-rw-r--r--              7 2026/11/15 10:00:00 States/GB-gambatte/a.gb.st0", &f) == 0);
-	CHECK(f.size == 7);
-	CHECK(Sy_parseRsync("drwxr-xr-x             42 2026/11/15 06:48:33 Saves/GB", &f) != 0);
-	CHECK(Sy_parseRsync("lrwxrwxrwx              4 2026/11/15 10:00:00 Saves/GB/a.sav", &f) != 0);
-	CHECK(Sy_parseRsync("-rw-r--r--              7 2026/11/15 Saves/GB/a.sav", &f) != 0);
-
 	SyBase b = base("Saves/GB/a b.sav", 10, 20, 11, 21), back;
 	char line[SY_PATH_MAX + 128];
 	CHECK(Sy_baseFormat(&b, line, sizeof(line)) > 0);
@@ -141,11 +132,20 @@ static void listings(void) {
 static void decide(void) {
 	SyFile l = file("Saves/GB/a.sav", 10, 1000), r = file("Saves/GB/a.sav", 10, 1000);
 	SyBase b = base("Saves/GB/a.sav", 10, 1000, 10, 1000);
-	// only on one side: copied there
+	// only on one side and not in the record: new, so copied there
 	CHECK(Sy_decide(&l, NULL, NULL) == SY_UPLOAD);
 	CHECK(Sy_decide(NULL, &r, NULL) == SY_DOWNLOAD);
-	CHECK(Sy_decide(&l, NULL, &b) == SY_UPLOAD);
+	// in the record: removed from the other side, so removed here too
+	CHECK(Sy_decide(&l, NULL, &b) == SY_DELETE_LOCAL);
+	CHECK(Sy_decide(NULL, &r, &b) == SY_DELETE_REMOTE);
 	CHECK(Sy_decide(NULL, NULL, &b) == SY_NONE);
+	// unless it changed on this side since: the changed copy goes back
+	SyFile changed = file("Saves/GB/a.sav", 11, 1500);
+	CHECK(Sy_decide(&changed, NULL, &b) == SY_UPLOAD);
+	CHECK(Sy_decide(NULL, &changed, &b) == SY_DOWNLOAD);
+	changed = file("Saves/GB/a.sav", 10, 1001); // only its time
+	CHECK(Sy_decide(&changed, NULL, &b) == SY_UPLOAD);
+	CHECK(Sy_decide(NULL, &changed, &b) == SY_DOWNLOAD);
 	// in step
 	CHECK(Sy_decide(&l, &r, &b) == SY_NONE);
 	// the same on both sides with no record, or within FAT's 2 seconds
@@ -185,6 +185,7 @@ static void plan(void) {
 		file("Saves/GB/c.sav", 5, 500),     // only here
 		file("Saves/GB/e.sav", 30, 3000),   // changed on both, this one newer
 		file("States/GB-gambatte/s.st0", 7, 700),
+		file("Saves/GB/f.sav", 4, 400),     // removed there since the last sync
 	};
 	SyFile remote[] = {
 		file("Saves/GB/a.sav", 10, 1000),
@@ -192,15 +193,20 @@ static void plan(void) {
 		file("Saves/GB/d.sav", 8, 800),     // only there
 		file("Saves/GB/e.sav", 31, 2500),
 		file("States/GB-gambatte/s.st0", 9, 9000), // changed there
+		file("Saves/GB/g.sav", 6, 600),     // removed here since the last sync
+		file("Saves/GB/h.sav", 7, 999),     // removed here, but changed there since
 	};
 	SyBase record[] = {
 		base("Saves/GB/a.sav", 10, 1000, 10, 1000),
 		base("Saves/GB/b.sav", 10, 1000, 10, 1000),
 		base("Saves/GB/e.sav", 10, 1000, 10, 1000),
+		base("Saves/GB/f.sav", 4, 400, 4, 400),
+		base("Saves/GB/g.sav", 6, 600, 6, 600),
 		base("Saves/GB/gone.sav", 1, 1, 1, 1),
+		base("Saves/GB/h.sav", 7, 700, 7, 700),
 		base("States/GB-gambatte/s.st0", 7, 700, 7, 700),
 	};
-	int nl = 5, nr = 5, nb = 5;
+	int nl = 6, nr = 7, nb = 8;
 	Sy_sortFiles(local, nl);
 	Sy_sortFiles(remote, nr);
 	Sy_sortBase(record, nb);
@@ -210,7 +216,7 @@ static void plan(void) {
 
 	SyStep steps[16];
 	int n = Sy_plan(local, nl, remote, nr, record, nb, NULL, NULL, steps, 16);
-	CHECK(n == 5);
+	CHECK(n == 8);
 	CHECK_STR(steps[0].rel, "Saves/GB/b.sav");
 	CHECK(steps[0].action == SY_UPLOAD);
 	CHECK_STR(steps[1].rel, "Saves/GB/c.sav");
@@ -219,8 +225,14 @@ static void plan(void) {
 	CHECK(steps[2].action == SY_DOWNLOAD);
 	CHECK_STR(steps[3].rel, "Saves/GB/e.sav");
 	CHECK(steps[3].action == SY_UPLOAD_KEEP);
-	CHECK_STR(steps[4].rel, "States/GB-gambatte/s.st0");
-	CHECK(steps[4].action == SY_DOWNLOAD);
+	CHECK_STR(steps[4].rel, "Saves/GB/f.sav");
+	CHECK(steps[4].action == SY_DELETE_LOCAL);
+	CHECK_STR(steps[5].rel, "Saves/GB/g.sav");
+	CHECK(steps[5].action == SY_DELETE_REMOTE);
+	CHECK_STR(steps[6].rel, "Saves/GB/h.sav");
+	CHECK(steps[6].action == SY_DOWNLOAD);
+	CHECK_STR(steps[7].rel, "States/GB-gambatte/s.st0");
+	CHECK(steps[7].action == SY_DOWNLOAD);
 	// only what want keeps
 	n = Sy_plan(local, nl, remote, nr, record, nb, onlyStates, NULL, steps, 16);
 	CHECK(n == 1);
@@ -228,14 +240,16 @@ static void plan(void) {
 	// at most max
 	CHECK(Sy_plan(local, nl, remote, nr, record, nb, NULL, NULL, steps, 2) == 2);
 
-	// the record after: b failed, so it keeps its old one; gone stays; the
-	// rest are as the lists after the run say
+	// the record after: b failed, so it keeps its old one; f, g and gone
+	// are on neither side, so their records go; the rest are as the lists
+	// after the run say
 	SyFile after_local[] = {
 		file("Saves/GB/a.sav", 10, 1000),
 		file("Saves/GB/b.sav", 12, 2000),
 		file("Saves/GB/c.sav", 5, 500),
 		file("Saves/GB/d.sav", 8, 800),
 		file("Saves/GB/e.sav", 30, 3000),
+		file("Saves/GB/h.sav", 7, 999),
 		file("States/GB-gambatte/s.st0", 9, 9000),
 	};
 	SyFile after_remote[] = {
@@ -244,28 +258,41 @@ static void plan(void) {
 		file("Saves/GB/c.sav", 5, 501),
 		file("Saves/GB/d.sav", 8, 800),
 		file("Saves/GB/e.sav", 30, 3000),
+		file("Saves/GB/h.sav", 7, 999),
 		file("States/GB-gambatte/s.st0", 9, 9000),
 	};
 	SyBase next[16];
-	int m = Sy_baseNext(record, nb, after_local, 6, after_remote, 6, NULL, failsGB, NULL, next, 16);
+	int m = Sy_baseNext(record, nb, after_local, 7, after_remote, 7, NULL, failsGB, NULL, next, 16);
 	CHECK(m == 7);
+	CHECK(Sy_findBase(next, m, "Saves/GB/f.sav") == NULL);
+	CHECK(Sy_findBase(next, m, "Saves/GB/g.sav") == NULL);
+	CHECK(Sy_findBase(next, m, "Saves/GB/gone.sav") == NULL);
 	const SyBase* e = Sy_findBase(next, m, "Saves/GB/b.sav");
 	CHECK(e && e->lsize == 10 && e->lmtime == 1000);
 	e = Sy_findBase(next, m, "Saves/GB/c.sav");
 	CHECK(e && e->lsize == 5 && e->rmtime == 501);
-	e = Sy_findBase(next, m, "Saves/GB/gone.sav");
-	CHECK(e && e->lsize == 1);
+	e = Sy_findBase(next, m, "Saves/GB/h.sav");
+	CHECK(e && e->lmtime == 999 && e->rmtime == 999);
 	e = Sy_findBase(next, m, "States/GB-gambatte/s.st0");
 	CHECK(e && e->lmtime == 9000 && e->rmtime == 9000);
 	// so the next run has nothing to do but b
-	n = Sy_plan(after_local, 6, after_remote, 6, next, m, NULL, NULL, steps, 16);
+	n = Sy_plan(after_local, 7, after_remote, 7, next, m, NULL, NULL, steps, 16);
 	CHECK(n == 1);
 	CHECK_STR(steps[0].rel, "Saves/GB/b.sav");
 	// a file want leaves out keeps its old record, even when it's changed
-	m = Sy_baseNext(record, nb, after_local, 6, after_remote, 6, onlyStates, NULL, NULL, next, 16);
+	m = Sy_baseNext(record, nb, after_local, 7, after_remote, 7, onlyStates, NULL, NULL, next, 16);
 	e = Sy_findBase(next, m, "Saves/GB/e.sav");
 	CHECK(e && e->lsize == 10);
 	CHECK(Sy_findBase(next, m, "Saves/GB/c.sav") == NULL);
+	CHECK(Sy_findBase(next, m, "Saves/GB/gone.sav") != NULL);
+
+	// files on neither side have nothing to do, and their records go
+	SyFile only_here[] = { file("Saves/GB/f.sav", 4, 400) };
+	n = Sy_plan(only_here, 1, NULL, 0, record, nb, NULL, NULL, steps, 16);
+	CHECK(n == 1);
+	CHECK(steps[0].action == SY_DELETE_LOCAL);
+	m = Sy_baseNext(record, nb, NULL, 0, NULL, 0, NULL, NULL, NULL, next, 16);
+	CHECK(m == 0);
 }
 
 static void romm(void) {

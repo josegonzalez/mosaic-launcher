@@ -91,11 +91,7 @@ void Sr_findTools(const char* dir, SrConfig* cfg) {
 		const char* name;
 	} tools[] = {
 		{ cfg->rclone, "rclone" },
-		{ cfg->rsync, "rsync" },
 		{ cfg->syncthing, "syncthing" },
-		{ cfg->ssh, "dbclient" },
-		{ cfg->dropbearkey, "dropbearkey" },
-		{ cfg->dropbearconvert, "dropbearconvert" },
 	};
 	for (size_t i = 0; i < sizeof(tools) / sizeof(tools[0]); i++) {
 		char path[SY_PATH_MAX];
@@ -103,11 +99,6 @@ void Sr_findTools(const char* dir, SrConfig* cfg) {
 		if (put(path, sizeof(path), "%s/%s", dir, tools[i].name) == 0 && isProgram(path)) {
 			snprintf(tools[i].out, SY_PATH_MAX, "%s", path);
 		}
-	}
-	cfg->ssh_dropbear = cfg->ssh[0] != '\0';
-	if (!cfg->ssh[0]) {
-		char path[SY_PATH_MAX];
-		if (put(path, sizeof(path), "%s/ssh", dir) == 0 && isProgram(path)) snprintf(cfg->ssh, sizeof(cfg->ssh), "%s", path);
 	}
 }
 
@@ -340,166 +331,15 @@ int Sr_scanLocal(const SrConfig* cfg, SyFile** out) {
 ///////////////////////////////////////
 // the remote
 
-// rsync's place for rel ("" for its top folder): host:path/rel or path/rel
-static int rsyncPlace(const SrConfig* cfg, const char* rel, char* out, size_t size) {
-	const char* sep = rel[0] && cfg->path[strlen(cfg->path) - 1] != '/' ? "/" : "";
-	if (cfg->host[0]) return put(out, size, "%s:%s%s%s", cfg->host, cfg->path, sep, rel);
-	return put(out, size, "%s%s%s", cfg->path, sep, rel);
-}
-
-// rsync's -e: the SSH client with the key, port and known hosts
-static int sshCommand(const SrConfig* cfg, char* out, size_t size) {
-	if (strpbrk(cfg->ssh, "\"'") || strpbrk(cfg->key, "\"'") || strpbrk(cfg->data_dir, "\"'")) return -1;
-	char key[SY_PATH_MAX + 8] = "";
-	if (cfg->key[0]) put(key, sizeof(key), " -i \"%s\"", cfg->key);
-	// BatchMode: never asks for a password, failing instead
-	if (cfg->ssh_dropbear) return put(out, size, "\"%s\" -y -o BatchMode=yes%s -p %d", cfg->ssh, key, cfg->port);
-	return put(out, size,
-		"\"%s\" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o \"UserKnownHostsFile=%s/known_hosts\"%s -p %d",
-		cfg->ssh, cfg->data_dir, key, cfg->port);
-}
-
-// 1 when the file at path is a key in OpenSSH's or PEM's format, which
-// dbclient doesn't read
-static int foreignKey(const char* path) {
-	FILE* f = fopen(path, "r");
-	if (!f) return 0;
-	char head[16] = "";
-	size_t n = fread(head, 1, sizeof(head) - 1, f);
-	head[n] = '\0';
-	fclose(f);
-	return !strncmp(head, "-----BEGIN", 10);
-}
-
-static long long mtimeOf(const char* path) {
-	struct stat st;
-	return stat(path, &st) == 0 ? (long long)st.st_mtime : -1;
-}
-
-// The key dbclient uses, into cfg->key: the key setting's file, or
-// <data_dir>/ssh_key, made with dropbearkey (its public half written to
-// ssh_key.pub, for the other device's authorized_keys) when it isn't
-// there; one in OpenSSH's format is converted into a .dropbear copy
-// beside the record. Returns 0, or -1.
-static int dropbearKey(SrJob* job) {
-	SrConfig* cfg = &job->cfg;
-	char key[SY_PATH_MAX];
-	if (cfg->key[0]) {
-		if (put(key, sizeof(key), "%s", cfg->key) != 0) return -1;
-	} else if (put(key, sizeof(key), "%s/ssh_key", cfg->data_dir) != 0) {
-		return -1;
-	}
-	if (!cfg->key[0] && !isFile(key)) {
-		if (!cfg->dropbearkey[0]) return -1;
-		char* make[] = { cfg->dropbearkey, "-t", "ed25519", "-f", key, NULL };
-		char* text = NULL;
-		if (run(job, make, &text, NULL) != 0) {
-			free(text);
-			return -1;
-		}
-		free(text);
-		char* show[] = { cfg->dropbearkey, "-y", "-f", key, NULL };
-		if (run(job, show, &text, NULL) == 0 && text) {
-			char* line = strstr(text, "ssh-");
-			if (line) {
-				line[strcspn(line, "\r\n")] = '\0';
-				char pub[SY_PATH_MAX + 8];
-				put(pub, sizeof(pub), "%s.pub", key);
-				FILE* f = fopen(pub, "w");
-				if (f) {
-					fprintf(f, "%s mosaic-sync\n", line);
-					fclose(f);
-				}
-				job->key_made = 1;
-				Sr_log(cfg, "made an SSH key; its public half is in %s", pub);
-			}
-		}
-		free(text);
-	}
-	if (!isFile(key)) {
-		put(job->error, sizeof(job->error), "the SSH key file isn't there");
-		return -1;
-	}
-	if (foreignKey(key)) {
-		char converted[SY_PATH_MAX];
-		if (put(converted, sizeof(converted), "%s/ssh_key.dropbear", cfg->data_dir) != 0 || !cfg->dropbearconvert[0]) return -1;
-		if (mtimeOf(converted) < mtimeOf(key)) {
-			unlink(converted);
-			char* convert[] = { cfg->dropbearconvert, "openssh", "dropbear", key, converted, NULL };
-			if (run(job, convert, NULL, NULL) != 0) {
-				put(job->error, sizeof(job->error), "couldn't read the SSH key; it needs no passphrase");
-				return -1;
-			}
-		}
-		put(key, sizeof(key), "%s", converted);
-	}
-	return put(cfg->key, sizeof(cfg->key), "%s", key);
-}
-
-// rsync's arguments before the source and destination
-static int rsyncArgs(const SrConfig* cfg, char** argv, char* ssh, size_t ssh_size) {
-	int n = 0;
-	argv[n++] = (char*)cfg->rsync;
-	argv[n++] = "-s";
-	if (cfg->host[0]) {
-		if (sshCommand(cfg, ssh, ssh_size) != 0) return -1;
-		argv[n++] = "-e";
-		argv[n++] = ssh;
-	}
-	return n;
-}
-
-// The folders the remote needs for the card's files, made on the remote
-// by sending an empty copy of them (kept in the data folder, only ever
-// added to): rsync makes folders, but not a file's missing parents.
-static int rsyncFolders(SrJob* job, const SyFile* local, int local_count) {
-	const SrConfig* cfg = &job->cfg;
-	char skel[SY_PATH_MAX];
-	if (put(skel, sizeof(skel), "%s/folders", cfg->data_dir) != 0) return -1;
-	char dir[SY_PATH_MAX];
-	put(dir, sizeof(dir), "%s/Saves", skel);
-	makeDirs(dir);
-	put(dir, sizeof(dir), "%s/States", skel);
-	makeDirs(dir);
-	for (int i = 0; i < local_count; i++) {
-		char path[SY_PATH_MAX];
-		if (put(path, sizeof(path), "%s/%s", skel, local[i].rel) == 0) parentDirs(path);
-	}
-	char* argv[16];
-	char ssh[SY_PATH_MAX * 3], src[SY_PATH_MAX], dst[SY_PATH_MAX * 2];
-	int n = rsyncArgs(cfg, argv, ssh, sizeof(ssh));
-	if (n < 0 || put(src, sizeof(src), "%s/", skel) != 0 || rsyncPlace(cfg, "", dst, sizeof(dst)) != 0) return -1;
-	size_t len = strlen(dst);
-	if (len + 1 < sizeof(dst) && dst[len - 1] != '/') strcat(dst, "/");
-	argv[n++] = "-r";
-	argv[n++] = src;
-	argv[n++] = dst;
-	argv[n] = NULL;
-	return run(job, argv, NULL, NULL) == 0 ? 0 : -1;
-}
-
 // Adds the lines of a listing under prefix ("Saves" or "States") to files
-static void addListing(char* text, const char* prefix, int rsync, SyFile* files, int* count) {
+static void addListing(char* text, const char* prefix, SyFile* files, int* count) {
 	char* save = NULL;
 	for (char* line = text ? strtok_r(text, "\n", &save) : NULL; line && *count < SY_FILES_MAX;
 			line = strtok_r(NULL, "\n", &save)) {
 		char full[SY_PATH_MAX + 64];
 		SyFile f;
-		if (rsync) {
-			// rsync names files from the listed folder, after the size,
-			// date and time: put the prefix in front of the name
-			if (strlen(line) < 32 || line[0] != '-') continue;
-			const char* p = line + 10;
-			while (*p == ' ') p++;
-			p = strchr(p, ' ');
-			if (!p || strlen(p) < 21) continue;
-			int head = (int)(p + 21 - line);
-			if (snprintf(full, sizeof(full), "%.*s%s/%s", head, line, prefix, p + 21) >= (int)sizeof(full)) continue;
-			if (Sy_parseRsync(full, &f) == 0) files[(*count)++] = f;
-		} else {
-			if (snprintf(full, sizeof(full), "%s/%s", prefix, line) >= (int)sizeof(full)) continue;
-			if (Sy_parseRclone(full, &f) == 0) files[(*count)++] = f;
-		}
+		if (snprintf(full, sizeof(full), "%s/%s", prefix, line) >= (int)sizeof(full)) continue;
+		if (Sy_parseRclone(full, &f) == 0) files[(*count)++] = f;
 	}
 }
 
@@ -516,28 +356,14 @@ static int listRemote(SrJob* job, SyFile** out) {
 	for (int t = 0; t < 2; t++) {
 		if (!on[t]) continue;
 		char* text = NULL;
-		int rc;
 		char place[SY_PATH_MAX * 2];
-		if (cfg->backend == SR_RCLONE) {
-			if (Sy_remoteJoin(cfg->remote, tops[t], place, sizeof(place)) != 0) return -1;
-			char* argv[] = { (char*)cfg->rclone, "--config", (char*)cfg->rclone_config, "--retries", "1", "lsf", "-R", "--files-only",
-				"--max-depth", "2", "--format", "pst", "--separator", "\t", place, NULL };
-			rc = run(job, argv, &text, NULL);
-			// 3 is rclone's "directory not found": nothing there yet
-			if (rc == 3) rc = 0;
-		} else {
-			char* argv[16];
-			char ssh[SY_PATH_MAX * 3];
-			int n = rsyncArgs(cfg, argv, ssh, sizeof(ssh));
-			if (n < 0 || rsyncPlace(cfg, tops[t], place, sizeof(place)) != 0) return -1;
-			strncat(place, "/", sizeof(place) - strlen(place) - 1);
-			argv[n++] = "-r";
-			argv[n++] = "--list-only";
-			argv[n++] = place;
-			argv[n] = NULL;
-			rc = run(job, argv, &text, NULL);
-		}
-		if (rc == 0) addListing(text, tops[t], cfg->backend == SR_RSYNC, files, &count);
+		if (Sy_remoteJoin(cfg->remote, tops[t], place, sizeof(place)) != 0) return -1;
+		char* argv[] = { (char*)cfg->rclone, "--config", (char*)cfg->rclone_config, "--retries", "1", "lsf", "-R", "--files-only",
+			"--max-depth", "2", "--format", "pst", "--separator", "\t", place, NULL };
+		int rc = run(job, argv, &text, NULL);
+		// 3 is rclone's "directory not found": nothing there yet
+		if (rc == 3) rc = 0;
+		if (rc == 0) addListing(text, tops[t], files, &count);
 		free(text);
 		if (rc != 0) {
 			put(job->error, sizeof(job->error), "couldn't list the remote's %s", tops[t]);
@@ -546,6 +372,13 @@ static int listRemote(SrJob* job, SyFile** out) {
 	}
 	Sy_sortFiles(files, count);
 	return count;
+}
+
+static int rclone(SrJob* job, const char* command, const char* from, const char* to) {
+	const SrConfig* cfg = &job->cfg;
+	char* argv[] = { (char*)cfg->rclone, "--config", (char*)cfg->rclone_config, "--retries", "1", (char*)command, (char*)from,
+		(char*)to, NULL };
+	return run(job, argv, NULL, NULL) == 0 ? 0 : -1;
 }
 
 // Copies one file across: up from the card or down to it. keep makes the
@@ -561,31 +394,26 @@ static int transfer(SrJob* job, const char* rel, int up, int keep) {
 			Sr_log(cfg, "kept %s as %s", rel, kept);
 		}
 	}
-	if (cfg->backend == SR_RCLONE) {
-		char place[SY_PATH_MAX * 2], conflict[SY_PATH_MAX * 2 + 16];
-		if (Sy_remoteJoin(cfg->remote, rel, place, sizeof(place)) != 0) return -1;
-		if (up && keep) {
-			if (put(conflict, sizeof(conflict), "%s" SY_CONFLICT, place) != 0) return -1;
-			char* argv[] = { (char*)cfg->rclone, "--config", (char*)cfg->rclone_config, "--retries", "1", "moveto", place, conflict, NULL };
-			if (run(job, argv, NULL, NULL) != 0) return -1;
-		}
-		char* argv[] = { (char*)cfg->rclone, "--config", (char*)cfg->rclone_config, "--retries", "1", "copyto", up ? local : place,
-			up ? place : local, NULL };
-		return run(job, argv, NULL, NULL) == 0 ? 0 : -1;
-	}
-	char* argv[16];
-	char ssh[SY_PATH_MAX * 3], place[SY_PATH_MAX * 2];
-	int n = rsyncArgs(cfg, argv, ssh, sizeof(ssh));
-	if (n < 0 || rsyncPlace(cfg, rel, place, sizeof(place)) != 0) return -1;
-	argv[n++] = "-t";
+	char place[SY_PATH_MAX * 2], conflict[SY_PATH_MAX * 2 + 16];
+	if (Sy_remoteJoin(cfg->remote, rel, place, sizeof(place)) != 0) return -1;
 	if (up && keep) {
-		argv[n++] = "--backup";
-		argv[n++] = "--suffix=" SY_CONFLICT;
+		if (put(conflict, sizeof(conflict), "%s" SY_CONFLICT, place) != 0 || rclone(job, "moveto", place, conflict) != 0) return -1;
 	}
-	argv[n++] = up ? local : place;
-	argv[n++] = up ? place : local;
-	argv[n] = NULL;
-	return run(job, argv, NULL, NULL) == 0 ? 0 : -1;
+	return rclone(job, "copyto", up ? local : place, up ? place : local);
+}
+
+// Removes a file from one side, as it was removed from the other, by
+// moving it to <name>.deleted beside it, so it can be put back.
+static int removeOne(SrJob* job, const char* rel, int here) {
+	const SrConfig* cfg = &job->cfg;
+	if (here) {
+		char local[SY_PATH_MAX], kept[SY_PATH_MAX + 16];
+		if (Sy_localPath(cfg->sdcard, rel, local, sizeof(local)) != 0 || put(kept, sizeof(kept), "%s" SY_DELETED, local) != 0) return -1;
+		return rename(local, kept);
+	}
+	char place[SY_PATH_MAX * 2], kept[SY_PATH_MAX * 2 + 16];
+	if (Sy_remoteJoin(cfg->remote, rel, place, sizeof(place)) != 0 || put(kept, sizeof(kept), "%s" SY_DELETED, place) != 0) return -1;
+	return rclone(job, "moveto", place, kept);
 }
 
 ///////////////////////////////////////
@@ -594,7 +422,7 @@ static int transfer(SrJob* job, const char* rel, int up, int keep) {
 static void basePath(const SrConfig* cfg, char* out, size_t size) {
 	// one record for each remote, so a different remote starts afresh
 	unsigned long h = 2166136261u;
-	const char* parts[] = { cfg->backend == SR_RCLONE ? "rclone" : "rsync", cfg->remote, cfg->host, cfg->path };
+	const char* parts[] = { "rclone", cfg->remote, "", "" };
 	for (size_t i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
 		for (const char* p = parts[i]; *p; p++) h = (h ^ (unsigned char)*p) * 16777619u;
 		h = (h ^ '\n') * 16777619u;
@@ -664,31 +492,48 @@ static void runSync(SrJob* job) {
 	Scope scope = { job, NULL, 0 };
 	int local_count = Sr_scanLocal(cfg, &local);
 	if (local_count < 0) goto done;
-	if (cfg->backend == SR_RSYNC && cfg->host[0] && cfg->ssh_dropbear && dropbearKey(job) != 0) {
-		if (!job->error[0]) put(job->error, sizeof(job->error), "no SSH key");
-		goto done;
-	}
-	if (cfg->backend == SR_RSYNC && rsyncFolders(job, local, local_count) != 0) {
-		if (!job->cancel) put(job->error, sizeof(job->error), "couldn't reach the remote folder");
-		goto done;
-	}
 	int remote_count = listRemote(job, &remote);
 	if (remote_count < 0) goto done;
+	// a list cut short would make the files past its end look removed
+	if (local_count >= SY_FILES_MAX || remote_count >= SY_FILES_MAX) {
+		put(job->error, sizeof(job->error), "more than %d files to sync", SY_FILES_MAX - 1);
+		goto done;
+	}
 	int base_count = baseLoad(cfg, &base);
 	steps = calloc(SY_FILES_MAX, sizeof(SyStep));
 	scope.failed = calloc(SY_FILES_MAX, sizeof(scope.failed[0]));
 	next = calloc(SY_FILES_MAX, sizeof(SyBase));
 	if (base_count < 0 || !steps || !scope.failed || !next) goto done;
-	int count = Sy_plan(local, local_count, remote, remote_count, base, base_count, wanted, &scope, steps, SY_FILES_MAX);
+	// one side with nothing at all, such as a remote folder renamed or
+	// gone, isn't taken as every file removed: it's filled again instead
+	int plan_base = base_count;
+	if (base_count && (!local_count || !remote_count)) {
+		Sr_log(cfg, "nothing %s, so nothing is removed this time", local_count ? "on the remote" : "here");
+		plan_base = 0;
+	}
+	int count = Sy_plan(local, local_count, remote, remote_count, base, plan_base, wanted, &scope, steps, SY_FILES_MAX);
 	Sr_log(cfg, "%d files here, %d on the remote, %d in the record, %d to do (%s)", local_count, remote_count, base_count, count,
 		job->whole ? "everything" : job->base);
 	int moved = 0;
 	for (int i = 0; i < count && !job->cancel; i++) {
 		const SyStep* s = &steps[i];
 		if (s->action == SY_SAME) continue;
+		moved++;
+		if (s->action == SY_DELETE_LOCAL || s->action == SY_DELETE_REMOTE) {
+			int here = s->action == SY_DELETE_LOCAL;
+			if (removeOne(job, s->rel, here) != 0) {
+				Sr_log(cfg, "couldn't remove %s %s", s->rel, here ? "here" : "from the remote");
+				snprintf(scope.failed[scope.failed_count++], SY_PATH_MAX, "%s", s->rel);
+				job->failed++;
+				continue;
+			}
+			Sr_log(cfg, "removed %s %s, as it was removed %s; kept as .deleted", s->rel, here ? "here" : "from the remote",
+				here ? "from the remote" : "here");
+			job->deleted++;
+			continue;
+		}
 		int up = s->action == SY_UPLOAD || s->action == SY_UPLOAD_KEEP;
 		int keep = s->action == SY_UPLOAD_KEEP || s->action == SY_DOWNLOAD_KEEP;
-		moved++;
 		if (transfer(job, s->rel, up, keep) != 0) {
 			Sr_log(cfg, "couldn't %s %s", up ? "upload" : "download", s->rel);
 			snprintf(scope.failed[scope.failed_count++], SY_PATH_MAX, "%s", s->rel);
@@ -828,7 +673,7 @@ static int writeIgnores(const SrJob* job, const char* dir, const char* top) {
 		if (d) closedir(d);
 		fprintf(f, "*\n");
 	}
-	fprintf(f, "*" SY_CONFLICT "\n");
+	fprintf(f, "*" SY_CONFLICT "\n*" SY_DELETED "\n");
 	if (fclose(f) != 0) return -1;
 	(void)cfg;
 	return rename(temp, path);

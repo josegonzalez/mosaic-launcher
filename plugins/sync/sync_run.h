@@ -1,6 +1,6 @@
-// The sync plugin's work off the launcher's thread: running rclone,
-// rsync and Syncthing's REST API, reading the card's saves and states,
-// and keeping the record of what's in sync. Nothing here calls the host;
+// The sync plugin's work off the launcher's thread: running rclone and
+// Syncthing's REST API, reading the card's saves and states, and keeping
+// the record of what's in sync. Nothing here calls the host;
 // it logs to its own file, .userdata/<platform>/logs/sync.txt, which the
 // programs' own output goes to too.
 
@@ -11,7 +11,7 @@
 
 #include "sync_model.h"
 
-enum { SR_RCLONE, SR_RSYNC, SR_SYNCTHING };
+enum { SR_RCLONE, SR_SYNCTHING };
 
 #define SR_FOLDER_SAVES "mosaic-saves"
 #define SR_FOLDER_STATES "mosaic-states"
@@ -24,20 +24,11 @@ typedef struct SrConfig {
 	char log_path[SY_PATH_MAX];
 	char ca_file[SY_PATH_MAX];
 	// the programs, beside plugin.so; empty when one isn't there
-	char rclone[SY_PATH_MAX], rsync[SY_PATH_MAX], ssh[SY_PATH_MAX], syncthing[SY_PATH_MAX];
-	char dropbearkey[SY_PATH_MAX], dropbearconvert[SY_PATH_MAX];
-	int ssh_dropbear; // ssh is Dropbear's dbclient, not OpenSSH's ssh
+	char rclone[SY_PATH_MAX], syncthing[SY_PATH_MAX];
 	// rclone
 	char rclone_config[SY_PATH_MAX];
 	char rclone_pass[256];
 	char remote[SY_PATH_MAX];
-	// rsync: user@host, or empty for a folder on this device
-	char host[256];
-	int port;
-	// the key file; empty for <data_dir>/ssh_key, which dbclient's runs
-	// make with dropbearkey when it isn't there
-	char key[SY_PATH_MAX];
-	char path[SY_PATH_MAX];
 	// Syncthing
 	int gui_port;
 	char api_key[64];
@@ -60,8 +51,7 @@ typedef struct SrJob {
 	volatile int finished;
 	// what came of it
 	int ok;
-	int up, down, conflicts, failed;
-	int key_made; // made <data_dir>/ssh_key, with its public half in ssh_key.pub
+	int up, down, conflicts, deleted, failed;
 	char error[256];
 	// Syncthing: this device's id, whether the peer is connected and how
 	// far it has the folders, and how many files this device still needs
@@ -71,9 +61,7 @@ typedef struct SrJob {
 	int need;
 } SrJob;
 
-// The programs beside the plugin, in dir: rclone, rsync, syncthing, and
-// dbclient with dropbearkey and dropbearconvert, or ssh when there's no
-// dbclient.
+// The programs beside the plugin, in dir: rclone and syncthing.
 void Sr_findTools(const char* dir, SrConfig* cfg);
 
 // A CA bundle for rclone and Syncthing's HTTPS: the card's own, then the

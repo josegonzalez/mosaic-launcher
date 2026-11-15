@@ -23,6 +23,13 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: sync.c
+#, c-format
+msgid ", %d removed (kept as .deleted)"
+msgid_plural ", %d removed (kept as .deleted)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: sync.c
 msgid "Conflicts"
 msgstr ""
 
@@ -36,10 +43,6 @@ msgstr ""
 
 #: plugin.txt
 msgid "Quick menu tile"
-msgstr ""
-
-#: sync.c
-msgid "SSH key"
 msgstr ""
 
 #: sync.c
@@ -61,6 +64,13 @@ msgstr ""
 #: plugin.txt sync.c
 msgid "Sync with"
 msgstr ""
+
+#: sync.c
+#, c-format
+msgid "Sync: %d file removed, as on the other side (kept as .deleted)"
+msgid_plural "Sync: %d files removed, as on the other side (kept as .deleted)"
+msgstr[0] ""
+msgstr[1] ""
 
 #: sync.c
 #, c-format
@@ -89,10 +99,6 @@ msgstr ""
 #: sync.c
 #, c-format
 msgid "Sync: %s; it tries again next time"
-msgstr ""
-
-#: sync.c
-msgid "Sync: made an SSH key; add ssh_key.pub to the other device's authorized_keys"
 msgstr ""
 
 #: sync.c
@@ -164,10 +170,6 @@ msgid "no rclone.conf"
 msgstr ""
 
 #: sync.c
-msgid "no rsync folder set"
-msgstr ""
-
-#: sync.c
 msgid "not synced yet"
 msgstr ""
 
@@ -193,30 +195,6 @@ msgstr ""
 
 #: plugin.txt
 msgid "rclone remote"
-msgstr ""
-
-#: plugin.txt
-msgid "rsync"
-msgstr ""
-
-#: plugin.txt
-msgid "rsync SSH key file"
-msgstr ""
-
-#: plugin.txt
-msgid "rsync SSH port"
-msgstr ""
-
-#: plugin.txt
-msgid "rsync folder"
-msgstr ""
-
-#: plugin.txt
-msgid "rsync host"
-msgstr ""
-
-#: sync.c
-msgid "rsync isn't installed beside the plugin"
 msgstr ""
 
 #: sync.c
@@ -249,14 +227,6 @@ msgstr ""
 
 #: sync.c
 msgid "the other device's ID isn't a Syncthing device ID"
-msgstr ""
-
-#: sync.c
-msgid "the rsync host isn't usable"
-msgstr ""
-
-#: sync.c
-msgid "there's no SSH client beside the plugin"
 msgstr ""
 
 #: sync.c

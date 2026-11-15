@@ -15,6 +15,12 @@ msgid_plural " (%d changed on both sides, the older kept as .conflict)"
 msgstr[0] " (%d cambió en los dos lados, el más antiguo guardado como .conflict)"
 msgstr[1] " (%d cambiaron en los dos lados, los más antiguos guardados como .conflict)"
 
+#, c-format
+msgid ", %d removed (kept as .deleted)"
+msgid_plural ", %d removed (kept as .deleted)"
+msgstr[0] ", %d quitado (guardado como .deleted)"
+msgstr[1] ", %d quitados (guardados como .deleted)"
+
 msgid "Conflicts"
 msgstr "Conflictos"
 
@@ -26,9 +32,6 @@ msgstr "Última sincronización"
 
 msgid "Quick menu tile"
 msgstr "Botón en el menú rápido"
-
-msgid "SSH key"
-msgstr "Clave SSH"
 
 msgid "Status"
 msgstr "Estado"
@@ -44,6 +47,12 @@ msgstr "Sincronizar estados"
 
 msgid "Sync with"
 msgstr "Sincronizar con"
+
+#, c-format
+msgid "Sync: %d file removed, as on the other side (kept as .deleted)"
+msgid_plural "Sync: %d files removed, as on the other side (kept as .deleted)"
+msgstr[0] "Sincronizar: %d archivo quitado, como en el otro lado (guardado como .deleted)"
+msgstr[1] "Sincronizar: %d archivos quitados, como en el otro lado (guardados como .deleted)"
 
 #, c-format
 msgid "Sync: %d file sent"
@@ -68,9 +77,6 @@ msgstr "Sincronizar: %s"
 #, c-format
 msgid "Sync: %s; it tries again next time"
 msgstr "Sincronizar: %s; lo intenta de nuevo la próxima vez"
-
-msgid "Sync: made an SSH key; add ssh_key.pub to the other device's authorized_keys"
-msgstr "Sincronizar: se creó una clave SSH; añade ssh_key.pub a authorized_keys del otro dispositivo"
 
 msgid "Sync: sending your saves to the other device"
 msgstr "Sincronizar: enviando tus partidas al otro dispositivo"
@@ -123,9 +129,6 @@ msgstr "ningún remoto de rclone configurado"
 msgid "no rclone.conf"
 msgstr "no hay rclone.conf"
 
-msgid "no rsync folder set"
-msgstr "ninguna carpeta de rsync configurada"
-
 msgid "not synced yet"
 msgstr "aún sin sincronizar"
 
@@ -146,24 +149,6 @@ msgstr "rclone no está instalado junto al plugin"
 
 msgid "rclone remote"
 msgstr "Remoto de rclone"
-
-msgid "rsync"
-msgstr "rsync"
-
-msgid "rsync SSH key file"
-msgstr "Archivo de clave SSH de rsync"
-
-msgid "rsync SSH port"
-msgstr "Puerto SSH de rsync"
-
-msgid "rsync folder"
-msgstr "Carpeta de rsync"
-
-msgid "rsync host"
-msgstr "Host de rsync"
-
-msgid "rsync isn't installed beside the plugin"
-msgstr "rsync no está instalado junto al plugin"
 
 msgid "saves"
 msgstr "partidas"
@@ -188,12 +173,6 @@ msgstr "syncthing"
 
 msgid "the other device's ID isn't a Syncthing device ID"
 msgstr "el ID del otro dispositivo no es un ID de Syncthing"
-
-msgid "the rsync host isn't usable"
-msgstr "el host de rsync no es válido"
-
-msgid "there's no SSH client beside the plugin"
-msgstr "no hay cliente SSH junto al plugin"
 
 msgid "up to date"
 msgstr "al día"

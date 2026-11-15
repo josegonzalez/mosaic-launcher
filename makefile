@@ -98,8 +98,8 @@ ffmpeg-device:
 		ghcr.io/loveretro/tg5040-toolchain:latest \
 		/bin/bash -c 'cd /root/workspace && sh plugins/video-previews/ffmpeg/build.sh build/ffmpeg/aarch64'
 
-# The programs the sync plugin runs (rclone, Syncthing, rsync and
-# Dropbear's dbclient), from pinned downloads checked against
+# The programs the sync plugin runs (rclone and Syncthing), from pinned
+# downloads checked against
 # plugins/sync/tools/SHA256SUMS (stamped, so it's a no-op once done), for
 # plugins-device to put beside the plugin. Without them the plugin says
 # its tool isn't there.
