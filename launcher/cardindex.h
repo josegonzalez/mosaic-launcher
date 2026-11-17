@@ -28,6 +28,11 @@ void CardIndex_setup(const char* sdcard, const char* platform, const char* path,
 // the one read from the card.
 void CardIndex_setView(CardIndex* (*view)(const CardIndex* raw));
 
+// Makes the view again from what was read from the card, such as once
+// more plugins have loaded. Returns 1 when it did, or 0 when nothing has
+// been read yet.
+int CardIndex_viewAgain(void);
+
 // The index to answer from, or NULL before the first copy is ready. The
 // first call starts it.
 const CardIndex* CardIndex_get(void);

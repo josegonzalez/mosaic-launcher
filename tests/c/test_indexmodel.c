@@ -544,6 +544,43 @@ static void testRows(void) {
 	Index_free(&index);
 }
 
+// Plugins' index_name names, on a copy, which keeps its order and the
+// rest of each entry.
+static void testRename(void) {
+	makeCard();
+	CardIndex index;
+	CHECK(Index_build(&index, &card, NULL, NULL, NULL) == 0);
+	CardIndex view;
+	CHECK(Index_withRows(&view, &index, NULL, 0) == 0);
+	int sonic = Index_find(&view, GG "/Sonic.gg", NULL, NULL);
+	int spyro = Index_find(&view, PS "/Loose/Spyro.cue", NULL, NULL);
+	CHECK(sonic >= 0 && spyro >= 0);
+	const IndexName names[] = {
+		{ sonic, "Sonic the Hedgehog" },
+		{ spyro, "Spyro the Dragon" },
+		{ view.total, "past the end" },
+		{ -1, "before the start" },
+		{ sonic, NULL },
+	};
+	CHECK(Index_rename(&view, names, (int)(sizeof(names) / sizeof(names[0]))) == 2);
+	const IndexEntry* e;
+	const IndexSystem* sys;
+	CHECK(Index_find(&view, GG "/Sonic.gg", &e, &sys) == sonic);
+	CHECK_STR(Index_str(sys, e->name), "Sonic the Hedgehog");
+	CHECK_STR(Index_str(sys, e->path), GG "/Sonic.gg");
+	CHECK(Index_find(&view, PS "/Loose/Spyro.cue", &e, &sys) == spyro);
+	CHECK_STR(Index_str(sys, e->name), "Spyro the Dragon");
+	CHECK(sys->strings_cap == sys->strings_len);
+	// the index it was copied from keeps its names
+	CHECK(Index_find(&index, GG "/Sonic.gg", &e, &sys) == sonic);
+	CHECK_STR(Index_str(sys, e->name), "Sonic");
+	CHECK(view.total == index.total);
+	CHECK(Index_rename(&view, NULL, 0) == 0);
+	CHECK(Index_rename(NULL, names, 1) == -1);
+	Index_free(&view);
+	Index_free(&index);
+}
+
 static int views = 0;
 static CardIndex* addRow(const CardIndex* raw) {
 	views++;
@@ -567,6 +604,7 @@ static void testView(void) {
 	CardIndex_setup(CARD, "test", FILE_PATH, quietLog);
 	CardIndex_setView(addRow);
 	views = 0;
+	CHECK(CardIndex_viewAgain() == 0); // nothing read yet
 	CHECK(CardIndex_get() == NULL);
 	CHECK(waitReady());
 	CHECK(views == 1);
@@ -582,6 +620,10 @@ static void testView(void) {
 	views = 0;
 	index = CardIndex_get();
 	CHECK(views == 1 && index && Index_find(index, PS "/Loose/Game.m3u", NULL, NULL) >= 0);
+	// made again, as once more plugins have loaded
+	CHECK(CardIndex_viewAgain() == 1 && views == 2);
+	index = CardIndex_get();
+	CHECK(index && Index_find(index, PS "/Loose/Game.m3u", NULL, NULL) >= 0);
 	touch(PS "/Loose/Game (Disc 2).cue");
 	age(PS "/Loose", 1000000700);
 	CardIndex_refresh();
@@ -601,6 +643,7 @@ int main(void) {
 	testStale();
 	testWorker();
 	testRows();
+	testRename();
 	testView();
 	CHECK(system("rm -rf '" TEST_DIR "'") == 0);
 	CHECK_DONE();

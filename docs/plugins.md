@@ -59,6 +59,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 ## Library
 
 - [all-games](../plugins/all-games/README.md) - Lists every game from every system in one list.
+- [arcade-names](../plugins/arcade-names/README.md) - Shows arcade games by their real titles from a DAT you put on the card, with BIOS sets hidden.
 - [clear-recents](../plugins/clear-recents/README.md) - Clears the Recently Played list, one game or all at once.
 - [collate-subfolders](../plugins/collate-subfolders/README.md) - Merges same-named folders from a system's several folders into one.
 - [collections-plus](../plugins/collections-plus/README.md) - Puts your collections on the first screen in your order, with their art.

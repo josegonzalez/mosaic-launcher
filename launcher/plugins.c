@@ -116,6 +116,11 @@ static int switcher_declined = 0; // the switcher screen's enter declined, so th
 
 static void dropOverrides(int owner);
 static CardIndex* indexView(const CardIndex* raw);
+static void indexViewAgain(void);
+// How many plugins were loaded when the index was last viewed, so the
+// view is made again once they're all loaded when it was made while some
+// were still loading.
+static int viewed_with = -1;
 static void saveBindings(int* counts);
 static void dropBindings(const int* counts);
 // the built-in lock and ambient screens, at the end
@@ -2304,6 +2309,7 @@ static void start(void) {
 	}
 	if (loaded_count == 0) unlink(marker);
 	listed = 1;
+	indexViewAgain();
 	logOverridden();
 	claimLayout();
 	claimTransitions();
@@ -2409,6 +2415,7 @@ void Plugins_quit(void) {
 	Wifi_quit();
 	// a build still running stops at its next file
 	CardIndex_quit();
+	viewed_with = -1;
 	settingsExit();
 	// the manifests go last, as the loaded plugins pointed at them
 	for (int i = 0; i < manifest_count; i++) Manifest_free(&manifests[i]);
@@ -2994,10 +3001,10 @@ int Plugins_artAlias(const Entry* entry, char* out, size_t size) {
 // what the index has, and each row they add that isn't on the card yet
 // goes in as a game, named and described as the entry its art_alias
 // names. NULL when no plugin adds rows.
-static CardIndex* indexView(const CardIndex* raw) {
+static CardIndex* indexRows(const CardIndex* raw) {
 	int any = 0;
 	EACH_PLUGIN_WITH(dir_entries) any = 1;
-	if (!any || !raw) return NULL;
+	if (!any) return NULL;
 	IndexRow* rows = NULL;
 	int row_count = 0, row_cap = 0;
 	for (int s = 0; s < raw->system_count; s++) {
@@ -3061,6 +3068,90 @@ static CardIndex* indexView(const CardIndex* raw) {
 	}
 	free(rows);
 	return view;
+}
+
+// view (or raw, while view is NULL) with its games named by plugins'
+// index_name, each seeing the name the one before it gave. A copy of raw
+// is made only when one renames something. Returns the view, or NULL for
+// none.
+static CardIndex* indexNames(const CardIndex* raw, CardIndex* view) {
+	int any = 0;
+	EACH_PLUGIN_WITH(index_name) any = 1;
+	if (!any) return view;
+	const CardIndex* from = view ? view : raw;
+	IndexName* names = NULL;
+	int count = 0, cap = 0;
+	for (int i = 0; i < from->total; i++) {
+		const IndexSystem* sys;
+		const IndexEntry* e = Index_at(from, NULL, i, &sys);
+		if (!e || e->kind != INDEX_KIND_GAME) continue;
+		Entry* entry = Entry_new((char*)Index_str(sys, e->path), e->type);
+		free(entry->name);
+		entry->name = strdup(Index_str(sys, e->name));
+		int renamed = 0;
+		EACH_PLUGIN_WITH(index_name) {
+			char name[256];
+			name[0] = '\0';
+			if (p->index_name((const MosaicEntry*)entry, name, sizeof(name)) && name[0] && strcmp(name, entry->name)) {
+				free(entry->name);
+				entry->name = strdup(name);
+				renamed = 1;
+			}
+		}
+		if (renamed && count == cap) {
+			int next = cap ? cap * 2 : 64;
+			IndexName* bigger = realloc(names, sizeof(IndexName) * (size_t)next);
+			if (bigger) {
+				names = bigger;
+				cap = next;
+			}
+		}
+		if (renamed && count < cap) {
+			names[count] = (IndexName){ i, entry->name };
+			entry->name = NULL; // the list's now
+			count++;
+		}
+		Entry_free(entry);
+	}
+	if (count && !view) {
+		view = malloc(sizeof(CardIndex));
+		if (view && Index_withRows(view, raw, NULL, 0) < 0) {
+			free(view);
+			view = NULL;
+		}
+	}
+	if (count && view) {
+		int renamed = Index_rename(view, names, count);
+		if (renamed < 0) LOG_warn("index: out of memory naming games from plugins\n");
+		else LOG_info("index: %d names from plugins\n", renamed);
+	}
+	for (int k = 0; k < count; k++) free((char*)names[k].name);
+	free(names);
+	return view;
+}
+
+// What plugins add to the card index: dir_entries' rows, then
+// index_name's names. NULL when there's nothing.
+static CardIndex* indexView(const CardIndex* raw) {
+	viewed_with = loaded_count;
+	if (!raw) return NULL;
+	return indexNames(raw, indexRows(raw));
+}
+
+// After every plugin's init: a view made while some were loading, such as
+// from an earlier plugin's init, is made again when a later one adds to
+// it, and readers hear about it as about any change.
+static void indexViewAgain(void) {
+	if (viewed_with < 0 || viewed_with >= loaded_count) return;
+	int adds = 0;
+	for (int i = viewed_with; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if ((Plugin_has(p, dir_entries) && p->dir_entries) || (Plugin_has(p, index_name) && p->index_name)) adds = 1;
+	}
+	if (!adds || !CardIndex_viewAgain()) return;
+	char payload[32];
+	snprintf(payload, sizeof(payload), "count=%i", Index_count(CardIndex_get(), NULL));
+	hostEvent(EVENT_HOST_PREFIX "index_ready", payload);
 }
 
 static int generates(int i) {

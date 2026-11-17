@@ -848,6 +848,31 @@ int Index_withRows(CardIndex* out, const CardIndex* index, const IndexRow* rows,
 	return added;
 }
 
+int Index_rename(CardIndex* index, const IndexName* names, int count) {
+	if (!index || (count && !names)) return -1;
+	int renamed = 0, failed = 0;
+	unsigned char* touched = index->system_count ? calloc((size_t)index->system_count, 1) : NULL;
+	if (index->system_count && !touched) return -1;
+	for (int n = 0; n < count && !failed; n++) {
+		const IndexSystem* found = NULL;
+		if (!names[n].name || !Index_at(index, NULL, names[n].index, &found)) continue;
+		IndexSystem* sys = (IndexSystem*)found;
+		uint32_t at = addString(sys, names[n].name);
+		if (names[n].name[0] && !at) {
+			failed = 1;
+			break;
+		}
+		sys->entries[names[n].index - sys->first].name = at;
+		touched[sys - index->systems] = 1;
+		renamed++;
+	}
+	for (int i = 0; i < index->system_count; i++) {
+		if (touched[i]) shrink(&index->systems[i]);
+	}
+	free(touched);
+	return failed ? -1 : renamed;
+}
+
 size_t Index_bytes(const CardIndex* index) {
 	size_t bytes = sizeof(*index) + sizeof(IndexSystem) * (size_t)index->system_count;
 	for (int i = 0; i < index->system_count; i++) {

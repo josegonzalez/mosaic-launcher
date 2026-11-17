@@ -432,7 +432,7 @@ typedef struct MosaicIndexEntry {
 	const char* launch;    // what opening it launches: a game folder's .cue (else its .m3u), otherwise path
 	const char* system;    // its system folder's name, such as "Game Boy (GB)"
 	const char* tag;       // the emulator tag in that name's last parentheses, such as "GB", or the whole name without any
-	const char* name;      // the name stock's list shows: its map.txt alias, else its file name tidied as stock tidies it
+	const char* name;      // the name stock's list shows: its map.txt alias, else its file name tidied as stock tidies it, or what plugins' index_name gave
 	const char* year;      // from its .info sidecar (see entry_info), "" for none
 	const char* publisher; // the same
 	const char* genre;     // the same
@@ -2165,6 +2165,17 @@ typedef struct MosaicPlugin {
 	// alias's alias isn't followed. Generated art (art_surface) comes only
 	// after the alias has none either.
 	int (*art_alias)(const MosaicEntry* entry, char* out, size_t size);
+
+	// A game's name in the card index, such as a title from a list of
+	// names, so search and the other plugins that read the index find it
+	// by the name the game list shows for it. Each time a new index is put
+	// in place, on the launcher's thread, its games (dir_entries' rows
+	// included) are asked about, in load order, with the entry's name the
+	// one the index has so far: its map.txt alias, else its tidied file
+	// name, or what an earlier plugin's index_name gave. Write a new name
+	// and return 1, or return 0. The game list asks display_name, not
+	// this, so a plugin renaming games usually has both.
+	int (*index_name)(const MosaicEntry* entry, char* out, size_t size);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

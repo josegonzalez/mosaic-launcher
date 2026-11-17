@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!-- Made up for the arcade-names screenshots: no real game, set or ROM. CC0. -->
+<datafile>
+	<header>
+		<name>Made-up arcade</name>
+		<description>Made-up arcade sets for screenshots</description>
+	</header>
+	<game name="mybios" isbios="yes">
+		<description>Made-up BIOS</description>
+	</game>
+	<machine name="mysound" isdevice="yes" runnable="no">
+		<description>Made-up sound chip</description>
+	</machine>
+	<game name="boltbr" romof="mybios">
+		<description>Bolt Brawlers (World 930215)</description>
+		<year>1993</year>
+	</game>
+	<game name="boltbru" cloneof="boltbr" romof="boltbr">
+		<description>Bolt Brawlers (US 930215)</description>
+		<year>1993</year>
+	</game>
+	<game name="boltbrj" cloneof="boltbr" romof="boltbr">
+		<description>Bolt Brawlers (Japan 930201)</description>
+		<year>1993</year>
+	</game>
+	<game name="cometc">
+		<description>Comet Courier (set 1)</description>
+		<year>1989</year>
+	</game>
+	<game name="duner3k">
+		<description>Dune Racer 3000 (Europe, rev 2)</description>
+		<year>1996</year>
+	</game>
+	<game name="kittycan">
+		<description>Kitty Cannon (Japan)</description>
+		<year>1991</year>
+	</game>
+</datafile>

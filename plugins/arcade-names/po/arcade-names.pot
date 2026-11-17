@@ -1,0 +1,51 @@
+# The arcade-names plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: arcade-names\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "Arcade names"
+msgstr ""
+
+#: plugin.txt
+msgid "Arcade tags"
+msgstr ""
+
+#: plugin.txt
+msgid "Clean"
+msgstr ""
+
+#: plugin.txt
+msgid "Full"
+msgstr ""
+
+#: plugin.txt
+msgid "Hide clones when the parent is there"
+msgstr ""
+
+#: plugin.txt
+msgid "Hide games that don't work"
+msgstr ""
+
+#: plugin.txt
+msgid "Hide mahjong, casino and quiz"
+msgstr ""
+
+#: plugin.txt
+msgid "Names"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows arcade games such as sf2.zip by their real titles, from a DAT file you put in the DATs folder on the card, and hides BIOS and device files."
+msgstr ""

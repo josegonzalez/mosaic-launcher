@@ -138,6 +138,18 @@ typedef struct IndexRow {
 // or -1 when out of memory, leaving out empty.
 int Index_withRows(CardIndex* out, const CardIndex* index, const IndexRow* rows, int count);
 
+// A new name for the entry at index (among every system's) in an index,
+// such as a plugin's index_name gives a game.
+typedef struct IndexName {
+	int index;
+	const char* name;
+} IndexName;
+
+// Renames the entries in place, giving back the room kept past what each
+// system then holds. An index past the end is skipped. Returns how many it
+// renamed, or -1 when out of memory, leaving the rest as they were.
+int Index_rename(CardIndex* index, const IndexName* names, int count);
+
 // Bytes the index holds in memory, for measuring.
 size_t Index_bytes(const CardIndex* index);
 

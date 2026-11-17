@@ -1,0 +1,14 @@
+id=arcade-names
+name=Arcade names
+api=1
+category=Library
+summary=Shows arcade games by their real titles from a DAT you put on the card, with BIOS sets hidden.
+description=Shows arcade games such as sf2.zip by their real titles, from a DAT file you put in the DATs folder on the card, and hides BIOS and device files.
+# the DAT's titles without the region and date, or as the DAT has them
+setting.names=choice|Names|Clean|Clean,Full
+setting.clones=toggle|Hide clones when the parent is there|off
+setting.not_working=toggle|Hide games that don't work|off
+# from a catver.ini beside the DAT
+setting.categories=toggle|Hide mahjong, casino and quiz|off
+# the system tags of the folders it names
+setting.tags=text|Arcade tags|MAME,FBN,FBNEO,FBA,ARCADE,CPS1,CPS2,CPS3,NEOGEO,HBMAME,MAME2003,MAME2003PLUS,MAME2010

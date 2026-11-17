@@ -66,6 +66,12 @@ static void makeView(void) {
 	if (view) current = view;
 }
 
+int CardIndex_viewAgain(void) {
+	if (!raw || viewing) return 0;
+	makeView();
+	return 1;
+}
+
 void CardIndex_setup(const char* card, const char* plat, const char* path, void (*log)(const char* message)) {
 	snprintf(sdcard, sizeof(sdcard), "%s", card ? card : "");
 	snprintf(platform, sizeof(platform), "%s", plat ? plat : "");
