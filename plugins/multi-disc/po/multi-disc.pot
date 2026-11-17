@@ -1,0 +1,78 @@
+# The multi-disc plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: multi-disc\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: multi_disc.c
+#, c-format
+msgid "%s is there already"
+msgstr ""
+
+#: multi_disc.c
+#, c-format
+msgid "%s.m3u names other files"
+msgstr ""
+
+#: multi_disc.c
+msgid "COMBINE"
+msgstr ""
+
+#: plugin.txt
+msgid "Combine discs button"
+msgstr ""
+
+#: multi_disc.c
+#, c-format
+msgid "Combined into %s"
+msgstr ""
+
+#: multi_disc.c
+#, c-format
+msgid "Couldn't combine %s"
+msgstr ""
+
+#: multi_disc.c
+#, c-format
+msgid "Couldn't make %s"
+msgstr ""
+
+#: multi_disc.c
+#, c-format
+msgid "Couldn't write %s"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: multi_disc.c
+#, c-format
+msgid "Move the discs of %.120s into a folder of their own?"
+msgstr ""
+
+#: plugin.txt
+msgid "Multi-disc"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the discs of a game, such as \"Game (Disc 1)\" and \"Game (Disc 2)\", as one game. Its first launch writes an .m3u listing them, and Y can move them into a folder of their own so you can change discs."
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""

@@ -19,8 +19,9 @@
 // Recently Played, collections and Favorites itself keep their own order.
 //
 // Other plugins read the favorites as the "favorites" entry set (see
-// set_register), by the full paths the collection records, and set the
-// collection, for the next start, through the favorites.setup service.
+// set_register), by the full paths the collection records, set the
+// collection, for the next start, through the favorites.setup service, and
+// point a favorite at a game's new path with favorites.move.
 
 #include <dirent.h>
 #include <stdio.h>
@@ -433,6 +434,45 @@ static int provideSetup(const char* name, const char* args, char* out, size_t si
 	return n < 0 || (size_t)n >= size - used;
 }
 
+// move: from=<full path>, to=<full path>. Points the favorite at from to
+// to, in its place, such as after its files moved; with to a favorite
+// already, from just goes. Replies moved=1, or moved=0 when from isn't a
+// favorite, or error=path (either isn't on the card) or save.
+static int provideMove(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char from[MAX_PATH_LEN * 2], to[MAX_PATH_LEN * 2];
+	if (host->event_value(args, "from", from, sizeof(from)) <= 0 || host->event_value(args, "to", to, sizeof(to)) <= 0) return -1;
+	const char* from_rel = relative(from);
+	const char* to_rel = relative(to);
+	if (!from_rel || !to_rel || strlen(to_rel) >= MAX_PATH_LEN || !strcmp(from_rel, to_rel)) {
+		snprintf(out, size, "error=path");
+		return 0;
+	}
+	load();
+	int i = indexOf(from_rel);
+	if (i < 0) {
+		snprintf(out, size, "moved=0");
+		return 0;
+	}
+	if (indexOf(to_rel) >= 0) {
+		memmove(&favorites[i], &favorites[i + 1], (size_t)(count - i - 1) * MAX_PATH_LEN);
+		count--;
+	}
+	else snprintf(favorites[i], MAX_PATH_LEN, "%s", to_rel);
+	relist();
+	if (save() != 0) {
+		load();
+		snprintf(out, size, "error=save");
+		return 0;
+	}
+	char message[MAX_PATH_LEN * 2 + 16];
+	snprintf(message, sizeof(message), "moved %s to %s", from_rel, to_rel);
+	say(message);
+	if (MOSAIC_HOST_HAS(host, set_names)) host->set_changed("favorites");
+	snprintf(out, size, "moved=1");
+	return 0;
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	const char* collection = host->cfg_get("collection", "Favorites");
@@ -452,6 +492,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't register the favorites set");
 	}
 	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".setup", provideSetup) != 0) say("couldn't provide " ID ".setup");
+	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".move", provideMove) != 0) say("couldn't provide " ID ".move");
 
 	if (host->register_action("favorites.toggle", "FAVORITE", 0, canToggle, toggle, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "favorites.toggle") != 0) {

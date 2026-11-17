@@ -408,6 +408,32 @@ static void testBig(void) {
 	unlink(DB);
 }
 
+// Moving a game's history: renamed when the new path has none, onto the
+// new path's row when it has one, and refused off Roms or onto itself.
+static void testMove(void) {
+	makeFixture();
+	PlayHistory_configure(DB, ROMS, onLog);
+	long long zelda = PlayHistory_seconds(ROMS "/GBA (MGBA)/Zelda.gba");
+	CHECK(zelda > 0);
+	CHECK(PlayHistory_move(ROMS "/GBA (MGBA)/Zelda.gba", ROMS "/GBA (MGBA)/Zelda/Zelda.gba") == 1);
+	CHECK(!PlayHistory_loaded());
+	CHECK(PlayHistory_seconds(ROMS "/GBA (MGBA)/Zelda.gba") == 0);
+	CHECK(PlayHistory_seconds(ROMS "/GBA (MGBA)/Zelda/Zelda.gba") >= zelda);
+	CHECK(strstr(last_log, "play history:") != NULL);
+
+	// both of Tetris's rows' sessions, onto Unplayed's row
+	CHECK(PlayHistory_move(ROMS "/GB (GB)/Tetris.gb", ROMS "/NES (FCEUMM)/Unplayed.nes") == 1);
+	CHECK(PlayHistory_seconds(ROMS "/NES (FCEUMM)/Unplayed.nes") == 3600 + 900 + 1200 + 77);
+	CHECK(PlayHistory_count(ROMS "/NES (FCEUMM)/Unplayed.nes") == 4);
+	CHECK(PlayHistory_seconds(ROMS "/GB (GB)/Tetris.gb") == 0);
+
+	CHECK(PlayHistory_move(ROMS "/GB (GB)/None.gb", ROMS "/GB (GB)/Other.gb") == 0);
+	CHECK(PlayHistory_move("/elsewhere/Tetris.gb", ROMS "/GB (GB)/Tetris.gb") == -1);
+	CHECK(PlayHistory_move(ROMS "/GB (GB)/Tetris.gb", ROMS "/GB (GB)/Tetris.gb") == -1);
+	CHECK(PlayHistory_move(NULL, ROMS "/GB (GB)/Tetris.gb") == -1);
+	PlayHistory_invalidate();
+}
+
 int main(void) {
 	mkdir(TEST_DIR, 0755);
 	if (!bindWriter()) {
@@ -423,6 +449,7 @@ int main(void) {
 	testNoLibrary();
 	testList();
 	testCaps();
+	testMove();
 	testBig();
 	PlayHistory_quit();
 	CHECK_DONE();

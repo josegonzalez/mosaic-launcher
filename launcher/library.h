@@ -48,6 +48,10 @@ void getUniqueName(Entry* entry, char* out_name);
 
 // Listing a directory, in stages. Directory_new runs them in this order.
 Array* Listing_source(char* path);
+// Plugins' dir_entries rows for a folder listed from the card, with any
+// whose path the folder already has dropped, sorted again by name when any
+// were added. Other lists are left as they are.
+void Listing_addRows(Array* entries, char* path);
 Hash* Listing_loadMap(char* path);
 void Listing_applyMap(Array* entries, Hash* map, int* renamed, int* hid_any);
 Array* Listing_filterHidden(Array* entries);

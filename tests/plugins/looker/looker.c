@@ -1,5 +1,6 @@
 // A plugin that looks at the art a folder's entries have, for the bundled
-// art-boxart plugin. Once the lists are up it opens <sd>/Boxart and logs
+// art-boxart plugin. Once the lists are up it opens <sd>/Boxart (or the
+// full path its folder setting names) and logs
 // the entries the list kept, then what art_find answers for each entry's
 // thumbnail, box, 3D box, logo and screenshot, with paths below the folder,
 // and, as a row decorator, which of its rows had their names hidden.
@@ -28,7 +29,9 @@ static void say(const char* fmt, ...) {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	snprintf(folder, sizeof(folder), "%s/Boxart", host->sdcard_path);
+	const char* named = host->cfg_get("folder", "");
+	if (named[0]) snprintf(folder, sizeof(folder), "%s", named);
+	else snprintf(folder, sizeof(folder), "%s/Boxart", host->sdcard_path);
 	return 0;
 }
 

@@ -249,11 +249,8 @@ static int mosaicKind(int art) {
 	return -1;
 }
 
-int ArtLoader_find(const Entry* entry, int kind, char* out, size_t size) {
-	if (!out || size == 0) return 0;
-	out[0] = '\0';
-	int art = stockKind(kind);
-	if (!entry || art < 0 || finding) return 0;
+// entry's own art of a kind, from plugins' art_path or stock's places.
+static int findOwn(const Entry* entry, int art, char* out, size_t size) {
 	finding = 1;
 	int answered = Plugins_artPath(entry, art, out, size);
 	finding = 0;
@@ -270,6 +267,27 @@ int ArtLoader_find(const Entry* entry, int kind, char* out, size_t size) {
 		else out[0] = '\0';
 	}
 	return out[0] && exists(out);
+}
+
+int ArtLoader_find(const Entry* entry, int kind, char* out, size_t size) {
+	if (!out || size == 0) return 0;
+	out[0] = '\0';
+	int art = stockKind(kind);
+	if (!entry || art < 0 || finding) return 0;
+	if (findOwn(entry, art, out, size)) return 1;
+	// a game's art from the entry a plugin says it shows; folders' backgrounds are the folder's
+	if (art == ART_FOLDER_BG || art == ART_LIST_BG) return 0;
+	char alias[MAX_PATH];
+	finding = 1;
+	int aliased = Plugins_artAlias(entry, alias, sizeof(alias));
+	finding = 0;
+	if (!aliased || exactMatch(alias, entry->path)) return 0;
+	Entry* other = Entry_new(alias, ENTRY_ROM);
+	char found[MAX_PATH * 2];
+	int has = findOwn(other, art, found, sizeof(found));
+	Entry_free(other);
+	if (has) snprintf(out, size, "%s", found);
+	return has;
 }
 
 // What entry's kind resolves to, asking plugins and the card once per selection.

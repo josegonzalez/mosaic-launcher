@@ -20,7 +20,8 @@
 // Other plugins read each tag as the entry set tags:<name> (see
 // set_register), by the full paths it records; the sets follow the tags
 // as they're added, deleted or edited in the file. They make a new tag
-// from another set's games with the tags.copy service.
+// from another set's games with the tags.copy service, and move a game's
+// path in every tag with tags.move.
 
 #include <stdint.h>
 #include <stdio.h>
@@ -278,6 +279,41 @@ static int provideCopy(const char* name, const char* args, char* out, size_t siz
 	snprintf(message, sizeof(message), "copied %i games from %s to tag %s", copying.count, set, clean);
 	say(message);
 	snprintf(out, size, "tag=%s\ngames=%i", clean, copying.count);
+	return 0;
+}
+
+// tags.move: from=<full path>, to=<full path>. Moves a game to its new
+// path in every tag, such as after its files moved. Replies tags=<how
+// many changed>, or error=path (either isn't on the card) or save.
+static int provideMove(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	char from[TG_PATH_LEN], to[TG_PATH_LEN];
+	if (host->event_value(args, "from", from, sizeof(from)) <= 0 || host->event_value(args, "to", to, sizeof(to)) <= 0) return -1;
+	size_t len = strlen(host->sdcard_path);
+	if (strncmp(from, host->sdcard_path, len) != 0 || strncmp(to, host->sdcard_path, len) != 0) {
+		snprintf(out, size, "error=path");
+		return 0;
+	}
+	refresh();
+	int changed = TG_rename(&store, from + len, to + len);
+	if (changed < 0) {
+		snprintf(out, size, "error=path");
+		return 0;
+	}
+	if (changed && save() != 0) {
+		snprintf(out, size, "error=save");
+		return 0;
+	}
+	if (changed) {
+		for (int i = 0; i < store.count; i++) {
+			if (TG_has(&store, i, to + len)) announce(store.tags[i].name);
+		}
+		reload();
+		char message[TG_PATH_LEN * 2 + 32];
+		snprintf(message, sizeof(message), "moved %s to %s in %i tags", from + len, to + len, changed);
+		say(message);
+	}
+	snprintf(out, size, "tags=%i", changed);
 	return 0;
 }
 
@@ -705,6 +741,7 @@ static int init(const MosaicHost* h) {
 	}
 	if (setting("tiles")) addTiles();
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("tags.copy", provideCopy) != 0) say("couldn't provide tags.copy");
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("tags.move", provideMove) != 0) say("couldn't provide tags.move");
 
 	char message[96];
 	snprintf(message, sizeof(message), "%i tags, %i with games, root %s", store.count, tagsOnCard(), root_on ? "on" : "off");

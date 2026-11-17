@@ -75,7 +75,7 @@ void getUniqueName(Entry* entry, char* out_name) {
 }
 
 ///////////////////////////////////////
-// Listing a directory, in stages: source -> map.txt names -> hide -> sort
+// Listing a directory, in stages: source -> plugin rows -> map.txt names -> hide -> sort
 // -> plugin filter -> translated names -> plugin display names -> plugin
 // sort -> plugin list_ready -> duplicate names -> letter index.
 // Directory_new runs them in order.
@@ -98,6 +98,40 @@ Array* Listing_source(char* path) {
 		return getDiscs(path);
 	}
 	return getEntries(path);
+}
+
+// 1 for a folder listed from the card by getEntries, not one of the
+// launcher's own lists or an .m3u's discs.
+static int isCardFolder(char* path) {
+	return !exactMatch(path, SDCARD_PATH) && !exactMatch(path, FAUX_RECENT_PATH) && !exactMatch(path, ROMS_PATH)
+		&& !prefixMatch(COLLECTIONS_PATH, path) && !suffixMatch(".m3u", path);
+}
+
+void Listing_addRows(Array* entries, char* path) {
+	if (!isCardFolder(path)) return;
+	int before = entries->count;
+	Plugins_dirEntries(entries, path);
+	if (entries->count == before) return;
+	// each path once, the folder's own first
+	int kept = before;
+	for (int i = before; i < entries->count; i++) {
+		Entry* entry = entries->items[i];
+		int seen = 0;
+		for (int k = 0; k < kept && !seen; k++) seen = exactMatch(((Entry*)entries->items[k])->path, entry->path);
+		if (seen) Entry_free(entry);
+		else entries->items[kept++] = entry;
+	}
+	entries->count = kept;
+	if (kept > before) EntryArray_sort(entries);
+}
+
+// A folder's entries: a plugin's virtual_dir, or the card's with plugins' rows.
+static Array* Listing_read(char* path) {
+	Array* entries = Plugins_virtualDir(path);
+	if (entries) return entries;
+	entries = Listing_source(path);
+	Listing_addRows(entries, path);
+	return entries;
 }
 
 // The file name -> display name map for a directory, or NULL. Collections
@@ -301,8 +335,7 @@ Directory* Directory_new(char* path, int selected) {
 	Directory* self = malloc(sizeof(Directory));
 	self->path = strdup(path);
 	self->name = strdup(display_name);
-	self->entries = Plugins_virtualDir(path);
-	if (!self->entries) self->entries = Listing_source(path);
+	self->entries = Listing_read(path);
 	self->alphas = IntArray_new();
 	self->names_hidden = NULL;
 	self->selected = selected;
@@ -320,8 +353,7 @@ void Directory_reload(Directory* self) {
 	}
 	EntryArray_free(self->entries);
 	IntArray_free(self->alphas);
-	self->entries = Plugins_virtualDir(self->path);
-	if (!self->entries) self->entries = Listing_source(self->path);
+	self->entries = Listing_read(self->path);
 	self->alphas = IntArray_new();
 	Directory_index(self);
 

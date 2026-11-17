@@ -1176,6 +1176,56 @@ static void test_root_names_translated_for_display(void) {
 	Directory_free(dir);
 }
 
+// A plugin row for each game with a .gb, under its name with .m3u, and one
+// for a path the folder has already.
+static int rows_asked = 0;
+static char rows_dir[512];
+static void addRows(Array* entries, const char* dir_path) {
+	rows_asked++;
+	snprintf(rows_dir, sizeof(rows_dir), "%s", dir_path);
+	Array_push(entries, Entry_new(ROMS_PATH "/Game Boy (GB)/Mario.m3u", ENTRY_ROM));
+	Array_push(entries, Entry_new(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", ENTRY_ROM));
+	Array_push(entries, Entry_new(ROMS_PATH "/Game Boy (GB)/Mario.m3u", ENTRY_ROM));
+}
+
+static void test_dir_entries_add_sorted_rows_to_card_folders(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Zelda.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Mario (Disc 1).gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Mario (Disc 2).gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/map.txt", "Mario.m3u\tSuper Mario\n");
+
+	stub_dir_entries = addRows;
+	rows_asked = 0;
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	CHECK(rows_asked == 1);
+	CHECK_STR(rows_dir, ROMS_PATH "/Game Boy (GB)");
+	// sorted in, each path once, and named by map.txt
+	CHECK_STR(names(dir->entries), "Alleyway,Mario,Mario,Super Mario,Zelda");
+	if (dir->entries->count == 5) CHECK_STR(at(dir, 3)->path, ROMS_PATH "/Game Boy (GB)/Mario.m3u");
+	// a reload asks again
+	Directory_reload(dir);
+	CHECK(rows_asked == 2);
+	CHECK_STR(names(dir->entries), "Alleyway,Mario,Mario,Super Mario,Zelda");
+	Directory_free(dir);
+
+	// the launcher's own lists aren't asked
+	rows_asked = 0;
+	dir = Directory_new(ROMS_PATH, 0);
+	Directory_free(dir);
+	dir = Directory_new(SDCARD_PATH, 0);
+	Directory_free(dir);
+	dir = Directory_new(FAUX_RECENT_PATH, 0);
+	Directory_free(dir);
+	writeFile(COLLECTIONS_PATH "/Mine.txt", "/Roms/Game Boy (GB)/Zelda.gb\n");
+	dir = Directory_new(COLLECTIONS_PATH "/Mine.txt", 0);
+	Directory_free(dir);
+	CHECK(rows_asked == 0);
+	stub_dir_entries = NULL;
+}
+
 int main(void) {
 	state.recents = Array_new();
 	test_root_orders_collections_consoles_tools();
@@ -1209,5 +1259,6 @@ int main(void) {
 	test_hidden_names_follow_the_final_order();
 	test_select_keeps_the_row_in_view();
 	test_root_names_translated_for_display();
+	test_dir_entries_add_sorted_rows_to_card_folders();
 	CHECK_DONE();
 }

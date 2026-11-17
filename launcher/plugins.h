@@ -77,6 +77,9 @@ Array* Plugins_rootReplace(int* with_entries);
 // The first plugin list for a path it owns, or NULL.
 Array* Plugins_virtualDir(const char* path);
 
+// Lets plugins push rows onto a folder listed from the card.
+void Plugins_dirEntries(Array* entries, const char* dir_path);
+
 // Drops entries any plugin hides. Takes ownership of entries.
 Array* Plugins_filter(Array* entries, const char* dir_path);
 
@@ -110,6 +113,10 @@ const LaunchCmd* Plugins_launchReplacement(void);
 // ART_LIST_BG or one of the kinds only plugins supply (see art.h). Returns
 // 1 if a plugin answered.
 int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size);
+
+// The first plugin's full path of another entry whose art entry shows
+// when it has none of its own. Returns 1 if a plugin answered.
+int Plugins_artAlias(const Entry* entry, char* out, size_t size);
 
 // 1 while any plugin generates art.
 int Plugins_hasArtSurface(void);

@@ -372,7 +372,7 @@ void GameList_handleInput(void) {
 // or stock's .media folder, or else the first of a box, 3D box or
 // screenshot that a plugin supplies. Returns 1 with the path of the first
 // that exists.
-static int listArt(Entry* entry, char* out, size_t size) {
+static int listOwnArt(Entry* entry, char* out, size_t size) {
 	for (int i = 0, kind; (kind = Art_listKind(i)) >= 0; i++) {
 		if (!Plugins_artPath(entry, kind, out, size)) {
 			if (kind != ART_THUMBNAIL) continue;
@@ -382,6 +382,17 @@ static int listArt(Entry* entry, char* out, size_t size) {
 	}
 	out[0] = '\0';
 	return 0;
+}
+
+// The same, falling back to the art of the entry a plugin's art_alias names.
+static int listArt(Entry* entry, char* out, size_t size) {
+	if (listOwnArt(entry, out, size)) return 1;
+	char alias[MAX_PATH];
+	if (!Plugins_artAlias(entry, alias, sizeof(alias)) || exactMatch(alias, entry->path)) return 0;
+	Entry* other = Entry_new(alias, ENTRY_ROM);
+	int found = listOwnArt(other, out, size);
+	Entry_free(other);
+	return found;
 }
 
 // Plugins' art decorators under the selected entry's thumbnail, placed as

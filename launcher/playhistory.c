@@ -16,6 +16,7 @@
 #define SQL_DONE 101
 #define SQL_NULL 5
 #define SQL_OPEN_READONLY 0x00000001
+#define SQL_OPEN_READWRITE 0x00000002
 
 #define BUSY_TIMEOUT_MS 250
 
@@ -37,6 +38,8 @@ static struct {
 	long long (*column_int64)(sqlite3_stmt* stmt, int col);
 	const unsigned char* (*column_text)(sqlite3_stmt* stmt, int col);
 	const char* (*errmsg)(sqlite3* db);
+	int (*bind_text)(sqlite3_stmt* stmt, int index, const char* text, int bytes, void (*destructor)(void*));
+	int (*changes)(sqlite3* db);
 } sql;
 
 static char db_path[512];
@@ -126,6 +129,8 @@ static int bindLibrary(void) {
 	BIND(column_int64, "sqlite3_column_int64");
 	BIND(column_text, "sqlite3_column_text");
 	BIND(errmsg, "sqlite3_errmsg");
+	BIND(bind_text, "sqlite3_bind_text");
+	BIND(changes, "sqlite3_changes");
 	return 1;
 }
 
@@ -238,7 +243,7 @@ static int readSessions(sqlite3* db, long long since, long long now) {
 }
 
 // Logs why it's unknown, and returns NULL, when it can't be opened.
-static sqlite3* openDatabase(void) {
+static sqlite3* openDatabaseAs(int flags) {
 	struct stat st;
 	if (!db_path[0] || stat(db_path, &st) != 0 || !S_ISREG(st.st_mode)) {
 		note("play history: unknown, no %s", db_path[0] ? db_path : "database");
@@ -247,13 +252,17 @@ static sqlite3* openDatabase(void) {
 	if (!loadLibrary()) return NULL;
 
 	sqlite3* db = NULL;
-	if (sql.open_v2(db_path, &db, SQL_OPEN_READONLY, NULL) != SQL_OK) {
+	if (sql.open_v2(db_path, &db, flags, NULL) != SQL_OK) {
 		note("play history: unknown, can't open %s: %s", db_path, db ? sql.errmsg(db) : "out of memory");
 		if (db) sql.close(db);
 		return NULL;
 	}
 	sql.busy_timeout(db, BUSY_TIMEOUT_MS);
 	return db;
+}
+
+static sqlite3* openDatabase(void) {
+	return openDatabaseAs(SQL_OPEN_READONLY);
 }
 
 static void load(void) {
@@ -408,4 +417,55 @@ long long PlayHistory_day(int days_ago) {
 		day_cached[days_ago] = 1;
 	}
 	return seconds;
+}
+
+// Runs one statement with up to two text arguments. Returns the rows it
+// changed, or -1.
+static int run(sqlite3* db, const char* query, const char* a, const char* b) {
+	sqlite3_stmt* stmt = NULL;
+	if (sql.prepare_v2(db, query, -1, &stmt, NULL) != SQL_OK) return -1;
+	int ok = (!a || sql.bind_text(stmt, 1, a, -1, NULL) == SQL_OK) && (!b || sql.bind_text(stmt, 2, b, -1, NULL) == SQL_OK);
+	ok = ok && sql.step(stmt) == SQL_DONE;
+	sql.finalize(stmt);
+	return ok ? sql.changes(db) : -1;
+}
+
+int PlayHistory_move(const char* from, const char* to) {
+	char from_rel[512], to_rel[512];
+	if (!from || !to || !Play_relPath(roms_path, from, from_rel, sizeof(from_rel))
+			|| !Play_relPath(roms_path, to, to_rel, sizeof(to_rel)) || !strcmp(from_rel, to_rel)) return -1;
+	sqlite3* db = openDatabaseAs(SQL_OPEN_READWRITE);
+	if (!db) return -1;
+	// the name gametimectl gives a game: its file name without the extension
+	char name[512];
+	const char* base = strrchr(to_rel, '/');
+	snprintf(name, sizeof(name), "%s", base ? base + 1 : to_rel);
+	char* dot = strrchr(name, '.');
+	if (dot && dot != name) *dot = '\0';
+
+	int moved = -1;
+	if (run(db, "BEGIN IMMEDIATE;", NULL, NULL) >= 0) {
+		sqlite3_stmt* stmt = NULL;
+		int has_to = 0;
+		if (sql.prepare_v2(db, "SELECT 1 FROM rom WHERE file_path = ?1 LIMIT 1;", -1, &stmt, NULL) == SQL_OK) {
+			if (sql.bind_text(stmt, 1, to_rel, -1, NULL) == SQL_OK) has_to = sql.step(stmt) == SQL_ROW;
+			sql.finalize(stmt);
+		}
+		// onto the first row the new path already has, as gametimectl would
+		// find it, leaving the old row with no sessions; otherwise renamed
+		if (has_to) {
+			moved = run(db, "UPDATE play_activity SET rom_id = (SELECT id FROM rom WHERE file_path = ?2 ORDER BY id LIMIT 1) "
+				"WHERE rom_id IN (SELECT id FROM rom WHERE file_path = ?1);", from_rel, to_rel);
+		}
+		else {
+			moved = run(db, "UPDATE rom SET file_path = ?2 WHERE file_path = ?1;", from_rel, to_rel);
+			if (moved > 0 && run(db, "UPDATE rom SET name = ?1 WHERE file_path = ?2;", name, to_rel) < 0) moved = -1;
+		}
+		if (run(db, moved < 0 ? "ROLLBACK;" : "COMMIT;", NULL, NULL) < 0) moved = -1;
+	}
+	if (moved < 0) note("play history: couldn't move %s to %s: %s", from_rel, to_rel, sql.errmsg(db));
+	else note("play history: moved %s to %s (%i rows)", from_rel, to_rel, moved);
+	sql.close(db);
+	PlayHistory_invalidate();
+	return moved < 0 ? -1 : moved > 0;
 }

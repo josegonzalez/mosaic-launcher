@@ -128,6 +128,29 @@ int TG_has(const TGStore* store, int tag, const char* rel) {
 	return gameAt(&store->tags[tag], rel) >= 0;
 }
 
+int TG_rename(TGStore* store, const char* from, const char* to) {
+	if (!TG_validPath(from) || !TG_validPath(to) || !strcmp(from, to)) return -1;
+	int changed = 0;
+	for (int i = 0; i < store->count; i++) {
+		TGTag* tag = &store->tags[i];
+		int at = gameAt(tag, from);
+		if (at < 0) continue;
+		if (gameAt(tag, to) >= 0) {
+			free(tag->games[at]);
+			memmove(&tag->games[at], &tag->games[at + 1], (size_t)(tag->count - at - 1) * sizeof(char*));
+			tag->count--;
+		}
+		else {
+			char* copy = strdup(to);
+			if (!copy) return -1;
+			free(tag->games[at]);
+			tag->games[at] = copy;
+		}
+		changed++;
+	}
+	return changed;
+}
+
 int TG_set(TGStore* store, int index, const char* rel, int on) {
 	if (index < 0 || index >= store->count || !TG_validPath(rel)) return -1;
 	TGTag* tag = &store->tags[index];

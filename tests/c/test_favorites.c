@@ -442,5 +442,22 @@ int main(void) {
 	}
 	CHECK_STR(collection_setting, "Zelda games");
 
+	// favorites.move: a favorite in its place at its new path, or dropped
+	// when the new path is one already
+	writeText(COLLECTION, "/Roms/GB/Alpha.gb\n/Roms/PS/Game.m3u\n/Roms/GB/Tetris.gb\n");
+	CHECK(fakeCall("favorites.move", "from=" CARD "/Roms/PS/Game.m3u\nto=" CARD "/Roms/PS/Game/Game.m3u", out, sizeof(out)) > 0);
+	CHECK_STR(out, "moved=1");
+	readText(COLLECTION, saved, sizeof(saved));
+	CHECK_STR(saved, "/Roms/GB/Alpha.gb\n/Roms/PS/Game/Game.m3u\n/Roms/GB/Tetris.gb\n");
+	CHECK(fakeCall("favorites.move", "from=" CARD "/Roms/GB/Alpha.gb\nto=" CARD "/Roms/GB/Tetris.gb", out, sizeof(out)) > 0);
+	CHECK_STR(out, "moved=1");
+	readText(COLLECTION, saved, sizeof(saved));
+	CHECK_STR(saved, "/Roms/PS/Game/Game.m3u\n/Roms/GB/Tetris.gb\n");
+	CHECK(fakeCall("favorites.move", "from=" CARD "/Roms/GB/Alpha.gb\nto=" CARD "/Roms/GB/Zelda.gb", out, sizeof(out)) > 0);
+	CHECK_STR(out, "moved=0");
+	CHECK(fakeCall("favorites.move", "from=/elsewhere/a.gb\nto=" CARD "/Roms/GB/Zelda.gb", out, sizeof(out)) > 0);
+	CHECK_STR(out, "error=path");
+	CHECK(fakeCall("favorites.move", "from=" CARD "/Roms/GB/Tetris.gb", out, sizeof(out)) < 0);
+
 	CHECK_DONE();
 }

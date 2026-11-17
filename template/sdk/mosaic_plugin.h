@@ -1719,6 +1719,18 @@ typedef struct MosaicHost {
 	int (*index_entry)(const char* system, int index, MosaicIndexEntry* out);
 	int (*index_find)(const char* path, MosaicIndexEntry* out);
 	int (*index_refresh)(void);
+
+	// Moving a game's play history, from stock's play tracker, to another
+	// full path on the card, such as after a plugin moved its files.
+	// play_move gives the sessions recorded for from to to: the tracker's
+	// row for from is given the new path, or, when to already has one,
+	// its sessions go to that one. It returns 1 when it moved any, 0 when
+	// from had none, and -1 for a path outside Roms, the same path twice, a
+	// tracker that can't be written, or a call where cfg_get is refused,
+	// and the launcher logs each move. play_time and the rest read the
+	// tracker again afterwards. Check for it with
+	// MOSAIC_HOST_HAS(host, play_move).
+	int (*play_move)(const char* from, const char* to);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -2124,6 +2136,30 @@ typedef struct MosaicPlugin {
 	// let it open as usual. Plugins are asked in load order, and the first
 	// to return 1 takes it. Folders and toggles aren't asked about.
 	int (*entry_open)(const char* path, int type);
+
+	// Rows added to a folder, such as one row for a game made of several
+	// files. Asked, in load order, for each folder listed from the card
+	// (not the root, Roms, Recently Played, collections, an .m3u's discs
+	// or a plugin's virtual_dir), with the list as the launcher read it,
+	// before map.txt names, hiding and plugins' filter. It can read the
+	// list with list_count and list_get and push entries with list_push
+	// (from entry_new), which then go through the rest of the listing like
+	// the folder's own. An entry whose path the list already has is
+	// dropped. When any were added, the list is sorted by name again, as
+	// the launcher sorts a folder. It can't remove or reorder entries:
+	// hide them with filter.
+	void (*dir_entries)(MosaicList* list, const char* dir_path);
+
+	// Art from another entry, for an entry with none of its own, such as a
+	// game made of several files showing its first's. When no file answers
+	// for an entry's kind (an enum MosaicArtKind), from plugins' art_path
+	// or the launcher's own places, the launcher asks each plugin with
+	// art_alias, in load order: write the full path of the entry whose art
+	// it shows and return 1, or return 0. The first to answer wins, and
+	// that path's art of the kind is looked for as for any game, once: an
+	// alias's alias isn't followed. Generated art (art_surface) comes only
+	// after the alias has none either.
+	int (*art_alias)(const MosaicEntry* entry, char* out, size_t size);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

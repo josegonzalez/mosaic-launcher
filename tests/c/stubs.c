@@ -53,6 +53,11 @@ Array* Plugins_rootReplace(int* with_entries) {
 }
 Array* Plugins_virtualDir(const char* path) { (void)path; return NULL; }
 int Plugins_entryOpen(const char* path, int type) { (void)path; (void)type; return 0; }
+// A test sets stub_dir_entries to stand in for plugins' dir_entries.
+void (*stub_dir_entries)(Array* entries, const char* dir_path) = NULL;
+void Plugins_dirEntries(Array* entries, const char* dir_path) {
+	if (stub_dir_entries) stub_dir_entries(entries, dir_path);
+}
 Array* Plugins_filter(Array* entries, const char* dir_path) { (void)dir_path; return entries; }
 int Plugins_displayNames(Array* entries) { (void)entries; return 0; }
 // Tests set these to stand in for plugins' sort_compare and list_ready.

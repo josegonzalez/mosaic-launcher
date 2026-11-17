@@ -4,8 +4,8 @@ api=1
 category=Library
 summary=Adds a Favorites folder and a button to add or remove favorites.
 description=Adds a Favorites folder on the first screen, and a button to add or remove the selected game.
-# the favorites entry set, and the service first-run sets the collection through
-provides=sets.favorites,favorites.setup
+# the favorites entry set, the service first-run sets the collection through, and favorites.move, which points a favorite at a game's new path
+provides=sets.favorites,favorites.setup,favorites.move
 # the collection in Collections/ that holds favorites, and the folder's name on the root
 setting.collection=text|Collection|Favorites
 # favorites sort first in every folder but Recently Played, collections and Favorites

@@ -475,6 +475,14 @@ static int hostIndexRefresh(void) {
 	return 0;
 }
 
+static int hostPlayMove(const char* from, const char* to) {
+	LoadedPlugin* caller = callingPlugin("play_move");
+	if (!caller) return -1;
+	int moved = PlayHistory_move(from, to);
+	LOG_info("plugins: %s moved play history from %s to %s: %i\n", caller->id, from ? from : "", to ? to : "", moved);
+	return moved;
+}
+
 static int hostFontMissing(const char* text, char* out, size_t size) {
 	return Fallback_missing(text, out, size);
 }
@@ -1855,6 +1863,7 @@ static const MosaicHost host = {
 	.index_entry = hostIndexEntry,
 	.index_find = hostIndexFind,
 	.index_refresh = hostIndexRefresh,
+	.play_move = hostPlayMove,
 };
 
 ///////////////////////////////////////
@@ -2717,6 +2726,10 @@ Array* Plugins_virtualDir(const char* path) {
 	return NULL;
 }
 
+void Plugins_dirEntries(Array* entries, const char* dir_path) {
+	EACH_PLUGIN_WITH(dir_entries) p->dir_entries((MosaicList*)entries, dir_path);
+}
+
 Array* Plugins_filter(Array* entries, const char* dir_path) {
 	int any = 0;
 	EACH_PLUGIN_WITH(filter) any = 1;
@@ -2960,6 +2973,16 @@ int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
 		out[0] = '\0';
 		if (p->art_path((const MosaicEntry*)entry, mosaic_kind, out, size) && out[0]) return 1;
 	}
+	return 0;
+}
+
+int Plugins_artAlias(const Entry* entry, char* out, size_t size) {
+	if (!entry || !out || size == 0) return 0;
+	EACH_PLUGIN_WITH(art_alias) {
+		out[0] = '\0';
+		if (p->art_alias((const MosaicEntry*)entry, out, size) && out[0]) return 1;
+	}
+	out[0] = '\0';
 	return 0;
 }
 

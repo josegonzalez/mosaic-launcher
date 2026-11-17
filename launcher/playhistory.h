@@ -54,6 +54,14 @@ int PlayHistory_gamePath(const PlayGame* game, char* out, size_t size);
 // before the newest PLAY_SESSIONS_MAX sessions when there are more.
 long long PlayHistory_day(int days_ago);
 
+// Moves a game's history from one full path on the card to another, such
+// as after its files moved, opening the database read-write for it: its
+// rows are given the new path, or, when the new path already has one, its
+// sessions go to that one. Returns 1 when it moved any, 0 when from had
+// none, or -1 for a path outside Roms, the same path twice, or a database
+// that can't be written. Forgets the answers, as PlayHistory_invalidate.
+int PlayHistory_move(const char* from, const char* to);
+
 // At most the PLAY_GAMES_MAX most played games are read, and the newest
 // PLAY_SESSIONS_MAX sessions for PlayHistory_day.
 #define PLAY_GAMES_MAX 10000

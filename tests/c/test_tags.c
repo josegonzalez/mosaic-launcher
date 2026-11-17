@@ -650,7 +650,7 @@ static void testCopy(void) {
 	fake_provider_count = 0;
 	fakeSetRegister("smart:Zelda", sourceHas, sourceList);
 	start();
-	CHECK(fake_provider_count == 1 && !strcmp(fake_provider_names[0], "tags.copy"));
+	CHECK(fake_provider_count == 2 && !strcmp(fake_provider_names[0], "tags.copy") && !strcmp(fake_provider_names[1], "tags.move"));
 
 	// a new tag with the set's games now, a game folder by its .m3u
 	fake_set_changed[0] = '\0';
@@ -683,6 +683,44 @@ static void testCopy(void) {
 	fake_provider_count = 0;
 }
 
+static const char* move(const char* args) {
+	static char reply[MOSAIC_CALL_MAX];
+	CHECK(fakeCall("tags.move", args, reply, sizeof(reply)) >= 0);
+	return reply;
+}
+
+// A game's path moved in every tag, in its place, and merged where a tag
+// has the new path already.
+static void testMove(void) {
+	TGStore store_;
+	TG_init(&store_);
+	CHECK(TG_parse(&store_, "A\nA\t/Roms/PS/Game.m3u\nA\t/Roms/PS/Zelda.chd\nB\nB\t/Roms/PS/Game.m3u\nB\t/Roms/PS/Game/Game.m3u\nC\n") == 0);
+	CHECK(TG_rename(&store_, "/Roms/PS/Game.m3u", "/Roms/PS/Game/Game.m3u") == 2);
+	char* text = TG_format(&store_);
+	CHECK_STR(text, "A\nA\t/Roms/PS/Game/Game.m3u\nA\t/Roms/PS/Zelda.chd\nB\nB\t/Roms/PS/Game/Game.m3u\nC\n");
+	free(text);
+	CHECK(TG_rename(&store_, "/Roms/PS/Game.m3u", "/Roms/PS/Other.m3u") == 0);
+	CHECK(TG_rename(&store_, "/Roms/PS/Zelda.chd", "/Roms/PS/Zelda.chd") == -1);
+	CHECK(TG_rename(&store_, "Roms/PS/Zelda.chd", "/Roms/PS/Z.chd") == -1);
+	TG_free(&store_);
+
+	writeFile(STORE, "Puzzle\nPuzzle\t/Roms/PS/Game.m3u\n");
+	fake_set_count = 0;
+	fake_provider_count = 0;
+	start();
+	fake_set_changed[0] = '\0';
+	CHECK_STR(move("from=" CARD "/Roms/PS/Game.m3u\nto=" CARD "/Roms/PS/Game/Game.m3u"), "tags=1");
+	CHECK_STR(fakeSetList("tags:Puzzle"), CARD "/Roms/PS/Game/Game.m3u\n");
+	CHECK(strstr(fake_set_changed, "tags:Puzzle\n") != NULL);
+	CHECK_STR(move("from=" CARD "/Roms/PS/Game.m3u\nto=" CARD "/Roms/PS/Game/Game.m3u"), "tags=0");
+	CHECK_STR(move("from=/elsewhere/Game.m3u\nto=" CARD "/Roms/PS/Game.m3u"), "error=path");
+	char reply[64];
+	CHECK(fakeCall("tags.move", "from=" CARD "/Roms/PS/Game.m3u", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
+	quit();
+	fake_set_count = 0;
+	fake_provider_count = 0;
+}
+
 int main(void) {
 	CHECK(system("rm -rf '" TEST_SDCARD_PATH "'") == 0);
 	testNames();
@@ -692,5 +730,6 @@ int main(void) {
 	testChecklist();
 	testPlugin();
 	testCopy();
+	testMove();
 	CHECK_DONE();
 }

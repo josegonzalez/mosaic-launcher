@@ -1,0 +1,52 @@
+# Spanish for the multi-disc plugin, from po/multi-disc.pot. Not reviewed by
+# a native speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "%s is there already"
+msgstr "%s ya existe"
+
+msgid "%s.m3u names other files"
+msgstr "%s.m3u nombra otros archivos"
+
+msgid "COMBINE"
+msgstr "UNIR"
+
+msgid "Combine discs button"
+msgstr "Botón de unir discos"
+
+msgid "Combined into %s"
+msgstr "Unido en %s"
+
+msgid "Couldn't combine %s"
+msgstr "No se pudo unir %s"
+
+msgid "Couldn't make %s"
+msgstr "No se pudo crear %s"
+
+msgid "Couldn't write %s"
+msgstr "No se pudo escribir %s"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "Move the discs of %.120s into a folder of their own?"
+msgstr "¿Mover los discos de %.120s a una carpeta propia?"
+
+msgid "Multi-disc"
+msgstr "Multidisco"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "Shows the discs of a game, such as \"Game (Disc 1)\" and \"Game (Disc 2)\", as one game. Its first launch writes an .m3u listing them, and Y can move them into a folder of their own so you can change discs."
+msgstr "Muestra los discos de un juego, como \"Game (Disc 1)\" y \"Game (Disc 2)\", como un solo juego. La primera vez que se abre escribe un .m3u con ellos, e Y puede moverlos a una carpeta propia para poder cambiar de disco."
+
+msgid "Y"
+msgstr "Y"

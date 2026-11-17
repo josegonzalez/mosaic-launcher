@@ -68,6 +68,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [game-actions](../plugins/game-actions/README.md) - Renames, deletes or adds a game to a collection from one button.
 - [genre-view](../plugins/genre-view/README.md) - Gathers the same genre from every system into one Genres folder.
 - [hidden](../plugins/hidden/README.md) - Hides the games you pick from every list.
+- [multi-disc](../plugins/multi-disc/README.md) - Shows a game's loose "(Disc N)" files as one game, with an .m3u and its saves carried over.
 - [numeric-prefix](../plugins/numeric-prefix/README.md) - Sorts names that start with a number by that number.
 - [path-repair](../plugins/path-repair/README.md) - Keeps recents and collections pointing at games after you rename them.
 - [search](../plugins/search/README.md) - Finds games from every system by typing part of a name.

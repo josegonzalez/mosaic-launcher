@@ -70,6 +70,12 @@ int TG_has(const TGStore* store, int tag, const char* rel);
 // so, -1 for a bad tag or path, past TG_GAMES_MAX or when memory ran out.
 int TG_set(TGStore* store, int tag, const char* rel, int on);
 
+// Moves a game from one card-relative path to another in every tag, in
+// its place, such as after its files moved; a tag that has both keeps the
+// new one where it is and drops the old. Returns how many tags changed,
+// or -1 for a bad path or the same path twice.
+int TG_rename(TGStore* store, const char* from, const char* to);
+
 // A card-relative path a tag can hold: starts with a slash, no tab or
 // newline, no "." or ".." part, under TG_PATH_LEN.
 int TG_validPath(const char* rel);

@@ -1,0 +1,10 @@
+id=multi-disc
+name=Multi-disc
+api=1
+category=Library
+summary=Shows a game's loose "(Disc N)" files as one game, with an .m3u and its saves carried over.
+description=Shows the discs of a game, such as "Game (Disc 1)" and "Game (Disc 2)", as one game. Its first launch writes an .m3u listing them, and Y can move them into a folder of their own so you can change discs.
+# favorites and tags move a game's paths for it, when they're on
+optional=favorites,tags
+# the button Combine discs is on, alongside other plugins' actions there
+setting.button=choice|Combine discs button|Y|Y,L2,R2|button:multi-disc.combine
