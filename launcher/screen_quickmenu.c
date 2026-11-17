@@ -169,7 +169,7 @@ void QuickMenu_update(void) {
 
 	// background
 	if(!exists(newBgPath))
-		strncpy(newBgPath, fallbackBgPath, sizeof(newBgPath) - 1);
+		snprintf(newBgPath, sizeof(newBgPath), "%s", fallbackBgPath);
 	// the theme's wallpaper where the card has neither
 	Theme_fillWallpaper(THEME_WALL_QUICK, newBgPath, sizeof(newBgPath));
 

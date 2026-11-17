@@ -111,7 +111,8 @@ int main (int argc, char *argv[]) {
 	Plugins_switcherCheck();
 
 	// make sure we have no running games logged as active anymore (we might be launching back into the UI here)
-	system("gametimectl.elf stop_all");
+	int stopped = system("gametimectl.elf stop_all");
+	if (stopped != 0) LOG_info("gametimectl.elf stop_all returned %i\n", stopped);
 	// and forget what plugins read before stop_all closed the last session
 	PlayHistory_invalidate();
 
@@ -321,8 +322,6 @@ int main (int argc, char *argv[]) {
 			state.dirty = 0;
 		} else if(getAnimationDraw() || folderbgchanged || thumbchanged || is_scrolling) {
 			// honestly this whole thing is here only for the scrolling text, I set it now to run this at 30fps which is enough for scrolling text, should move this to seperate animation function eventually
-			Uint32 now = SDL_GetTicks();
-			Uint32 frame_start = now;
 			static char cached_display_name[256] = "";
 			// a plugin screen has none of the game list's layers; they wait for it
 			int on_plugin = currentScreen == SCREEN_PLUGIN;

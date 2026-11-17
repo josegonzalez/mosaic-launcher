@@ -316,6 +316,7 @@ static int animWorker(void* unused) {
 		free(finaltask);
 		SDL_UnlockMutex(animMutex);
 	}
+	return 0;
 }
 
 static void enqueueanmimtask(AnimTask* task) {

@@ -119,10 +119,11 @@ static void readStatus(Status* s) {
 	char line[256];
 	while (fgets(line, sizeof(line), p)) {
 		line[strcspn(line, "\r\n")] = '\0';
-		if (!strncmp(line, "status=", 7)) snprintf(s->status, sizeof(s->status), "%s", line + 7);
+		// each field keeps what fits of its value
+		if (!strncmp(line, "status=", 7)) snprintf(s->status, sizeof(s->status), "%.*s", (int)sizeof(s->status) - 1, line + 7);
 		else if (!strncmp(line, "enabled=", 8)) s->enabled = atoi(line + 8);
 		else if (!strncmp(line, "try_again=", 10)) s->try_again = atoi(line + 10);
-		else if (!strncmp(line, "release=", 8)) snprintf(s->release, sizeof(s->release), "%s", line + 8);
+		else if (!strncmp(line, "release=", 8)) snprintf(s->release, sizeof(s->release), "%.*s", (int)sizeof(s->release) - 1, line + 8);
 	}
 	pclose(p);
 }

@@ -4025,7 +4025,7 @@ void Plugins_screenInput(void) {
 		closeTo(top);
 		return;
 	}
-	int rc;
+	int rc = MOSAIC_SCREEN_STAY; // AS_SCREEN always runs the input, which sets it
 	if (s->hooks.input) {
 		LayoutButton map[LAYOUT_BUTTONS + 1];
 		int count = screenButtons(map);

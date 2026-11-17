@@ -533,9 +533,6 @@ void GameList_update(void) {
 				}
 			}
 			int max_w = (int)(screen->w - (screen->w * CFG_getGameArtWidth()));
-			int max_h = (int)(screen->h * 0.6);
-			int new_w = max_w;
-			int new_h = max_h;
 			if(found || made || swapped) {
 				ox = (int)(max_w) - SCALE1(BUTTON_MARGIN*5);
 				had_thumb = 1;
@@ -626,7 +623,6 @@ void GameList_render(void) {
 			SDL_UnlockMutex(thumbMutex);
 		}
 
-		SDL_Color text_color = uintToColour(THEME_COLOR4_255); // list text color
 		for (int i = state.top->start, j = 0; !list_layout_drawn && i < state.top->end; i++, j++) {
 			Entry* entry = state.top->entries->items[i];
 			char* entry_name = entry->name;

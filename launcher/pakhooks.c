@@ -36,7 +36,7 @@ int PakHooks_preLaunch(const char* path, int type) {
 	int go_ahead = 1;
 	for (int i = 0; i < hook_count && go_ahead; i++) {
 		char quoted[600];
-		snprintf(quoted, sizeof(quoted), "%s", hooks[i]);
+		snprintf(quoted, sizeof(quoted), "%.*s", (int)sizeof(hooks[0]) - 1, hooks[i]);
 		char cmd[1400];
 		// escapeSingleQuotes rewrites in place, so it gets its own copy
 		snprintf(cmd, sizeof(cmd), "sh '%s' >/dev/null 2>&1", escapeSingleQuotes(quoted));

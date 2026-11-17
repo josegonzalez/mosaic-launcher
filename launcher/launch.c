@@ -76,7 +76,12 @@ void readyResumePath(char* rom_path, int type) {
 	tmp = strrchr(path, '/') + 1;
 	strcpy(rom_file, tmp);
 
-	sprintf(state.slot_path, "%s/.minui/%s/%s.txt", SHARED_USERDATA_PATH, emu_name, rom_file); // /.userdata/.minui/<EMU>/<romname>.ext.txt
+	// /.userdata/.minui/<EMU>/<romname>.ext.txt, and no resume when it's too long to be one
+	if ((size_t)snprintf(state.slot_path, sizeof(state.slot_path), "%s/.minui/%s/%s.txt", SHARED_USERDATA_PATH, emu_name, rom_file)
+			>= sizeof(state.slot_path)) {
+		state.slot_path[0] = '\0';
+		return;
+	}
 	state.can_resume = exists(state.slot_path);
 
 	// slot_path contains a single integer representing the last used slot
@@ -84,8 +89,10 @@ void readyResumePath(char* rom_path, int type) {
 		char slot[16];
 		getFile(state.slot_path, slot, 16);
 		int s = atoi(slot);
-		sprintf(state.preview_path, "%s/.minui/%s/%s.%0d.bmp", SHARED_USERDATA_PATH, emu_name, rom_file, s); // /.userdata/.minui/<EMU>/<romname>.ext.<n>.bmp
-		state.has_preview = exists(state.preview_path);
+		// /.userdata/.minui/<EMU>/<romname>.ext.<n>.bmp, and no preview when it's too long to be one
+		int fits = (size_t)snprintf(state.preview_path, sizeof(state.preview_path), "%s/.minui/%s/%s.%0d.bmp", SHARED_USERDATA_PATH,
+			emu_name, rom_file, s) < sizeof(state.preview_path);
+		state.has_preview = fits && exists(state.preview_path);
 	}
 }
 void readyResume(Entry* entry) {
@@ -103,7 +110,7 @@ int autoResume(void) {
 
 	// make sure rom still exists
 	char sd_path[256];
-	sprintf(sd_path, "%s%s", SDCARD_PATH, path);
+	if ((size_t)snprintf(sd_path, sizeof(sd_path), "%s%s", SDCARD_PATH, path) >= sizeof(sd_path)) return 0; // too long to be on the card
 	if (!exists(sd_path)) return 0;
 
 	// make sure emu still exists
@@ -117,13 +124,14 @@ int autoResume(void) {
 
 	// putFile(LAST_PATH, FAUX_RECENT_PATH); // saveLast() will crash here because top is NULL
 
-	char act[256];
-	sprintf(act, "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));
-	system(act);
+	char act[sizeof(sd_path) + 32];
+	snprintf(act, sizeof(act), "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));
+	int started = system(act);
+	if (started != 0) LOG_info("%s returned %i\n", act, started);
 
-	char cmd[256];
+	char cmd[sizeof(emu_path) + sizeof(sd_path) + 8];
 	// dont escape sd_path again because it was already escaped for gametimectl and function modifies input str aswell
-	sprintf(cmd, "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
+	snprintf(cmd, sizeof(cmd), "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
 	putInt(RESUME_SLOT_PATH, AUTO_RESUME_SLOT);
 	queueNext(cmd);
 	return 1;
@@ -187,9 +195,9 @@ int runFnAction(int index) {
 	if (!rel[0]) return 0;
 
 	char pak_path[256];
-	snprintf(pak_path, sizeof(pak_path), "%s/Tools/%s/%s", SDCARD_PATH, PLATFORM, rel);
+	if ((size_t)snprintf(pak_path, sizeof(pak_path), "%s/Tools/%s/%s", SDCARD_PATH, PLATFORM, rel) >= sizeof(pak_path)) return 0; // too long to be a pak
 
-	char launch_path[256];
+	char launch_path[sizeof(pak_path) + 16];
 	snprintf(launch_path, sizeof(launch_path), "%s/launch.sh", pak_path);
 	if (!exists(launch_path)) return 0; // stale binding, eg. the pak was deleted
 	if (!Plugins_preLaunch(pak_path, ENTRY_PAK)) return 0;
@@ -202,7 +210,7 @@ int runFnAction(int index) {
 	}
 	if (queueReplacement(NULL)) return 1;
 
-	char cmd[256];
+	char cmd[sizeof(pak_path) + 16];
 	// NOTE: escapeSingleQuotes() modifies pak_path in place
 	snprintf(cmd, sizeof(cmd), "'%s/launch.sh'", escapeSingleQuotes(pak_path));
 	queueNext(cmd);
@@ -244,8 +252,8 @@ int openRom(char* path, char* last) {
 			strcpy(rom_file, strrchr(m3u_path, '/') + 1);
 
 			// get disc for state
-			char disc_path_path[256];
-			sprintf(disc_path_path, "%s/.minui/%s/%s.%s.txt", SHARED_USERDATA_PATH, emu_name, rom_file, slot); // /.userdata/arm-480/.minui/<EMU>/<romname>.ext.0.txt
+			char disc_path_path[sizeof(SHARED_USERDATA_PATH) + sizeof(emu_name) + sizeof(rom_file) + sizeof(slot) + 16];
+			snprintf(disc_path_path, sizeof(disc_path_path), "%s/.minui/%s/%s.%s.txt", SHARED_USERDATA_PATH, emu_name, rom_file, slot); // /.userdata/arm-480/.minui/<EMU>/<romname>.ext.0.txt
 
 			if (exists(disc_path_path)) {
 				// switch to disc path
@@ -271,13 +279,14 @@ int openRom(char* path, char* last) {
 	saveLast(last==NULL ? sd_path : last);
 	char target[256]; // before escapeSingleQuotes rewrites sd_path
 	strcpy(target, sd_path);
-	char act[256];
-	sprintf(act, "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));
-	system(act);
+	char act[sizeof(sd_path) + 32];
+	snprintf(act, sizeof(act), "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));
+	int started = system(act);
+	if (started != 0) LOG_info("%s returned %i\n", act, started);
 	if (queueReplacement(target)) return 1;
-	char cmd[256];
+	char cmd[sizeof(emu_path) + sizeof(sd_path) + 8];
 	// dont escape sd_path again because it was already escaped for gametimectl and function modifies input str aswell
-	sprintf(cmd, "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
+	snprintf(cmd, sizeof(cmd), "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
 	queueNext(cmd);
 	return 1;
 }

@@ -60,7 +60,6 @@ int getIndexChar(char* str) {
 }
 
 void getUniqueName(Entry* entry, char* out_name) {
-	char* filename = strrchr(entry->path, '/')+1;
 	char emu_tag[256];
 	getEmuName(entry->path, emu_tag);
 
@@ -634,7 +633,8 @@ int hasRecents(void) {
 			}
 
 			char sd_path[256];
-			sprintf(sd_path, "%s%s", SDCARD_PATH, path);
+			// a line too long for a path on the card is dropped, as it couldn't be one
+			if ((size_t)snprintf(sd_path, sizeof(sd_path), "%s%s", SDCARD_PATH, path) >= sizeof(sd_path)) continue;
 			// plugins only see lines stock would drop
 			char repaired[256];
 			if (!exists(sd_path) && repairRecent(sd_path, repaired, sizeof(repaired))) {
@@ -939,7 +939,8 @@ Array* getCollection(char* path) {
 			if (strlen(line)==0) continue; // skip empty lines
 
 			char sd_path[256];
-			sprintf(sd_path, "%s%s", SDCARD_PATH, line);
+			// a line too long for a path on the card is skipped, as it couldn't be one
+			if ((size_t)snprintf(sd_path, sizeof(sd_path), "%s%s", SDCARD_PATH, line) >= sizeof(sd_path)) continue;
 			if (exists(sd_path)) {
 				int type = suffixMatch(".pak", sd_path) ? ENTRY_PAK : ENTRY_ROM; // ???
 				Array_push(entries, Entry_new(sd_path, type));
