@@ -14,12 +14,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: plugin.txt
-msgid "Hold SELECT in a long list for a strip of the letters its games start with, move along it with the d-pad, and let go to jump to that letter. A quick press of SELECT still opens the game switcher."
+#: jump_letter.c
+msgid "AZ"
 msgstr ""
 
-#: jump_letter.c
-msgid "JUMP"
+#: plugin.txt
+msgid "Hold SELECT in a long list for a strip of the letters its games start with, move along it with the d-pad, and let go to jump to that letter. A quick press of SELECT still opens the game switcher."
 msgstr ""
 
 #: plugin.txt

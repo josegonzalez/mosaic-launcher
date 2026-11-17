@@ -334,7 +334,7 @@ static int init(const MosaicHost* h) {
 		say("unsupported: this launcher has no input filters, overlays or action list");
 		return 1;
 	}
-	if (host->register_action(ACTION_ID, "JUMP", 0, canStrip, runStrip, NULL) != 0) {
+	if (host->register_action(ACTION_ID, "AZ", 0, canStrip, runStrip, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 1;
 	}

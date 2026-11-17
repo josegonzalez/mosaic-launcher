@@ -12,8 +12,8 @@ msgstr ""
 msgid "Hold SELECT in a long list for a strip of the letters its games start with, move along it with the d-pad, and let go to jump to that letter. A quick press of SELECT still opens the game switcher."
 msgstr "Mantén SELECT en una lista larga para ver una tira con las letras por las que empiezan sus juegos, muévete por ella con la cruceta y suelta para saltar a esa letra. Una pulsación corta de SELECT sigue abriendo el selector de juegos."
 
-msgid "JUMP"
-msgstr "SALTAR"
+msgid "AZ"
+msgstr "AZ"
 
 msgid "Jump letter"
 msgstr "Saltar a letra"

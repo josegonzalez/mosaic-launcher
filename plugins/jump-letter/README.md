@@ -16,7 +16,7 @@ Turn on **Jump letter** in Launcher > Plugins ([how](../../docs/plugins.md#turni
 
 ## How to use
 
-Hold SELECT in a list. When the strip shows, press left or right (or up or down) to move along it, and let go of SELECT to jump to the lit letter. The name under the strip is the game you'll land on. Press B to close the strip without jumping. Letting go without moving leaves the selection where it was.
+Hold SELECT in a list; the game list's hints show it as SELECT AZ. When the strip shows, press left or right (or up or down) to move along it, and let go of SELECT to jump to the lit letter. The name under the strip is the game you'll land on. Press B to close the strip without jumping. Letting go without moving leaves the selection where it was.
 
 SELECT is used only when no other plugin has an action on it on the game list, such as [search](../search/README.md) with its Search button on SELECT; the Strip button setting picks another button. An [FN button](../../docs/glossary.md#fn-button) set to `action:jump-letter.strip` opens the strip until you press A to jump or B to close it.
 
