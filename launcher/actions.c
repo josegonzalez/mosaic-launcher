@@ -23,6 +23,29 @@ void Actions_register(const Action* action) {
 	registry[registered++] = action;
 }
 
+int BindingList_add(BindingList* list, const Binding* binding, int owner) {
+	if (list->count >= list->room) {
+		int room = list->room ? list->room * 2 : 16;
+		Binding* items = realloc(list->items, sizeof(Binding) * (size_t)room);
+		if (!items) return -1;
+		list->items = items;
+		int* owners = realloc(list->owners, sizeof(int) * (size_t)room);
+		if (!owners) return -1;
+		list->owners = owners;
+		list->room = room;
+	}
+	list->items[list->count] = *binding;
+	list->owners[list->count] = owner;
+	list->count++;
+	return 0;
+}
+
+void BindingList_free(BindingList* list) {
+	free(list->items);
+	free(list->owners);
+	memset(list, 0, sizeof(*list));
+}
+
 int Actions_full(void) {
 	return registered >= ACTIONS_MAX;
 }

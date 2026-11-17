@@ -2,6 +2,7 @@
 // what's available, in the order given. Bindings that share a button run
 // their one available action, or offer a menu of them.
 
+#include <stdlib.h>
 #include "check.h"
 #include "actions.h"
 
@@ -460,6 +461,42 @@ static void test_paths(void) {
 	Actions_setSelected(NULL);
 }
 
+// As many bindings as plugins make: more than the 16, and then 64, the
+// game list once kept.
+static void test_binding_list(void) {
+	enum { MANY = 130 };
+	BindingList list = { 0 };
+	for (int i = 0; i < MANY; i++) {
+		Binding b = { i % 2 ? BTN_A : BTN_Y, TRIGGER_PRESS, i % 2 ? "A" : "Y", i % 3 ? &openAction : &backAction, NULL, NULL };
+		CHECK(BindingList_add(&list, &b, i) == 0);
+	}
+	CHECK(list.count == MANY && list.room >= MANY);
+	CHECK(list.items[MANY - 1].button == BTN_A && list.owners[MANY - 1] == MANY - 1);
+	CHECK(list.items[0].button == BTN_Y && list.owners[0] == 0);
+	// every one is in effect, and an override takes its button from all of them
+	Binding* kept = malloc(sizeof(Binding) * MANY);
+	CHECK(Bindings_drop(list.items, list.count, NULL, 0, kept) == MANY);
+	const Binding takeA = { BTN_A, TRIGGER_PRESS, "A", &resumeAction, NULL, NULL };
+	CHECK(Bindings_drop(list.items, list.count, &takeA, 1, kept) == MANY / 2);
+	CHECK(kept[MANY / 2 - 1].button == BTN_Y);
+	// the last one bound still fires
+	open_ok = back_ok = 1;
+	ran = NULL;
+	pressed_button = BTN_Y;
+	CHECK(Bindings_dispatch(&list.items[MANY - 2], 1) == 1);
+	CHECK(ran != NULL);
+	pressed_button = -1;
+	free(kept);
+	// a declined init's go by cutting the count, and it grows again
+	list.count = 70;
+	Binding b = { BTN_X, TRIGGER_PRESS, "X", &resumeAction, NULL, NULL };
+	CHECK(BindingList_add(&list, &b, -1) == 0);
+	CHECK(list.count == 71 && list.items[70].button == BTN_X && list.owners[70] == -1);
+	BindingList_free(&list);
+	CHECK(list.items == NULL && list.owners == NULL && list.count == 0 && list.room == 0);
+	BindingList_free(&list); // twice is fine
+}
+
 int main(void) {
 	// dispatch: the fired, available binding runs
 	press(BTN_A);
@@ -537,6 +574,7 @@ int main(void) {
 	test_repeat();
 	test_override_repeat();
 	test_paths();
+	test_binding_list();
 
 	CHECK_DONE();
 }

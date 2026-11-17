@@ -2434,6 +2434,8 @@ void Plugins_quit(void) {
 	}
 	loaded_count = 0;
 	loadedRoom(0);
+	// their actions went with the plugins
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) BindingList_free(&pluginBindings[screen]);
 	theme_owner = strings_owner = -1;
 	listed = 0;
 	EntrySets_free(&sets);
@@ -2469,9 +2471,9 @@ int Plugins_count(void) {
 ///////////////////////////////////////
 // button bindings
 
-static Binding pluginBindings[SCREEN_COUNT][PLUGIN_BINDING_MAX];
-static int pluginBindingOwner[SCREEN_COUNT][PLUGIN_BINDING_MAX]; // index in loaded, or -1
-static int pluginBindingCount[SCREEN_COUNT];
+// bind_button's, as many as plugins make, each owned by its index in
+// loaded, or -1
+static BindingList pluginBindings[SCREEN_COUNT];
 static Binding overrideBindings[SCREEN_COUNT][PLUGIN_OVERRIDE_MAX];
 static int overrideOwner[SCREEN_COUNT][PLUGIN_OVERRIDE_MAX]; // index in loaded
 static int overrideCount[SCREEN_COUNT];
@@ -2533,23 +2535,23 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 	const ButtonInfo* info = buttonInfo(button);
 	if (!info) return -1;
 	const char* caller = Caller_current();
-	if (pluginBindingCount[screen] >= PLUGIN_BINDING_MAX) {
-		LOG_warn("plugins: %s can't bind %s on the game list to %s: there are %i bindings\n", caller ? caller : "?", info->glyph,
-			action->id, PLUGIN_BINDING_MAX);
+	LoadedPlugin* owner = caller ? loadedById(caller) : NULL;
+	Binding made;
+	memset(&made, 0, sizeof(made));
+	made.button = info->btn;
+	made.trigger = trigger == MOSAIC_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
+	made.glyph = info->glyph;
+	made.action = action;
+	BindingList* list = &pluginBindings[screen];
+	if (BindingList_add(list, &made, owner ? (int)(owner - loaded) : -1) != 0) {
+		LOG_warn("plugins: %s can't bind %s on the game list to %s: out of memory\n", caller ? caller : "?", info->glyph, action->id);
 		return -1;
 	}
-
-	LoadedPlugin* owner = caller ? loadedById(caller) : NULL;
-	pluginBindingOwner[screen][pluginBindingCount[screen]] = owner ? (int)(owner - loaded) : -1;
-	Binding* b = &pluginBindings[screen][pluginBindingCount[screen]++];
-	b->button = info->btn;
-	b->trigger = trigger == MOSAIC_TRIGGER_RELEASE ? TRIGGER_RELEASE : TRIGGER_PRESS;
-	b->glyph = info->glyph;
-	b->action = action;
+	const Binding* b = &list->items[list->count - 1];
 
 	int sharing = 0;
-	for (int i = 0; i < pluginBindingCount[screen]; i++) {
-		const Binding* other = &pluginBindings[screen][i];
+	for (int i = 0; i < list->count; i++) {
+		const Binding* other = &list->items[i];
 		if (other->button == b->button && other->trigger == b->trigger && other->action != action) sharing++;
 	}
 	if (sharing) LOG_info("plugins: %s on the game list is shared by %i actions; with more than one available it opens a menu\n", info->glyph, sharing + 1);
@@ -2559,16 +2561,16 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 // bind_button only appends, so a declined init's bindings are the ones past
 // the counts from before it ran.
 static void saveBindings(int* counts) {
-	for (int screen = 0; screen < SCREEN_COUNT; screen++) counts[screen] = pluginBindingCount[screen];
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) counts[screen] = pluginBindings[screen].count;
 }
 static void dropBindings(const int* counts) {
-	for (int screen = 0; screen < SCREEN_COUNT; screen++) pluginBindingCount[screen] = counts[screen];
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) pluginBindings[screen].count = counts[screen];
 }
 
 int Plugins_bindings(int screen, const Binding** bindings) {
 	if (screen < 0 || screen >= SCREEN_COUNT) return 0;
-	*bindings = pluginBindings[screen];
-	return pluginBindingCount[screen];
+	*bindings = pluginBindings[screen].items;
+	return pluginBindings[screen].count;
 }
 
 // Overrides are made from init, so the loader knows which plugin made each
@@ -2641,8 +2643,8 @@ static void dropOverrides(int owner) {
 // Plugin bindings an override took the button from never run; say so once.
 static void logOverridden(void) {
 	for (int screen = 0; screen < SCREEN_COUNT; screen++) {
-		for (int i = 0; i < pluginBindingCount[screen]; i++) {
-			const Binding* b = &pluginBindings[screen][i];
+		for (int i = 0; i < pluginBindings[screen].count; i++) {
+			const Binding* b = &pluginBindings[screen].items[i];
 			for (int j = 0; j < overrideCount[screen]; j++) {
 				if (overrideBindings[screen][j].button != b->button) continue;
 				LOG_info("plugins: %s overrides %s, so %s bound to it doesn't run\n",
@@ -2663,7 +2665,12 @@ int Plugins_overrides(int screen, const Binding** bindings) {
 // listing actions
 
 #define OWN_BINDINGS_MAX 16
-#define ACTION_BINDS_MAX (OWN_BINDINGS_MAX + SCREEN_COUNT * (PLUGIN_OVERRIDE_MAX + PLUGIN_BINDING_MAX) + FN_COUNT)
+// Room for every bind actionBinds lists.
+static int actionBindsRoom(void) {
+	int room = OWN_BINDINGS_MAX + SCREEN_COUNT * PLUGIN_OVERRIDE_MAX + FN_COUNT;
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) room += pluginBindings[screen].count;
+	return room;
+}
 
 // A BTN_* as an enum MosaicButton, MENU too, or -1.
 static int mosaicButton(int btn) {
@@ -2702,8 +2709,8 @@ static int actionBinds(ActionBind* out) {
 		}
 	}
 	for (int screen = 0; screen < SCREEN_COUNT; screen++) {
-		for (int i = 0; i < pluginBindingCount[screen]; i++) {
-			out[n++] = pluginBind(&pluginBindings[screen][i], MOSAIC_BIND_BUTTON, screen, pluginBindingOwner[screen][i]);
+		for (int i = 0; i < pluginBindings[screen].count; i++) {
+			out[n++] = pluginBind(&pluginBindings[screen].items[i], MOSAIC_BIND_BUTTON, screen, pluginBindings[screen].owners[i]);
 		}
 	}
 	n = ActionList_dropOverridden(out, n);
@@ -2734,10 +2741,15 @@ static int hostActionInfo(int index, MosaicActionInfo* out) {
 	int count = Actions_list(all, ACTIONS_MAX);
 	if (index < 0 || index >= count || index >= ACTIONS_MAX) return -1;
 	const Action* action = all[index];
-	static ActionBind binds[ACTION_BINDS_MAX];
+	ActionBind* binds = malloc(sizeof(ActionBind) * (size_t)actionBindsRoom());
+	if (!binds) {
+		LOG_warn("plugins: out of memory listing %s's buttons\n", action->id);
+		return -1;
+	}
 	int bind_count = actionBinds(binds);
 	MosaicActionInfo full;
 	ActionList_fill(&full, action->id, Action_label(action), action->plugin_id, action->takes_path, binds, bind_count);
+	free(binds);
 	return ActionList_copy(&full, out);
 }
 

@@ -162,7 +162,7 @@ typedef struct Effective {
 	int letter_count;
 	Binding actions[BINDING_COUNT + PLUGIN_OVERRIDE_MAX];
 	int action_count;
-	Binding shared[PLUGIN_BINDING_MAX];
+	Binding* shared; // as many as plugins bound; effectiveFree frees them
 	int shared_count;
 	const Binding* overrides;
 	int override_count;
@@ -179,7 +179,19 @@ static void effective(Effective* e) {
 	Bindings_keepChecks(overridden, e->override_count, letterBindings, LETTER_BINDINGS);
 	const Binding* extra;
 	int extra_count = Plugins_bindings(MOSAIC_SCREEN_GAMELIST, &extra);
-	e->shared_count = Bindings_drop(extra, extra_count, e->overrides, e->override_count, e->shared);
+	e->shared = extra_count > 0 ? malloc(sizeof(Binding) * (size_t)extra_count) : NULL;
+	if (extra_count > 0 && !e->shared) {
+		static int logged = 0;
+		if (!logged) LOG_warn("gamelist: out of memory, leaving plugins' buttons out\n");
+		logged = 1;
+	}
+	e->shared_count = e->shared ? Bindings_drop(extra, extra_count, e->overrides, e->override_count, e->shared) : 0;
+}
+
+static void effectiveFree(Effective* e) {
+	free(e->shared);
+	e->shared = NULL;
+	e->shared_count = 0;
 }
 
 // The actions a shared button offers, kept until the user picks one.
@@ -366,6 +378,7 @@ void GameList_handleInput(void) {
 	// plugins' bindings rank after the game list's own and the overrides
 	if (!Bindings_dispatch(e.actions, e.action_count))
 		Bindings_dispatchShared(e.shared, e.shared_count, openEntryMenu);
+	effectiveFree(&e);
 }
 
 // The built-in list's art for entry: its thumbnail, from plugins' art_path
@@ -560,6 +573,8 @@ void GameList_render(void) {
 			extra_label = Action_label(b->action);
 		}
 	}
+	// the hint is the action's, which outlives the list
+	effectiveFree(&e);
 	char* extra_label_tr = extra_glyph ? (char*)extra_label : NULL;
 
 	// the game list's hints are on whichever buttons their actions are on

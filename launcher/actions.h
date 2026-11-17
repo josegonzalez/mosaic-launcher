@@ -55,6 +55,21 @@ typedef struct Binding {
 
 #define ACTIONS_MAX 64
 
+// Bindings with their owners, as many as are added, such as plugins'
+// bind_button ones.
+typedef struct BindingList {
+	Binding* items;
+	int* owners; // one per binding, such as the index of the plugin that made it, or -1
+	int count;
+	int room;
+} BindingList;
+
+// Adds a copy of binding with its owner, growing the list. 0, or -1 when
+// out of memory, adding nothing.
+int BindingList_add(BindingList* list, const Binding* binding, int owner);
+// Frees the list, leaving it empty.
+void BindingList_free(BindingList* list);
+
 void Actions_register(const Action* action);
 // True when there are ACTIONS_MAX actions, so a new one can't register.
 int Actions_full(void);
