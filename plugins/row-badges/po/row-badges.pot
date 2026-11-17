@@ -15,11 +15,15 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: plugin.txt
-msgid "Adds small dots after a game's name for games you haven't played, your favorites, games with a tag, and tiers."
+msgid "Adds small dots after a game's name for games you haven't played, your favorites, games with a tag or a manual, and tiers."
 msgstr ""
 
 #: plugin.txt
 msgid "Favorite mark"
+msgstr ""
+
+#: plugin.txt
+msgid "Manual mark"
 msgstr ""
 
 #: plugin.txt

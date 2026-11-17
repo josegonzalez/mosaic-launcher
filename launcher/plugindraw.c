@@ -2,6 +2,7 @@
 #include "launcher.h"
 #include "drawmodel.h"
 #include "plugindraw.h"
+#include "shrinkmodel.h"
 
 #define COORD_MAX DRAW_COORD_MAX
 #define IMAGE_FILE_MAX (16 * 1024 * 1024)
@@ -121,6 +122,94 @@ MosaicSurface* PluginDraw_imageLoad(const char* owner, const char* path) {
 		LOG_warn("plugins: %s can't load %s: %ix%i is over %i a side\n", owner, path, decoded->w, decoded->h, DRAW_MAX_SIDE);
 	}
 	SDL_FreeSurface(decoded);
+	return (MosaicSurface*)image;
+}
+
+// Shrinks decoded into image a row at a time, each row converted to
+// ARGB8888 as it's fed in.
+static int shrinkInto(SDL_Surface* decoded, SDL_Surface* image) {
+	SDL_Surface* src = decoded;
+	SDL_Surface* converted = NULL;
+	SDL_Palette* palette = decoded->format->palette;
+	Uint32 colors[256];
+	int paletted = decoded->format->format == SDL_PIXELFORMAT_INDEX8 && palette;
+	if (paletted) {
+		// SDL_ConvertPixels can't read a palette, so its colours are looked up
+		for (int i = 0; i < 256; i++) {
+			SDL_Color c = i < palette->ncolors ? palette->colors[i] : (SDL_Color){ 0, 0, 0, 255 };
+			colors[i] = (Uint32)c.a << 24 | (Uint32)c.r << 16 | (Uint32)c.g << 8 | c.b;
+		}
+		Uint32 key;
+		if (SDL_GetColorKey(decoded, &key) == 0 && key < 256) colors[key] &= 0x00FFFFFFu;
+	}
+	else if (SDL_ISPIXELFORMAT_INDEXED(decoded->format->format)) {
+		// other paletted formats, converted whole
+		converted = SDL_ConvertSurfaceFormat(decoded, SDL_PIXELFORMAT_ARGB8888, 0);
+		if (!converted) return -1;
+		src = converted;
+	}
+	Shrink* shrink = Shrink_new(src->w, src->h, image->w, image->h);
+	Uint32* row = malloc(sizeof(Uint32) * src->w);
+	int rc = shrink && row ? 0 : -1;
+	if (rc == 0 && SDL_MUSTLOCK(src)) rc = SDL_LockSurface(src);
+	for (int y = 0; rc == 0 && y < src->h; y++) {
+		const Uint8* from = (const Uint8*)src->pixels + (size_t)y * src->pitch;
+		if (paletted) {
+			for (int x = 0; x < src->w; x++) row[x] = colors[from[x]];
+		}
+		else if (SDL_ConvertPixels(src->w, 1, src->format->format, from, src->pitch, SDL_PIXELFORMAT_ARGB8888, row,
+				src->w * 4) != 0) {
+			rc = -1;
+			break;
+		}
+		rc = Shrink_row(shrink, row, image->pixels, image->pitch / 4);
+	}
+	if (SDL_MUSTLOCK(src)) SDL_UnlockSurface(src);
+	if (rc == 0 && !Shrink_done(shrink)) rc = -1;
+	free(row);
+	Shrink_free(shrink);
+	if (converted) SDL_FreeSurface(converted);
+	return rc;
+}
+
+MosaicSurface* PluginDraw_imageLoadFit(const char* owner, const char* path, int max_w, int max_h) {
+	if (!owner || !owner[0] || !path || max_w < 1 || max_h < 1 || max_w > DRAW_MAX_SIDE || max_h > DRAW_MAX_SIDE) return NULL;
+	size_t size = 0;
+	unsigned char* data = PluginDraw_readImageFile(path, &size);
+	if (!data) {
+		LOG_warn("plugins: %s can't load %s: not a readable file up to %i MiB\n", owner, path, IMAGE_FILE_MAX / (1024 * 1024));
+		return NULL;
+	}
+	// the size from its header, before anything is decoded
+	int sw = 0, sh = 0, dw = 0, dh = 0;
+	if (Shrink_headerSize(data, size, &sw, &sh) != 0) {
+		LOG_warn("plugins: %s can't load %s: not a PNG or JPEG\n", owner, path);
+		free(data);
+		return NULL;
+	}
+	if (!Shrink_allowed(sw, sh)) {
+		LOG_warn("plugins: %s can't load %s: %ix%i is over %i a side or %i pixels\n", owner, path, sw, sh,
+			SHRINK_MAX_SIDE, SHRINK_MAX_PIXELS);
+		free(data);
+		return NULL;
+	}
+	Shrink_fit(sw, sh, max_w, max_h, &dw, &dh);
+	SDL_Surface* image = make(owner, dw, dh);
+	if (!image) {
+		free(data);
+		return NULL;
+	}
+	SDL_Surface* decoded = IMG_Load_RW(SDL_RWFromConstMem(data, (int)size), 1);
+	free(data);
+	int rc = -1;
+	if (!decoded) LOG_warn("plugins: %s can't load %s: %s\n", owner, path, IMG_GetError());
+	else if (decoded->w != sw || decoded->h != sh) LOG_warn("plugins: %s can't load %s: it isn't the size its header says\n", owner, path);
+	else if ((rc = shrinkInto(decoded, image)) != 0) LOG_warn("plugins: %s can't load %s: couldn't shrink it\n", owner, path);
+	if (decoded) SDL_FreeSurface(decoded);
+	if (rc != 0) {
+		PluginDraw_surfaceFree(owner, (MosaicSurface*)image);
+		return NULL;
+	}
 	return (MosaicSurface*)image;
 }
 

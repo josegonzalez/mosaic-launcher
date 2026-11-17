@@ -22,10 +22,12 @@ struct MosaicEntry {
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 
 static char cfg_unplayed[8] = "off", cfg_tiers[8] = "off", cfg_favorites[8] = "off", cfg_tagged[8] = "off";
+static char cfg_manual[8] = "off";
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "unplayed")) return cfg_unplayed;
 	if (!strcmp(key, "favorites")) return cfg_favorites;
 	if (!strcmp(key, "tagged")) return cfg_tagged;
+	if (!strcmp(key, "manual")) return cfg_manual;
 	if (!strcmp(key, "tiers")) return cfg_tiers;
 	return fallback;
 }
@@ -54,7 +56,7 @@ static int fakePlayCount(const char* path) { return strstr(path, "Tracked") ? 1 
 static int fakeThemeColor(int index) {
 	return index == MOSAIC_COLOR_ACCENT ? 0xAA0000 : index == MOSAIC_COLOR_LIST_TEXT ? 0xFFFFFF
 		: index == MOSAIC_COLOR_ACCENT2 ? 0x00AA00 : index == MOSAIC_COLOR_HINT ? 0x0000AA
-		: index == MOSAIC_COLOR_BACKGROUND ? 0x123456 : -1;
+		: index == MOSAIC_COLOR_BACKGROUND ? 0x123456 : index == MOSAIC_COLOR_MAIN ? 0x777777 : -1;
 }
 
 // the dots drawn since the last reset, and the background rings around them
@@ -113,6 +115,14 @@ static void rpgList(const char* name, void (*add)(const char*, void*), void* ctx
 static void puzzleList(const char* name, void (*add)(const char*, void*), void* ctx) {
 	(void)name;
 	add(GB "/Tagged.gb", ctx);
+}
+// the manuals plugin's set
+static const char* manual_extra = NULL;
+static void manualList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Both.gb", ctx);
+	add(GB "/Manual.gb", ctx);
+	if (manual_extra) add(manual_extra, ctx);
 }
 static int noHas(const char* name, const char* path) {
 	(void)name;
@@ -527,10 +537,35 @@ int main(void) {
 	CHECK(dots(GB "/Fav.gb", MOSAIC_ENTRY_ROM, "", 1) == 1); // the unplayed dot alone
 	fav_extra = NULL;
 	quit();
+	// the manual mark, after the others, off by default
+	fake_set_count = 0;
+	fakeSetRegister("favorites", noHas, favList);
+	fakeSetRegister("manual", noHas, manualList);
+	strcpy(cfg_unplayed, "off");
+	strcpy(cfg_tiers, "off");
+	CHECK(init(&fake) == 0);
+	CHECK(dots(GB "/Manual.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);
+	quit();
+	strcpy(cfg_favorites, "on");
+	strcpy(cfg_manual, "on");
+	CHECK(init(&fake) == 0);
+	CHECK(dots(GB "/Manual.gb", MOSAIC_ENTRY_ROM, "", 1) == 1 && drawn_rgb[0] == 0x777777);
+	CHECK(dots(GB "/Both.gb", MOSAIC_ENTRY_ROM, "", 1) == 2 && drawn_rgb[0] == 0x00AA00 && drawn_rgb[1] == 0x777777);
+	// read again when the set changes
+	manual_extra = GB "/Saved.gb";
+	redraws = 0;
+	CHECK(dots(GB "/Saved.gb", MOSAIC_ENTRY_ROM, "", 1) == 0);
+	set_changed_fn("launcher.set_changed", "name=manual", NULL);
+	CHECK(redraws == 1 && dots(GB "/Saved.gb", MOSAIC_ENTRY_ROM, "", 1) == 1);
+	manual_extra = NULL;
+	quit();
+	strcpy(cfg_manual, "off");
 	// a launcher without sets: no marks
 	fake.size = offsetof(MosaicHost, set_register);
+	strcpy(cfg_manual, "on");
 	CHECK(init(&fake) == 0);
-	CHECK(!show_favorites && !show_tagged);
+	CHECK(!show_favorites && !show_tagged && !show_manual);
+	strcpy(cfg_manual, "off");
 	quit();
 	fake.size = sizeof(MosaicHost);
 	strcpy(cfg_favorites, "off");

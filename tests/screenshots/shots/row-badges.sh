@@ -45,3 +45,13 @@ printf '%s\t%s\n' \
 	Puzzle "/Roms/Nintendo Entertainment System (FC)/Concentration Room.nes" >"$STATE/tags.txt"
 press "down a down a"
 shot tagged
+
+# Libbet and Thwaite have manuals, from tests/screenshots/manuals
+begin
+on manuals row-badges
+cfg row-badges manual=on
+mkdir -p "$CARD/Roms/Nintendo Entertainment System (FC)/.manuals" "$CARD/Roms/Game Boy (GB)/.manuals"
+cp -R "$ROOT/tests/screenshots/manuals/Thwaite" "$CARD/Roms/Nintendo Entertainment System (FC)/.manuals/"
+cp "$ROOT/tests/screenshots/manuals/Libbet and the Magic Floor.txt" "$CARD/Roms/Game Boy (GB)/.manuals/"
+press "down a down a"
+shot with-manuals

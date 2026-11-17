@@ -1,0 +1,55 @@
+# Spanish for the manuals plugin, from po/manuals.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "BACK"
+msgstr "ATRÁS"
+
+msgid "Can't show this page"
+msgstr "No se puede mostrar esta página"
+
+msgid "FIT"
+msgstr "AJUSTAR"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "Manual button"
+msgstr "Botón del manual"
+
+msgid "Manuals"
+msgstr "Manuales"
+
+msgid "NEXT"
+msgstr "SIG."
+
+msgid "PREV"
+msgstr "ANT."
+
+msgid "R2"
+msgstr "R2"
+
+msgid "READ"
+msgstr "LEER"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "Shows a game's manual or guide from Y on the game list: pages of images you can zoom into, or a text file. Put them in a .manuals folder beside the game, as stock keeps art in .media."
+msgstr "Muestra el manual o la guía de un juego con Y en la lista de juegos: páginas de imágenes que puedes ampliar, o un archivo de texto. Ponlos en una carpeta .manuals junto al juego, como stock guarda el arte en .media."
+
+msgid "This manual has no pages"
+msgstr "Este manual no tiene páginas"
+
+msgid "ZOOM"
+msgstr "ZOOM"
+
+msgid "none"
+msgstr "ninguno"

@@ -50,7 +50,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [layout-hero-rail](../plugins/layout-hero-rail/README.md) - Shows the game list as a row of cards under big art for the selected game.
 - [layout-shelf](../plugins/layout-shelf/README.md) - Shows the game list as cartridges standing on shelves.
 - [metadata-band](../plugins/metadata-band/README.md) - Shows a game's year, publisher and genre under its art.
-- [row-badges](../plugins/row-badges/README.md) - Adds dots after a game's name for unplayed, favorite and tagged games and for tiers.
+- [row-badges](../plugins/row-badges/README.md) - Adds dots after a game's name for unplayed, favorite and tagged games, games with a manual, and for tiers.
 - [switcher-plus](../plugins/switcher-plus/README.md) - Replaces the game switcher with your recent games in a choice of styles.
 - [theme-plus](../plugins/theme-plus/README.md) - Changes colours, fonts, text size and wallpapers from a theme.
 - [transitions](../plugins/transitions/README.md) - Picks how folders open and close and how the game switcher comes in.
@@ -70,6 +70,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [genre-view](../plugins/genre-view/README.md) - Gathers the same genre from every system into one Genres folder.
 - [hidden](../plugins/hidden/README.md) - Hides the games you pick from every list.
 - [jump-letter](../plugins/jump-letter/README.md) - Hold SELECT on the game list for a strip of its first letters, and let go to jump to one.
+- [manuals](../plugins/manuals/README.md) - Shows a game's manual or guide, as pages of images or a .txt, from Y on the game list.
 - [multi-disc](../plugins/multi-disc/README.md) - Shows a game's loose "(Disc N)" files as one game, with an .m3u and its saves carried over.
 - [numeric-prefix](../plugins/numeric-prefix/README.md) - Sorts names that start with a number by that number.
 - [path-repair](../plugins/path-repair/README.md) - Keeps recents and collections pointing at games after you rename them.

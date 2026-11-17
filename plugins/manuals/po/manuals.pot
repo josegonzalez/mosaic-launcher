@@ -1,0 +1,75 @@
+# The manuals plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: manuals\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: manuals.c
+msgid "BACK"
+msgstr ""
+
+#: manuals.c
+msgid "Can't show this page"
+msgstr ""
+
+#: manuals.c
+msgid "FIT"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: plugin.txt
+msgid "Manual button"
+msgstr ""
+
+#: plugin.txt
+msgid "Manuals"
+msgstr ""
+
+#: manuals.c
+msgid "NEXT"
+msgstr ""
+
+#: manuals.c
+msgid "PREV"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: manuals.c
+msgid "READ"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows a game's manual or guide from Y on the game list: pages of images you can zoom into, or a text file. Put them in a .manuals folder beside the game, as stock keeps art in .media."
+msgstr ""
+
+#: manuals.c
+msgid "This manual has no pages"
+msgstr ""
+
+#: manuals.c
+msgid "ZOOM"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""

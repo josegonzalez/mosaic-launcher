@@ -1,10 +1,10 @@
 // Drives the bundled search plugin. Its steps setting is a comma separated
 // list run from tick, one every 20 ticks from the 40th: action:<id> calls
-// run_action, and a, b, y, start, select, up, down, left and right press
-// that button, +<button> holds it down until -<button> lets it go, and any
-// other word waits (the desktop build reads the keyboard through SDL, so
-// it pushes key events with SDL_PushEvent, found with dlsym: a test-only
-// shortcut). With its sections setting, a folder's full path, it orders
+// run_action, and a, b, y, l1, r1, start, select, up, down, left and right
+// press that button, +<button> holds it down until -<button> lets it go,
+// and any other word waits (the desktop build reads the keyboard through
+// SDL, so it pushes key events with SDL_PushEvent, found with dlsym: a
+// test-only shortcut). With its sections setting, a folder's full path, it orders
 // that folder by the last word of each name, such as a year, and gives
 // that word as the entry's section with section_key, logging once what
 // entry_section answers when asked from inside it. It logs
@@ -65,6 +65,8 @@ static int scancode(const char* name) {
 	if (!strcmp(name, "a")) return 22;      // S
 	if (!strcmp(name, "b")) return 4;       // A
 	if (!strcmp(name, "y")) return 20;      // Q
+	if (!strcmp(name, "l1")) return 43;     // tab
+	if (!strcmp(name, "r1")) return 5;      // B
 	if (!strcmp(name, "start")) return 40;  // return
 	if (!strcmp(name, "select")) return 53; // `
 	if (!strcmp(name, "up")) return 82;     // up arrow

@@ -1466,9 +1466,9 @@ typedef struct MosaicHost {
 	// Entry sets: named sets of entries, by full path as entry_path
 	// returns it, that one plugin owns and others read, in place of
 	// reading each other's files. The first plugin to register a name owns
-	// it, and others can only read it: favorites, hidden, tags:<tag>,
-	// smart:<collection>, or <its own id>.<anything>; any other name is
-	// refused. Names are matched exactly. set_register registers the
+	// it, and others can only read it: favorites, hidden, manual,
+	// tags:<tag>, smart:<collection>, or <its own id>.<anything>; any
+	// other name is refused. Names are matched exactly. set_register registers the
 	// calling plugin's set, which the launcher knows as for cfg_get, with
 	// two callbacks the launcher calls on its thread, as the owner, each
 	// time a plugin asks, so the set is always current and the launcher
@@ -1744,6 +1744,18 @@ typedef struct MosaicHost {
 	// argument. Asked from inside a section_key it returns 0. Check for it
 	// with MOSAIC_HOST_HAS(host, entry_section).
 	int (*entry_section)(const MosaicEntry* entry, const char* dir_path, char* out, size_t size);
+
+	// Reads a PNG or JPEG as image_load does, shrunk to fit inside max_w by
+	// max_h (each 1 to 4096), keeping its shape, so a large image, such as
+	// a scanned page, takes only its shrunk size against the plugin's 32
+	// MiB. An image that fits already keeps its size; it's never enlarged.
+	// Its size is read from its header before it's decoded, and one over
+	// 8192 pixels a side or 40 million pixels is refused. Shrinking
+	// averages the pixels each result pixel covers. Returns the plugin's
+	// own surface, or NULL, logging why, for a bad argument, a file
+	// image_load wouldn't read, a size past those, or the budget. Check for
+	// it with MOSAIC_HOST_HAS(host, image_load_fit).
+	MosaicSurface* (*image_load_fit)(const char* plugin_id, const char* path, int max_w, int max_h);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

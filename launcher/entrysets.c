@@ -25,7 +25,7 @@ int EntrySets_nameAllowed(const char* name, const char* owner) {
 	for (size_t i = 0; i < len; i++) {
 		if ((unsigned char)name[i] < 0x20 || name[i] == 0x7f) return 0;
 	}
-	if (!strcmp(name, "favorites") || !strcmp(name, "hidden")) return 1;
+	if (!strcmp(name, "favorites") || !strcmp(name, "hidden") || !strcmp(name, "manual")) return 1;
 	if (prefixed(name, "tags:", 5) || prefixed(name, "smart:", 6)) return 1;
 	size_t own = strlen(owner);
 	return !strncmp(name, owner, own) && name[own] == '.' && name[own + 1];

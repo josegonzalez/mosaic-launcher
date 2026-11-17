@@ -1,0 +1,10 @@
+id=manuals
+name=Manuals
+api=1
+category=Library
+summary=Shows a game's manual or guide, as pages of images or a .txt, from Y on the game list.
+description=Shows a game's manual or guide from Y on the game list: pages of images you can zoom into, or a text file. Put them in a .manuals folder beside the game, as stock keeps art in .media.
+# the "manual" entry set: the games with a manual, for row-badges' mark
+provides=sets.manual
+# a second game list button for the manual, besides Y
+setting.button=choice|Manual button|none|none,L2,R2,SELECT|button:manuals.open

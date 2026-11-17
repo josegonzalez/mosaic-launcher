@@ -9,6 +9,8 @@ static void testNames(void) {
 	CHECK(EntrySets_nameAllowed("favorites", "favorites"));
 	CHECK(EntrySets_nameAllowed("favorites", "rival"));
 	CHECK(EntrySets_nameAllowed("hidden", "hidden"));
+	CHECK(EntrySets_nameAllowed("manual", "manuals"));
+	CHECK(EntrySets_nameAllowed("manual", "rival"));
 	CHECK(EntrySets_nameAllowed("tags:RPG", "tags"));
 	CHECK(EntrySets_nameAllowed("tags:Two words", "tags"));
 	CHECK(EntrySets_nameAllowed("smart:Mario", "smart-collections"));
@@ -22,6 +24,7 @@ static void testNames(void) {
 	CHECK(!EntrySets_nameAllowed("romm.liked", "music"));
 	CHECK(!EntrySets_nameAllowed("musicx.liked", "music"));
 	CHECK(!EntrySets_nameAllowed("Favorites", "favorites"));
+	CHECK(!EntrySets_nameAllowed("manuals", "rival"));
 	CHECK(!EntrySets_nameAllowed("tag:RPG", "tags"));
 	CHECK(!EntrySets_nameAllowed("", "music"));
 	CHECK(!EntrySets_nameAllowed(NULL, "music"));

@@ -1,0 +1,16 @@
+LIBBET AND THE MAGIC FLOOR
+Sample text manual for the screenshots
+
+This is a sample text manual, made for the manuals plugin's screenshots. A text manual is a plain .txt file in the .manuals folder beside the game, named after the game.
+
+Long lines are wrapped to the screen in the launcher's font. Up and down scroll a line at a time, and L1 and R1 a screen at a time.
+
+The manual opens where it was left the last time.
+
+Blank lines are kept, so a guide's paragraphs and lists keep their shape.
+
+- One
+- Two
+- Three
+
+The end of the sample.

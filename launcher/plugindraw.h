@@ -18,6 +18,7 @@ int PluginDraw_screenScale(void);
 // Surfaces owned by owner, a plugin id the loader has checked.
 MosaicSurface* PluginDraw_surfaceNew(const char* owner, int w, int h);
 MosaicSurface* PluginDraw_imageLoad(const char* owner, const char* path);
+MosaicSurface* PluginDraw_imageLoadFit(const char* owner, const char* path, int max_w, int max_h);
 MosaicSurface* PluginDraw_surfaceScale(const char* owner, const MosaicSurface* src, int w, int h, int fit);
 int PluginDraw_surfaceFree(const char* owner, MosaicSurface* surface);
 

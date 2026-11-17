@@ -102,7 +102,7 @@ int RB_stateDir(const char* name, char* out, size_t size);
 // else, such as "", "0", "6" or "B".
 int RB_tier(const char* value);
 
-#define RB_MAX_MARKS 3 // one-dot marks: unplayed, favorite and tagged
+#define RB_MAX_MARKS 4 // one-dot marks: unplayed, favorite, tagged and manual
 
 // Lays out marks one-dot marks (up to RB_MAX_MARKS, such as the unplayed
 // dot) and tier tier dots, in that order, each dot pixels square, gap

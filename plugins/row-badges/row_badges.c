@@ -6,9 +6,11 @@
 // "tiers" setting), each ringed in its background colour. A favorite mark,
 // in its secondary accent colour, marks games in the favorites entry set
 // (the "favorites" setting), and a tag mark, in its hint colour, games in
-// any tags:<name> set (the "tagged" setting). The sets are read when the
-// launcher builds a list, back from a game and when one of them changes
-// (launcher.set_changed), never while drawing. All are off by default.
+// any tags:<name> set (the "tagged" setting), and a manual mark, in its
+// main colour, games in the manual set the manuals plugin keeps (the
+// "manual" setting). The sets are read when the launcher builds a list,
+// back from a game and when one of them changes (launcher.set_changed),
+// never while drawing. All are off by default.
 //
 // A game counts as played when it's in recents, when stock or minarch
 // left a file for it: a save in Saves/<tag>/, a state in
@@ -39,10 +41,12 @@ static int show_unplayed = 0;
 static int show_tiers = 0;
 static int show_favorites = 0;
 static int show_tagged = 0;
+static int show_manual = 0;
 static char roms[MAX_PATH_LEN];
 static RBSet played;
 static RBSet favorites; // the favorites set's paths, while its mark is on
 static RBSet tagged;    // every tags:<name> set's paths, while its mark is on
+static RBSet manual;    // the manual set's paths, while its mark is on
 
 static int isOn(const char* key) {
 	return !strcmp(host->cfg_get(key, "off"), "on");
@@ -126,6 +130,19 @@ static void readSets(void) {
 		host->set_names(addTagged, NULL);
 		RB_setFinish(&tagged);
 	}
+	if (show_manual) {
+		RB_setFree(&manual);
+		int count = host->set_list("manual", addPath, &manual);
+		RB_setFinish(&manual);
+		// logged when it changes, for tests and bug reports
+		static int logged = -2;
+		if (count != logged) {
+			char message[64];
+			snprintf(message, sizeof(message), "manual mark on %i games", count < 0 ? 0 : count);
+			host->log(ID, message);
+			logged = count;
+		}
+	}
 }
 
 // Reads the card now while the dot is on, and otherwise the next time a
@@ -142,7 +159,8 @@ static void setChanged(const char* name, const char* payload, void* data) {
 	(void)data;
 	char set[256];
 	if (host->event_value(payload, "name", set, sizeof(set)) < 0) return;
-	if ((show_favorites && !strcmp(set, "favorites")) || (show_tagged && !strncmp(set, "tags:", 5))) {
+	if ((show_favorites && !strcmp(set, "favorites")) || (show_tagged && !strncmp(set, "tags:", 5))
+			|| (show_manual && !strcmp(set, "manual"))) {
 		readSets();
 		host->request_redraw();
 	}
@@ -187,6 +205,7 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	}
 	if (show_favorites && RB_hasGame(&favorites, path, is_dir)) colors[marks++] = MOSAIC_COLOR_ACCENT2;
 	if (show_tagged && RB_hasGame(&tagged, path, is_dir)) colors[marks++] = MOSAIC_COLOR_HINT;
+	if (show_manual && RB_hasGame(&manual, path, is_dir)) colors[marks++] = MOSAIC_COLOR_MAIN;
 	int tier = 0;
 	if (show_tiers) {
 		char value[16];
@@ -217,6 +236,7 @@ static void quit(void) {
 	RB_setFree(&played);
 	RB_setFree(&favorites);
 	RB_setFree(&tagged);
+	RB_setFree(&manual);
 	stale = 1;
 }
 
@@ -235,19 +255,21 @@ static int init(const MosaicHost* h) {
 	}
 	show_favorites = isOn("favorites");
 	show_tagged = isOn("tagged");
-	if ((show_favorites || show_tagged) && !MOSAIC_HOST_HAS(host, set_names)) {
-		host->log(ID, "this launcher has no entry sets, so the favorite and tag marks are off");
-		show_favorites = show_tagged = 0;
+	show_manual = isOn("manual");
+	if ((show_favorites || show_tagged || show_manual) && !MOSAIC_HOST_HAS(host, set_names)) {
+		host->log(ID, "this launcher has no entry sets, so the favorite, tag and manual marks are off");
+		show_favorites = show_tagged = show_manual = 0;
 	}
 	RB_setInit(&played);
 	RB_setInit(&favorites);
 	RB_setInit(&tagged);
-	if (show_favorites || show_tagged) host->subscribe("launcher.set_changed", setChanged, NULL);
+	RB_setInit(&manual);
+	if (show_favorites || show_tagged || show_manual) host->subscribe("launcher.set_changed", setChanged, NULL);
 	refresh();
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("games.played", providePlayed) != 0) host->log(ID, "couldn't provide games.played");
 	char message[128];
-	snprintf(message, sizeof(message), "unplayed %s, tiers %s, favorites %s, tagged %s", show_unplayed ? "on" : "off",
-		show_tiers ? "on" : "off", show_favorites ? "on" : "off", show_tagged ? "on" : "off");
+	snprintf(message, sizeof(message), "unplayed %s, tiers %s, favorites %s, tagged %s, manual %s", show_unplayed ? "on" : "off",
+		show_tiers ? "on" : "off", show_favorites ? "on" : "off", show_tagged ? "on" : "off", show_manual ? "on" : "off");
 	host->log(ID, message);
 	return 0;
 }

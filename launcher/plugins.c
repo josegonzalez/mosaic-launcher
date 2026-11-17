@@ -1598,6 +1598,9 @@ static MosaicSurface* hostSurfaceNew(const char* plugin_id, int w, int h) {
 static MosaicSurface* hostImageLoad(const char* plugin_id, const char* path) {
 	return isLoaded(plugin_id) ? PluginDraw_imageLoad(plugin_id, path) : NULL;
 }
+static MosaicSurface* hostImageLoadFit(const char* plugin_id, const char* path, int max_w, int max_h) {
+	return isLoaded(plugin_id) ? PluginDraw_imageLoadFit(plugin_id, path, max_w, max_h) : NULL;
+}
 static MosaicSurface* hostSurfaceScale(const char* plugin_id, const MosaicSurface* src, int w, int h, int fit) {
 	return isLoaded(plugin_id) ? PluginDraw_surfaceScale(plugin_id, src, w, h, fit) : NULL;
 }
@@ -1891,6 +1894,7 @@ static const MosaicHost host = {
 	.index_refresh = hostIndexRefresh,
 	.play_move = hostPlayMove,
 	.entry_section = hostEntrySection,
+	.image_load_fit = hostImageLoadFit,
 };
 
 ///////////////////////////////////////

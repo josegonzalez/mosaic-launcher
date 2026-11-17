@@ -42,7 +42,7 @@ enum EntrySetResult {
 void EntrySets_init(EntrySets* sets);
 void EntrySets_free(EntrySets* sets);
 
-// 1 when owner may register name: favorites, hidden, tags:<tag>,
+// 1 when owner may register name: favorites, hidden, manual, tags:<tag>,
 // smart:<collection>, or <owner>.<anything>, with something after each
 // prefix, shorter than SET_NAME_MAX and with no control characters.
 int EntrySets_nameAllowed(const char* name, const char* owner);

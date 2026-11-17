@@ -42,4 +42,6 @@ the following restrictions:
 
 Only add a title whose licence clearly allows redistribution, such as CC0, CC BY, CC BY-SA, MIT, zlib or the GPL, and add its row here with the files it brings.
 
+`manuals/` holds sample manuals made for the manuals shots: `Thwaite/01.png` and `02.png`, pages set in NextUI's `font1.ttf`, the first with Thwaite's thumbnail above (GPL-3.0-or-later, as that art is), and `Libbet and the Magic Floor.txt`, a text manual. Their text is CC0. The manuals loader case uses `Thwaite/01.png` as a page that is shrunk to fit.
+
 `arcade-names.dat` is a DAT made up for the arcade-names shots, CC0: its sets, titles and makers are invented, and it lists no ROMs. Its shots make an Arcade folder of empty `.zip` files named after its sets.
