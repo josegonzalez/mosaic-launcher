@@ -137,9 +137,16 @@ MosaicSurface* PluginDraw_imageLoad(const char* owner, const char* path) {
 		LOG_warn("plugins: %s can't load %s: not a readable file up to %i MiB\n", owner, path, IMAGE_FILE_MAX / (1024 * 1024));
 		return NULL;
 	}
-	// the size from its header, before it's decoded
+	// the size from its header, before it's decoded, which also refuses
+	// what would be refused below once decoded
+	int w = 0, h = 0;
+	int rc = Shrink_headerCheck(data, size, &w, &h);
 	char why[96];
-	const char* no = PluginDraw_imageRefusal(data, size, why, sizeof(why));
+	const char* no = refusal(rc, w, h, why, sizeof(why));
+	if (!no && rc == 0 && (w > DRAW_MAX_SIDE || h > DRAW_MAX_SIDE)) {
+		snprintf(why, sizeof(why), "%ix%i is over %i a side", w, h, DRAW_MAX_SIDE);
+		no = why;
+	}
 	if (no) {
 		LOG_warn("plugins: %s can't load %s: %s\n", owner, path, no);
 		free(data);

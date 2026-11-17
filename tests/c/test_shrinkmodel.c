@@ -225,6 +225,11 @@ static void testCheck(void) {
 	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0 && !Shrink_allowed(w, h));
 	n = png(d, 7000, 7000);
 	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0 && !Shrink_allowed(w, h));
+	// just over image_load's 4096 a side is within these limits, so the
+	// size is read for image_load to refuse it itself
+	n = png(d, 4097, 1);
+	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0);
+	CHECK(w == 4097 && h == 1 && Shrink_allowed(w, h));
 	// ordinary sizes are decoded
 	n = png(d, 640, 480);
 	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0);

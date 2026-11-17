@@ -114,6 +114,7 @@ static int init(const MosaicHost* h) {
 	MosaicSurface* bmp = host->image_load(ID, host->cfg_get("bmp", ""));
 	int bw = 0, bh = 0;
 	host->surface_size(bmp, &bw, &bh);
+	say("image wide png %s", made(host->image_load(ID, host->cfg_get("wide_png", ""))));
 	say("image huge png %s, huge jpeg %s, bmp %s %ix%i, left %s, right %s", made(host->image_load(ID, host->cfg_get("huge_png", ""))),
 		made(host->image_load(ID, host->cfg_get("huge_jpeg", ""))), made(bmp), bw, bh, pixel(bmp, 0, 0), pixel(bmp, 1, 0));
 	host->surface_free(ID, bmp);

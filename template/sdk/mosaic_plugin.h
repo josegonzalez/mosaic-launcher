@@ -918,12 +918,11 @@ typedef struct MosaicHost {
 	// the launcher frees any left after the plugin's quit, or when its init
 	// declines. surface_new makes a transparent w by h surface. image_load
 	// reads a PNG or JPEG from a regular file, refusing one whose header
-	// says it's over 8192 pixels a side or 40 million pixels before it's
-	// decoded. surface_scale makes a w by h copy of src, fitted by an enum
-	// MosaicFit. Each is up to 4096 pixels a side, and a plugin's surfaces
-	// together up to 32 MiB; past that, or for a bad argument or file, they
-	// return NULL. surface_free returns 0, or -1 for a surface this plugin
-	// didn't make.
+	// says it's over 4096 pixels a side before it's decoded. surface_scale
+	// makes a w by h copy of src, fitted by an enum MosaicFit. Each is up
+	// to 4096 pixels a side, and a plugin's surfaces together up to 32 MiB;
+	// past that, or for a bad argument or file, they return NULL.
+	// surface_free returns 0, or -1 for a surface this plugin didn't make.
 	MosaicSurface* (*surface_new)(const char* plugin_id, int w, int h);
 	MosaicSurface* (*image_load)(const char* plugin_id, const char* path);
 	MosaicSurface* (*surface_scale)(const char* plugin_id, const MosaicSurface* src, int w, int h, int fit);
