@@ -12,7 +12,7 @@ Turn on **Theme plus** in Launcher > Plugins ([how](../../docs/plugins.md#turnin
 
 The Theme setting names a theme. The default, `stock`, changes nothing. A theme can be:
 
-- A folder `<sd>/Themes/<name>/` with a `theme.txt` and, if it likes, its own font and wallpapers.
+- A folder `<sd>/Themes/<name>/` with a `theme.txt` and, if it likes, its own font and wallpapers, and a `sounds/` folder for [`ui-sounds`](../ui-sounds/README.md).
 - One of the themes it ships: `nord`, `dracula`, `solarized-dark`, `pocket-green` and `high-contrast` (colours only; the last has a 7:1 contrast and larger text).
 - The name of any of stock's palettes (the built-in ones and `<sd>/Palettes/*.txt`), as a colours-only theme. It shows only in the launcher while stock's Settings app and other apps keep your palette.
 
@@ -47,6 +47,7 @@ For example, one per line: `name=Night`, `palette=Catppuccin Mocha`, `color7=0x1
 - Font, fallback font and wallpaper paths are relative to the theme's folder and must stay inside it: no absolute paths, no `..`, and no symlink that leads out.
 - Any other key with a `.` in it, such as `led-status.colour=0x88C0D0`, is another plugin's. It's passed on to the launcher as it is, for that plugin to read with `theme_value` (see [plugin-api.md](../../docs/plugin-api.md) for the keys the bundled plugins read and the launcher's limits on them), and the launcher logs one it refuses.
 - Other unknown keys and lines without `=` are logged and ignored. A bad value is logged and dropped, as is anything the launcher then refuses.
+- A `sounds/` folder in the theme's folder holds its sounds for [`ui-sounds`](../ui-sounds/README.md), such as `move.wav` and `select.wav` (its page lists them), which play in place of ui-sounds' own. Like the paths above, it must stay inside the theme's folder.
 
 ## Screenshots
 
@@ -105,7 +106,7 @@ With `localization` on and a language picked, a theme whose font lacks some of t
 ## For plugin authors
 
 - Owns the `theme` slot (`slots=theme`) and applies the theme without writing to stock's settings.
-- Passes other plugins' keys (with a `.`) to `theme_value`. The bundled plugins' keys are `art-backdrop.dim`, `art-placeholder.style`, `layout-grid.columns`, `layout-grid.rows`, `layout-hero-rail.cards`, `layout-shelf.shelves` and `led-status.colour`.
+- Passes other plugins' keys (with a `.`) to `theme_value`. The bundled plugins' keys are `art-backdrop.dim`, `art-placeholder.style`, `layout-grid.columns`, `layout-grid.rows`, `layout-hero-rail.cards`, `layout-shelf.shelves`, `led-status.colour` and `ui-sounds.dir`. For a folder theme with a `sounds/` folder it adds `ui-sounds.dir`, the folder's full path, after the theme's own keys, so it wins over one `theme.txt` names. A path over the 255 bytes a key's value can be is logged and left out.
 - Registers the `theme-plus.pick` action, which the `button` setting follows, and a quick menu tile.
 - Provides the `theme-plus.setup` service (`provides=theme-plus.setup`), which [`first-run`](../first-run/README.md) sets the theme through. With no arguments it gives the Theme setting now as `theme=<id>` and, as its choices, what the Theme tile lists, Stock first, as `theme.<i>=<id>` and `theme.label.<i>=<its name, as the list shows it>` from 0, as many as fit, with `theme.count=<n>`, and `restart=0`. `theme=<id>` of one of them saves the setting and reloads the lists first, as picking it from the list does, so it shows at once; any other gives `error=theme` and saves nothing. Other keys are ignored.
 - Reads `<sd>/Themes/<name>/`, `<sd>/Palettes/*.txt`, and the stock background files named above.

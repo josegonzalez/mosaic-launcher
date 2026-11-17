@@ -813,6 +813,9 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   - `launcher.set_changed`, with `name=<set>`, when a set's owner calls `set_changed`;
   - `launcher.theme_changed`, with no payload, when the `theme` slot's owner puts a different theme in place (from `reload_lists`, as theme-plus's picker does) or its theme fails and stock's is back; the theme in place as the launcher starts isn't a change.
   - `launcher.index_ready`, with `count=<entries>`, when the card index changes (see `index_count` below).
+  - `launcher.menu_open` and `launcher.menu_close`, with `menu=quick` or `menu=dialog`, as the quick menu or a dialog (`confirm`, `keyboard`, `choose` and the PIN keyboard) opens or closes. A dialog over the quick menu leaves it open, so closing the dialog gives only its own `menu_close`. The quick menu the launcher starts on, as Settings' start screen, isn't an opening.
+  - `launcher.toast`, with no payload, as a toast shows, a plugin's (`toast`) or the launcher's own.
+  - `launcher.error`, with `what=pin`, when a wrong PIN is typed on the PIN keyboard (`ask_pin`).
 
   The bundled `romm` publishes `romm.download_done`, with `path=<the file the download launches>` and `name=<RomM's name for it>` (the path alone when both don't fit), as each game it downloads finishes, before the game launches; `gamification` counts it towards its RomM quest.
 
@@ -887,6 +890,7 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   - `art-placeholder.style`, `title` or `pattern`, at its `style` setting's `theme`.
   - `art-backdrop.dim`, a percentage from 0 to 100, at its `dim` setting's `theme` (50 without the key).
   - `layout-grid.columns` and `layout-grid.rows`, `auto` or a number, at its `columns` and `rows` settings' `theme`; `layout-shelf.shelves`, `auto` or 1 to 4, at its `shelves` setting's `theme`; and `layout-hero-rail.cards`, `small`, `medium` or `large`, at its `cards` setting's `theme`.
+  - `ui-sounds.dir`, the full path of a folder of the theme's sounds, `<name>.wav` for each sound, which win over the bundled ones. It isn't a default for a setting: there's none to choose. The bundled `theme-plus` sets it to a folder theme's `sounds/` folder, after the theme's own keys, so it wins over one the theme's `theme.txt` names. `ui-sounds` reads it again on `launcher.theme_changed`.
 
   This is how a theme chooses the layout: the plugin that owns the `layout` slot reads its own keys to pick among its own modes, such as a grid of one row. A theme can't turn a layout plugin on or pick which one owns the slot. That's the user's choice, in `plugins.txt` (which plugins are on and `slot.layout`), and it's made before any plugin loads, so before there's a theme to ask.
 
@@ -980,6 +984,16 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   ```c
   // a page shrunk to fit the screen, or at its own size when it's smaller
   MosaicSurface* page = host->image_load_fit(ID, path, host->screen_width(), host->screen_height());
+  ```
+
+- `sound_play(id, frames, count, rate, channels)` plays a short sound, such as a button's click, on a device of the launcher's own beside `audio_open`'s, so a plugin needs no device of its own for it, and it plays over another plugin's `audio_open` audio, such as a video preview's, and over `music`, where the system mixes two players. `frames` are signed 16-bit samples in the machine's byte order, `channels` (1 or 2) of them interleaved, at `rate` (8000 to 96000 Hz), at most 2 seconds of them; the launcher copies and converts them to its device's format, so they can be freed once it returns. A sound replaces the one playing, whichever plugin played it, and `NULL` frames with a `count` of 0 stops it. It returns 0, or -1 for a bad format, a sound over 2 seconds, or when the device can't open, and the launcher logs why. The device opens on the first sound, stays open on silence and closes after 5 seconds without one. The launcher closes it itself before a sleep and at quit, once the sound playing has played out, so a sound played for `launcher.launch` is heard before the game starts, and before powering off, without waiting. Volume and mute are the system's, on top of whatever scaling the plugin gives its samples. Main thread only.
+
+  `system_volume()` returns the system's volume as stock's Settings shows it, 0 to 20, where 0 is silent: while mute is on (the hold switch, with its Mute settings' volume), it's the volume mute leaves. On desktop, which has none, it returns -1, or for its tests the 0 to 20 in the `MOSAIC_LAUNCHER_VOLUME_FAKE` environment variable. It's cheap enough to ask for each sound. The bundled `ui-sounds` plays nothing while it's 0. Check for both with `MOSAIC_HOST_HAS(host, system_volume)`.
+
+  ```c
+  // a click at the plugin's own volume, silent while the system is muted
+  if (MOSAIC_HOST_HAS(host, system_volume) && host->system_volume() != 0)
+      host->sound_play(ID, click, click_frames, 22050, 1);
   ```
 
 ## Without writing C

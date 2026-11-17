@@ -1,0 +1,52 @@
+# Spanish for the ui-sounds plugin, from po/ui-sounds.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "0"
+msgstr "0"
+
+msgid "10"
+msgstr "10"
+
+msgid "100"
+msgstr "100"
+
+msgid "20"
+msgstr "20"
+
+msgid "30"
+msgstr "30"
+
+msgid "40"
+msgstr "40"
+
+msgid "50"
+msgstr "50"
+
+msgid "60"
+msgstr "60"
+
+msgid "70"
+msgstr "70"
+
+msgid "80"
+msgstr "80"
+
+msgid "90"
+msgstr "90"
+
+msgid "Plays short sounds as you move through the lists, select, go back, open menus and launch games, from your theme's sounds or a bundled set, at a volume of its own."
+msgstr "Reproduce sonidos cortos al moverte por las listas, seleccionar, volver, abrir menús e iniciar juegos, con los sonidos de tu tema o un conjunto incluido, con su propio volumen."
+
+msgid "UI sounds"
+msgstr "Sonidos de la interfaz"
+
+msgid "Volume"
+msgstr "Volumen"

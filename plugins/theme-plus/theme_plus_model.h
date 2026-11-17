@@ -159,12 +159,23 @@ void TP_overrideFallback(TPOverrides* overrides, const char* card, const char* v
 // The button size theme-plus uses with a ui_size pill, or 0 for stock's.
 int TP_buttonFor(int pill);
 
+// A folder theme's sounds, for the ui-sounds plugin, which theme-plus
+// passes on in the theme's extra keys as TP_SOUNDS_KEY.
+#define TP_SOUNDS_DIR "sounds"
+#define TP_SOUNDS_KEY "ui-sounds.dir"
+
+// The real path of dir's sounds/ folder into out: 0, or -1 when it has
+// none (or it leads outside dir), or -2 when it's longer than size.
+int TP_soundsDir(const char* dir, char* out, size_t size);
+
 // Fills theme (at stock's values, as the host hands it) from a parsed
 // theme in the folder dir (NULL for a palette theme), its palette (NULL
 // for none), then the overrides. A palette sets all seven colours and the
 // theme's own colours go over it. A path that won't resolve inside dir is
 // logged and dropped. The parsed theme's extra keys are passed on as they
-// are. Fields theme doesn't have (MOSAIC_THEME_HAS) are skipped.
+// are, and then, for a folder theme with a sounds/ folder, TP_SOUNDS_KEY
+// with its real path. Fields theme doesn't have (MOSAIC_THEME_HAS) are
+// skipped.
 void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const TPPalette* palette,
 	const TPOverrides* overrides, TPLogFn log, void* ctx);
 

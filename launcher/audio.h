@@ -35,4 +35,17 @@ void Audio_hostClose(const char* why, int drain);
 // Closes the device if id has it, logging why.
 void Audio_closeFor(const char* id, const char* why);
 
+// Plugins' sounds, on a device of their own (see audiomodel.h), main
+// thread only. Audio_sound plays count frames for plugin id in place of
+// the sound playing, opening the device first; NULL frames with a count
+// of 0 stops it. 0 or -1.
+int Audio_sound(const char* id, const short* frames, int count, int rate, int channels);
+
+// Call every frame: closes the sound device once it's been quiet a while.
+void Audio_soundTick(unsigned long now);
+
+// The launcher closes the sound device, logging why. With drain, it first
+// waits for the sound playing to play out. Does nothing when it isn't open.
+void Audio_soundHostClose(const char* why, int drain);
+
 #endif

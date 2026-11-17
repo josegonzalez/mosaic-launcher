@@ -9,6 +9,7 @@ void Toast_show(const char* text) {
 	snprintf(message, sizeof(message), "%s", text);
 	pending = 1;
 	state.dirty = 1;
+	Plugins_toastEvent();
 }
 
 void Toast_tick(unsigned long now) {

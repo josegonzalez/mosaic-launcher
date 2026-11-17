@@ -31,6 +31,9 @@ void Modal_keyboardHidden(const char* title, void (*on_done)(const char* text, v
 int Modal_choose(const char* title, const char* const* choices, int count, int selected,
 	void (*on_pick)(int index, void* data), void* data);
 
+// The screen an open dialog goes back to when it closes.
+int Modal_returnsTo(void);
+
 void Modal_handleInput(void);
 void Modal_render(void);
 

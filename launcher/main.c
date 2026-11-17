@@ -213,6 +213,8 @@ int main (int argc, char *argv[]) {
 		Screen_get(currentScreen)->handleInput();
 		// plugins' screens close once a built-in screen opened over them
 		Plugins_screensCheck();
+		// the quick menu opening or closing, for plugins' events
+		Plugins_menuCheck();
 
 		// so a thumbnail decoded meanwhile shows on this frame
 		ArtLoader_pump(0);

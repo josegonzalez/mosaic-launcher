@@ -59,3 +59,30 @@ int AudioDrain_ms(const AudioOwner* o, int queued) {
 	if (queued > AudioQueue_maxFrames(o)) queued = AudioQueue_maxFrames(o);
 	return framesMs(queued, o->rate) + framesMs(AUDIO_BUFFER_FRAMES, o->rate);
 }
+
+int AudioSound_maxFrames(int rate) {
+	return (int)((long long)rate * AUDIO_SOUND_MAX_MS / 1000);
+}
+
+int AudioSound_valid(const char* id, int count, int rate, int channels) {
+	if (!AudioSpec_valid(id, rate, channels)) return 0;
+	return count > 0 && count <= AudioSound_maxFrames(rate);
+}
+
+int AudioSound_drainMs(unsigned long bytes) {
+	long long frames = (long long)(bytes / (AUDIO_SOUND_CHANNELS * 2));
+	return framesMs(frames, AUDIO_SOUND_RATE) + framesMs(AUDIO_BUFFER_FRAMES, AUDIO_SOUND_RATE);
+}
+
+int AudioSound_idle(unsigned long bytes, unsigned long now, unsigned long* quiet_since) {
+	if (bytes > 0) {
+		*quiet_since = 0;
+		return 0;
+	}
+	// what's left in the device's buffer plays meanwhile
+	if (*quiet_since == 0) {
+		*quiet_since = now ? now : 1;
+		return 0;
+	}
+	return now - *quiet_since >= AUDIO_SOUND_LINGER_MS;
+}

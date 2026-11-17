@@ -4,7 +4,8 @@
 // The parts of plugins' audio that don't need SDL: which plugin has the
 // device and in what format, whether an open keeps, reopens or is refused,
 // how much a plugin may have queued, and how long the launcher waits for
-// what's queued to play out before it closes the device for a sleep.
+// what's queued to play out before it closes the device for a sleep, and
+// plugins' sounds, which play on a device of their own beside it.
 
 #define AUDIO_RATE_MIN 8000
 #define AUDIO_RATE_MAX 96000
@@ -66,5 +67,32 @@ int AudioQueue_frames(const AudioOwner* o, unsigned long bytes);
 // closing: them and the device's buffer, rounded up, or 0 while it's
 // paused, since nothing plays then.
 int AudioDrain_ms(const AudioOwner* o, int queued);
+
+// Plugins' sounds (host->sound_play): short clips, such as a button's
+// click, on a device of their own, opened in one format that every sound
+// is converted to, so a sound plays beside a plugin's audio_open device
+// where the system mixes two. A sound replaces the one playing. The
+// device closes once it's been quiet for AUDIO_SOUND_LINGER_MS.
+#define AUDIO_SOUND_MAX_MS 2000     // the longest sound sound_play takes
+#define AUDIO_SOUND_LINGER_MS 5000  // quiet for this long, the sound device closes
+#define AUDIO_SOUND_RATE 48000      // the sound device's format
+#define AUDIO_SOUND_CHANNELS 2
+
+// 1 for a sound sound_play takes: a plugin id the launcher can keep,
+// count frames (1 up to AUDIO_SOUND_MAX_MS of them at rate) and a rate
+// and channel count as AudioSpec_valid takes them.
+int AudioSound_valid(const char* id, int count, int rate, int channels);
+
+// The most frames sound_play takes at rate.
+int AudioSound_maxFrames(int rate);
+
+// The longest to wait, in ms, for bytes queued on the sound device to
+// play out, with its buffer, rounded up.
+int AudioSound_drainMs(unsigned long bytes);
+
+// Whether the sound device should close at now, with bytes still queued:
+// it keeps *quiet_since at when it went quiet (0 while it plays), and
+// returns 1 once it's been quiet for AUDIO_SOUND_LINGER_MS.
+int AudioSound_idle(unsigned long bytes, unsigned long now, unsigned long* quiet_since);
 
 #endif

@@ -745,13 +745,20 @@ static int hostHasPin(void) {
 static void (*pin_done)(int result, void* data);
 static void* pin_data;
 
+static void hostEvent(const char* name, const char* payload);
+
 static void pinTyped(const char* text, void* data) {
 	(void)data;
 	void (*done)(int, void*) = pin_done;
 	pin_done = NULL;
 	if (!done) return;
-	if (!text) done(MOSAIC_PIN_CANCELLED, pin_data);
-	else done(Pin_matches(PIN_PATH, text) ? MOSAIC_PIN_RIGHT : MOSAIC_PIN_WRONG, pin_data);
+	if (!text) {
+		done(MOSAIC_PIN_CANCELLED, pin_data);
+		return;
+	}
+	int right = Pin_matches(PIN_PATH, text);
+	if (!right) hostEvent(EVENT_HOST_PREFIX "error", "what=pin");
+	done(right ? MOSAIC_PIN_RIGHT : MOSAIC_PIN_WRONG, pin_data);
 }
 
 static void hostAskPin(const char* title, void (*on_done)(int result, void* data), void* data) {
@@ -1330,6 +1337,24 @@ static void hostEvent(const char* name, const char* payload) {
 	if (loaded_count > 0) eventPost(name, payload, NULL, 1);
 }
 
+// -1 before the first check, so the screen the launcher starts on isn't an opening
+static int quick_shown = -1;
+
+void Plugins_menuCheck(void) {
+	int shown = currentScreen == SCREEN_QUICKMENU || (currentScreen == SCREEN_MODAL && Modal_returnsTo() == SCREEN_QUICKMENU);
+	if (quick_shown >= 0 && shown != quick_shown)
+		hostEvent(shown ? EVENT_HOST_PREFIX "menu_open" : EVENT_HOST_PREFIX "menu_close", "menu=quick");
+	quick_shown = shown;
+}
+
+void Plugins_dialogEvent(int open) {
+	hostEvent(open ? EVENT_HOST_PREFIX "menu_open" : EVENT_HOST_PREFIX "menu_close", "menu=dialog");
+}
+
+void Plugins_toastEvent(void) {
+	hostEvent(EVENT_HOST_PREFIX "toast", "");
+}
+
 __attribute__((noinline))
 static int hostPublish(const char* name, const char* payload) {
 	char id[EVENT_OWNER_MAX];
@@ -1701,6 +1726,25 @@ static int hostAudioOpen(const char* plugin_id, int rate, int channels) {
 	return isLoaded(plugin_id) ? Audio_open(plugin_id, rate, channels) : -1;
 }
 
+static int hostSoundPlay(const char* plugin_id, const short* frames, int count, int rate, int channels) {
+	if (!Audio_onMain(plugin_id, "sound_play")) return -1;
+	return isLoaded(plugin_id) ? Audio_sound(plugin_id, frames, count, rate, channels) : -1;
+}
+
+// Desktop has no volume; its tests can stand one in with
+// MOSAIC_LAUNCHER_VOLUME_FAKE. Device builds never read it.
+static int hostSystemVolume(void) {
+	if (IS_DESKTOP) {
+		const char* fake = getenv("MOSAIC_LAUNCHER_VOLUME_FAKE");
+		if (!fake || !fake[0]) return -1;
+		char* end = NULL;
+		long volume = strtol(fake, &end, 10);
+		return *end == '\0' && volume >= 0 && volume <= 20 ? (int)volume : -1;
+	}
+	if (!InitializedSettings()) return -1;
+	return GetVolume();
+}
+
 static int hostArtFind(const MosaicEntry* entry, int kind, char* out, size_t size) {
 	return ArtLoader_find((const Entry*)entry, kind, out, size);
 }
@@ -1895,6 +1939,8 @@ static const MosaicHost host = {
 	.play_move = hostPlayMove,
 	.entry_section = hostEntrySection,
 	.image_load_fit = hostImageLoadFit,
+	.sound_play = hostSoundPlay,
+	.system_volume = hostSystemVolume,
 };
 
 ///////////////////////////////////////
@@ -2424,6 +2470,8 @@ void Plugins_quit(void) {
 	Tr_setOwner(NULL);
 	// before plugins' quit, which stop their threads: one still queueing meanwhile is refused
 	Audio_hostClose("at quit", 0);
+	// a sound for launcher.launch, just delivered, is heard before the game starts
+	Audio_soundHostClose("at quit", 1);
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) AS_PLUGIN(i) p->plugin->quit();
@@ -3334,12 +3382,14 @@ void Plugins_tick(unsigned long now) {
 	// what was published since the last frame, before plugins' ticks
 	eventsDeliver();
 	EACH_PLUGIN_WITH(tick) p->tick(now);
+	Audio_soundTick(now);
 }
 
 void Plugins_beforeSleep(void) {
 	EACH_PLUGIN_WITH(before_sleep) p->before_sleep();
 	// what plugins left open, once its last sound plays out
 	Audio_hostClose("before sleep", 1);
+	Audio_soundHostClose("before sleep", 1);
 	Bluetooth_pause(1);
 	Wifi_pause(1);
 }
@@ -3361,6 +3411,7 @@ void Plugins_afterResume(void) {
 void Plugins_beforePoweroff(void) {
 	EACH_PLUGIN_WITH(before_poweroff) p->before_poweroff();
 	Audio_hostClose("before powering off", 0);
+	Audio_soundHostClose("before powering off", 0);
 	// so the device doesn't power off in a plugin's colour
 	const char* holder = Leds_holder();
 	if (holder) {

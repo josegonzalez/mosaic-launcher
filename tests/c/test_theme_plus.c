@@ -650,6 +650,51 @@ static void testApply(void) {
 	TP_apply(&t, &extras, CARD "/Themes/Night", mocha, &none, NULL, NULL);
 	CHECK_STR(t.extra, "untouched");
 
+	// a folder theme's sounds/ folder, for ui-sounds, after the theme's own keys
+	char sounds[PATH_MAX];
+	CHECK(TP_soundsDir(CARD "/Themes/Night", sounds, sizeof(sounds)) == -1);
+	writeFile(CARD "/Themes/Night/sounds/move.wav", "wav");
+	real(CARD "/Themes/Night/sounds", want);
+	CHECK(TP_soundsDir(CARD "/Themes/Night", sounds, sizeof(sounds)) == 0);
+	CHECK_STR(sounds, want);
+	CHECK(TP_soundsDir(CARD "/Themes/Night", sounds, 4) == -2);
+	CHECK(TP_soundsDir(NULL, sounds, sizeof(sounds)) == -1);
+	snprintf(extras.extra, sizeof(extras.extra), "led-status.colour=0x112233\nui-sounds.dir=/elsewhere\n");
+	t = stockTheme();
+	TP_apply(&t, &extras, CARD "/Themes/Night", mocha, &none, NULL, NULL);
+	char line[PATH_MAX * 2];
+	snprintf(line, sizeof(line), "led-status.colour=0x112233\nui-sounds.dir=/elsewhere\nui-sounds.dir=%s\n", want);
+	CHECK_STR(t.extra, line);
+	// a palette theme has no folder
+	t = stockTheme();
+	TP_apply(&t, NULL, NULL, mocha, &none, NULL, NULL);
+	CHECK(t.extra[0] == '\0');
+	// a file named sounds, or a link out of the theme's folder, isn't one
+	CHECK(system("rm -rf '" CARD "/Themes/Night/sounds'") == 0);
+	writeFile(CARD "/Themes/Night/sounds", "a file");
+	CHECK(TP_soundsDir(CARD "/Themes/Night", sounds, sizeof(sounds)) == -1);
+	CHECK(unlink(CARD "/Themes/Night/sounds") == 0);
+	writeFile(CARD "/Elsewhere/sounds/move.wav", "wav");
+	CHECK(symlink("../../Elsewhere/sounds", CARD "/Themes/Night/sounds") == 0);
+	CHECK(TP_soundsDir(CARD "/Themes/Night", sounds, sizeof(sounds)) == -1);
+	t = stockTheme();
+	TP_apply(&t, &parsed, CARD "/Themes/Night", mocha, &none, NULL, NULL);
+	CHECK(strstr(t.extra, "ui-sounds.dir") == NULL);
+	CHECK(unlink(CARD "/Themes/Night/sounds") == 0);
+	// a path too long for a value is logged
+	char deep[PATH_MAX];
+	snprintf(deep, sizeof(deep), CARD "/Themes/%0200d/%080d", 0, 0);
+	char file[PATH_MAX + 32];
+	snprintf(file, sizeof(file), "%s/sounds/move.wav", deep);
+	writeFile(file, "wav");
+	t = stockTheme();
+	logCount = 0;
+	TP_apply(&t, &extras, deep, mocha, &none, capture, NULL);
+	CHECK_STR(t.extra, "led-status.colour=0x112233\nui-sounds.dir=/elsewhere\n");
+	CHECK(loggedLine("the path of its sounds folder is longer than the 255 bytes a key's value can be, so ui-sounds won't play it"));
+	snprintf(file, sizeof(file), "rm -rf '%s'", deep);
+	CHECK(system(file) == 0);
+
 	// an older launcher's smaller MosaicTheme: fields past its size are left alone
 	t = stockTheme();
 	t.size = offsetof(MosaicTheme, font);

@@ -1,0 +1,71 @@
+# The ui-sounds plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: ui-sounds\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: plugin.txt
+msgid "0"
+msgstr ""
+
+#: plugin.txt
+msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "100"
+msgstr ""
+
+#: plugin.txt
+msgid "20"
+msgstr ""
+
+#: plugin.txt
+msgid "30"
+msgstr ""
+
+#: plugin.txt
+msgid "40"
+msgstr ""
+
+#: plugin.txt
+msgid "50"
+msgstr ""
+
+#: plugin.txt
+msgid "60"
+msgstr ""
+
+#: plugin.txt
+msgid "70"
+msgstr ""
+
+#: plugin.txt
+msgid "80"
+msgstr ""
+
+#: plugin.txt
+msgid "90"
+msgstr ""
+
+#: plugin.txt
+msgid "Plays short sounds as you move through the lists, select, go back, open menus and launch games, from your theme's sounds or a bundled set, at a volume of its own."
+msgstr ""
+
+#: plugin.txt
+msgid "UI sounds"
+msgstr ""
+
+#: plugin.txt
+msgid "Volume"
+msgstr ""

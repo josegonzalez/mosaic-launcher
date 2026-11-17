@@ -172,3 +172,108 @@ void Audio_closeFor(const char* id, const char* why) {
 	pthread_mutex_unlock(&lock);
 	if (mine) LOG_info("plugins: closed %s's audio %s\n", id, why);
 }
+
+///////////////////////////////////////
+// plugins' sounds, on the main thread only, so they need no lock
+
+static SDL_AudioDeviceID sound_device = 0;
+static unsigned long sound_quiet = 0;
+
+static void soundCloseNow(void) {
+	if (!sound_device) return;
+	SDL_CloseAudioDevice(sound_device);
+	sound_device = 0;
+	sound_quiet = 0;
+	SDL_QuitSubSystem(SDL_INIT_AUDIO);
+}
+
+static int soundOpen(const char* id) {
+	if (sound_device) return 0;
+	if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+		LOG_warn("plugins: %s can't open the sound device: %s\n", id, SDL_GetError());
+		return -1;
+	}
+	SDL_AudioSpec want;
+	SDL_AudioSpec have;
+	memset(&want, 0, sizeof(want));
+	want.freq = AUDIO_SOUND_RATE;
+	want.format = AUDIO_S16SYS;
+	want.channels = AUDIO_SOUND_CHANNELS;
+	want.samples = AUDIO_BUFFER_FRAMES;
+	want.callback = NULL;
+	sound_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+	if (!sound_device) {
+		LOG_warn("plugins: %s can't open the sound device: %s\n", id, SDL_GetError());
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
+		return -1;
+	}
+	sound_quiet = 0;
+	SDL_PauseAudioDevice(sound_device, 0);
+	LOG_info("plugins: %s opened the sound device (%s)\n", id, SDL_GetCurrentAudioDriver());
+	return 0;
+}
+
+int Audio_sound(const char* id, const short* frames, int count, int rate, int channels) {
+	if (!Audio_onMain(id, "sound_play")) return -1;
+	if (!frames && count == 0) {
+		if (sound_device) SDL_ClearQueuedAudio(sound_device);
+		return 0;
+	}
+	if (!frames || !AudioSound_valid(id, count, rate, channels)) {
+		LOG_warn("plugins: %s can't play a sound of %i frames at %i Hz with %i channels\n", id ? id : "(null)", count, rate,
+			channels);
+		return -1;
+	}
+	SDL_AudioCVT cvt;
+	int built = SDL_BuildAudioCVT(&cvt, AUDIO_S16SYS, (Uint8)channels, rate, AUDIO_S16SYS, AUDIO_SOUND_CHANNELS, AUDIO_SOUND_RATE);
+	if (built < 0) {
+		LOG_warn("plugins: %s can't play a sound at %i Hz with %i channels: %s\n", id, rate, channels, SDL_GetError());
+		return -1;
+	}
+	int bytes = count * channels * 2;
+	cvt.len = bytes;
+	cvt.buf = malloc((size_t)bytes * (size_t)(cvt.len_mult > 0 ? cvt.len_mult : 1));
+	if (!cvt.buf) return -1;
+	memcpy(cvt.buf, frames, (size_t)bytes);
+	if (built > 0 && SDL_ConvertAudio(&cvt) != 0) {
+		LOG_warn("plugins: %s can't convert a sound: %s\n", id, SDL_GetError());
+		free(cvt.buf);
+		return -1;
+	}
+	int len = built > 0 ? cvt.len_cvt : bytes;
+	if (soundOpen(id) != 0) {
+		free(cvt.buf);
+		return -1;
+	}
+	// in place of the one playing
+	SDL_ClearQueuedAudio(sound_device);
+	int rc = SDL_QueueAudio(sound_device, cvt.buf, (Uint32)len) == 0 ? 0 : -1;
+	free(cvt.buf);
+	sound_quiet = 0;
+	return rc;
+}
+
+void Audio_soundTick(unsigned long now) {
+	if (!sound_device) return;
+	if (AudioSound_idle(SDL_GetQueuedAudioSize(sound_device), now, &sound_quiet)) {
+		soundCloseNow();
+		LOG_info("plugins: closed the sound device after %i s quiet\n", AUDIO_SOUND_LINGER_MS / 1000);
+	}
+}
+
+void Audio_soundHostClose(const char* why, int drain) {
+	if (!sound_device) return;
+	Uint32 drained = 0;
+	if (drain) {
+		Uint32 wait = AudioSound_drainMs(SDL_GetQueuedAudioSize(sound_device));
+		Uint32 buffer_ms = AudioSound_drainMs(0);
+		Uint32 start = SDL_GetTicks();
+		while (SDL_GetTicks() - start < wait && SDL_GetQueuedAudioSize(sound_device) > 0) SDL_Delay(5);
+		Uint32 spent = SDL_GetTicks() - start;
+		if (spent < wait) SDL_Delay(wait - spent < buffer_ms ? wait - spent : buffer_ms);
+		drained = SDL_GetTicks() - start;
+	}
+	soundCloseNow();
+	if (drain) LOG_info("plugins: closed the sound device %s, after %u ms for it to play out\n", why, (unsigned)drained);
+	else LOG_info("plugins: closed the sound device %s\n", why);
+}

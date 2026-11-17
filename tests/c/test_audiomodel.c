@@ -110,9 +110,45 @@ static void testDrain(void) {
 	CHECK(AudioDrain_ms(&o, 48000) == 0);
 }
 
+static void testSound(void) {
+	CHECK(AudioSound_maxFrames(48000) == 48000 * AUDIO_SOUND_MAX_MS / 1000);
+	CHECK(AudioSound_valid("ui-sounds", 1, 22050, 1));
+	CHECK(AudioSound_valid("ui-sounds", AudioSound_maxFrames(22050), 22050, 2));
+	// longer than the cap, none, or a bad format or id
+	CHECK(!AudioSound_valid("ui-sounds", AudioSound_maxFrames(22050) + 1, 22050, 2));
+	CHECK(!AudioSound_valid("ui-sounds", 0, 22050, 2));
+	CHECK(!AudioSound_valid("ui-sounds", -1, 22050, 2));
+	CHECK(!AudioSound_valid("ui-sounds", 100, 1000, 2));
+	CHECK(!AudioSound_valid("ui-sounds", 100, 22050, 3));
+	CHECK(!AudioSound_valid(NULL, 100, 22050, 2));
+	CHECK(!AudioSound_valid("", 100, 22050, 2));
+
+	int buffer_ms = (AUDIO_BUFFER_FRAMES * 1000 + AUDIO_SOUND_RATE - 1) / AUDIO_SOUND_RATE;
+	CHECK(AudioSound_drainMs(0) == buffer_ms);
+	// half a second of the device's stereo frames
+	CHECK(AudioSound_drainMs(AUDIO_SOUND_RATE / 2 * AUDIO_SOUND_CHANNELS * 2) == 500 + buffer_ms);
+	CHECK(AudioSound_drainMs(4) == 1 + buffer_ms);
+
+	// quiet from the first look with nothing queued, closing a linger later
+	unsigned long quiet = 0;
+	CHECK(AudioSound_idle(400, 1000, &quiet) == 0);
+	CHECK(quiet == 0);
+	CHECK(AudioSound_idle(0, 2000, &quiet) == 0);
+	CHECK(quiet == 2000);
+	CHECK(AudioSound_idle(0, 2000 + AUDIO_SOUND_LINGER_MS - 1, &quiet) == 0);
+	CHECK(AudioSound_idle(0, 2000 + AUDIO_SOUND_LINGER_MS, &quiet) == 1);
+	// another sound starts it again
+	CHECK(AudioSound_idle(4, 9000, &quiet) == 0);
+	CHECK(quiet == 0);
+	// at a clock of 0, quiet is still kept
+	CHECK(AudioSound_idle(0, 0, &quiet) == 0);
+	CHECK(quiet == 1);
+}
+
 int main(void) {
 	testOpen();
 	testQueue();
 	testDrain();
+	testSound();
 	CHECK_DONE();
 }

@@ -1757,6 +1757,33 @@ typedef struct MosaicHost {
 	// image_load wouldn't read, a size past those, or the budget. Check for
 	// it with MOSAIC_HOST_HAS(host, image_load_fit).
 	MosaicSurface* (*image_load_fit)(const char* plugin_id, const char* path, int max_w, int max_h);
+
+	// Short sounds, such as a button's click or a menu opening, on a
+	// device of the launcher's own beside audio_open's, so they need no
+	// device of the plugin's and play over what another plugin or music
+	// plays, where the system mixes two players. sound_play plays count
+	// frames of signed 16-bit samples in the machine's byte order,
+	// channels (1 or 2) of them interleaved, at rate (8000 to 96000 Hz),
+	// at most 2 seconds of them, in place of the sound playing, whichever
+	// plugin played it; NULL frames with a count of 0 stops it. The frames
+	// are copied, so they can be freed or changed once it returns. It
+	// returns 0, or -1 for a bad format, a sound that's too long, or when
+	// the device can't open. The device opens on the first sound, stays
+	// open on silence and closes after 5 seconds without one; the
+	// launcher closes it itself before a sleep and at quit, once the
+	// sound playing plays out (so one played for launcher.launch is
+	// heard before the game starts), and before powering off. Volume and
+	// mute are the system's, on top of the plugin's own scaling of its
+	// samples. Main thread only.
+	//
+	// system_volume returns the system's volume as stock's Settings
+	// shows it, 0 to 20, where 0 is silent: what mute (the hold switch's
+	// Mute settings) leaves it at while it's on. On desktop, which has
+	// none, it returns -1, or the MOSAIC_LAUNCHER_VOLUME_FAKE environment
+	// variable's 0 to 20, for its tests. It's cheap enough to ask for
+	// each sound. Check for both with MOSAIC_HOST_HAS(host, system_volume).
+	int (*sound_play)(const char* plugin_id, const short* frames, int count, int rate, int channels);
+	int (*system_volume)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

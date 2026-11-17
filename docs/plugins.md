@@ -124,5 +124,6 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [second-screen](../plugins/second-screen/README.md) - Shows the selected game in a second window (experimental, desktop only).
 - [system-info](../plugins/system-info/README.md) - Shows the device's battery, Wi-Fi, storage, memory and uptime.
 - [tasks](../plugins/tasks/README.md) - Runs shell scripts of your own from the Tasks folder on the card, on their own or for the selected game.
+- [ui-sounds](../plugins/ui-sounds/README.md) - Plays short sounds as you move through the menus, select, go back and launch games.
 
 <!-- plugins:end -->

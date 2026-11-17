@@ -1,0 +1,10 @@
+id=ui-sounds
+name=UI sounds
+api=1
+category=Extras
+summary=Plays short sounds as you move through the menus, select, go back and launch games.
+description=Plays short sounds as you move through the lists, select, go back, open menus and launch games, from your theme's sounds or a bundled set, at a volume of its own.
+# for other plugins: sound=<move, select, back, error, launch, menu_open, menu_close or toast> plays it
+provides=ui-sounds.play
+# the sounds' own volume, under the system's; 0 turns them off
+setting.volume=choice|Volume|50|0,10,20,30,40,50,60,70,80,90,100

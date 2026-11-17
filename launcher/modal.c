@@ -37,7 +37,10 @@ static const char* takeCaller(char* out, size_t size) {
 }
 
 static void openModal(int what) {
-	if (kind == MODAL_NONE) return_to = currentScreen;
+	if (kind == MODAL_NONE) {
+		return_to = currentScreen;
+		Plugins_dialogEvent(1);
+	}
 	kind = what;
 	currentScreen = SCREEN_MODAL;
 	state.dirty = 1;
@@ -48,6 +51,11 @@ static void closeModal(void) {
 	currentScreen = return_to;
 	state.dirty = 1;
 	folderbgchanged = 1; // the dialog cleared every layer; repaint the background
+	Plugins_dialogEvent(0);
+}
+
+int Modal_returnsTo(void) {
+	return return_to;
 }
 
 void Modal_confirm(const char* text, const char* yes, void (*on_yes)(void* data), void* data) {

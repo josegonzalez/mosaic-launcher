@@ -40,7 +40,8 @@
 # bundled favorites and hidden plugins' entry sets, two that publish and
 # subscribe to events, one that calls the bundled providers' services and
 # two that provide their own, one that reads the keys the bundled theme
-# plus passes on with its theme,
+# plus passes on with its theme, one that opens a toast, a dialog and the
+# PIN keyboard for the bundled UI sounds plugin to play sounds for,
 # and one that crashes
 # during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play

@@ -1,0 +1,7 @@
+ui-sounds' bundled sounds
+
+move.wav, select.wav, back.wav, error.wav, launch.wav, menu_open.wav,
+menu_close.wav and toast.wav are sine tones written by
+plugins/ui-sounds/tools/make-sounds.py in mosaic-launcher. They're the
+project's own work, dedicated to the public domain under CC0 1.0
+Universal: https://creativecommons.org/publicdomain/zero/1.0/

@@ -458,6 +458,40 @@ static void applyPath(char* field, size_t size, const char* key, const char* dir
 	copyText(field, size, real);
 }
 
+int TP_soundsDir(const char* dir, char* out, size_t size) {
+	char root[PATH_MAX];
+	char real[PATH_MAX];
+	char path[PATH_MAX * 2];
+	if (!dir || !realpath(dir, root)) return -1;
+	snprintf(path, sizeof(path), "%s/%s", dir, TP_SOUNDS_DIR);
+	if (!realpath(path, real)) return -1;
+	size_t len = strlen(root);
+	struct stat st;
+	if (strncmp(real, root, len) != 0 || real[len] != '/' || stat(real, &st) != 0 || !S_ISDIR(st.st_mode)) return -1;
+	if (strlen(real) >= size) return -2;
+	copyText(out, size, real);
+	return 0;
+}
+
+// The theme's sounds/ folder, for ui-sounds, after the theme's own keys
+// in extra, so it wins over one the theme names itself.
+static void addSounds(char* extra, size_t size, const char* dir, TPLogFn log, void* ctx) {
+	char sounds[MOSAIC_THEME_EXTRA_VALUE_MAX + 1];
+	int rc = TP_soundsDir(dir, sounds, sizeof(sounds));
+	if (rc == -2) {
+		say(log, ctx, "the path of its %s folder is longer than the %d bytes a key's value can be, so ui-sounds won't play it",
+			TP_SOUNDS_DIR, MOSAIC_THEME_EXTRA_VALUE_MAX);
+	}
+	if (rc != 0) return;
+	size_t used = strlen(extra);
+	size_t len = strlen(TP_SOUNDS_KEY) + 1 + strlen(sounds) + 1;
+	if (used + len >= size) {
+		say(log, ctx, "%s doesn't fit in the %d bytes of keys for other plugins, dropped", TP_SOUNDS_KEY, (int)size - 1);
+		return;
+	}
+	snprintf(extra + used, size - used, "%s=%s\n", TP_SOUNDS_KEY, sounds);
+}
+
 void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const TPPalette* palette,
 		const TPOverrides* overrides, TPLogFn log, void* ctx) {
 	if (MOSAIC_THEME_HAS(theme, colors)) {
@@ -509,4 +543,5 @@ void TP_apply(MosaicTheme* theme, const TPTheme* parsed, const char* dir, const 
 
 	if (parsed && parsed->hint_style && MOSAIC_THEME_HAS(theme, hint_style)) theme->hint_style = parsed->hint_style;
 	if (parsed && MOSAIC_THEME_HAS(theme, extra)) copyText(theme->extra, sizeof(theme->extra), parsed->extra);
+	if (parsed && dir && MOSAIC_THEME_HAS(theme, extra)) addSounds(theme->extra, sizeof(theme->extra), dir, log, ctx);
 }

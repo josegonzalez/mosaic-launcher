@@ -246,6 +246,18 @@ const char* Plugins_currentScreen(void);
 // once a built-in screen opened over them, such as from an FN button.
 void Plugins_screensCheck(void);
 
+// launcher.menu_open and launcher.menu_close for the quick menu: once a
+// frame after input, as it opens or closes, a dialog over it counting as
+// still open. The quick menu the launcher starts on isn't an opening.
+void Plugins_menuCheck(void);
+
+// launcher.menu_open and launcher.menu_close for a dialog (modal.c), as
+// one opens (open 1) or closes (open 0).
+void Plugins_dialogEvent(int open);
+
+// launcher.toast, as a toast shows.
+void Plugins_toastEvent(void);
+
 // Closes every open screen, running their exit, as for a launch or quit.
 void Plugins_screensClose(void);
 
