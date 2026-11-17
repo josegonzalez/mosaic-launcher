@@ -180,15 +180,32 @@ int Bindings_shared(const Binding* bindings, int count, int button, int trigger,
 	return n;
 }
 
-#define SHARED_MAX 16
+// The actions past BINDINGS_SHARED_MAX on a shared button, which its menu
+// leaves out; said once, the first time it happens.
+static void sharedDropped(const Binding* bindings, int count, const Binding* pressed, int n) {
+	static int warned = 0;
+	if (warned) return;
+	warned = 1;
+	const Action** all = malloc(sizeof(const Action*) * (size_t)n);
+	if (!all) return;
+	Bindings_shared(bindings, count, pressed->button, pressed->trigger, all, n);
+	for (int i = BINDINGS_SHARED_MAX; i < n; i++) {
+		LOG_warn("plugins: %s's action %s is left off %s's menu, which lists %i actions at most\n",
+			all[i]->plugin_id ? all[i]->plugin_id : "launcher", all[i]->id, pressed->glyph, BINDINGS_SHARED_MAX);
+	}
+	free(all);
+}
 
 int Bindings_dispatchShared(const Binding* bindings, int count, void (*menu)(const Action** actions, int n)) {
 	for (int i = 0; i < count; i++) {
 		const Binding* binding = &bindings[i];
 		if (!fired(binding) || !buttonAvailable(binding->action)) continue;
-		const Action* actions[SHARED_MAX];
-		int n = Bindings_shared(bindings, count, binding->button, binding->trigger, actions, SHARED_MAX);
-		if (n > SHARED_MAX) n = SHARED_MAX;
+		const Action* actions[BINDINGS_SHARED_MAX];
+		int n = Bindings_shared(bindings, count, binding->button, binding->trigger, actions, BINDINGS_SHARED_MAX);
+		if (n > BINDINGS_SHARED_MAX) {
+			sharedDropped(bindings, count, binding, n);
+			n = BINDINGS_SHARED_MAX;
+		}
 		if (n == 1 || !menu) buttonRun(actions[0]);
 		else menu(actions, n);
 		return 1;

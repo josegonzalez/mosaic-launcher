@@ -2,6 +2,7 @@
 // what's available, in the order given. Bindings that share a button run
 // their one available action, or offer a menu of them.
 
+#include <stdarg.h>
 #include <stdlib.h>
 #include "check.h"
 #include "actions.h"
@@ -18,7 +19,18 @@ static int repeated_button = -1;
 int PAD_justPressed(int btn) { return btn == pressed_button; }
 int PAD_justReleased(int btn) { return btn == released_button; }
 int PAD_justRepeated(int btn) { return btn == repeated_button; }
-void LOG_note(int level, const char* fmt, ...) { (void)level; (void)fmt; }
+// What was logged, each line as given.
+static char logged[4096];
+static int log_lines = 0;
+void LOG_note(int level, const char* fmt, ...) {
+	(void)level;
+	va_list args;
+	va_start(args, fmt);
+	size_t used = strlen(logged);
+	vsnprintf(logged + used, sizeof(logged) - used, fmt, args);
+	va_end(args);
+	log_lines++;
+}
 
 static int open_ok = 1, back_ok = 1, resume_ok = 1;
 static const char* ran = NULL;
@@ -497,6 +509,34 @@ static void test_binding_list(void) {
 	BindingList_free(&list); // twice is fine
 }
 
+// A button shared by more actions than its menu lists: the menu gets the
+// first BINDINGS_SHARED_MAX, and the rest are named in a warning, once.
+static int menu_n = 0;
+static void countMenu(const Action** actions, int n) { (void)actions; menu_n = n; }
+static void test_shared_overflow(void) {
+	enum { MANY = BINDINGS_SHARED_MAX + 4 };
+	static Action many[MANY];
+	static char ids[MANY][16];
+	Binding shared[MANY];
+	for (int i = 0; i < MANY; i++) {
+		snprintf(ids[i], sizeof(ids[i]), "p.a%02d", i);
+		many[i] = (Action){ ids[i], ids[i], NULL, runOpen, NULL, "p", 0 };
+		shared[i] = (Binding){ BTN_L2, TRIGGER_PRESS, "L2", &many[i], NULL, NULL };
+	}
+	logged[0] = '\0';
+	log_lines = 0;
+	pressed_button = BTN_L2;
+	CHECK(Bindings_dispatchShared(shared, MANY, countMenu) == 1);
+	CHECK(menu_n == BINDINGS_SHARED_MAX);
+	CHECK(log_lines == 4);
+	CHECK(strstr(logged, "plugins: p's action p.a16 is left off L2's menu, which lists 16 actions at most\n") != NULL);
+	CHECK(strstr(logged, "p.a19") != NULL && strstr(logged, "p.a15") == NULL);
+	// once, not on every press
+	CHECK(Bindings_dispatchShared(shared, MANY, countMenu) == 1);
+	CHECK(menu_n == BINDINGS_SHARED_MAX && log_lines == 4);
+	pressed_button = -1;
+}
+
 int main(void) {
 	// dispatch: the fired, available binding runs
 	press(BTN_A);
@@ -575,6 +615,7 @@ int main(void) {
 	test_override_repeat();
 	test_paths();
 	test_binding_list();
+	test_shared_overflow();
 
 	CHECK_DONE();
 }

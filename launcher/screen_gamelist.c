@@ -195,7 +195,7 @@ static void effectiveFree(Effective* e) {
 }
 
 // The actions a shared button offers, kept until the user picks one.
-#define ENTRY_MENU_MAX 16
+#define ENTRY_MENU_MAX BINDINGS_SHARED_MAX // as many as a shared button offers
 static const Action* menu_actions[ENTRY_MENU_MAX];
 static int menu_count = 0;
 

@@ -498,6 +498,17 @@ int main(void) {
 	ManifestList_free(&list); // twice is fine
 	CHECK(PluginSet_resolve(NULL, 0, "x=on\n", NULL) == 0);
 
+	// a refusal's reason has the whole id and path, however long
+	reset();
+	char longid[80];
+	snprintf(longid, sizeof(longid), "id=%063d\n", 7);
+	add(longid, 0);
+	add(longid, 0);
+	n = PluginSet_resolve(manifests, count, NULL, out);
+	char want[200];
+	snprintf(want, sizeof(want), "another plugin with id %063d was found first in /plugins/1", 7);
+	CHECK_STR(out[1].reason, want);
+
 	// what's cut to fit or left out is said, naming the plugin, once each
 	Manifest_setLog(warning);
 	unwarn();

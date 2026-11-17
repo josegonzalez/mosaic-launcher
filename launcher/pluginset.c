@@ -524,8 +524,8 @@ int PluginSet_resolve(const PluginManifest* manifests, int count, const char* ch
 		}
 		for (int j = 0; j < i; j++) {
 			if (!strcmp(out[j].manifest->id, m->id)) {
-				char why[160];
-				snprintf(why, sizeof(why), "another plugin with id %.40s was found first in %.60s", m->id, out[j].manifest->dir);
+				char why[sizeof(((PluginDecision*)0)->reason)];
+				snprintf(why, sizeof(why), "another plugin with id %s was found first in %s", m->id, out[j].manifest->dir);
 				refuse(d, why);
 				break;
 			}
@@ -543,16 +543,16 @@ int PluginSet_resolve(const PluginManifest* manifests, int count, const char* ch
 			if (!slot[0]) continue;
 			const char* chosen = slotOwner(&c, slot);
 			int chosen_loads = chosen && findLoading(out, n, chosen) && csvHas(findLoading(out, n, chosen)->manifest->slots, slot);
-			char why[160];
+			char why[sizeof(((PluginDecision*)0)->reason)];
 			if (chosen_loads && strcmp(chosen, d->manifest->id) != 0) {
-				snprintf(why, sizeof(why), "the %.40s slot belongs to %.40s", slot, chosen);
+				snprintf(why, sizeof(why), "the %s slot belongs to %s", slot, chosen);
 				refuse(d, why);
 				break;
 			}
 			if (chosen_loads) continue;
 			for (int j = 0; j < i; j++) {
 				if (out[j].load && csvHas(out[j].manifest->slots, slot)) {
-					snprintf(why, sizeof(why), "the %.40s slot belongs to %.40s", slot, out[j].manifest->id);
+					snprintf(why, sizeof(why), "the %s slot belongs to %s", slot, out[j].manifest->id);
 					refuse(d, why);
 					break;
 				}
@@ -569,8 +569,8 @@ int PluginSet_resolve(const PluginManifest* manifests, int count, const char* ch
 			const PluginManifest* a = out[j].manifest;
 			const PluginManifest* b = d->manifest;
 			if (csvHas(a->conflicts, b->id) || csvHas(b->conflicts, a->id)) {
-				char why[160];
-				snprintf(why, sizeof(why), "conflicts with %.60s", a->id);
+				char why[sizeof(((PluginDecision*)0)->reason)];
+				snprintf(why, sizeof(why), "conflicts with %s", a->id);
 				refuse(d, why);
 				break;
 			}
@@ -589,8 +589,8 @@ int PluginSet_resolve(const PluginManifest* manifests, int count, const char* ch
 			for (char* req = strtok(reqs, ","); req; req = strtok(NULL, ",")) {
 				trim(req);
 				if (!req[0] || findLoading(out, n, req)) continue;
-				char why[160];
-				snprintf(why, sizeof(why), "requires %.60s, which isn't loading", req);
+				char why[sizeof(((PluginDecision*)0)->reason)];
+				snprintf(why, sizeof(why), "requires %s, which isn't loading", req);
 				refuse(d, why);
 				changed = 1;
 				break;

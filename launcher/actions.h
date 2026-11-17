@@ -89,6 +89,10 @@ int Bindings_dispatch(const Binding* bindings, int count);
 // room for 2 * count + 1 entries. Returns the number of hints.
 int Bindings_hints(const Binding* const* bindings, int count, char** pairs);
 
+// The most actions a shared button's menu lists; past it, the rest are left
+// out, with a warning the first time.
+#define BINDINGS_SHARED_MAX 16
+
 // Bindings that can share a button, like plugins' on the game list. When
 // one fires, the available actions bound to its button and trigger decide:
 // one runs straight away, and two or more go to menu to pick from (in

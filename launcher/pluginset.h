@@ -57,7 +57,7 @@ typedef struct ManifestList {
 typedef struct PluginDecision {
 	const PluginManifest* manifest;
 	int load;
-	char reason[160]; // why it isn't loading, when load is 0
+	char reason[640]; // why it isn't loading, when load is 0, with whole ids and paths
 } PluginDecision;
 
 // Parses plugin.txt (key=value lines). Returns 0, or -1 when id is missing.
