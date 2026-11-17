@@ -151,6 +151,8 @@ test-profiles: desktop plugins-desktop
 
 lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh plugins/sync/tools/build.sh
+	@# tasks' examples, which it copies to the card
+	shellcheck plugins/tasks/res/tasks/*.sh plugins/tasks/res/tasks/Game/*.sh
 	@# the cases set variables run.sh's helpers read, such as plugin and log, and read ones it sets
 	shellcheck -x -e SC2034,SC2153,SC2154 tests/plugins/cases/*.sh
 	shellcheck -x tests/screenshots/shots/*.sh

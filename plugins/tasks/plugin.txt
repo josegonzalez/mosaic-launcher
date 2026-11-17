@@ -1,0 +1,6 @@
+id=tasks
+name=Tasks
+api=1
+category=Extras
+summary=Runs shell scripts of your own from the Tasks folder on the card, on their own or for the selected game.
+description=Runs shell scripts of your own from the Tasks folder on the card: from a Tasks folder on the first screen, or with Y for the selected game. Each one's last line of output shows when it ends.

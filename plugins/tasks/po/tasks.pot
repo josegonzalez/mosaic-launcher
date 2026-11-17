@@ -1,0 +1,62 @@
+# The tasks plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: tasks\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: tasks.c
+#, c-format
+msgid "%s (exit %d)"
+msgstr ""
+
+#: tasks.c
+#, c-format
+msgid "%s finished (exit %d)"
+msgstr ""
+
+#: tasks.c
+#, c-format
+msgid "%s stopped"
+msgstr ""
+
+#: tasks.c
+#, c-format
+msgid "%s was killed by signal %d"
+msgstr ""
+
+#: tasks.c
+msgid "A task is already running"
+msgstr ""
+
+#: tasks.c
+#, c-format
+msgid "Couldn't run %s"
+msgstr ""
+
+#: tasks.c
+#, c-format
+msgid "Running... %lld:%02lld"
+msgstr ""
+
+#: plugin.txt
+msgid "Runs shell scripts of your own from the Tasks folder on the card: from a Tasks folder on the first screen, or with Y for the selected game. Each one's last line of output shows when it ends."
+msgstr ""
+
+#: tasks.c
+#, c-format
+msgid "Stopping... %lld:%02lld"
+msgstr ""
+
+#: plugin.txt tasks.c
+msgid "Tasks"
+msgstr ""
