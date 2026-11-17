@@ -1,0 +1,95 @@
+# The guest-profile plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: guest-profile\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: guest_profile.c
+msgid "CLEAR"
+msgstr ""
+
+#: guest_profile.c
+msgid "Clear guest"
+msgstr ""
+
+#: plugin.txt
+msgid "Clear guest tile on the quick menu"
+msgstr ""
+
+#: guest_profile.c
+msgid "Clear the guest's recents, favorites,\ncollections and play history?\nSaves and states stay."
+msgstr ""
+
+#: guest_profile.c
+msgid "Couldn't clear guest data"
+msgstr ""
+
+#: guest_profile.c
+msgid "Couldn't switch profiles"
+msgstr ""
+
+#: guest_profile.c
+msgid "GUEST"
+msgstr ""
+
+#: plugin.txt
+msgid "Gives a guest their own recents, favorites, collections and play history while you lend the device, kept for next time. Saves and states stay shared."
+msgstr ""
+
+#: guest_profile.c
+msgid "Guest"
+msgstr ""
+
+#: plugin.txt
+msgid "Guest button"
+msgstr ""
+
+#: guest_profile.c
+msgid "Guest data cleared"
+msgstr ""
+
+#: plugin.txt
+msgid "Guest mark in the header"
+msgstr ""
+
+#: plugin.txt
+msgid "Guest profile"
+msgstr ""
+
+#: guest_profile.c
+msgid "Guest profile off"
+msgstr ""
+
+#: guest_profile.c
+msgid "Guest profile on"
+msgstr ""
+
+#: plugin.txt
+msgid "Guest tile on the quick menu"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""

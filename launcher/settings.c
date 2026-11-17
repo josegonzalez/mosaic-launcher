@@ -161,6 +161,8 @@ static void turnOn(void) {
 }
 
 static void turnOff(void) {
+	// stock knows nothing of profiles, so it gets the owner's data
+	Plugins_profileOwner("the Launcher pak, as the launcher is turned off,");
 	manage("turn-off");
 	Modal_message(TR("Launcher is off.\nThe stock launcher is back."));
 }

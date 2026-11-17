@@ -38,6 +38,7 @@
 #include "ambientmodel.h"
 #include "cardindex.h"
 #include "openmodel.h"
+#include "profiles.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -1337,6 +1338,150 @@ static void hostEvent(const char* name, const char* payload) {
 	if (loaded_count > 0) eventPost(name, payload, NULL, 1);
 }
 
+///////////////////////////////////////
+// profiles
+
+// What a profile switch swaps in place: what stock reads and writes at
+// fixed paths, gametimectl's database with its sqlite side files among it.
+#define PLAY_DB_PATH SHARED_USERDATA_PATH "/game_logs.sqlite"
+static const ProfileItem profile_items[] = {
+	{ RECENT_PATH, "recent.txt" },
+	{ PLAY_DB_PATH, "game_logs.sqlite" },
+	{ PLAY_DB_PATH "-journal", "game_logs.sqlite-journal" },
+	{ PLAY_DB_PATH "-wal", "game_logs.sqlite-wal" },
+	{ PLAY_DB_PATH "-shm", "game_logs.sqlite-shm" },
+	{ COLLECTIONS_PATH, "Collections" },
+};
+
+static void profileLog(const char* message) {
+	LOG_info("profiles: %s\n", message);
+}
+
+static const ProfileConfig profile_config = {
+	.state_path = SHARED_USERDATA_PATH "/launcher/profile.txt",
+	.parks_dir = SHARED_USERDATA_PATH "/launcher/profiles",
+	.items = profile_items,
+	.item_count = sizeof(profile_items) / sizeof(profile_items[0]),
+	.userdata_dir = SDCARD_PATH "/.userdata",
+	.log = profileLog,
+};
+
+static char live_profile[PROFILE_NAME_MAX]; // "" for the owner's
+static int profile_relist = 0; // list the folders again once plugins heard of a change
+
+// The profile on the card, finishing a switch a power cut stopped.
+static void profileRead(void) {
+	Profile_settle(&profile_config);
+	Profile_current(&profile_config, live_profile);
+	if (live_profile[0]) LOG_info("profiles: %s is live\n", live_profile);
+}
+
+// The play history and recents read again now, so plugins hearing of it
+// read the new profile's, and the folders listed again once they have,
+// from Plugins_tick, so the lists and quick menu tiles are built once,
+// from what they read.
+static void profileChanged(void) {
+	PlayHistory_invalidate();
+	// not before the lists are first made: Menu_init reads recents itself
+	if (state.stack) {
+		hasRecents();
+		if (state.switcher_selected >= state.recents->count) {
+			state.switcher_selected = state.recents->count > 0 ? state.recents->count - 1 : 0;
+		}
+		profile_relist = 1;
+	}
+	char payload[PROFILE_NAME_MAX + 16];
+	snprintf(payload, sizeof(payload), "profile=%s", live_profile);
+	hostEvent(EVENT_HOST_PREFIX "profile_changed", payload);
+}
+
+static int profileSwitch(const char* name, const char* who) {
+	// a session a game left open, closed in the history it belongs to
+	int stopped = system("gametimectl.elf stop_all");
+	if (stopped != 0) LOG_info("profiles: gametimectl.elf stop_all returned %i\n", stopped);
+	char before[PROFILE_NAME_MAX];
+	snprintf(before, sizeof(before), "%s", live_profile);
+	int rc = Profile_switch(&profile_config, name);
+	Profile_current(&profile_config, live_profile);
+	if (rc != 0) LOG_warn("profiles: %s couldn't switch to %s\n", who, name[0] ? name : "the owner's");
+	if (strcmp(before, live_profile) != 0) {
+		LOG_info("profiles: %s switched from %s to %s\n", who, before[0] ? before : "the owner's",
+			live_profile[0] ? live_profile : "the owner's");
+		profileChanged();
+	}
+	return rc;
+}
+
+// A plugin's capability for a profile, profile.<name>.
+static int providesProfile(const LoadedPlugin* p, const char* name) {
+	char capability[PROFILE_NAME_MAX + 16];
+	snprintf(capability, sizeof(capability), "profile.%s", name);
+	return csvHas(p->manifest->provides, capability);
+}
+
+// A live profile no loaded plugin provides goes back to the owner's, as
+// when its plugin is turned off or plugins are paused.
+static void profileCheck(void) {
+	if (!live_profile[0]) return;
+	for (int i = 0; i < loaded_count; i++) {
+		if (providesProfile(&loaded[i], live_profile)) return;
+	}
+	char why[PROFILE_NAME_MAX + 64];
+	snprintf(why, sizeof(why), "the launcher, as no plugin provides profile.%s,", live_profile);
+	profileSwitch("", why);
+}
+
+void Plugins_profileOwner(const char* why) {
+	profileRead();
+	if (live_profile[0]) profileSwitch("", why);
+}
+
+static const char* hostProfileName(void) {
+	return live_profile;
+}
+
+static int hostProfileSwitch(const char* name) {
+	LoadedPlugin* p = callingPlugin("profile_switch");
+	if (!p || !name) return -1;
+	if (!Profile_nameValid(name)) {
+		LOG_warn("plugins: %s can't switch to profile %s: it isn't a profile's name\n", p->id, name);
+		return -1;
+	}
+	if (!strcmp(name, live_profile)) return 0;
+	const char* needs = name[0] ? name : live_profile;
+	if (!providesProfile(p, needs)) {
+		LOG_warn("plugins: %s can't switch profiles: its plugin.txt doesn't provide profile.%s\n", p->id, needs);
+		return -1;
+	}
+	return profileSwitch(name, p->id);
+}
+
+static int hostProfileClear(const char* name) {
+	LoadedPlugin* p = callingPlugin("profile_clear");
+	if (!p || !name) return -1;
+	if (!name[0] || !Profile_nameValid(name)) {
+		LOG_warn("plugins: %s can't clear profile %s: only another profile than the owner's can be cleared\n", p->id, name);
+		return -1;
+	}
+	if (!providesProfile(p, name)) {
+		LOG_warn("plugins: %s can't clear profile %s: its plugin.txt doesn't provide profile.%s\n", p->id, name, name);
+		return -1;
+	}
+	int live = !strcmp(name, live_profile);
+	if (live) {
+		int stopped = system("gametimectl.elf stop_all");
+		if (stopped != 0) LOG_info("profiles: gametimectl.elf stop_all returned %i\n", stopped);
+	}
+	int rc = Profile_clear(&profile_config, name);
+	LOG_info("plugins: %s cleared profile %s%s%s\n", p->id, name, live ? ", which is live" : "", rc ? ", not all of it" : "");
+	if (live) profileChanged();
+	return rc;
+}
+
+static int hostProfilePath(const char* file, char* out, size_t size) {
+	return Profile_filePath(PLUGIN_STATE_DIR, live_profile, file, out, size);
+}
+
 // -1 before the first check, so the screen the launcher starts on isn't an opening
 static int quick_shown = -1;
 
@@ -1941,6 +2086,10 @@ static const MosaicHost host = {
 	.image_load_fit = hostImageLoadFit,
 	.sound_play = hostSoundPlay,
 	.system_volume = hostSystemVolume,
+	.profile_name = hostProfileName,
+	.profile_switch = hostProfileSwitch,
+	.profile_clear = hostProfileClear,
+	.profile_path = hostProfilePath,
 };
 
 ///////////////////////////////////////
@@ -2419,7 +2568,10 @@ static void start(void) {
 }
 
 void Plugins_init(void) {
+	// before any plugin's init, and whether or not any loads
+	profileRead();
 	start();
+	profileCheck();
 }
 
 void Plugins_initSettings(void) {
@@ -3381,6 +3533,11 @@ void Plugins_tick(unsigned long now) {
 	}
 	// what was published since the last frame, before plugins' ticks
 	eventsDeliver();
+	// another profile, once plugins read their own data for it
+	if (profile_relist) {
+		profile_relist = 0;
+		state.reload = 1;
+	}
 	EACH_PLUGIN_WITH(tick) p->tick(now);
 	Audio_soundTick(now);
 }

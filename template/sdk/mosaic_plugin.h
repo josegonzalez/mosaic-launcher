@@ -1784,6 +1784,44 @@ typedef struct MosaicHost {
 	// each sound. Check for both with MOSAIC_HOST_HAS(host, system_volume).
 	int (*sound_play)(const char* plugin_id, const short* frames, int count, int rate, int channels);
 	int (*system_volume)(void);
+
+	// Profiles: a separate set of recents, collections (favorites among
+	// them), play history and the plugins' data kept with them, such as a
+	// guest's, that a plugin switches to and back. The owner's data is
+	// the profile named "", and another's name is 1 to 31 lower case
+	// letters, digits and -, not starting with -, and not "owner". Saves
+	// and states are never switched.
+	//
+	// profile_name returns the live profile's name, "" for the owner's.
+	// It's set from before any plugin's init, and stays through restarts
+	// and launches until it's switched.
+	//
+	// profile_switch makes name live, and profile_clear removes a
+	// profile's data, the live one's too (which then starts empty), never
+	// the owner's. Each needs the calling plugin's plugin.txt to provide
+	// profile.<name> (for profile_switch(""), the live profile's), and
+	// returns 0, or -1 for a bad name, a call where cfg_get is refused, a
+	// missing capability, or a file that couldn't be moved or removed,
+	// which the launcher logs. A profile that's live while no loaded
+	// plugin provides it, as when its plugin is turned off, is switched
+	// back to the owner's as the launcher starts.
+	//
+	// After a switch, or clearing the live profile, the launcher reads
+	// the play history and recents again at once, publishes
+	// launcher.profile_changed, with profile=<name>, for plugins to read
+	// their own data again, and lists the folders again once they have.
+	//
+	// profile_path writes where a plugin's own file is in the live
+	// profile: <userdata_path>/launcher/<file> for the owner's, and
+	// <userdata_path>/launcher/profiles/<name>/<file> for another's,
+	// making that profile's folder. file is relative, with no empty, .
+	// or .. parts. It returns 0, or -1 for a bad file or a path that
+	// doesn't fit. Check for all four with
+	// MOSAIC_HOST_HAS(host, profile_path).
+	const char* (*profile_name)(void);
+	int (*profile_switch)(const char* name);
+	int (*profile_clear)(const char* name);
+	int (*profile_path)(const char* file, char* out, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

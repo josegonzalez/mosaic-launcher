@@ -22,10 +22,11 @@
 // The folder's games are the ones its list showed with no preset on, as
 // list_ready saw them, so other plugins' filters, such as hidden's, still
 // apply. A preset's games are worked out when it's picked, and again when
-// a set changes (launcher.set_changed) or the index does; the filter hook
-// then keeps only them, in that folder alone, so plain folders inside it
-// are left out too. Leaving the folder, by backing out, opening something
-// else or launching a game, puts it back to all games.
+// a set changes (launcher.set_changed), the index does or the profile does
+// (launcher.profile_changed); the filter hook then keeps only them, in
+// that folder alone, so plain folders inside it are left out too. Leaving
+// the folder, by backing out, opening something else or launching a game,
+// puts it back to all games.
 //
 // The "prev_button" and "next_button" settings put the two actions on L2
 // and R2 by default, but only once every plugin has loaded (the first
@@ -582,6 +583,8 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	if (MOSAIC_HOST_HAS(host, set_names)) host->subscribe("launcher.set_changed", refreshActive, NULL);
+	// another profile's recents and play history, for Played and Unplayed
+	if (MOSAIC_HOST_HAS(host, profile_path)) host->subscribe("launcher.profile_changed", refreshActive, NULL);
 	if (MOSAIC_HOST_HAS(host, index_refresh)) {
 		host->subscribe("launcher.index_ready", indexReady, NULL);
 		host->index_count(NULL); // starts reading the card, for genres and players

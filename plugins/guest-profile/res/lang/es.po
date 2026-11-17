@@ -1,0 +1,70 @@
+# Spanish for the guest-profile plugin, from po/guest-profile.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "CLEAR"
+msgstr "BORRAR"
+
+msgid "Clear guest"
+msgstr "Borrar invitado"
+
+msgid "Clear guest tile on the quick menu"
+msgstr "Icono de borrar invitado en el menú rápido"
+
+msgid "Clear the guest's recents, favorites,\ncollections and play history?\nSaves and states stay."
+msgstr "¿Borrar los recientes, favoritos, colecciones\ne historial de juego del invitado?\nLas partidas y estados se quedan."
+
+msgid "Couldn't clear guest data"
+msgstr "No se pudieron borrar los datos del invitado"
+
+msgid "Couldn't switch profiles"
+msgstr "No se pudo cambiar de perfil"
+
+msgid "GUEST"
+msgstr "INVITADO"
+
+msgid "Gives a guest their own recents, favorites, collections and play history while you lend the device, kept for next time. Saves and states stay shared."
+msgstr "Da a un invitado sus propios recientes, favoritos, colecciones e historial de juego mientras le prestas el dispositivo, guardados para la próxima vez. Las partidas y estados se comparten."
+
+msgid "Guest"
+msgstr "Invitado"
+
+msgid "Guest button"
+msgstr "Botón de invitado"
+
+msgid "Guest data cleared"
+msgstr "Datos del invitado borrados"
+
+msgid "Guest mark in the header"
+msgstr "Marca de invitado en la cabecera"
+
+msgid "Guest profile"
+msgstr "Perfil de invitado"
+
+msgid "Guest profile off"
+msgstr "Perfil de invitado desactivado"
+
+msgid "Guest profile on"
+msgstr "Perfil de invitado activado"
+
+msgid "Guest tile on the quick menu"
+msgstr "Icono de invitado en el menú rápido"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "none"
+msgstr "ninguno"

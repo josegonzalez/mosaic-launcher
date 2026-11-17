@@ -45,7 +45,7 @@ description=Keeps a list of favorite games
 - `slots` lists exclusive slots the plugin takes over, such as `root` for `root_replace`, `layout` for the `layout_*` hooks, `transition` and `launch` for the `transition_*` hooks, `background` for `background_render`, `home` for a screen in place of the root list, `switcher` for a screen in place of the game switcher, `strings` for `translate`, or `theme` for `theme`. Only one plugin can own a slot.
 - `requires` lists plugins that must also load. `conflicts` lists plugins that can't load alongside it.
 - `optional` lists plugins it works with when they're there: when one of them loads, this plugin loads after it, so it's already started by this plugin's `init` (see `plugin_loaded` in [Features added since the first API](#features-added-since-the-first-api)), and when one is off, missing or refused, this plugin loads anyway. It changes only the order, never which plugins load: the launcher first decides which plugins load from `plugins.txt`, `slots`, `conflicts` and `requires`, in the usual order (so the later of two conflicting plugins still gives way, wherever `optional` would put it), and then moves each plugin that loads after the loading plugins its `optional` names, the rest keeping their order. `requires` doesn't order anything, so list a plugin in both to require it and load after it. Plugins that name each other, directly or through others, load in their usual order, and the launcher logs which of them loads before a plugin it names. A plugin naming itself is ignored.
-- `provides` lists the capabilities it offers other plugins, which they check with `has_capability`. Names are `<kind>.<name>`: `sets.<name>` for an entry set it registers, with `sets.tags` and `sets.smart` for the `tags:<tag>` and `smart:<collection>` families, `events.<event>` for an event it publishes, such as `events.music.track`, and a service's own name, such as `captions.text`, for a service it provides with `provide`, which refuses a name not listed here (see `provide` in [Features added since the first API](#features-added-since-the-first-api)). Other kinds are for later host features. Names are matched exactly, case included. The launcher's own features aren't listed here; plugins check those with `MOSAIC_HOST_HAS`.
+- `provides` lists the capabilities it offers other plugins, which they check with `has_capability`. Names are `<kind>.<name>`: `sets.<name>` for an entry set it registers, with `sets.tags` and `sets.smart` for the `tags:<tag>` and `smart:<collection>` families, `events.<event>` for an event it publishes, such as `events.music.track`, `profile.<name>` for a profile it switches to and clears (see Profiles in [Features added since the first API](#features-added-since-the-first-api)), and a service's own name, such as `captions.text`, for a service it provides with `provide`, which refuses a name not listed here (see `provide` in [Features added since the first API](#features-added-since-the-first-api)). Other kinds are for later host features. Names are matched exactly, case included. The launcher's own features aren't listed here; plugins check those with `MOSAIC_HOST_HAS`.
 - `ambient` lists the screens it makes ambient screens with `register_ambient`, such as `screensaver.main`, so the Launcher page can list them in the ambient screens' order without loading the plugin (see `register_ambient` in [Features added since the first API](#features-added-since-the-first-api)). `register_ambient` refuses a screen it doesn't list.
 - `description` is one line about the plugin, a sentence or two in plain words, which other plugins read with `plugin_info`, up to 255 bytes. It's translated as the plugin's own text, like its `name`, so it goes in its language packs. The bundled `first-run` shows it for the plugins it suggests, falling back to `summary`, and every bundled plugin has one, which `make lint` checks fits.
 - Each line is read up to 511 bytes, and each value up to its field's size: `id` 63 bytes, `name` 127, `slots`, `requires`, `conflicts`, `optional`, `provides`, `ambient` and `description` 255 each, and for a setting its key 47, `label` 63, `default` 127, `options` 255 and the ids of its `button:` markers 255 together. The launcher cuts what's longer to fit, or leaves out a `button:` id that doesn't fit, and logs a warning naming the plugin and what it cut. For a bundled plugin, `make lint` fails instead. `plugins.txt` has the same 511-byte lines and a 63-byte id, and the launcher warns about what it cuts there too.
@@ -816,6 +816,7 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   - `launcher.menu_open` and `launcher.menu_close`, with `menu=quick` or `menu=dialog`, as the quick menu or a dialog (`confirm`, `keyboard`, `choose` and the PIN keyboard) opens or closes. A dialog over the quick menu leaves it open, so closing the dialog gives only its own `menu_close`. The quick menu the launcher starts on, as Settings' start screen, isn't an opening.
   - `launcher.toast`, with no payload, as a toast shows, a plugin's (`toast`) or the launcher's own.
   - `launcher.error`, with `what=pin`, when a wrong PIN is typed on the PIN keyboard (`ask_pin`).
+  - `launcher.profile_changed`, with `profile=<name>` (empty for the owner's), when another profile's data is in place, or the live profile's was cleared (see Profiles below).
 
   The bundled `romm` publishes `romm.download_done`, with `path=<the file the download launches>` and `name=<RomM's name for it>` (the path alone when both don't fit), as each game it downloads finishes, before the game launches; `gamification` counts it towards its RomM quest.
 
@@ -994,6 +995,35 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   // a click at the plugin's own volume, silent while the system is muted
   if (MOSAIC_HOST_HAS(host, system_volume) && host->system_volume() != 0)
       host->sound_play(ID, click, click_frames, 22050, 1);
+  ```
+
+- Profiles are a separate set of the launcher's data, such as a guest's, that a plugin switches to and back: recents, the collections in the Collections folder (favorites among them), the play history and the data plugins keep with them. Saves and save states are never switched, and neither is anything else on the card. The owner's data is the profile named `""`, and another's name is 1 to 31 lower case letters, digits and `-`, not starting with `-`, and not `owner`. The bundled `guest-profile` switches to and from `guest`.
+
+  `profile_name()` returns the live profile's name, `""` for the owner's. It's set from before any plugin's `init`, and stays through restarts and launches until it's switched. `profile_switch(name)` makes `name` live, and `profile_clear(name)` removes a profile's data, the live one's too (which then starts empty), never the owner's. Each needs the calling plugin's `plugin.txt` to provide `profile.<name>` (for `profile_switch("")`, the live profile's), and works where `cfg_get` does, from an action or a dialog's callback as a rule, and returns 0, or -1 for a bad name, a missing capability, a call where `cfg_get` is refused or a file that couldn't be moved or removed, which the launcher logs. A profile that's live while no loaded plugin provides it, as when its plugin is turned off or plugins are paused after a crash, is switched back to the owner's as the launcher starts, and the Launcher pak switches back to the owner's as it turns the launcher off, so stock NextUI gets the owner's data.
+
+  What stock reads and writes at fixed paths is swapped in place: `.userdata/shared/.minui/recent.txt`, the play tracker's `.userdata/shared/game_logs.sqlite` (with its `-journal`, `-wal` and `-shm` files) and the `Collections` folder. The live profile's are at their usual paths, so stock's tools, the Game Tracker and `gametimectl` among them, see the live profile's, and the others are parked in `.userdata/shared/launcher/profiles/<name>/`, the owner's in `profiles/owner/`. Which profile is live is kept in `.userdata/shared/launcher/profile.txt`. A switch closes any session `gametimectl` left open, parks the live profile's files, saves the new name and moves the new profile's files in, so a power cut between two steps loses nothing: the launcher finishes the switch as it next starts. After a switch, or clearing the live profile, the launcher reads the play history and recents again at once, publishes `launcher.profile_changed` with `profile=<name>` (empty for the owner's), and lists the folders again, and builds the quick menu's tiles again, once plugins have heard it, so what they show comes from the data they read again.
+
+  A plugin keeps its own data per profile with `profile_path(file, out, size)`, which writes where `file` is in the live profile: `<userdata_path>/launcher/<file>` for the owner's, as before profiles, and `<userdata_path>/launcher/profiles/<name>/<file>` for another's, making that profile's folder. `file` is relative, with no empty, `.` or `..` parts. It returns 0, or -1 for a bad `file` or a path that doesn't fit `size`. Such a plugin asks again, and reads its data again, on `launcher.profile_changed`. `profile_clear` removes every `.userdata/<platform>/launcher/profiles/<name>/` folder, on every platform. The bundled `tags` (its `tags.txt`) and `gamification` (its `state.txt`) keep theirs this way, and `favorites` and `tags` announce their sets as changed on `launcher.profile_changed`. Check for all four with `MOSAIC_HOST_HAS(host, profile_path)`.
+
+  ```c
+  // in plugin.txt: provides=profile.guest
+  static void toggle(const char* path, void* data) {
+      host->profile_switch(strcmp(host->profile_name(), "guest") ? "guest" : "");
+  }
+
+  // a file of the plugin's own, in the live profile
+  static char store[512];
+  static void storePath(void) {
+      if (host->profile_path("example.txt", store, sizeof(store)) != 0)
+          snprintf(store, sizeof(store), "%s/launcher/example.txt", host->userdata_path);
+  }
+  static void profileChanged(const char* name, const char* payload, void* data) {
+      storePath();
+      load(store);
+  }
+  // in init
+  storePath();
+  if (MOSAIC_HOST_HAS(host, profile_path)) host->subscribe("launcher.profile_changed", profileChanged, NULL);
   ```
 
 ## Without writing C

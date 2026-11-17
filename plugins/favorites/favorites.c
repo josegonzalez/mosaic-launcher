@@ -18,6 +18,10 @@
 // they're in, keeping the launcher's order among them and among the rest.
 // Recently Played, collections and Favorites itself keep their own order.
 //
+// The Collections folder is a profile's (see profile_switch), so another
+// profile, such as a guest's, has favorites of its own; the set is
+// announced as changed when the profile does (launcher.profile_changed).
+//
 // Other plugins read the favorites as the "favorites" entry set (see
 // set_register), by the full paths the collection records, set the
 // collection, for the next start, through the favorites.setup service, and
@@ -473,6 +477,20 @@ static int provideMove(const char* name, const char* args, char* out, size_t siz
 	return 0;
 }
 
+// Another profile's Collections folder is in place.
+static void profileChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	load();
+	memset(&seen, 0, sizeof(seen));
+	seen.st_size = -1;
+	char message[64];
+	snprintf(message, sizeof(message), "profile changed: %i favorites", count);
+	say(message);
+	if (MOSAIC_HOST_HAS(host, set_names)) host->set_changed("favorites");
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	const char* collection = host->cfg_get("collection", "Favorites");
@@ -493,6 +511,7 @@ static int init(const MosaicHost* h) {
 	}
 	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".setup", provideSetup) != 0) say("couldn't provide " ID ".setup");
 	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".move", provideMove) != 0) say("couldn't provide " ID ".move");
+	if (MOSAIC_HOST_HAS(host, profile_path)) host->subscribe("launcher.profile_changed", profileChanged, NULL);
 
 	if (host->register_action("favorites.toggle", "FAVORITE", 0, canToggle, toggle, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "favorites.toggle") != 0) {

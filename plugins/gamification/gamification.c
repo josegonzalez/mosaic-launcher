@@ -38,7 +38,9 @@
 // towards it on its day whether or not it's offered, and toasts it when
 // that completes it.
 //
-// The state is in .userdata/<platform>/launcher/gamification/state.txt.
+// The state is in .userdata/<platform>/launcher/gamification/state.txt,
+// and each profile (host->profile_path), such as a guest's, has one of its
+// own, read again when the profile changes (launcher.profile_changed).
 // The gamification.open action opens the screen, from a Quests tile on
 // the quick menu (the tile setting), a game list button (the button
 // setting), or button-remap or an FN button (action:gamification.open).
@@ -77,7 +79,7 @@ static const char* trPlural(const char* singular, const char* plural, unsigned l
 	return n == 1 ? singular : plural;
 }
 static GMState state;
-static char state_dir[GM_PATH_MAX];
+static char state_dir[GM_PATH_MAX + 16];
 static char state_path[GM_PATH_MAX + 16];
 static GMTargets targets;
 static int toasts = 1;
@@ -549,6 +551,27 @@ static void openQuests(const char* path, void* data) {
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the quests screen");
 }
 
+// The live profile's state file, and its folder.
+static void statePaths(void) {
+	if (!MOSAIC_HOST_HAS(host, profile_path) || host->profile_path(ID "/state.txt", state_path, sizeof(state_path)) != 0) {
+		snprintf(state_path, sizeof(state_path), "%s/launcher/" ID "/state.txt", host->userdata_path);
+	}
+	snprintf(state_dir, sizeof(state_dir), "%s", state_path);
+	char* slash = strrchr(state_dir, '/');
+	if (slash) *slash = '\0';
+}
+
+// Another profile's quests and streak.
+static void profileChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	statePaths();
+	loadState();
+	say("profile changed: its state read");
+	host->request_redraw();
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	static const GMWords words = { tr, trPlural };
@@ -557,8 +580,7 @@ static int init(const MosaicHost* h) {
 		say("this launcher has no plugin screens with button hints");
 		return 1;
 	}
-	snprintf(state_dir, sizeof(state_dir), "%s/launcher/" ID, host->userdata_path);
-	snprintf(state_path, sizeof(state_path), "%s/state.txt", state_dir);
+	statePaths();
 	readSettings();
 	loadState();
 	static const MosaicScreenHooks hooks = {
@@ -597,6 +619,9 @@ static int init(const MosaicHost* h) {
 	}
 	if (MOSAIC_HOST_HAS(host, set_names) && host->subscribe("romm.download_done", onDownload, NULL) != 0) {
 		say("couldn't subscribe to romm.download_done");
+	}
+	if (MOSAIC_HOST_HAS(host, profile_path) && host->subscribe("launcher.profile_changed", profileChanged, NULL) != 0) {
+		say("couldn't subscribe to launcher.profile_changed");
 	}
 	char message[160];
 	snprintf(message, sizeof(message), "quests: play %i minutes, %i games, %i days and %i hours a week; streak at %lld minutes",

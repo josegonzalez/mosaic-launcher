@@ -68,6 +68,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [focus-mode](../plugins/focus-mode/README.md) - Makes the first screen list only your favorites, or the games in a tag or collection.
 - [game-actions](../plugins/game-actions/README.md) - Renames, deletes or adds a game to a collection from one button.
 - [genre-view](../plugins/genre-view/README.md) - Gathers the same genre from every system into one Genres folder.
+- [guest-profile](../plugins/guest-profile/README.md) - Switches to a guest's own recents, favorites, collections and play history for lending the device.
 - [hidden](../plugins/hidden/README.md) - Hides the games you pick from every list.
 - [jump-letter](../plugins/jump-letter/README.md) - Hold SELECT on the game list for a strip of its first letters, and let go to jump to one.
 - [manuals](../plugins/manuals/README.md) - Shows a game's manual or guide, as pages of images or a .txt, from Y on the game list.

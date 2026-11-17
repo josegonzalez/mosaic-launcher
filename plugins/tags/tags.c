@@ -15,7 +15,9 @@
 // first TILES_MAX by name, as the launcher starts).
 //
 // The tags are in .userdata/<platform>/launcher/tags.txt, as tags_model.h
-// describes, with card-relative paths, and written atomically.
+// describes, with card-relative paths, and written atomically. Each
+// profile (host->profile_path), such as a guest's, has a tags.txt of its
+// own, read again when the profile changes (launcher.profile_changed).
 //
 // Other plugins read each tag as the entry set tags:<name> (see
 // set_register), by the full paths it records; the sets follow the tags
@@ -38,7 +40,7 @@
 
 static const MosaicHost* host;
 static char folder_path[TG_PATH_LEN]; // the virtual folder, <sd>/Tags
-static char state_dir[TG_PATH_LEN];   // <userdata>/launcher
+static char state_dir[TG_PATH_LEN + 16]; // the folder store_path is in
 static char store_path[TG_PATH_LEN + 16];
 static TGStore store;
 static struct stat seen; // the file as last read or written
@@ -180,12 +182,17 @@ static void syncSets(void) {
 	}
 }
 
-// Tells other plugins tag's set changed, a deleted one's too.
-static void announce(const char* tag) {
-	if (!MOSAIC_HOST_HAS(host, set_names)) return;
+// Tells other plugins tag's set changed, a deleted one's too. 0, or -1
+// when it couldn't, as when the event queue is full.
+static int announceTag(const char* tag) {
+	if (!MOSAIC_HOST_HAS(host, set_names)) return 0;
 	char name[sizeof(set_names[0])];
 	snprintf(name, sizeof(name), "tags:%s", tag);
-	host->set_changed(name);
+	return host->set_changed(name);
+}
+
+static void announce(const char* tag) {
+	announceTag(tag);
 }
 
 static int gamesOnCard(int tag) {
@@ -683,6 +690,47 @@ static void postReturn(void) {
 	refresh();
 }
 
+// The live profile's tags.txt, and its folder.
+static void storePaths(void) {
+	if (!MOSAIC_HOST_HAS(host, profile_path) || host->profile_path("tags.txt", store_path, sizeof(store_path)) != 0) {
+		snprintf(store_path, sizeof(store_path), "%s/launcher/tags.txt", host->userdata_path);
+	}
+	snprintf(state_dir, sizeof(state_dir), "%s", store_path);
+	char* slash = strrchr(state_dir, '/');
+	if (slash) *slash = '\0';
+}
+
+// Another profile's tags: every tag that was or is now a set is announced.
+static void profileChanged(const char* name, const char* payload, void* data) {
+	(void)name;
+	(void)payload;
+	(void)data;
+	static char before[TG_TAGS_MAX][TG_NAME_LEN];
+	int before_count = store.count;
+	for (int i = 0; i < before_count; i++) snprintf(before[i], TG_NAME_LEN, "%s", store.tags[i].name);
+	storePaths();
+	memset(&seen, 0, sizeof(seen));
+	seen.st_size = -1;
+	refresh();
+	int announced = 0, dropped = 0;
+	for (int i = 0; i < before_count; i++) {
+		if (TG_find(&store, before[i]) >= 0) continue;
+		if (announceTag(before[i]) == 0) announced++;
+		else dropped++;
+	}
+	for (int i = 0; i < store.count; i++) {
+		if (announceTag(store.tags[i].name) == 0) announced++;
+		else dropped++;
+	}
+	char message[128];
+	snprintf(message, sizeof(message), "profile changed: %i tags, %i announced", store.count, announced);
+	say(message);
+	if (dropped) {
+		snprintf(message, sizeof(message), "the event queue was full, so %i tags' changes weren't announced", dropped);
+		say(message);
+	}
+}
+
 static void quit(void) {
 	TG_free(&store);
 }
@@ -707,8 +755,7 @@ static int init(const MosaicHost* h) {
 		return -1;
 	}
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
-	snprintf(state_dir, sizeof(state_dir), "%s/launcher", host->userdata_path);
-	snprintf(store_path, sizeof(store_path), "%s/tags.txt", state_dir);
+	storePaths();
 	TG_free(&store);
 	set_count = 0;
 	memset(&seen, 0, sizeof(seen));
@@ -742,6 +789,7 @@ static int init(const MosaicHost* h) {
 	if (setting("tiles")) addTiles();
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("tags.copy", provideCopy) != 0) say("couldn't provide tags.copy");
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("tags.move", provideMove) != 0) say("couldn't provide tags.move");
+	if (MOSAIC_HOST_HAS(host, profile_path)) host->subscribe("launcher.profile_changed", profileChanged, NULL);
 
 	char message[96];
 	snprintf(message, sizeof(message), "%i tags, %i with games, root %s", store.count, tagsOnCard(), root_on ? "on" : "off");

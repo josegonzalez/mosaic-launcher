@@ -1,0 +1,15 @@
+id=guest-profile
+name=Guest profile
+api=1
+category=Library
+summary=Switches to a guest's own recents, favorites, collections and play history for lending the device.
+description=Gives a guest their own recents, favorites, collections and play history while you lend the device, kept for next time. Saves and states stay shared.
+provides=profile.guest
+# a Guest tile on the quick menu that switches to the guest's profile and back
+setting.tile=toggle|Guest tile on the quick menu|on
+# a Clear guest tile on the quick menu that clears the guest's data, which asks first
+setting.clear_tile=toggle|Clear guest tile on the quick menu|on
+# a GUEST mark in the header while the guest's profile is on
+setting.mark=toggle|Guest mark in the header|on
+# a game list button that switches to the guest's profile and back
+setting.button=choice|Guest button|none|none,L2,R2,SELECT|button:guest-profile.toggle

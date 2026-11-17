@@ -316,8 +316,15 @@ void Plugins_beforePoweroff(void);
 int Plugins_themeRefresh(void);
 
 // Loads plugins unless they're paused after a crash. Call once, before
-// Menu_init, since building the root list already runs plugin hooks.
+// Menu_init, since building the root list already runs plugin hooks. A
+// live profile (see profiles.h) no loaded plugin provides is switched back
+// to the owner's here.
 void Plugins_init(void);
+
+// Switches the live profile back to the owner's, if another is live, for
+// why (logged), eg. as the launcher is turned off, so stock sees the
+// owner's data.
+void Plugins_profileOwner(const char* why);
 
 // For the Launcher pak's settings, in place of Plugins_init, once
 // GFX_init has run: loads only the strings and theme slots' owners, so the
