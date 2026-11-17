@@ -68,7 +68,7 @@ None.
 
 ## For plugin authors
 
-- Adds a Tasks folder at `<sdcard>/Tasks` to the first screen with `root_entries` and lists its scripts with `virtual_dir`, as paks; `pre_launch` cancels their launch and runs the task instead.
+- Adds a Tasks folder at `<sdcard>/Tasks` to the first screen with `root_entries` and lists its scripts with `virtual_dir`, as paks, and runs a task from its `entry_open` when one is opened, so it never goes through a launch: no paks' `pre-launch.sh` hooks or plugins' `pre_launch` run for it.
 - Registers an action with `MOSAIC_ACTION_PATH` for each game task, bound to Y on the game list with `bind_button`: `tasks.game.<name>`, or `tasks.game.<tag>.<name>` for one limited to a system, in lower case with anything but letters, digits and dots as `-`, such as `tasks.game.list-saves`. Each is available only for a game of a system it's for.
 - Runs each task as `/bin/sh <script> [<game>]`, the paths as arguments and never through a shell command line, with `posix_spawn` in a process group of its own, with stdin from `/dev/null`, stdout and stderr into its log and none of the launcher's other open files, and with the launcher's environment less `LD_PRELOAD` and `DYLD_INSERT_LIBRARIES`. B sends the group `SIGTERM`, then `SIGKILL` after 2 seconds. A task still running when the launcher quits or powers off, or its wait screen closes some other way, is killed with its group.
 - Registers the `tasks.running` screen, its wait screen, and holds off sleep with `inhibit_sleep` while a task runs.

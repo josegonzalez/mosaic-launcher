@@ -98,6 +98,9 @@ unsigned char* Plugins_hideNames(Array* entries, const char* dir_path);
 // Asks plugins before a launch. Returns 1 to go ahead, 0 if one cancelled.
 // Going ahead also arranges for post_return on the next start.
 int Plugins_preLaunch(const char* path, int type);
+// Asks plugins' entry_open about opening a game or pak entry. Returns 1
+// when one opened it itself, so the launcher does nothing more.
+int Plugins_entryOpen(const char* path, int type);
 
 // The command a plugin's pre_launch replaced the last launch with, or NULL
 // to launch as stock does.

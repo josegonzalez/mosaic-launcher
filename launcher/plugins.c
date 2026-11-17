@@ -37,6 +37,7 @@
 #include "lockmodel.h"
 #include "ambientmodel.h"
 #include "cardindex.h"
+#include "openmodel.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -2866,6 +2867,29 @@ static int hostReplaceLaunch(const char* program, const char* const* args, int c
 	}
 	pending_set = 1;
 	return 0;
+}
+
+typedef struct EntryOpen {
+	const char* path;
+	int type;
+} EntryOpen;
+
+static int askEntryOpen(int index, void* data) {
+	const EntryOpen* open = data;
+	const MosaicPlugin* p = loaded[index].plugin;
+	if (!Plugin_has(p, entry_open) || !p->entry_open) return 0;
+	int result = 0;
+	AS_PLUGIN(index) result = p->entry_open(open->path, open->type);
+	return result;
+}
+
+int Plugins_entryOpen(const char* path, int type) {
+	if (!path || !OpenModel_asks(type)) return 0;
+	EntryOpen open = { path, type };
+	int taker = OpenModel_first(loaded_count, askEntryOpen, &open);
+	if (taker < 0) return 0;
+	LOG_info("plugins: %s opened %s itself\n", loaded[taker].id, path);
+	return 1;
 }
 
 int Plugins_preLaunch(const char* path, int type) {

@@ -52,6 +52,7 @@ Array* Plugins_rootReplace(int* with_entries) {
 	return root;
 }
 Array* Plugins_virtualDir(const char* path) { (void)path; return NULL; }
+int Plugins_entryOpen(const char* path, int type) { (void)path; (void)type; return 0; }
 Array* Plugins_filter(Array* entries, const char* dir_path) { (void)dir_path; return entries; }
 int Plugins_displayNames(Array* entries) { (void)entries; return 0; }
 // Tests set these to stand in for plugins' sort_compare and list_ready.

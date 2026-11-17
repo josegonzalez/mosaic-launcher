@@ -5,7 +5,9 @@
 // with SDL_PushEvent, found with dlsym: a test-only shortcut). It logs
 // "screen <id>" whenever current_screen changes, and "list <path>:
 // <names> selected <index>" whenever the game list's folder or selection
-// changes, and "done" 40 ticks after the last step.
+// changes, and "done" 40 ticks after the last step. It logs "pre_launch
+// <path>" for each launch it hears about, cancelling it when its
+// cancel_launches setting is on.
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -104,6 +106,15 @@ static void logChanges(void) {
 	}
 }
 
+static int cancel_launches = 0;
+
+static int preLaunch(const MosaicLaunch* launch) {
+	char message[1100];
+	snprintf(message, sizeof(message), "pre_launch %s", launch->path ? launch->path : "(none)");
+	say(message);
+	return cancel_launches ? MOSAIC_LAUNCH_CANCEL : MOSAIC_LAUNCH_CONTINUE;
+}
+
 static void tick(unsigned long now) {
 	(void)now;
 	ticks++;
@@ -136,6 +147,7 @@ static void tick(unsigned long now) {
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(steps, sizeof(steps), "%s", host->cfg_get("steps", ""));
+	cancel_launches = !strcmp(host->cfg_get("cancel_launches", "off"), "on");
 	step_count = steps[0] ? 1 : 0;
 	for (const char* p = steps; *p; p++) {
 		if (*p == ',') step_count++;
@@ -151,6 +163,7 @@ static const MosaicPlugin plugin = {
 	.id = ID,
 	.init = init,
 	.tick = tick,
+	.pre_launch = preLaunch,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

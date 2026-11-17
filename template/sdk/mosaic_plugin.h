@@ -2114,6 +2114,16 @@ typedef struct MosaicPlugin {
 	// plugin's notes out until the pages close. The launcher itself never
 	// asks. Check for it with MOSAIC_HOST_HAS(host, font_missing).
 	int (*settings_note)(const char* plugin_id, char* out, size_t size);
+
+	// Opening a game or pak entry (type MOSAIC_ENTRY_ROM or
+	// MOSAIC_ENTRY_PAK), such as with A on the game list, gamelist.open or
+	// open_path, before anything of a launch: paks' pre-launch.sh hooks,
+	// plugins' pre_launch, recents and the last path. Return 1 when the
+	// plugin opened it itself, such as a row of its own virtual_dir that
+	// runs something, and the launcher does nothing more with it; or 0 to
+	// let it open as usual. Plugins are asked in load order, and the first
+	// to return 1 takes it. Folders and toggles aren't asked about.
+	int (*entry_open)(const char* path, int type);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

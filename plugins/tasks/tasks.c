@@ -371,19 +371,19 @@ static MosaicList* virtualDir(const char* path) {
 	return list;
 }
 
-// A from the Tasks folder launches a task's entry as a pak would; tick
-// runs it instead.
-static int preLaunch(const MosaicLaunch* launch) {
-	if (!launch->path || launch->type != MOSAIC_ENTRY_PAK) return MOSAIC_LAUNCH_CONTINUE;
+// A from the Tasks folder opens a task's entry, which runs it, never
+// launching it as a pak: tick opens the wait screen.
+static int entryOpen(const char* path, int type) {
+	if (!path || type != MOSAIC_ENTRY_PAK) return 0;
 	size_t len = strlen(tasks_dir);
-	if (strncmp(launch->path, tasks_dir, len) != 0 || launch->path[len] != '/') return MOSAIC_LAUNCH_CONTINUE;
+	if (strncmp(path, tasks_dir, len) != 0 || path[len] != '/') return 0;
 	TK_scan(tasks_dir, &global, NULL);
 	for (int i = 0; i < global.count; i++) {
-		if (strcmp(global.items[i].path, launch->path) != 0) continue;
+		if (strcmp(global.items[i].path, path) != 0) continue;
 		queue(&global.items[i], NULL);
-		return MOSAIC_LAUNCH_CANCEL;
+		return 1;
 	}
-	return MOSAIC_LAUNCH_CONTINUE;
+	return 0;
 }
 
 static int gameTaskAvailable(const char* path, void* data) {
@@ -521,7 +521,7 @@ static const MosaicPlugin plugin = {
 	.quit = quit,
 	.root_entries = rootEntries,
 	.virtual_dir = virtualDir,
-	.pre_launch = preLaunch,
+	.entry_open = entryOpen,
 	.tick = tick,
 	.before_poweroff = stopAll,
 };

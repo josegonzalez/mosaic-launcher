@@ -198,6 +198,8 @@ void toggleQuick(Entry* self)
 }
 
 void Entry_open(Entry* self) {
+	// a plugin's own row that it opens itself, before anything of a launch
+	if (Plugins_entryOpen(self->path, self->type)) return;
 	state.recent_alias = self->name;  // yiiikes
 	if (self->type==ENTRY_ROM) {
 		state.startgame = 1;
@@ -392,6 +394,7 @@ void Menu_reload(void) {
 // or a launch is queued.
 int Entry_openPath(const char* path, int type) {
 	if (!path || !path[0] || !state.top) return 0;
+	if (Plugins_entryOpen(path, type)) return 1;
 	if ((type == ENTRY_ROM || type == ENTRY_PAK) && !exists((char*)path)) return 0;
 
 	// openRom and openPak quote the path in place, so leave them room
