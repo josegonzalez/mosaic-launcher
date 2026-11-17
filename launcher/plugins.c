@@ -127,6 +127,7 @@ static void indexViewAgain(void);
 static int viewed_with = -1;
 static void saveBindings(int* counts);
 static void dropBindings(const int* counts);
+static void freeBindings(void);
 // the built-in lock and ambient screens, at the end
 static void lockStart(void);
 static int lockFrame(unsigned long now);
@@ -2435,7 +2436,7 @@ void Plugins_quit(void) {
 	loaded_count = 0;
 	loadedRoom(0);
 	// their actions went with the plugins
-	for (int screen = 0; screen < SCREEN_COUNT; screen++) BindingList_free(&pluginBindings[screen]);
+	freeBindings();
 	theme_owner = strings_owner = -1;
 	listed = 0;
 	EntrySets_free(&sets);
@@ -2565,6 +2566,10 @@ static void saveBindings(int* counts) {
 }
 static void dropBindings(const int* counts) {
 	for (int screen = 0; screen < SCREEN_COUNT; screen++) pluginBindings[screen].count = counts[screen];
+}
+
+static void freeBindings(void) {
+	for (int screen = 0; screen < SCREEN_COUNT; screen++) BindingList_free(&pluginBindings[screen]);
 }
 
 int Plugins_bindings(int screen, const Binding** bindings) {
