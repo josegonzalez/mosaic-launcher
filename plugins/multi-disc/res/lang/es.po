@@ -36,6 +36,9 @@ msgstr "No se pudo escribir %s"
 msgid "L2"
 msgstr "L2"
 
+msgid "MERGE"
+msgstr "UNIR"
+
 msgid "Move the discs of %.120s into a folder of their own?"
 msgstr "¿Mover los discos de %.120s a una carpeta propia?"
 

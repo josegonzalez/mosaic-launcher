@@ -21,9 +21,9 @@ Turn on **Multi-disc** in Launcher > Plugins ([how](../../docs/plugins.md#turnin
 
 ## How to use
 
-Nothing to do: games with discs in a system's folder show as one game. Press **A** to play. To be able to change discs, press **Y** on the game and choose Combine discs. With other plugins' actions on Y, such as [game-actions](../game-actions/README.md) or favorites, Y opens a menu of them all.
+Nothing to do: games with discs in a system's folder show as one game. Press **A** to play. To be able to change discs, press **Y** on the game (its hint says MERGE) and choose Combine discs. With other plugins' actions on Y, such as [game-actions](../game-actions/README.md) or favorites, Y opens a menu of them all.
 
-Until its first launch, a game's `.m3u` isn't on the card yet, so search and other plugins that look through the card find neither it nor its discs.
+Search and the other plugins that look through the card index find the game from the start, under its first disc's name, year, publisher, genre and players, and opening it from them launches it as from the game list. Its discs are hidden from them as from the list, though Recently Played, collections and Favorites keep a disc you put there.
 
 ## Screenshots
 
@@ -43,7 +43,7 @@ Y on it: Combine discs asks first.
 
 ## For plugin authors
 
-- Adds a row at each game's `.m3u` path with `dir_entries` before the `.m3u` is written, and hides the discs with `filter` in folders under `Roms` (not in Recently Played or collections). Shows the first disc's art for the game with `art_alias`.
+- Adds a row at each game's `.m3u` path with `dir_entries` before the `.m3u` is written, grouping the list's own entries, so the card index gets the row too, and hides the discs with `filter` in system folders and other plugins' lists, such as search's, but not in Recently Played, collections or Favorites, which show what you put there. Names the first disc with `art_alias`, for the game's art and its name and details in the card index.
 - Writes the `.m3u` and carries the first disc over from `entry_open`, returning 0 so the launcher launches it. The saves and states it copies are the ones minarch keeps under the first disc's file name, in `Saves/<tag>/`, each `.userdata/shared/<tag>-<core>/` and `.userdata/shared/.minui/<tag>/`, by the [system tag](../../docs/glossary.md#system-tag) of the system's folder. Keeps the `.m3u` paths it has carried over in `.userdata/<platform>/launcher/multi-disc.txt`.
 - Registers the `multi-disc.combine` action, bound to the Combine discs button on the game list with `bind_button`, available on a game it shows. Moves recents with `recent_set` (and `recent_remove` for a line that would then be there twice), favorites and tags through the `favorites.move` and `tags.move` services, and play time with `play_move`.
 - Never overwrites or deletes a file of yours: new files are created only where nothing is, and Combine discs puts back what it moved when a move fails.

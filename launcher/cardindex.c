@@ -13,8 +13,11 @@ static char file[1024];
 static void (*log_fn)(const char* message) = NULL;
 
 // the main thread's
-static CardIndex* current = NULL; // what plugins are answered from
+static CardIndex* raw = NULL;     // what was read from the card, which the worker checks and keeps
+static CardIndex* current = NULL; // what plugins are answered from: raw, or the view made from it
 static int asked = 0;             // a plugin asked: the worker has started at least once
+static CardIndex* (*view_fn)(const CardIndex* raw) = NULL;
+static int viewing = 0;           // in view_fn, which mustn't make another
 
 // shared with the worker, under the lock
 static pthread_t worker;
@@ -42,6 +45,27 @@ static double nowMs(void) {
 	return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
 }
 
+void CardIndex_setView(CardIndex* (*view)(const CardIndex* raw)) {
+	view_fn = view;
+}
+
+static void freeIndex(CardIndex* index) {
+	if (!index) return;
+	Index_free(index);
+	free(index);
+}
+
+// Makes current again from raw, through view_fn.
+static void makeView(void) {
+	if (current != raw) freeIndex(current);
+	current = raw;
+	if (!raw || !view_fn || viewing) return;
+	viewing = 1;
+	CardIndex* view = view_fn(raw);
+	viewing = 0;
+	if (view) current = view;
+}
+
 void CardIndex_setup(const char* card, const char* plat, const char* path, void (*log)(const char* message)) {
 	snprintf(sdcard, sizeof(sdcard), "%s", card ? card : "");
 	snprintf(platform, sizeof(platform), "%s", plat ? plat : "");
@@ -50,7 +74,7 @@ void CardIndex_setup(const char* card, const char* plat, const char* path, void 
 }
 
 static void* work(void* arg) {
-	const CardIndex* prev = arg; // the main thread's current, which it keeps until this is joined
+	const CardIndex* prev = arg; // the main thread's raw, which it keeps until this is joined
 	IndexCard card = { sdcard, platform };
 	CardIndex* next = malloc(sizeof(CardIndex));
 	IndexBuildStats stats;
@@ -97,7 +121,7 @@ static void start(void) {
 	cancel = 0;
 	finished = 0;
 	again = 0;
-	if (pthread_create(&worker, NULL, work, current) != 0) {
+	if (pthread_create(&worker, NULL, work, raw) != 0) {
 		say("index: couldn't start its thread\n");
 		return;
 	}
@@ -112,7 +136,8 @@ const CardIndex* CardIndex_get(void) {
 		CardIndex* cached = malloc(sizeof(CardIndex));
 		double began = nowMs();
 		if (cached && file[0] && Index_load(cached, file, roms) == 0) {
-			current = cached;
+			raw = cached;
+			makeView();
 			say("index: %d entries read from %s in %.1f ms, checking the card\n", cached->total, file, nowMs() - began);
 		}
 		else {
@@ -148,11 +173,10 @@ int CardIndex_poll(void) {
 	finished = 0;
 	pthread_mutex_unlock(&lock);
 	if (next) {
-		if (current) {
-			Index_free(current);
-			free(current);
-		}
-		current = next;
+		if (current != raw) freeIndex(current);
+		freeIndex(raw);
+		raw = current = next;
+		makeView();
 	}
 	pthread_mutex_lock(&lock);
 	if (again) start();
@@ -176,10 +200,8 @@ void CardIndex_quit(void) {
 		built = NULL;
 	}
 	pthread_mutex_unlock(&lock);
-	if (current) {
-		Index_free(current);
-		free(current);
-		current = NULL;
-	}
+	if (current != raw) freeIndex(current);
+	freeIndex(raw);
+	raw = current = NULL;
 	asked = 0;
 }

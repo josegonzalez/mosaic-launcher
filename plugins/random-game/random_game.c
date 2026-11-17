@@ -77,6 +77,14 @@ static int exists(const char* path) {
 	return stat(path, &st) == 0;
 }
 
+// On the card, or a game the card index has from a plugin's dir_entries,
+// which opening it puts on the card, such as a multi-disc game's .m3u.
+static int playable(const char* path) {
+	if (exists(path)) return 1;
+	MosaicIndexEntry e = { .size = sizeof(e) };
+	return MOSAIC_HOST_HAS(host, index_find) && host->index_find(path, &e) >= 0 && e.added;
+}
+
 static int isOn(const char* key, const char* fallback) {
 	return strcmp(host->cfg_get(key, fallback), "off") != 0;
 }
@@ -199,7 +207,7 @@ static int pick(int system, char* out, size_t size, int* type) {
 	while (total) {
 		int i = RG_pick(weights, library.count, total, below, NULL);
 		if (i < 0) break;
-		if (exists(library.games[i].path) && !filtered(library.games[i].path)) {
+		if (playable(library.games[i].path) && !filtered(library.games[i].path)) {
 			snprintf(out, size, "%s", library.games[i].path);
 			*type = library.games[i].type;
 			found = 1;
@@ -348,7 +356,7 @@ static MosaicList* virtualDir(const char* path) {
 		pending = 1;
 		if (!pick(-1, shown_path, sizeof(shown_path), &shown_type)) shown_path[0] = '\0';
 	}
-	if (shown_path[0] && exists(shown_path)) {
+	if (shown_path[0] && playable(shown_path)) {
 		host->list_push(list, host->entry_new(shown_path, shown_type, NULL));
 	}
 	return list;

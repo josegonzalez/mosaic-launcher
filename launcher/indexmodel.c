@@ -770,6 +770,84 @@ int Index_find(const CardIndex* index, const char* path, const IndexEntry** entr
 	return -1;
 }
 
+int Index_withRows(CardIndex* out, const CardIndex* index, const IndexRow* rows, int count) {
+	Index_init(out);
+	if (!index) return -1;
+	out->roms = index->roms ? strdup(index->roms) : NULL;
+	out->roms_mtime = index->roms_mtime;
+	out->map_mtime = index->map_mtime;
+	if (index->roms && !out->roms) return -1;
+	if (index->system_count) {
+		out->systems = calloc((size_t)index->system_count, sizeof(IndexSystem));
+		if (!out->systems) {
+			Index_free(out);
+			return -1;
+		}
+	}
+	for (int i = 0; i < index->system_count; i++) {
+		if (systemCopy(&out->systems[i], &index->systems[i]) != 0) {
+			Index_free(out);
+			return -1;
+		}
+		out->systems[i].first = index->systems[i].first;
+		out->system_count++;
+	}
+	out->total = index->total;
+
+	int added = 0;
+	size_t roms_len = out->roms ? strlen(out->roms) : 0;
+	for (int r = 0; r < count; r++) {
+		const char* path = rows[r].path;
+		if (!path || !out->roms || strncmp(path, out->roms, roms_len) != 0 || path[roms_len] != '/') continue;
+		const char* folder = path + roms_len + 1;
+		const char* slash = strchr(folder, '/');
+		if (!slash || !slash[1]) continue;
+		IndexSystem* sys = (IndexSystem*)findSystem(out, folder, (size_t)(slash - folder));
+		if (!sys) continue;
+		// already there: found in the copy as it was, rows added since included
+		int there = 0;
+		for (int k = 0; k < sys->count && !there; k++) there = !strcmp(Index_str(sys, sys->entries[k].path), path);
+		if (there) continue;
+		int depth = 0;
+		for (const char* p = slash + 1; *p; p++) depth += *p == '/';
+		if (depth > INDEX_DEPTH_MAX) continue;
+
+		const IndexEntry* from = NULL;
+		const IndexSystem* from_sys = NULL;
+		if (rows[r].from && rows[r].from[0]) Index_find(index, rows[r].from, &from, &from_sys);
+		char name[NAME_MAX_LEN];
+		const char* file_name = strrchr(path, '/') + 1;
+		if (from) snprintf(name, sizeof(name), "%s", Index_str(from_sys, from->name));
+		else Index_cleanName(file_name, name, sizeof(name));
+
+		IndexEntry entry;
+		memset(&entry, 0, sizeof(entry));
+		entry.kind = INDEX_KIND_GAME;
+		entry.type = (uint8_t)rows[r].type;
+		entry.depth = (int8_t)depth;
+		entry.added = 1;
+		entry.path = addString(sys, path);
+		entry.launch = entry.path;
+		entry.name = addString(sys, name);
+		if (from) {
+			entry.year = addString(sys, Index_str(from_sys, from->year));
+			entry.publisher = addString(sys, Index_str(from_sys, from->publisher));
+			entry.genre = addString(sys, Index_str(from_sys, from->genre));
+			entry.players = addString(sys, Index_str(from_sys, from->players));
+		}
+		if (!entry.path || (name[0] && !entry.name) || addEntry(sys, &entry) != 0) {
+			Index_free(out);
+			return -1;
+		}
+		added++;
+	}
+	if (added) {
+		for (int i = 0; i < out->system_count; i++) sortEntries(&out->systems[i]);
+		finish(out);
+	}
+	return added;
+}
+
 size_t Index_bytes(const CardIndex* index) {
 	size_t bytes = sizeof(*index) + sizeof(IndexSystem) * (size_t)index->system_count;
 	for (int i = 0; i < index->system_count; i++) {

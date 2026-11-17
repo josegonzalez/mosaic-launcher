@@ -63,6 +63,14 @@ static int exists(const char* path) {
 	return stat(path, &st) == 0;
 }
 
+// On the card, or a game the card index has from a plugin's dir_entries,
+// which opening it puts on the card, such as a multi-disc game's .m3u.
+static int playable(const char* path) {
+	if (exists(path)) return 1;
+	MosaicIndexEntry e = { .size = sizeof(e) };
+	return MOSAIC_HOST_HAS(host, index_find) && host->index_find(path, &e) >= 0 && e.added;
+}
+
 ///////////////////////////////////////
 // the games, from the card index
 
@@ -294,7 +302,7 @@ static MosaicList* virtualDir(const char* path) {
 	if (i < 0) return list;
 	for (int k = 0; k < index_.member_count[i]; k++) {
 		const SMGame* game = &index_.games[index_.members[i][k]];
-		if (!exists(game->path)) continue; // deleted since the index was read
+		if (!playable(game->path)) continue; // deleted since the index was read
 		host->list_push(list, host->entry_new(game->path, game->type, game->name));
 	}
 	return list;

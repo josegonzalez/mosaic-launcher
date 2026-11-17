@@ -115,6 +115,7 @@ static int switcher_declined = 0; // the switcher screen's enter declined, so th
 #define AS_SCREEN(s) AS_CALLER((s)->owner >= 0 ? loaded[(s)->owner].id : NULL)
 
 static void dropOverrides(int owner);
+static CardIndex* indexView(const CardIndex* raw);
 static void saveBindings(int* counts);
 static void dropBindings(const int* counts);
 // the built-in lock and ambient screens, at the end
@@ -440,6 +441,7 @@ static void indexFill(const IndexEntry* e, const IndexSystem* sys, MosaicIndexEn
 		.publisher = Index_str(sys, e->publisher),
 		.genre = Index_str(sys, e->genre),
 		.players = Index_str(sys, e->players),
+		.added = e->added,
 	};
 	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
 }
@@ -2265,6 +2267,7 @@ static void start(void) {
 	Wifi_setLog(wifiLog);
 	// only where to look: nothing is read until a plugin asks
 	CardIndex_setup(SDCARD_PATH, PLATFORM, PLUGIN_STATE_DIR "/card-index.txt", indexLog);
+	CardIndex_setView(indexView);
 
 	char* choices = readText(PLUGIN_CHOICES_PATH);
 	static PluginDecision decisions[PLUGIN_MAX];
@@ -2984,6 +2987,80 @@ int Plugins_artAlias(const Entry* entry, char* out, size_t size) {
 	}
 	out[0] = '\0';
 	return 0;
+}
+
+// The card index with plugins' dir_entries rows: each folder in it with
+// games is listed to the plugins as the game list would list it, from
+// what the index has, and each row they add that isn't on the card yet
+// goes in as a game, named and described as the entry its art_alias
+// names. NULL when no plugin adds rows.
+static CardIndex* indexView(const CardIndex* raw) {
+	int any = 0;
+	EACH_PLUGIN_WITH(dir_entries) any = 1;
+	if (!any || !raw) return NULL;
+	IndexRow* rows = NULL;
+	int row_count = 0, row_cap = 0;
+	for (int s = 0; s < raw->system_count; s++) {
+		const IndexSystem* sys = &raw->systems[s];
+		for (int f = 0; f < sys->count; f++) {
+			const IndexEntry* folder = &sys->entries[f];
+			if (folder->kind != INDEX_KIND_SYSTEM && folder->kind != INDEX_KIND_FOLDER) continue;
+			const char* dir = Index_str(sys, folder->path);
+			size_t len = strlen(dir);
+			// its own entries: right after it in path order, among those it starts
+			Array* list = Array_new();
+			int games = 0;
+			for (int k = f + 1; k < sys->count; k++) {
+				const IndexEntry* e = &sys->entries[k];
+				const char* path = Index_str(sys, e->path);
+				if (strncmp(path, dir, len) != 0) break;
+				if (path[len] != '/' || strchr(path + len + 1, '/')) continue;
+				Array_push(list, Entry_new((char*)path, e->kind == INDEX_KIND_FOLDER ? ENTRY_DIR : e->type));
+				if (e->type == ENTRY_ROM) games++;
+			}
+			int before = list->count;
+			if (games) Plugins_dirEntries(list, dir);
+			for (int k = before; k < list->count; k++) {
+				Entry* added = list->items[k];
+				const char* slash = strrchr(added->path, '/');
+				if (added->type != ENTRY_ROM || !slash || (size_t)(slash - added->path) != len || strncmp(added->path, dir, len) != 0) continue;
+				if (Index_find(raw, added->path, NULL, NULL) >= 0) continue;
+				if (row_count == row_cap) {
+					int cap = row_cap ? row_cap * 2 : 16;
+					IndexRow* bigger = realloc(rows, sizeof(IndexRow) * (size_t)cap);
+					if (!bigger) break;
+					rows = bigger;
+					row_cap = cap;
+				}
+				char alias[MAX_PATH];
+				char* from = Plugins_artAlias(added, alias, sizeof(alias)) ? strdup(alias) : NULL;
+				char* path = strdup(added->path);
+				if (!path) {
+					free(from);
+					break;
+				}
+				rows[row_count++] = (IndexRow){ path, ENTRY_ROM, from };
+			}
+			EntryArray_free(list);
+		}
+	}
+	CardIndex* view = NULL;
+	if (row_count) {
+		view = malloc(sizeof(CardIndex));
+		int added = view ? Index_withRows(view, raw, rows, row_count) : -1;
+		if (added <= 0) {
+			if (added == 0) Index_free(view);
+			free(view);
+			view = NULL;
+		}
+		else LOG_info("index: %d rows from plugins\n", added);
+	}
+	for (int i = 0; i < row_count; i++) {
+		free((char*)rows[i].path);
+		free((char*)rows[i].from);
+	}
+	free(rows);
+	return view;
 }
 
 static int generates(int i) {

@@ -57,6 +57,10 @@ msgid "L2"
 msgstr ""
 
 #: multi_disc.c
+msgid "MERGE"
+msgstr ""
+
+#: multi_disc.c
 #, c-format
 msgid "Move the discs of %.120s into a folder of their own?"
 msgstr ""

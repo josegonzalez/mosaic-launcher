@@ -30,6 +30,7 @@ typedef struct IndexEntry {
 	uint8_t kind;
 	uint8_t type;  // MOSAIC_ENTRY_*
 	int8_t depth;  // -1 for the system folder
+	uint8_t added; // 1 for a plugin's row (see Index_withRows), never kept on the card
 } IndexEntry;
 
 // A folder, .media folder or map.txt the system's entries were read
@@ -118,6 +119,24 @@ void Index_cleanName(const char* file_name, char* out, size_t size);
 // A system folder's emulator tag: what's in its last parentheses, or the
 // whole name when it has none.
 void Index_emuTag(const char* system, char* out, size_t size);
+
+// A game a plugin's dir_entries adds to a folder, for the index: its full
+// path and MOSAIC_ENTRY_* type, and the full path of the entry it takes
+// its name and .info fields from (NULL or "" for none).
+typedef struct IndexRow {
+	const char* path;
+	int type;
+	const char* from;
+} IndexRow;
+
+// A copy of index in out, with each row added as a game (marked added), in its system
+// and its folder's depth, in path order. Its name and .info fields are
+// those of the entry at from when the index has it, else its tidied file
+// name and none. A row is skipped when the index has its path already, or
+// it isn't in a system folder or is more than INDEX_DEPTH_MAX folders
+// inside one. With no rows it's a plain copy. Returns how many it added,
+// or -1 when out of memory, leaving out empty.
+int Index_withRows(CardIndex* out, const CardIndex* index, const IndexRow* rows, int count);
 
 // Bytes the index holds in memory, for measuring.
 size_t Index_bytes(const CardIndex* index);

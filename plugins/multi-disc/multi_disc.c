@@ -39,7 +39,7 @@
 
 #define ID "multi-disc"
 #define PATH_LEN 1024
-#define FOLDERS 4 // folders kept read
+#define FOLDERS 64 // folders kept read, so a list across many, such as search's, reads each once
 #define M3U_MAX 8192
 // an action label the launcher translates where it draws it, for make pot
 #define TR_MARK(text) (text)
@@ -168,15 +168,22 @@ static int readNames(Folder* f) {
 // as FAT's 2 second clock wouldn't show a second change.
 static Folder* folderAt(const char* dir) {
 	if (!underRoms(dir) || strlen(dir) >= PATH_LEN) return NULL;
+	// the same folder again within a second, as for each entry of a list, without asking the card
+	static Folder* last = NULL;
+	static time_t last_at = 0;
+	time_t now = time(NULL);
+	if (last && last->path[0] && now == last_at && !strcmp(last->path, dir)) return last;
+	last = NULL;
 	struct stat st;
 	if (stat(dir, &st) != 0 || !S_ISDIR(st.st_mode)) return NULL;
-	time_t now = time(NULL);
 	Folder* oldest = &folders[0];
 	for (int i = 0; i < FOLDERS; i++) {
 		Folder* f = &folders[i];
 		if (f->path[0] && !strcmp(f->path, dir)) {
 			if (f->mtime == st.st_mtime && now - st.st_mtime > 3) {
 				f->used = ++uses;
+				last = f;
+				last_at = now;
 				return f;
 			}
 			oldest = f;
@@ -198,6 +205,8 @@ static Folder* folderAt(const char* dir) {
 	if (!MD_stockFolder(own, (const char* const*)f->names, f->count)) {
 		if (MD_group((const char* const*)f->names, f->count, &f->groups) < 0) say("out of memory reading a folder");
 	}
+	last = f;
+	last_at = now;
 	return f;
 }
 
@@ -218,35 +227,66 @@ static const char* discName(const Folder* f, const MDGroup* g, int i) {
 ///////////////////////////////////////
 // the list
 
+// Groups the games among the list's own entries, a folder at a time (a
+// system's list can be read from several), without reading the card
+// again, as the card index lists every folder this way too.
 static void dirEntries(MosaicList* list, const char* dir_path) {
 	if (!underRoms(dir_path)) return;
-	// every folder the list was read from: a system's can be several
-	char seen[FOLDERS * 2][PATH_LEN];
-	int seen_count = 0;
 	int count = host->list_count(list);
+	if (count <= 0) return;
+	const char** names = malloc(sizeof(char*) * (size_t)count);
+	char* done_dirs = calloc((size_t)count, 1); // entries whose folder was grouped already
+	if (!names || !done_dirs) {
+		free(names);
+		free(done_dirs);
+		return;
+	}
 	for (int i = 0; i < count; i++) {
+		if (done_dirs[i]) continue;
 		const MosaicEntry* entry = host->list_get(list, i);
 		char dir[PATH_LEN];
-		if (host->entry_type(entry) != MOSAIC_ENTRY_ROM || !parentOf(host->entry_path(entry), dir, sizeof(dir))) continue;
-		int known = 0;
-		for (int k = 0; k < seen_count && !known; k++) known = !strcmp(seen[k], dir);
-		if (known || seen_count == (int)(sizeof(seen) / sizeof(seen[0]))) continue;
-		snprintf(seen[seen_count++], PATH_LEN, "%s", dir);
-	}
-	for (int k = 0; k < seen_count; k++) {
-		Folder* f = folderAt(seen[k]);
-		if (!f) continue;
-		for (int g = 0; g < f->groups.count; g++) {
+		if (host->entry_type(entry) != MOSAIC_ENTRY_ROM || !parentOf(host->entry_path(entry), dir, sizeof(dir)) || !underRoms(dir)) continue;
+		size_t len = strlen(dir);
+		int n = 0;
+		for (int k = i; k < count; k++) {
+			const MosaicEntry* other = host->list_get(list, k);
+			const char* path = host->entry_path(other);
+			if (host->entry_type(other) != MOSAIC_ENTRY_ROM || strncmp(path, dir, len) != 0 || path[len] != '/' || strchr(path + len + 1, '/')) continue;
+			done_dirs[k] = 1;
+			names[n++] = path + len + 1;
+		}
+		// a folder in stock's own layout is stock's
+		if (MD_stockFolder(strrchr(dir, '/') + 1, names, n)) continue;
+		MDGroups groups;
+		if (MD_group(names, n, &groups) < 0) continue;
+		for (int g = 0; g < groups.count; g++) {
 			char m3u[PATH_LEN];
-			if (!join(m3u, sizeof(m3u), f->path, f->groups.items[g].m3u) || exists(m3u)) continue;
+			if (!join(m3u, sizeof(m3u), dir, groups.items[g].m3u) || exists(m3u)) continue;
 			host->list_push(list, host->entry_new(m3u, MOSAIC_ENTRY_ROM, NULL));
 		}
+		MD_groupsFree(&groups);
 	}
+	free(names);
+	free(done_dirs);
 }
 
-// The discs of a game it groups, in a system's folders.
+// 1 for a list that shows what the user put there themselves: Recently
+// Played, collections and favorites' Favorites folder.
+static int ownList(const char* dir_path) {
+	char recents[PATH_LEN], collections[PATH_LEN], favorites[PATH_LEN];
+	snprintf(recents, sizeof(recents), "%s/Recently Played", host->sdcard_path);
+	snprintf(collections, sizeof(collections), "%s/Collections", host->sdcard_path);
+	snprintf(favorites, sizeof(favorites), "%s/Favorites", host->sdcard_path);
+	size_t n = strlen(collections);
+	return !strcmp(dir_path, recents) || !strcmp(dir_path, favorites)
+		|| (!strncmp(dir_path, collections, n) && (!dir_path[n] || dir_path[n] == '/'));
+}
+
+// The discs of a game it groups: in a system's folders and in other
+// plugins' lists, such as search's, but not in Recently Played,
+// collections or Favorites.
 static int filter(const MosaicEntry* entry, const char* dir_path) {
-	if (!underRoms(dir_path) || host->entry_type(entry) != MOSAIC_ENTRY_ROM) return 1;
+	if (!dir_path || host->entry_type(entry) != MOSAIC_ENTRY_ROM || ownList(dir_path)) return 1;
 	const char* path = host->entry_path(entry);
 	char dir[PATH_LEN];
 	if (!parentOf(path, dir, sizeof(dir))) return 1;
@@ -660,7 +700,7 @@ static int init(const MosaicHost* h) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 	if (!MOSAIC_HOST_HAS(host, confirm)) say("this launcher has no confirm dialog; Combine discs is off");
-	else if (host->register_action(ID ".combine", TR_MARK("COMBINE"), 0, canCombine, combineAsk, NULL) != 0
+	else if (host->register_action(ID ".combine", TR_MARK("MERGE"), 0, canCombine, combineAsk, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, ID ".combine") != 0) {
 		say("couldn't bind Combine discs");
 	}

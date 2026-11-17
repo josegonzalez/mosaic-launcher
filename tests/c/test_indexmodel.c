@@ -488,12 +488,120 @@ static void testWorker(void) {
 	CardIndex_quit();
 }
 
+// Rows a plugin adds: in their system, in path order, named and described
+// as the entry they come from, and only where the index has nothing.
+static void testRows(void) {
+	makeCard();
+	CHECK(system("mkdir -p '" PS "/Loose/.media'") == 0);
+	touch(PS "/Loose/Game (Disc 1).cue");
+	touch(PS "/Loose/Game (Disc 2).cue");
+	writeText(PS "/Loose/.media/Game (Disc 1).info", "year=1999\npublisher=Squaresoft\ngenre=RPG\nplayers=1\n");
+	CardIndex index;
+	CHECK(Index_build(&index, &card, NULL, NULL, NULL) == 0);
+	const IndexRow rows[] = {
+		{ PS "/Loose/Game.m3u", MOSAIC_ENTRY_ROM, PS "/Loose/Game (Disc 1).cue" },
+		{ PS "/Loose/Other.m3u", MOSAIC_ENTRY_ROM, NULL },
+		{ PS "/Loose/Spyro.cue", MOSAIC_ENTRY_ROM, NULL },       // there already
+		{ PS "/Loose/Game.m3u", MOSAIC_ENTRY_ROM, NULL },        // twice
+		{ ROMS "/Nowhere (NW)/Game.m3u", MOSAIC_ENTRY_ROM, NULL }, // no such system
+		{ CARD "/Elsewhere/Game.m3u", MOSAIC_ENTRY_ROM, NULL },
+		{ PS, MOSAIC_ENTRY_ROM, NULL },                           // the system folder itself
+		{ GB "/Hacks/1/2/3/4/5/6/7/8/Deep.m3u", MOSAIC_ENTRY_ROM, NULL },
+	};
+	CardIndex view;
+	CHECK(Index_withRows(&view, &index, rows, (int)(sizeof(rows) / sizeof(rows[0]))) == 2);
+	CHECK(view.total == index.total + 2);
+	CHECK(Index_count(&view, "PlayStation (PS)") == Index_count(&index, "PlayStation (PS)") + 2);
+	const IndexSystem* sys = NULL;
+	const IndexEntry* e = entryAt(&view, PS "/Loose/Game.m3u", &sys);
+	CHECK(e && e->kind == INDEX_KIND_GAME && e->type == MOSAIC_ENTRY_ROM && e->depth == 1 && e->added == 1);
+	CHECK(entryAt(&view, PS "/Loose/Spyro.cue", NULL) && entryAt(&view, PS "/Loose/Spyro.cue", NULL)->added == 0);
+	if (e) {
+		CHECK_STR(Index_str(sys, e->name), "Game");
+		CHECK_STR(Index_str(sys, e->launch), PS "/Loose/Game.m3u");
+		CHECK_STR(Index_str(sys, e->year), "1999");
+		CHECK_STR(Index_str(sys, e->publisher), "Squaresoft");
+		CHECK_STR(Index_str(sys, e->genre), "RPG");
+		CHECK_STR(Index_str(sys, e->players), "1");
+	}
+	e = entryAt(&view, PS "/Loose/Other.m3u", &sys);
+	CHECK(e && !strcmp(Index_str(sys, e->name), "Other") && !strcmp(Index_str(sys, e->year), ""));
+	CHECK(!entryAt(&view, GB "/Hacks/1/2/3/4/5/6/7/8/Deep.m3u", NULL));
+	// in path order, every system's first entry following on
+	for (int i = 0; i < view.system_count; i++) {
+		const IndexSystem* s = &view.systems[i];
+		for (int k = 1; k < s->count; k++) CHECK(strcmp(Index_str(s, s->entries[k - 1].path), Index_str(s, s->entries[k].path)) < 0);
+		if (i) CHECK(s->first == view.systems[i - 1].first + view.systems[i - 1].count);
+	}
+	CHECK(Index_find(&view, GG "/Sonic.gg", NULL, NULL) == Index_find(&index, GG "/Sonic.gg", NULL, NULL));
+	Index_free(&view);
+
+	// no rows: a copy
+	CHECK(Index_withRows(&view, &index, NULL, 0) == 0);
+	CHECK(view.total == index.total && view.system_count == index.system_count);
+	Index_free(&view);
+	CHECK(Index_withRows(&view, NULL, NULL, 0) == -1);
+	Index_free(&index);
+}
+
+static int views = 0;
+static CardIndex* addRow(const CardIndex* raw) {
+	views++;
+	// asking from inside gets the index read from the card
+	CHECK(CardIndex_get() == raw);
+	static const IndexRow row = { PS "/Loose/Game.m3u", MOSAIC_ENTRY_ROM, PS "/Loose/Game (Disc 1).cue" };
+	CardIndex* view = malloc(sizeof(CardIndex));
+	if (view && Index_withRows(view, raw, &row, 1) < 0) {
+		free(view);
+		view = NULL;
+	}
+	return view;
+}
+
+// The worker hands over what it read, the view is made from it, and only
+// what was read from the card is kept there.
+static void testView(void) {
+	makeCard();
+	touch(PS "/Loose/Game (Disc 1).cue");
+	unlink(FILE_PATH);
+	CardIndex_setup(CARD, "test", FILE_PATH, quietLog);
+	CardIndex_setView(addRow);
+	views = 0;
+	CHECK(CardIndex_get() == NULL);
+	CHECK(waitReady());
+	CHECK(views == 1);
+	const CardIndex* index = CardIndex_get();
+	CHECK(index && Index_find(index, PS "/Loose/Game.m3u", NULL, NULL) >= 0);
+	char* kept = readText(FILE_PATH);
+	CHECK(kept && strstr(kept, "Game (Disc 1).cue") && !strstr(kept, "Game.m3u"));
+	free(kept);
+	CardIndex_quit();
+
+	// from the file at the next start, and again once a check changes it
+	CardIndex_setup(CARD, "test", FILE_PATH, quietLog);
+	views = 0;
+	index = CardIndex_get();
+	CHECK(views == 1 && index && Index_find(index, PS "/Loose/Game.m3u", NULL, NULL) >= 0);
+	touch(PS "/Loose/Game (Disc 2).cue");
+	age(PS "/Loose", 1000000700);
+	CardIndex_refresh();
+	// the check started at the first ask may come in first
+	for (int i = 0; i < 3 && Index_find(CardIndex_get(), PS "/Loose/Game (Disc 2).cue", NULL, NULL) < 0; i++) waitReady();
+	index = CardIndex_get();
+	CHECK(views >= 2 && index && Index_find(index, PS "/Loose/Game (Disc 2).cue", NULL, NULL) >= 0
+		&& Index_find(index, PS "/Loose/Game.m3u", NULL, NULL) >= 0);
+	CardIndex_quit();
+	CardIndex_setView(NULL);
+}
+
 int main(void) {
 	testNames();
 	testBuild();
 	testFile();
 	testStale();
 	testWorker();
+	testRows();
+	testView();
 	CHECK(system("rm -rf '" TEST_DIR "'") == 0);
 	CHECK_DONE();
 }

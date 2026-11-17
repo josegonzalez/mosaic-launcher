@@ -437,6 +437,7 @@ typedef struct MosaicIndexEntry {
 	const char* publisher; // the same
 	const char* genre;     // the same
 	const char* players;   // the same, such as "2" or "1-4"
+	int added;             // 1 for a game a plugin's dir_entries adds, which isn't on the card until it's opened, else 0
 } MosaicIndexEntry;
 
 // How button hints are drawn, as stock's Settings app offers them (its
@@ -1699,7 +1700,8 @@ typedef struct MosaicHost {
 	// published each time its entries change after a plugin asked: once
 	// the first read is done when nothing was kept, and after a check that
 	// found the card changed, before the next frame's ticks. It lists what
-	// a plugin's filter hides too, but not what stock never lists (dot
+	// a plugin's filter hides too, and plugins' dir_entries rows (see
+	// dir_entries in MosaicPlugin), but not what stock never lists (dot
 	// files, *.disabled, map.txt and names map.txt hides) or anything more
 	// than 7 folders inside a system folder. Entries are by system folder,
 	// by name bytewise, and in each by path bytewise, so a system folder
@@ -2147,7 +2149,10 @@ typedef struct MosaicPlugin {
 	// the folder's own. An entry whose path the list already has is
 	// dropped. When any were added, the list is sorted by name again, as
 	// the launcher sorts a folder. It can't remove or reorder entries:
-	// hide them with filter.
+	// hide them with filter. The card index asks too, each time a new one
+	// is put in place, with each of its folders listed from its own
+	// entries, and adds the game rows that aren't on the card, with the
+	// name and .info fields of the entry art_alias names for them.
 	void (*dir_entries)(MosaicList* list, const char* dir_path);
 
 	// Art from another entry, for an entry with none of its own, such as a
