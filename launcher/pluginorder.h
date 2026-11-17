@@ -27,9 +27,13 @@ const char* PluginOrder_title(int group);
 // Compares names A-Z, ignoring case and the accents on Latin letters.
 int PluginOrder_compareNames(const char* a, const char* b);
 
+// The most rows count plugins make: each plugin and each group's header.
+#define PLUGIN_ORDER_ROWS(count) ((count) + PLUGIN_GROUP_COUNT + 1)
+
 // Fills out with the page's rows: each group with plugins, its header
 // first, then the others, with their own header only when a group came
-// before them. Returns how many, at most max.
+// before them. Returns how many, at most max; max of
+// PLUGIN_ORDER_ROWS(count) fits them all.
 int PluginOrder_rows(const PluginManifest* manifests, int count, PluginPageRow* out, int max);
 
 #endif

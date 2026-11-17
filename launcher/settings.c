@@ -305,23 +305,38 @@ static void setLauncherValue(const LauncherSetting* l, const char* value) {
 	if (Cfg_set(LAUNCHER_SETTINGS_PATH, l->key, value) != 0) LOG_warn("settings: couldn't save %s in %s\n", l->key, LAUNCHER_SETTINGS_PATH);
 }
 
-// The ambient screens there are, in the saved order.
+// The ambient screens there are, in the saved order. What doesn't fit is
+// logged once.
 static void listAmbient(void) {
 	static char kept[AMBIENT_MAX][AMBIENT_ID_MAX];
+	static int warned = 0;
 	const char* ids[AMBIENT_MAX];
 	char labels[AMBIENT_MAX][128];
 	int n = 0;
 	ids[n] = AMBIENT_LOCK;
 	snprintf(labels[n++], sizeof(labels[0]), "%s", TR("Lock"));
-	for (int i = 0; i < manifest_count && n < AMBIENT_MAX; i++) {
+	for (int i = 0; i < manifest_count; i++) {
 		const PluginManifest* m = &manifests[i];
 		if (!m->ambient[0] || !pluginOn(m)) continue;
 		char list[256];
 		snprintf(list, sizeof(list), "%s", m->ambient);
 		int several = strchr(list, ',') != NULL;
-		for (char* id = strtok(list, ","); id && n < AMBIENT_MAX; id = strtok(NULL, ",")) {
+		for (char* id = strtok(list, ","); id; id = strtok(NULL, ",")) {
 			while (*id == ' ') id++;
-			if (!*id || strlen(id) >= AMBIENT_ID_MAX) continue;
+			if (!*id) continue;
+			if (n >= AMBIENT_MAX || strlen(id) >= AMBIENT_ID_MAX) {
+				if (warned) continue;
+				warned = 1;
+				if (n >= AMBIENT_MAX) {
+					LOG_warn("settings: leaving %s's ambient screen %s off the Ambient screens page, which lists %d at most\n",
+						m->id, id, AMBIENT_MAX);
+				}
+				else {
+					LOG_warn("settings: leaving %s's ambient screen %.40s... off the Ambient screens page: its id is over %d bytes\n",
+						m->id, id, AMBIENT_ID_MAX - 1);
+				}
+				continue;
+			}
 			snprintf(kept[n], AMBIENT_ID_MAX, "%s", id);
 			ids[n] = kept[n];
 			const char* name = Tr_plugin(m->id, NULL, m->name);
@@ -438,13 +453,16 @@ static void buildRows(void) {
 	}
 	else if (m->kind == MENU_PLUGINS) {
 		snprintf(title, sizeof(title), "%s", TR("Plugins"));
-		PluginPageRow order[PLUGIN_MAX + PLUGIN_GROUP_COUNT + 1];
-		int n = PluginOrder_rows(manifests, manifest_count, order, (int)(sizeof(order) / sizeof(order[0])));
+		int room = PLUGIN_ORDER_ROWS(manifest_count);
+		PluginPageRow* order = malloc(sizeof(PluginPageRow) * (size_t)room);
+		int n = order ? PluginOrder_rows(manifests, manifest_count, order, room) : 0;
+		if (!order) LOG_warn("settings: out of memory listing the plugins\n");
 		for (int i = 0; i < n; i++) {
 			int at = order[i].plugin;
 			if (at < 0) addRow(ROW_HEADER, order[i].group, TR(PluginOrder_title(order[i].group)), NULL);
 			else addRow(ROW_PLUGIN, at, pluginText(&manifests[at], manifests[at].name), onOff(pluginOn(&manifests[at])));
 		}
+		free(order);
 		addRow(ROW_PIN, 0, TR("PIN"), Pin_isSet(PIN_PATH) ? TR("Set") : TR("Not set"));
 	}
 	else if (m->kind == MENU_PLUGIN) {

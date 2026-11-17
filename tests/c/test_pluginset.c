@@ -49,6 +49,18 @@ static int loads(int n, const char* id) {
 	return d && d->load;
 }
 
+// What the parser warned about, each followed by a newline.
+static char warned[8192];
+static int warnings;
+static void warning(const char* message) {
+	snprintf(warned + strlen(warned), sizeof(warned) - strlen(warned), "%s\n", message);
+	warnings++;
+}
+static void unwarn(void) {
+	warned[0] = '\0';
+	warnings = 0;
+}
+
 // Manifest_strings' texts, each followed by ;
 static char strings[2048];
 static void append(const char* text, void* data) {
@@ -441,6 +453,116 @@ int main(void) {
 	n = PluginSet_resolve(manifests, count, NULL, out);
 	CHECK(n == 2 && !loads(n, "x"));
 	CHECK_STR(out[0].manifest->id, "x");
+
+	// as many plugins as there are: more than the 64 the launcher once stopped at
+	enum { MANY = 130 };
+	ManifestList list = { 0 };
+	for (int i = 0; i < MANY; i++) {
+		char text[64], dir[32];
+		snprintf(text, sizeof(text), "id=p%03d\nsetting.s=toggle|S|on\n", i);
+		snprintf(dir, sizeof(dir), "/plugins/p%03d", i);
+		CHECK(ManifestList_add(&list, text, dir, i % 2) == 0);
+	}
+	CHECK(list.count == MANY && list.room >= MANY);
+	CHECK_STR(list.items[0].id, "p000");
+	CHECK_STR(list.items[MANY - 1].id, "p129");
+	CHECK_STR(list.items[MANY - 1].dir, "/plugins/p129");
+	CHECK(list.items[MANY - 1].bundled == 1 && list.items[MANY - 1].setting_count == 1);
+	// one without an id, or with a path too long for its dir, isn't added
+	CHECK(ManifestList_add(&list, "name=nobody\n", "/plugins/nobody", 0) == -1);
+	char long_dir[600];
+	memset(long_dir, 'd', sizeof(long_dir) - 1);
+	long_dir[sizeof(long_dir) - 1] = '\0';
+	CHECK(ManifestList_add(&list, "id=far\n", long_dir, 0) == -3);
+	CHECK(list.count == MANY);
+	// every one is decided, and plugins.txt's lines for all of them count:
+	// the last listed loads first, and the bundled ones turned on load
+	char* choices = calloc(MANY, 16);
+	for (int i = MANY - 1; i >= 0; i--) snprintf(choices + strlen(choices), MANY * 16 - strlen(choices), "p%03d=on\n", i);
+	PluginDecision* decided = calloc(MANY, sizeof(PluginDecision));
+	n = PluginSet_resolve(list.items, list.count, choices, decided);
+	CHECK(n == MANY);
+	CHECK_STR(decided[0].manifest->id, "p129");
+	CHECK_STR(decided[MANY - 1].manifest->id, "p000");
+	int loading = 0;
+	for (int i = 0; i < n; i++) loading += decided[i].load;
+	CHECK(loading == MANY);
+	CHECK(PluginSet_isOn(choices, &list.items[MANY - 1]));
+	free(choices);
+	n = PluginSet_resolve(list.items, list.count, "p129=off\n", decided);
+	CHECK(n == MANY && !decided[0].load && decided[0].manifest == &list.items[MANY - 1]);
+	CHECK_STR(decided[1].manifest->id, "p000");
+	free(decided);
+	ManifestList_free(&list);
+	CHECK(list.items == NULL && list.count == 0 && list.room == 0);
+	ManifestList_free(&list); // twice is fine
+	CHECK(PluginSet_resolve(NULL, 0, "x=on\n", NULL) == 0);
+
+	// what's cut to fit or left out is said, naming the plugin, once each
+	Manifest_setLog(warning);
+	unwarn();
+	PluginManifest cut = { .dir = "/plugins/cut" };
+	char text[4096];
+	char filler[600];
+	memset(filler, 'x', sizeof(filler) - 1);
+	filler[sizeof(filler) - 1] = '\0';
+	snprintf(text, sizeof(text),
+		"name=%.200s\n"
+		"setting.big=choice|Big|a|a,%.300s\n"
+		"setting.%.60s=toggle|Key|on\n"
+		"setting.btn=toggle|Btn|on||button:%.130s,button:%.130s\n"
+		"description=%s\n"
+		"id=cut\n"
+		"setting.fine=toggle|Fine|on\n",
+		filler, filler, filler, filler, filler + 200, filler);
+	CHECK(Manifest_parse(text, &cut) == 0);
+	CHECK(strlen(cut.name) == sizeof(cut.name) - 1);
+	CHECK(cut.setting_count == 4);
+	CHECK(strlen(cut.settings[0].options) == sizeof(cut.settings[0].options) - 1);
+	CHECK(strlen(cut.settings[1].key) == sizeof(cut.settings[1].key) - 1);
+	CHECK(strlen(cut.settings[2].buttons) == 130);
+	CHECK(strlen(cut.description) == sizeof(cut.description) - 1);
+	CHECK_STR(cut.settings[3].key, "fine");
+	CHECK(warnings == 6);
+	CHECK(strstr(warned, "cut's plugin.txt: name is over 127 bytes, cut to fit\n") != NULL);
+	CHECK(strstr(warned, "cut's plugin.txt: setting.big's options is over 255 bytes, cut to fit\n") != NULL);
+	CHECK(strstr(warned, "cut's plugin.txt: setting.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx's key is over 47 bytes, cut to fit\n") != NULL);
+	CHECK(strstr(warned, "cut's plugin.txt: setting.btn's button: markers are over 255 bytes, leaving out 1\n") != NULL);
+	CHECK(strstr(warned, "cut's plugin.txt: a line is over 511 bytes, cut to fit: description=xxxxxxxxxxxxxxxxxxxxxxxxxxxx...\n") != NULL);
+	CHECK(strstr(warned, "cut's plugin.txt: description is over 255 bytes, cut to fit\n") != NULL);
+	// without an id, the dir names it
+	unwarn();
+	snprintf(text, sizeof(text), "name=%.200s\n", filler);
+	CHECK(Manifest_parse(text, &cut) == -1);
+	CHECK_STR(warned, "/plugins/cut/plugin.txt: name is over 127 bytes, cut to fit\n");
+	// a plugins.txt line or id that's cut, as the launcher decides
+	unwarn();
+	reset();
+	add("id=fav", 0);
+	snprintf(text, sizeof(text), "%.70s=off\nslot.theme=%.70s\n%s=on\nfav=off\n", filler, filler, filler);
+	n = PluginSet_resolve(manifests, count, text, out);
+	CHECK(n == 1 && !loads(n, "fav"));
+	CHECK(warnings == 3);
+	CHECK(strstr(warned, "plugins.txt: the plugin id xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx is over 63 bytes, cut to fit\n") != NULL);
+	CHECK(strstr(warned, "plugins.txt: slot.theme's plugin id is over 63 bytes, cut to fit\n") != NULL);
+	CHECK(strstr(warned, "plugins.txt: a line is over 511 bytes, cut to fit: xxxx") != NULL);
+	// checking one plugin's choice says nothing, as the Plugins page asks for each
+	unwarn();
+	CHECK(PluginSet_isOn(text, &manifests[0]) == 0);
+	CHECK(warnings == 0);
+	// writing plugins.txt back says what it cuts
+	char* rewritten = PluginSet_setChoice(text, "fav", 1);
+	CHECK(warnings == 1 && strstr(warned, "plugins.txt: a line is over 511 bytes, cut to fit") != NULL);
+	free(rewritten);
+	// a manifest that fits says nothing, and with no log nothing is said
+	unwarn();
+	CHECK(Manifest_parse("id=fits\nname=Fits\nsetting.a=choice|A|x|x,y|button:go\n", &cut) == 0);
+	CHECK(warnings == 0);
+	Manifest_setLog(NULL);
+	snprintf(text, sizeof(text), "id=quiet\nname=%.200s\n", filler);
+	CHECK(Manifest_parse(text, &cut) == 0);
+	CHECK(warnings == 0);
+	Manifest_free(&cut);
 
 	for (int i = 0; i < (int)(sizeof(manifests) / sizeof(manifests[0])); i++) Manifest_free(&manifests[i]);
 	Manifest_free(&m);

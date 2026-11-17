@@ -168,6 +168,14 @@ static int settingLines(const char* text) {
 	return count;
 }
 
+// What the parser cut or left out, which fails make pot and make lint, as
+// the launcher would warn about it.
+static int cuts = 0;
+static void parseLog(const char* message) {
+	fprintf(stderr, "plugin-pot: %s\n", message);
+	cuts++;
+}
+
 int main(int argc, char* argv[]) {
 	static PluginManifest m;
 	if (argc != 2 && !(argc == 4 && !strcmp(argv[2], "-c"))) {
@@ -179,8 +187,13 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "plugin-pot: can't read %s\n", argv[1]);
 		return 1;
 	}
+	Manifest_setLog(parseLog);
 	if (Manifest_parse(text, &m) != 0) {
 		fprintf(stderr, "plugin-pot: %s has no id\n", argv[1]);
+		return 1;
+	}
+	if (cuts) {
+		fprintf(stderr, "plugin-pot: the launcher cuts %s to fit; shorten what it names\n", argv[1]);
 		return 1;
 	}
 	int lines = settingLines(text);

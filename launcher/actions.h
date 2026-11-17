@@ -56,6 +56,8 @@ typedef struct Binding {
 #define ACTIONS_MAX 64
 
 void Actions_register(const Action* action);
+// True when there are ACTIONS_MAX actions, so a new one can't register.
+int Actions_full(void);
 const Action* Actions_find(const char* id);
 
 // The registered actions, in order, to put back later with Actions_restore.

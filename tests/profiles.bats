@@ -110,3 +110,36 @@ print_profile() {
 	run print_profile bogus
 	[ "$status" -ne 0 ]
 }
+
+# check_profile <log lines> <plugins.txt lines>: the profile's log check on
+# a made-up log
+check_profile() {
+	printf '%s\n' "$1" >"$BATS_TEST_TMPDIR/run.log"
+	printf '%s\n' "$2" >"$BATS_TEST_TMPDIR/plugins.txt"
+	"$REPO_ROOT/scripts/plugin-profiles.sh" check "$BATS_TEST_TMPDIR/run.log" "$BATS_TEST_TMPDIR/plugins.txt"
+}
+
+@test "a profile passes when every plugin it turned on loaded" {
+	run check_profile "$(printf '[INFO] plugins: loaded alpha\n[INFO] plugins: not loading beta: turned off')" \
+		"$(printf 'alpha=on\nbeta=off\nslot.layout=alpha')"
+	[ "$status" -eq 0 ]
+}
+
+@test "a profile fails when a plugin it turned on is missing, as one the loader never found" {
+	run check_profile '[INFO] plugins: loaded alpha' "$(printf 'alpha=on\nomega=on')"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"omega didn't load"* ]]
+}
+
+@test "a profile fails when the loader warns, as about a field cut to fit" {
+	run check_profile "$(printf "[INFO] plugins: loaded alpha\n[WARN] plugins: alpha's plugin.txt: name is over 127 bytes, cut to fit")" 'alpha=on'
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"the loader warned"* ]]
+}
+
+@test "a profile fails when a plugin is refused for a reason it didn't choose" {
+	run check_profile "$(printf '[INFO] plugins: loaded alpha\n[INFO] plugins: not loading beta: requires gamma, which isn'"'"'t loading')" \
+		"$(printf 'alpha=on\nbeta=off')"
+	[ "$status" -ne 0 ]
+	[[ "$output" == *"beta was refused"* ]]
+}

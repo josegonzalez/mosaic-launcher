@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 #include "pluginorder.h"
 #include "tr.h"
@@ -65,9 +66,11 @@ static int before(const PluginManifest* a, const PluginManifest* b) {
 
 // Adds group's plugins A-Z, after its header when header is set.
 static int addGroup(const PluginManifest* manifests, int count, int group, int header, PluginPageRow* out, int n, int max) {
-	int members[PLUGIN_MAX];
+	if (count <= 0) return n;
+	int* members = malloc(sizeof(int) * (size_t)count);
+	if (!members) return n;
 	int found = 0;
-	for (int i = 0; i < count && found < PLUGIN_MAX; i++) {
+	for (int i = 0; i < count; i++) {
 		if (PluginOrder_group(&manifests[i]) != group) continue;
 		int at = found++;
 		while (at > 0 && before(&manifests[i], &manifests[members[at - 1]])) {
@@ -76,9 +79,9 @@ static int addGroup(const PluginManifest* manifests, int count, int group, int h
 		}
 		members[at] = i;
 	}
-	if (!found) return n;
-	if (header && n < max) out[n++] = (PluginPageRow){ .group = group, .plugin = -1 };
+	if (found && header && n < max) out[n++] = (PluginPageRow){ .group = group, .plugin = -1 };
 	for (int i = 0; i < found && n < max; i++) out[n++] = (PluginPageRow){ .group = group, .plugin = members[i] };
+	free(members);
 	return n;
 }
 

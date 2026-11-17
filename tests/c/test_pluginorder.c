@@ -4,8 +4,11 @@
 #include "check.h"
 #include "pluginorder.h"
 
-static PluginManifest manifests[PLUGIN_MAX];
-static PluginPageRow rows[PLUGIN_MAX + PLUGIN_GROUP_COUNT + 1];
+// more than the 64 the page once stopped at
+#define MANY 130
+
+static PluginManifest manifests[MANY];
+static PluginPageRow rows[PLUGIN_ORDER_ROWS(MANY)];
 static int count;
 
 static void add(const char* id, const char* name, const char* slots) {
@@ -121,19 +124,19 @@ int main(void) {
 
 	// every plugin the page can list, plus a header for each group
 	count = 0;
-	for (int i = 0; i < PLUGIN_MAX; i++) {
+	for (int i = 0; i < MANY; i++) {
 		char id[16];
-		snprintf(id, sizeof(id), "p%02d", PLUGIN_MAX - 1 - i);
+		snprintf(id, sizeof(id), "p%03d", MANY - 1 - i);
 		add(id, id, i % 2 ? "" : "home");
 	}
-	int n = PluginOrder_rows(manifests, count, rows, (int)(sizeof(rows) / sizeof(rows[0])));
-	CHECK(n == PLUGIN_MAX + 2);
+	int n = PluginOrder_rows(manifests, count, rows, PLUGIN_ORDER_ROWS(count));
+	CHECK(n == MANY + 2);
 	CHECK(rows[0].plugin == -1 && rows[0].group == 5);
-	CHECK_STR(manifests[rows[1].plugin].id, "p01");
-	CHECK(rows[PLUGIN_MAX / 2 + 1].plugin == -1 && rows[PLUGIN_MAX / 2 + 1].group == PLUGIN_GROUP_OTHER);
-	CHECK_STR(manifests[rows[PLUGIN_MAX / 2 + 2].plugin].id, "p00");
-	CHECK_STR(manifests[rows[n - 1].plugin].id, "p62");
+	CHECK_STR(manifests[rows[1].plugin].id, "p001");
+	CHECK(rows[MANY / 2 + 1].plugin == -1 && rows[MANY / 2 + 1].group == PLUGIN_GROUP_OTHER);
+	CHECK_STR(manifests[rows[MANY / 2 + 2].plugin].id, "p000");
+	CHECK_STR(manifests[rows[n - 1].plugin].id, "p128");
 
-	for (int i = 0; i < PLUGIN_MAX; i++) Manifest_free(&manifests[i]);
+	for (int i = 0; i < MANY; i++) Manifest_free(&manifests[i]);
 	CHECK_DONE();
 }

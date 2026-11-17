@@ -24,6 +24,10 @@
 #       plugins.txt for the plugins in dir (default plugins/), notes on stderr
 #   scripts/plugin-profiles.sh count [dir]           print how many profiles
 #       the plugins in dir need
+#   scripts/plugin-profiles.sh check <log> <plugins.txt> check a run's log as
+#       each profile's is checked: fails when a plugin turned on didn't load
+#       (such as one never found), one was refused for another reason, or
+#       the loader warned
 #
 # Running expects `make desktop plugins-desktop` first.
 
@@ -208,6 +212,14 @@ stuck() {
 	sed '/^--- still running/,$d' "$1" | tail -n 5 | sed 's/^/    /' >&2
 	sed -n '/^--- still running/,$p' "$1" | sed -n '/^processes:$/,/^$/p; /^Thread 1 /,/^$/p' | head -n 60 >&2
 }
+
+if [ "${1:-}" = check ]; then
+	WORK="$(mktemp -d)"
+	check_log "${2:?usage: $0 check <log> <plugins.txt>}" "${3:?usage: $0 check <log> <plugins.txt>}"
+	rm -rf "$WORK"
+	[ "$failures" -eq 0 ]
+	exit
+fi
 
 [ -x "$ROOT/build/desktop/nextui.elf" ] || { echo "run make desktop first" >&2; exit 1; }
 [ -d "$PLUGINS" ] || { echo "run make plugins-desktop first" >&2; exit 1; }

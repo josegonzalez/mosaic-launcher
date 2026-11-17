@@ -23,6 +23,10 @@ void Actions_register(const Action* action) {
 	registry[registered++] = action;
 }
 
+int Actions_full(void) {
+	return registered >= ACTIONS_MAX;
+}
+
 const Action* Actions_find(const char* id) {
 	if (!id) return NULL;
 	for (int i = 0; i < registered; i++) {

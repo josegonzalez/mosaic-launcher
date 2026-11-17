@@ -6,8 +6,6 @@
 
 #include <stddef.h>
 
-#define PLUGIN_MAX 64
-
 enum PluginSettingType {
 	SETTING_TOGGLE, // on or off
 	SETTING_CHOICE, // one of options
@@ -49,6 +47,13 @@ typedef struct PluginManifest {
 	int setting_count;
 } PluginManifest;
 
+// The plugins discovered, as many as there are.
+typedef struct ManifestList {
+	PluginManifest* items; // moves as it grows, so point into it once discovery is done
+	int count;
+	int room;
+} ManifestList;
+
 typedef struct PluginDecision {
 	const PluginManifest* manifest;
 	int load;
@@ -63,6 +68,19 @@ int Manifest_parse(const char* text, PluginManifest* out);
 
 // Frees the manifest's settings, leaving it with none.
 void Manifest_free(PluginManifest* m);
+
+// Where parsing plugin.txt and plugins.txt says what it cut to fit or left
+// out, such as a line or field over its size, one message for each, with
+// no newline. NULL, the default, says nothing.
+void Manifest_setLog(void (*log)(const char* message));
+
+// Parses text, the plugin.txt in dir, onto the end of list, which grows to
+// fit. Returns 0, -1 when it has no id, -2 when out of memory or -3 when
+// dir is too long, adding nothing for any of those.
+int ManifestList_add(ManifestList* list, const char* text, const char* dir, int bundled);
+
+// Frees the list and its manifests, leaving it empty.
+void ManifestList_free(ManifestList* list);
 
 // True when any of the plugin's settings is protected.
 int Manifest_isProtected(const PluginManifest* m);
@@ -97,12 +115,12 @@ int Manifest_res(const PluginManifest* m, char* out, size_t size);
 //   <id>=on|off       turn a plugin on or off; listed ids load first, in order
 //   slot.<name>=<id>  which plugin owns an exclusive slot
 //
-// Fills out with one decision per manifest, in load order, and returns the
-// count. choices may be NULL. Once it's decided which plugins load, each
-// that does is moved after the loading plugins its optional= names, the
-// rest keeping their order; optional= never changes which plugins load.
-// Plugins that name each other load in their usual order, and
-// PluginSet_orderBroken says which.
+// Fills out, which has room for count, with one decision per manifest, in
+// load order, and returns the count. choices may be NULL. Once it's
+// decided which plugins load, each that does is moved after the loading
+// plugins its optional= names, the rest keeping their order; optional=
+// never changes which plugins load. Plugins that name each other load in
+// their usual order, and PluginSet_orderBroken says which.
 int PluginSet_resolve(const PluginManifest* manifests, int count, const char* choices, PluginDecision* out);
 
 // After PluginSet_resolve: keeps loading only the plugins that claim one

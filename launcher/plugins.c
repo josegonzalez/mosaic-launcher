@@ -76,8 +76,12 @@ typedef struct LoadedPlugin {
 	int note_off;        // its settings_note failed, so its notes are left off the Launcher pak's pages
 } LoadedPlugin;
 
-static LoadedPlugin loaded[PLUGIN_MAX];
+// The plugins loaded, with room for every one deciding to load (start), so
+// pointers into it hold while they load.
+static LoadedPlugin* loaded = NULL;
 static int loaded_count = 0;
+static int loaded_room = 0;
+static int loadedRoom(int room);
 static int initializing = -1; // the loaded plugin whose init is running
 static int launching = -1;    // the loaded plugin whose pre_launch is running
 static LayoutSlot layout = { LAYOUT_NONE, -1 };
@@ -133,9 +137,8 @@ static int hostLock(void);
 static int hostIsLocked(void);
 static int hostLockButton(int button, const char* action_id);
 static int hostRegisterAmbient(const char* screen_id, int (*wants)(unsigned long idle_ms, void* data), void* data);
-static PluginManifest manifests[PLUGIN_MAX];
-static int manifest_count = 0;
-static int discovered = 0; // manifests holds what discover() found
+static ManifestList manifest_list; // every plugin discover() found
+static int discovered = 0; // manifest_list holds what discover() found
 static int listed = 0; // every plugin has loaded, so plugin_info lists them
 
 // The Launcher pak's settings, with only the strings and theme slots'
@@ -153,6 +156,7 @@ static char* readText(const char* path) {
 	fseek(f, 0, SEEK_SET);
 	if (len < 0 || len > 64 * 1024) {
 		fclose(f);
+		LOG_warn("plugins: ignoring %s: it's over 64 KiB\n", path);
 		return NULL;
 	}
 	char* text = malloc(len + 1);
@@ -178,18 +182,20 @@ void Plugins_ensureStateDir(void) {
 ///////////////////////////////////////
 // discovery
 
+static void manifestLog(const char* message) {
+	LOG_warn("plugins: %s\n", message);
+}
+
 static void addPluginDir(const char* dir, int bundled) {
-	if (manifest_count >= PLUGIN_MAX) return;
-	char path[512];
-	snprintf(path, sizeof(path), "%s/plugin.txt", dir);
+	char path[600];
+	if ((size_t)snprintf(path, sizeof(path), "%s/plugin.txt", dir) >= sizeof(path)) {
+		LOG_warn("plugins: skipping %.80s...: its path is too long\n", dir);
+		return;
+	}
 	char* text = readText(path);
 	if (!text) return;
-
-	PluginManifest* m = &manifests[manifest_count];
-	snprintf(m->dir, sizeof(m->dir), "%s", dir);
-	m->bundled = bundled;
-	if (Manifest_parse(text, m) == 0) manifest_count++;
-	else LOG_warn("plugins: %s has no id, skipping\n", path);
+	// the list says what else it skips
+	if (ManifestList_add(&manifest_list, text, dir, bundled) == -1) LOG_warn("plugins: %s has no id, skipping\n", path);
 	free(text);
 }
 
@@ -202,7 +208,10 @@ static void scan(const char* parent, const char* suffix, int bundled) {
 		// hide() skips dot-files, including the ._* files macOS leaves on cards
 		if (hide(dp->d_name) || !suffixMatch((char*)suffix, dp->d_name)) continue;
 		char dir[512];
-		snprintf(dir, sizeof(dir), "%s/%s", parent, dp->d_name);
+		if ((size_t)snprintf(dir, sizeof(dir), "%s/%s", parent, dp->d_name) >= sizeof(dir)) {
+			LOG_warn("plugins: skipping %s in %.80s...: its path is too long\n", dp->d_name, parent);
+			continue;
+		}
 		addPluginDir(dir, bundled);
 	}
 	closedir(dh);
@@ -231,10 +240,13 @@ int Plugins_pakDir(char* out, size_t size) {
 static void discover(void) {
 	if (discovered) return;
 	discovered = 1;
+	Manifest_setLog(manifestLog);
 	const char* override = getenv("MOSAIC_LAUNCHER_PLUGIN_PATH");
 	if (override && override[0]) {
 		char dirs[1024];
-		snprintf(dirs, sizeof(dirs), "%s", override);
+		if ((size_t)snprintf(dirs, sizeof(dirs), "%s", override) >= sizeof(dirs)) {
+			LOG_warn("plugins: MOSAIC_LAUNCHER_PLUGIN_PATH is over %zu bytes, so only its start is searched\n", sizeof(dirs) - 1);
+		}
 		for (char* dir = strtok(dirs, ":"); dir; dir = strtok(NULL, ":")) {
 			scan(dir, ".plugin", 0);
 		}
@@ -376,6 +388,11 @@ static void hostRequestRedraw(void) {
 static int hostRegisterAction(const char* id, const char* label, int flags,
 		int (*available)(const char* path, void* data), void (*run)(const char* path, void* data), void* data) {
 	if (!id || !run) return -1;
+	const char* owner = Caller_current();
+	if (!Actions_find(id) && Actions_full()) {
+		LOG_warn("plugins: %s can't register action %s: there are %i actions\n", owner ? owner : "?", id, ACTIONS_MAX);
+		return -1;
+	}
 	Action* action = calloc(1, sizeof(Action));
 	action->takes_path = (flags & MOSAIC_ACTION_PATH) != 0;
 	action->id = strdup(id);
@@ -385,7 +402,6 @@ static int hostRegisterAction(const char* id, const char* label, int flags,
 	action->data = data;
 	// its label is the plugin's own text, translated as its id's, and it
 	// runs as that plugin
-	const char* owner = Caller_current();
 	action->plugin_id = owner ? strdup(owner) : NULL;
 	Actions_register(action);
 	return 0;
@@ -406,11 +422,11 @@ static const char* hostTrPlural(const char* plugin_id, const char* context, cons
 // page shows (every one discovered), once they've all loaded.
 static int hostPluginsCount(void) {
 	if (!listed) return 0;
-	return settings_only ? manifest_count : loaded_count;
+	return settings_only ? manifest_list.count : loaded_count;
 }
 static int hostPluginInfo(int index, MosaicPluginInfo* out) {
 	if (!out || out->size < sizeof(out->size) || index < 0 || index >= hostPluginsCount()) return -1;
-	const PluginManifest* m = settings_only ? &manifests[index] : loaded[index].manifest;
+	const PluginManifest* m = settings_only ? &manifest_list.items[index] : loaded[index].manifest;
 	MosaicPluginInfo full;
 	memset(&full, 0, sizeof(full));
 	full.size = out->size;
@@ -1226,13 +1242,13 @@ typedef struct Publisher {
 	void* base;
 	char id[EVENT_OWNER_MAX];
 } Publisher;
-static Publisher publishers[PLUGIN_MAX];
+static Publisher* publishers = NULL; // with room for loaded_room
 static int publisher_count = 0;
 
 static void publisherAdd(void* base, const char* id) {
 	if (!base) return;
 	pthread_mutex_lock(&event_lock);
-	if (publisher_count < PLUGIN_MAX) {
+	if (publisher_count < loaded_room) {
 		publishers[publisher_count].base = base;
 		snprintf(publishers[publisher_count].id, EVENT_OWNER_MAX, "%s", id);
 		publisher_count++;
@@ -1364,8 +1380,8 @@ static void eventsDeliver(void) {
 		int took = EventQueue_take(&event_queue, &event);
 		pthread_mutex_unlock(&event_lock);
 		if (!took) break;
-		EventSub matched[PLUGIN_MAX];
-		int count = EventSubs_match(&event_subs, event.name, matched, PLUGIN_MAX);
+		static EventSub matched[EVENT_SUBS_MAX]; // every subscription, as for event
+		int count = EventSubs_match(&event_subs, event.name, matched, EVENT_SUBS_MAX);
 		for (int k = 0; k < count; k++) {
 			// one that unsubscribed, or changed its callback, in an earlier callback
 			const EventSub* still = EventSubs_find(&event_subs, event.name, matched[k].owner);
@@ -1906,6 +1922,12 @@ static void load(const PluginManifest* m) {
 		return;
 	}
 
+	if (loaded_count >= loaded_room) {
+		// start makes room for every plugin deciding to load
+		LOG_warn("plugins: %s isn't loaded: there's no room for it\n", m->id);
+		dlclose(handle);
+		return;
+	}
 	LoadedPlugin* p = &loaded[loaded_count++];
 	memset(p, 0, sizeof(*p));
 	// so publish from a thread its init starts knows it
@@ -2269,7 +2291,7 @@ static void start(void) {
 	}
 
 	discover();
-	if (manifest_count == 0) return;
+	if (manifest_list.count == 0) return;
 	if (!settings_only) Plugins_adoptPin(); // before simple mode's cfg is read; the settings adopt it themselves
 	Bluetooth_setLog(bluetoothLog);
 	Wifi_setLog(wifiLog);
@@ -2277,9 +2299,14 @@ static void start(void) {
 	CardIndex_setup(SDCARD_PATH, PLATFORM, PLUGIN_STATE_DIR "/card-index.txt", indexLog);
 	CardIndex_setView(indexView);
 
+	if (!loadedRoom(manifest_list.count)) return;
+	PluginDecision* decisions = calloc((size_t)manifest_list.count, sizeof(PluginDecision));
+	if (!decisions) {
+		LOG_warn("plugins: out of memory deciding which plugins load, so none do\n");
+		return;
+	}
 	char* choices = readText(PLUGIN_CHOICES_PATH);
-	static PluginDecision decisions[PLUGIN_MAX];
-	int n = PluginSet_resolve(manifests, manifest_count, choices, decisions);
+	int n = PluginSet_resolve(manifest_list.items, manifest_list.count, choices, decisions);
 	free(choices);
 	const char* marker = LOADING_MARKER;
 	if (settings_only) {
@@ -2287,6 +2314,7 @@ static void start(void) {
 		// and the settings run none of the hooks that would need it
 		if (PluginSet_onlySlots(decisions, n, STRINGS_SLOT "," THEME_SLOT,
 				"the settings load only the " STRINGS_SLOT " and " THEME_SLOT " slots' owners") == 0) {
+			free(decisions);
 			return;
 		}
 		marker = SETTINGS_MARKER;
@@ -2310,6 +2338,7 @@ static void start(void) {
 		if (decisions[i].load) load(decisions[i].manifest);
 		else LOG_info("plugins: not loading %s: %s\n", decisions[i].manifest->id, decisions[i].reason);
 	}
+	free(decisions);
 	if (loaded_count == 0) unlink(marker);
 	listed = 1;
 	indexViewAgain();
@@ -2404,6 +2433,8 @@ void Plugins_quit(void) {
 		dlclose(p->handle);
 	}
 	loaded_count = 0;
+	loadedRoom(0);
+	theme_owner = strings_owner = -1;
 	listed = 0;
 	EntrySets_free(&sets);
 	Providers_init(&providers);
@@ -2421,15 +2452,14 @@ void Plugins_quit(void) {
 	viewed_with = -1;
 	settingsExit();
 	// the manifests go last, as the loaded plugins pointed at them
-	for (int i = 0; i < manifest_count; i++) Manifest_free(&manifests[i]);
-	manifest_count = 0;
+	ManifestList_free(&manifest_list);
 	discovered = 0;
 }
 
 int Plugins_discover(const PluginManifest** out) {
 	discover();
-	*out = manifests;
-	return manifest_count;
+	*out = manifest_list.items;
+	return manifest_list.count;
 }
 
 int Plugins_count(void) {
@@ -2501,9 +2531,14 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 		return -1;
 	}
 	const ButtonInfo* info = buttonInfo(button);
-	if (!info || pluginBindingCount[screen] >= PLUGIN_BINDING_MAX) return -1;
-
+	if (!info) return -1;
 	const char* caller = Caller_current();
+	if (pluginBindingCount[screen] >= PLUGIN_BINDING_MAX) {
+		LOG_warn("plugins: %s can't bind %s on the game list to %s: there are %i bindings\n", caller ? caller : "?", info->glyph,
+			action->id, PLUGIN_BINDING_MAX);
+		return -1;
+	}
+
 	LoadedPlugin* owner = caller ? loadedById(caller) : NULL;
 	pluginBindingOwner[screen][pluginBindingCount[screen]] = owner ? (int)(owner - loaded) : -1;
 	Binding* b = &pluginBindings[screen][pluginBindingCount[screen]++];
@@ -2570,7 +2605,10 @@ static int hostOverrideButton(int screen, int button, int trigger, const char* a
 		}
 		if (other->trigger == btn_trigger && other->action == action) return 0; // already there
 	}
-	if (overrideCount[screen] >= PLUGIN_OVERRIDE_MAX) return -1;
+	if (overrideCount[screen] >= PLUGIN_OVERRIDE_MAX) {
+		LOG_warn("plugins: %s can't override %s on the game list: there are %i overrides\n", id, info->glyph, PLUGIN_OVERRIDE_MAX);
+		return -1;
+	}
 
 	int at = overrideCount[screen]++;
 	Binding* b = &overrideBindings[screen][at];
@@ -2811,7 +2849,7 @@ int Plugins_displayNames(Array* entries) {
 
 // The plugins with a sort_compare, in load order, while a sort runs. Each
 // is asked as itself, so the chain is one compare over all of them.
-static int sorters[PLUGIN_MAX];
+static int* sorters = NULL; // with room for loaded_room
 static int sorter_count = 0;
 
 static int pluginsCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
@@ -2847,7 +2885,7 @@ int Plugins_listReady(Array* entries, const char* dir_path) {
 }
 
 // The plugins with a hide_name, like sorters.
-static int hiders[PLUGIN_MAX];
+static int* hiders = NULL; // with room for loaded_room
 static int hider_count = 0;
 
 static int pluginsHide(const MosaicEntry* entry, const char* dir_path) {
@@ -2857,6 +2895,45 @@ static int pluginsHide(const MosaicEntry* entry, const char* dir_path) {
 		if (hide) return 1;
 	}
 	return 0;
+}
+
+// Room for room plugins in loaded and the lists kept beside it, which are
+// emptied; 0 frees them. 1, or 0 when out of memory, leaving no room.
+static int loadedRoom(int room) {
+	free(loaded);
+	free(sorters);
+	free(hiders);
+	loaded = NULL;
+	sorters = hiders = NULL;
+	sorter_count = hider_count = 0;
+	pthread_mutex_lock(&event_lock);
+	free(publishers);
+	publishers = NULL;
+	publisher_count = 0;
+	loaded_room = 0;
+	pthread_mutex_unlock(&event_lock);
+	if (room <= 0) return 1;
+
+	LoadedPlugin* all = calloc((size_t)room, sizeof(LoadedPlugin));
+	Publisher* bases = calloc((size_t)room, sizeof(Publisher));
+	int* sorting = calloc((size_t)room, sizeof(int));
+	int* hiding = calloc((size_t)room, sizeof(int));
+	if (!all || !bases || !sorting || !hiding) {
+		free(all);
+		free(bases);
+		free(sorting);
+		free(hiding);
+		LOG_warn("plugins: out of memory loading %i plugins, so none load\n", room);
+		return 0;
+	}
+	loaded = all;
+	sorters = sorting;
+	hiders = hiding;
+	pthread_mutex_lock(&event_lock);
+	publishers = bases;
+	loaded_room = room;
+	pthread_mutex_unlock(&event_lock);
+	return 1;
 }
 
 unsigned char* Plugins_hideNames(Array* entries, const char* dir_path) {
