@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "listsort.h"
 
 typedef struct Ranked {
@@ -49,4 +50,25 @@ unsigned char* ListHide_chain(const Array* items, const ListHideName* hides, int
 		hidden[i] = 1;
 	}
 	return hidden;
+}
+
+int ListSection_take(int rc, const char* key, char* out, size_t size) {
+	if (!out || size == 0) return 0;
+	out[0] = '\0';
+	if (rc != 1 || !key) return 0;
+	size_t len = strcspn(key, "\r\n");
+	while (len > 0 && (key[0] == ' ' || key[0] == '\t')) {
+		key++;
+		len--;
+	}
+	while (len > 0 && (key[len - 1] == ' ' || key[len - 1] == '\t')) len--;
+	if (len == 0) return 0;
+	if (len >= size) {
+		len = size - 1;
+		// back to the start of the character it would cut
+		while (len > 0 && ((unsigned char)key[len] & 0xC0) == 0x80) len--;
+	}
+	memcpy(out, key, len);
+	out[len] = '\0';
+	return len > 0;
 }

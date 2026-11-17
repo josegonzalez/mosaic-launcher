@@ -1017,6 +1017,28 @@ static void test_hide_chain_any_hides(void) {
 	EntryArray_free(items);
 }
 
+static void test_section_keys_taken_on_one_line(void) {
+	char out[16];
+	// an answer with a key is taken
+	CHECK(ListSection_take(1, "1994", out, sizeof(out)) == 1 && !strcmp(out, "1994"));
+	// a 0, an error or an empty key is no answer
+	CHECK(ListSection_take(0, "1994", out, sizeof(out)) == 0 && !strcmp(out, ""));
+	CHECK(ListSection_take(-1, "1994", out, sizeof(out)) == 0 && !strcmp(out, ""));
+	CHECK(ListSection_take(1, "", out, sizeof(out)) == 0 && !strcmp(out, ""));
+	CHECK(ListSection_take(1, NULL, out, sizeof(out)) == 0);
+	CHECK(ListSection_take(1, "  \t ", out, sizeof(out)) == 0);
+	// one line, trimmed
+	CHECK(ListSection_take(1, "  Capcom \nSega", out, sizeof(out)) == 1 && !strcmp(out, "Capcom"));
+	CHECK(ListSection_take(1, "\nSega", out, sizeof(out)) == 0);
+	// cut between characters: ten e-acutes are 20 bytes, and 7 fit in 16
+	CHECK(ListSection_take(1, "\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9", out, sizeof(out)) == 1);
+	CHECK(strlen(out) == 14);
+	char tiny[2];
+	CHECK(ListSection_take(1, "\xc3\xa9", tiny, sizeof(tiny)) == 0 && !strcmp(tiny, ""));
+	CHECK(ListSection_take(1, "Ab", tiny, sizeof(tiny)) == 1 && !strcmp(tiny, "A"));
+	CHECK(ListSection_take(1, "A", out, 0) == 0);
+}
+
 static void test_hidden_names_follow_the_final_order(void) {
 	resetCard();
 	addEmu("GB");
@@ -1256,6 +1278,7 @@ int main(void) {
 	test_list_ready_names_are_drawn_and_indexed();
 	test_list_ready_renames_keep_collection_order();
 	test_hide_chain_any_hides();
+	test_section_keys_taken_on_one_line();
 	test_hidden_names_follow_the_final_order();
 	test_select_keeps_the_row_in_view();
 	test_root_names_translated_for_display();

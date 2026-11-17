@@ -1,0 +1,8 @@
+id=jump-letter
+name=Jump letter
+api=1
+category=Library
+summary=Hold SELECT on the game list for a strip of its first letters, and let go to jump to one.
+description=Hold SELECT in a long list for a strip of the letters its games start with, move along it with the d-pad, and let go to jump to that letter. A quick press of SELECT still opens the game switcher.
+# taken only when no other plugin has an action on the button on the game list
+setting.button=choice|Strip button|SELECT|none,SELECT,Y,L2,R2|button:jump-letter.strip

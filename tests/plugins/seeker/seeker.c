@@ -1,8 +1,13 @@
 // Drives the bundled search plugin. Its steps setting is a comma separated
 // list run from tick, one every 20 ticks from the 40th: action:<id> calls
-// run_action, and a, b, y, start, down and right press that button (the
-// desktop build reads the keyboard through SDL, so it pushes key events
-// with SDL_PushEvent, found with dlsym: a test-only shortcut). It logs
+// run_action, and a, b, y, start, select, up, down, left and right press
+// that button, +<button> holds it down until -<button> lets it go, and any
+// other word waits (the desktop build reads the keyboard through SDL, so
+// it pushes key events with SDL_PushEvent, found with dlsym: a test-only
+// shortcut). With its sections setting, a folder's full path, it orders
+// that folder by the last word of each name, such as a year, and gives
+// that word as the entry's section with section_key, logging once what
+// entry_section answers when asked from inside it. It logs
 // "screen <id>" whenever current_screen changes, and "list <path>:
 // <names> selected <index>" whenever the game list's folder or selection
 // changes, and "done" 40 ticks after the last step. It logs "pre_launch
@@ -61,7 +66,10 @@ static int scancode(const char* name) {
 	if (!strcmp(name, "b")) return 4;       // A
 	if (!strcmp(name, "y")) return 20;      // Q
 	if (!strcmp(name, "start")) return 40;  // return
+	if (!strcmp(name, "select")) return 53; // `
+	if (!strcmp(name, "up")) return 82;     // up arrow
 	if (!strcmp(name, "down")) return 81;   // down arrow
+	if (!strcmp(name, "left")) return 80;   // left arrow
 	if (!strcmp(name, "right")) return 79;  // right arrow
 	return 0;
 }
@@ -132,6 +140,9 @@ static void tick(unsigned long now) {
 			snprintf(message, sizeof(message), "run %s %d", step + 7, host->run_action(step + 7, NULL));
 			say(message);
 		}
+		else if ((step[0] == '+' || step[0] == '-') && scancode(step + 1)) {
+			key(scancode(step + 1), step[0] == '+');
+		}
 		else if (scancode(step)) {
 			key_scancode = scancode(step);
 			key(key_scancode, 1);
@@ -144,10 +155,39 @@ static void tick(unsigned long now) {
 	}
 }
 
+// the sections setting's folder, ordered by the last word of each name
+static char sections_dir[1024] = "";
+
+static const char* lastWord(const MosaicEntry* entry) {
+	const char* name = host->entry_name(entry);
+	const char* space = strrchr(name, ' ');
+	return space ? space + 1 : name;
+}
+
+static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
+	if (!sections_dir[0] || !dir_path || strcmp(dir_path, sections_dir)) return 0;
+	return strcmp(lastWord(a), lastWord(b));
+}
+
+static int sectionKey(const MosaicEntry* entry, const char* dir_path, char* out, size_t size) {
+	if (!sections_dir[0] || !dir_path || strcmp(dir_path, sections_dir)) return 0;
+	static int asked = 0;
+	if (!asked) {
+		asked = 1;
+		char inner[64];
+		char message[96];
+		snprintf(message, sizeof(message), "inner entry_section %d", host->entry_section(entry, dir_path, inner, sizeof(inner)));
+		say(message);
+	}
+	snprintf(out, size, "%s", lastWord(entry));
+	return 1;
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(steps, sizeof(steps), "%s", host->cfg_get("steps", ""));
 	cancel_launches = !strcmp(host->cfg_get("cancel_launches", "off"), "on");
+	snprintf(sections_dir, sizeof(sections_dir), "%s", host->cfg_get("sections", ""));
 	step_count = steps[0] ? 1 : 0;
 	for (const char* p = steps; *p; p++) {
 		if (*p == ',') step_count++;
@@ -164,6 +204,8 @@ static const MosaicPlugin plugin = {
 	.init = init,
 	.tick = tick,
 	.pre_launch = preLaunch,
+	.sort_compare = sortCompare,
+	.section_key = sectionKey,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

@@ -1733,6 +1733,17 @@ typedef struct MosaicHost {
 	// tracker again afterwards. Check for it with
 	// MOSAIC_HOST_HAS(host, play_move).
 	int (*play_move)(const char* from, const char* to);
+
+	// The section an entry is in, for jumping through a list by section,
+	// such as a sort mode's years or publishers in place of letters: asks
+	// plugins' section_key (see MosaicPlugin), in load order, about entry
+	// in the folder at dir_path's list, and writes the first answer to
+	// out, cut between characters to fit size, and returns 1. With no
+	// answer it writes "" and returns 0, so the caller picks its own, such
+	// as the first letter of the entry's name, and it returns -1 for a bad
+	// argument. Asked from inside a section_key it returns 0. Check for it
+	// with MOSAIC_HOST_HAS(host, entry_section).
+	int (*entry_section)(const MosaicEntry* entry, const char* dir_path, char* out, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -2176,6 +2187,15 @@ typedef struct MosaicPlugin {
 	// and return 1, or return 0. The game list asks display_name, not
 	// this, so a plugin renaming games usually has both.
 	int (*index_name)(const MosaicEntry* entry, char* out, size_t size);
+
+	// An entry's section in a list this plugin orders with sort_compare,
+	// such as its year for a sort by year, so jumping through the list by
+	// section stops at each year in place of each letter. Asked through
+	// host->entry_section, with the list's folder as sort_compare gets it:
+	// write a short key, on one line, and return 1, or return 0 for a list
+	// it doesn't order. Entries the sort keeps together share a key. The
+	// first plugin in load order to answer wins.
+	int (*section_key)(const MosaicEntry* entry, const char* dir_path, char* out, size_t size);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

@@ -490,6 +490,8 @@ static int hostPlayMove(const char* from, const char* to) {
 	return moved;
 }
 
+static int hostEntrySection(const MosaicEntry* entry, const char* dir_path, char* out, size_t size);
+
 static int hostFontMissing(const char* text, char* out, size_t size) {
 	return Fallback_missing(text, out, size);
 }
@@ -1871,6 +1873,7 @@ static const MosaicHost host = {
 	.index_find = hostIndexFind,
 	.index_refresh = hostIndexRefresh,
 	.play_move = hostPlayMove,
+	.entry_section = hostEntrySection,
 };
 
 ///////////////////////////////////////
@@ -2994,6 +2997,29 @@ int Plugins_artAlias(const Entry* entry, char* out, size_t size) {
 	}
 	out[0] = '\0';
 	return 0;
+}
+
+// Plugins' section_key, in load order, until one answers. A section_key
+// asking again gets no answer, rather than asking itself.
+static int section_asking = 0;
+
+static int hostEntrySection(const MosaicEntry* entry, const char* dir_path, char* out, size_t size) {
+	if (!entry || !out || size == 0) return -1;
+	out[0] = '\0';
+	if (section_asking) return 0;
+	section_asking = 1;
+	int found = 0;
+	EACH_PLUGIN_WITH(section_key) {
+		if (!found) {
+			char key[256];
+			key[0] = '\0';
+			int rc = p->section_key(entry, dir_path ? dir_path : "", key, sizeof(key));
+			key[sizeof(key) - 1] = '\0';
+			found = ListSection_take(rc, key, out, size);
+		}
+	}
+	section_asking = 0;
+	return found;
 }
 
 // The card index with plugins' dir_entries rows: each folder in it with

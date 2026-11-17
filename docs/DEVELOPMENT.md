@@ -180,7 +180,7 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `lockmodel.c` | the SDL-free half of the built-in lock: its chord held for the hold time, the hold switch, a plugin's `lock` request, the buttons it takes until they're let go after an unlock, and the padlock's shapes; `plugins.c` runs it before every input filter, draws the padlock in the header and the lock screen, and runs the lock screen's `lock_button` actions |
 | `ambientmodel.c` | the SDL-free half of ambient screens: the ones registered (the lock first, then `register_ambient`'s), their order from the Launcher page's setting, and moving one up or down without losing the place of one whose plugin is off; `plugins.c` asks each before the one showing whether it wants to show, once a frame over the game list, home or an ambient screen, and opens the first that does |
 | `pin.c` | the launcher's PIN file (`pin.txt` beside `plugins.txt`): reading, checking and saving it, and taking over simple mode's old one |
-| `listsort.c` | sorting a list by plugins' chained `sort_compare` hooks |
+| `listsort.c` | sorting a list by plugins' chained `sort_compare` hooks, and taking a plugin's `section_key` answer for `entry_section` |
 | `launchcmd.c` | checking and quoting the command a plugin replaces a launch with |
 | `stocktoggles.c` | the stock settings plugins can read and set, through `CFG_get*` and `CFG_set*` |
 | `leds.c` | a plugin's LED colour, as stock's ambient LED override, and the theme colours |

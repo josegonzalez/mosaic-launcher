@@ -22,4 +22,10 @@ typedef int (*ListHideName)(const MosaicEntry* entry, const char* dir_path);
 // NULL when none is hidden (or there are no hooks or items).
 unsigned char* ListHide_chain(const Array* items, const ListHideName* hides, int count, const char* dir_path);
 
+// A plugin's section_key answer, rc what it returned and key what it
+// wrote: taken when rc is 1 and key isn't empty once cut at its first
+// newline and trimmed of spaces. Writes it to out, cut between UTF-8
+// characters to fit size, and returns 1, or writes "" and returns 0.
+int ListSection_take(int rc, const char* key, char* out, size_t size);
+
 #endif
