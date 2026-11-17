@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "plugindraw.h"
 
 void Switcher_handleInput(void) {
 	if (PAD_justPressed(BTN_B) || PAD_tappedSelect(now)) {
@@ -104,7 +105,7 @@ void Switcher_render(void) {
 		if(state.has_preview) {
 			// lotta memory churn here
 
-			SDL_Surface* bmp = IMG_Load(state.preview_path);
+			SDL_Surface* bmp = PluginDraw_loadImage("switcher", state.preview_path);
 			SDL_Surface* raw_preview = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);
 			if (raw_preview) {
 				SDL_FreeSurface(bmp);

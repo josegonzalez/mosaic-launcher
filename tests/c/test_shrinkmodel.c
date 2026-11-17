@@ -192,10 +192,134 @@ static void testShrink(void) {
 	Shrink_free(NULL);
 }
 
+// A JPEG's start: SOI, then segs APP1 segments of 65535 bytes, then a SOF0
+// w by h, in out (which must hold its size), returning its size.
+static size_t bigJpeg(unsigned char* out, int segs, unsigned w, unsigned h) {
+	size_t at = 0;
+	out[at++] = 0xFF;
+	out[at++] = 0xD8;
+	for (int i = 0; i < segs; i++) {
+		unsigned char app[4] = { 0xFF, 0xE1, 0xFF, 0xFF };
+		memcpy(out + at, app, 4);
+		memset(out + at + 4, 0, 65533);
+		at += 4 + 65533;
+	}
+	unsigned char sof[] = { 0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 0xFF, w >> 8, w & 0xFF, 0x03 };
+	memcpy(out + at, sof, sizeof(sof));
+	return at + sizeof(sof);
+}
+
+static void testCheck(void) {
+	unsigned char d[64];
+	int w = 0, h = 0;
+	// a 33-byte PNG and an 11-byte JPEG whose headers say they're huge:
+	// the size is read, and it's one that isn't decoded
+	size_t n = png(d, 100000, 100000);
+	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0);
+	CHECK(w == 100000 && h == 100000 && !Shrink_allowed(w, h));
+	unsigned char huge[] = { 0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0xFF, 0xFF, 0xFF, 0xFF };
+	CHECK(Shrink_headerCheck(huge, sizeof(huge), &w, &h) == 0);
+	CHECK(w == 65535 && h == 65535 && !Shrink_allowed(w, h));
+	// 9000x1 is over a side, 7000x7000 over the pixels
+	n = png(d, 9000, 1);
+	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0 && !Shrink_allowed(w, h));
+	n = png(d, 7000, 7000);
+	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0 && !Shrink_allowed(w, h));
+	// ordinary sizes are decoded
+	n = png(d, 640, 480);
+	CHECK(Shrink_headerCheck(d, n, &w, &h) == 0);
+	CHECK(w == 640 && h == 480 && Shrink_allowed(w, h));
+	// other formats are decoded as before, their size unknown
+	CHECK(Shrink_headerCheck((const unsigned char*)"GIF89a....", 10, &w, &h) == SHRINK_UNKNOWN);
+	CHECK(Shrink_headerCheck((const unsigned char*)"BM\x46\0\0\0", 6, &w, &h) == SHRINK_UNKNOWN);
+	CHECK(Shrink_headerCheck((const unsigned char*)"\x89PN", 3, &w, &h) == SHRINK_UNKNOWN);
+	CHECK(Shrink_headerCheck(d, 0, &w, &h) == SHRINK_UNKNOWN);
+	// a PNG or JPEG whose size can't be read isn't: a PNG cut short, one
+	// with the start of its signature only, and a JPEG with junk before
+	// its frame, which libjpeg would skip
+	CHECK(Shrink_headerCheck(d, 20, &w, &h) == -1);
+	CHECK(Shrink_headerCheck((const unsigned char*)"\x89PNG\0\0\0\0", 8, &w, &h) == -1);
+	unsigned char junk[] = { 0xFF, 0xD8, 0x00, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0xFF, 0xFF, 0xFF, 0xFF };
+	CHECK(Shrink_headerCheck(junk, sizeof(junk), &w, &h) == -1);
+	CHECK(Shrink_headerCheck(huge, 2, &w, &h) == -1);
+	CHECK(Shrink_headerCheck(NULL, 10, &w, &h) == -1);
+	CHECK(Shrink_headerCheck(d, n, NULL, &h) == -1);
+}
+
+// A file in memory, handed out at most chunk bytes a read, or past its
+// end, when endless, as APP1 segments for ever.
+typedef struct {
+	const unsigned char* data;
+	size_t size, at, chunk, total;
+	int endless, extra;
+} Mem;
+
+static size_t memRead(void* ctx, void* buf, size_t n) {
+	Mem* m = ctx;
+	if (m->extra) return n + 1;
+	if (n > m->chunk) n = m->chunk;
+	unsigned char* out = buf;
+	size_t got = 0;
+	for (; got < n; got++, m->at++) {
+		if (m->at < m->size) out[got] = m->data[m->at];
+		else if (!m->endless) break;
+		else {
+			size_t i = (m->at - m->size) % 65537;
+			out[got] = i == 0 ? 0xFF : i == 1 ? 0xE1 : i < 4 ? 0xFF : 0;
+		}
+	}
+	m->total += got;
+	return got;
+}
+
+static void testReadCheck(void) {
+	unsigned char d[64];
+	int w = 0, h = 0;
+	// the huge PNG is refused after reading the file's 33 bytes
+	size_t n = png(d, 100000, 100000);
+	Mem m = { d, n, 0, 7, 0, 0, 0 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == 0);
+	CHECK(w == 100000 && h == 100000 && m.total == n);
+	// a JPEG whose frame comes after three 64 KiB segments is read until
+	// it's found, and not much further
+	size_t big = 3 * 65537 + 64;
+	unsigned char* j = malloc(big + 100000);
+	n = bigJpeg(j, 3, 30000, 20000);
+	memset(j + n, 0, 100000);
+	m = (Mem){ j, n + 100000, 0, 4096, 0, 0, 0 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == 0);
+	CHECK(w == 30000 && h == 20000 && !Shrink_allowed(w, h));
+	CHECK(m.total >= n && m.total <= 2 * n);
+	// and one at an ordinary size is decoded
+	n = bigJpeg(j, 3, 640, 480);
+	m = (Mem){ j, n, 0, 65536, 0, 0, 0 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == 0 && w == 640 && h == 480);
+	// the same without its frame: read to its end, and its size can't be read
+	m = (Mem){ j, n - 10, 0, 65536, 0, 0, 0 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == -1 && m.total == n - 10);
+	// segments for ever: it gives up after SHRINK_HEADER_MAX
+	m = (Mem){ j, 2, 0, 1 << 20, 0, 1, 0 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == -1 && m.total == SHRINK_HEADER_MAX);
+	free(j);
+	// another format reads only the first part
+	unsigned char gif[40000] = "GIF89a";
+	m = (Mem){ gif, sizeof(gif), 0, 1 << 20, 0, 0, 0 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == SHRINK_UNKNOWN && m.total == 16 * 1024);
+	// an empty file, a reader that claims more than it was asked for, and no reader
+	m = (Mem){ gif, 0, 0, 10, 0, 0, 0 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == SHRINK_UNKNOWN);
+	m = (Mem){ gif, sizeof(gif), 0, 10, 0, 0, 1 };
+	CHECK(Shrink_readCheck(memRead, &m, &w, &h) == SHRINK_UNKNOWN);
+	CHECK(Shrink_readCheck(NULL, &m, &w, &h) == -1);
+	CHECK(Shrink_readCheck(memRead, &m, &w, NULL) == -1);
+}
+
 int main(void) {
 	testPng();
 	testJpeg();
 	testAllowed();
+	testCheck();
+	testReadCheck();
 	testFit();
 	testShrink();
 	CHECK_DONE();

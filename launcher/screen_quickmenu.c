@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "plugindraw.h"
 
 // cursor: row 0 is the top row of folders, row 1 the shortcuts and toggles
 static int qm_row;
@@ -199,7 +200,7 @@ static const char* tileIcon(const QuickTile* tile) {
 // label when it has none.
 static void blitTileIcon(const QuickTile* tile, Entry* item, SDL_Rect rect, uint32_t icon_color, SDL_Color text_color) {
 	const char* path = tileIcon(tile);
-	SDL_Surface* bmp = path[0] ? IMG_Load(path) : NULL;
+	SDL_Surface* bmp = path[0] ? PluginDraw_loadImage("quick menu", path) : NULL;
 	if (bmp) {
 		SDL_Surface* converted = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);
 		if (converted) {
@@ -280,7 +281,7 @@ void QuickMenu_render(void) {
 			const QuickTile* tile = QuickTiles_forEntry(item);
 			if (tile) snprintf(icon_path, sizeof(icon_path), "%s", tileIcon(tile));
 			else resolveArt(ART_QUICK_ICON, item->name, icon_path, sizeof(icon_path));
-			SDL_Surface* bmp = icon_path[0] ? IMG_Load(icon_path) : NULL;
+			SDL_Surface* bmp = icon_path[0] ? PluginDraw_loadImage("quick menu", icon_path) : NULL;
 			if(bmp) {
 				SDL_Surface* converted = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);
 				if (converted) {

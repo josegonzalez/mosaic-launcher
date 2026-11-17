@@ -110,6 +110,13 @@ static int init(const MosaicHost* h) {
 		made(host->image_load(ID, host->cfg_get("dir", ""))), made(host->image_load(ID, "/nonexistent/art.png")),
 		made(host->image_load(ID, host->cfg_get("text", ""))), made(host->image_load(ID, host->cfg_get("fifo", ""))),
 		made(host->image_load(ID, NULL)), made(host->image_load("nobody", art)));
+	// headers that say they're huge are refused before they're decoded, and a BMP loads as before
+	MosaicSurface* bmp = host->image_load(ID, host->cfg_get("bmp", ""));
+	int bw = 0, bh = 0;
+	host->surface_size(bmp, &bw, &bh);
+	say("image huge png %s, huge jpeg %s, bmp %s %ix%i, left %s, right %s", made(host->image_load(ID, host->cfg_get("huge_png", ""))),
+		made(host->image_load(ID, host->cfg_get("huge_jpeg", ""))), made(bmp), bw, bh, pixel(bmp, 0, 0), pixel(bmp, 1, 0));
+	host->surface_free(ID, bmp);
 
 	// scaling
 	MosaicSurface* contain = keep(host->surface_scale(ID, img, 8, 8, MOSAIC_FIT_CONTAIN));

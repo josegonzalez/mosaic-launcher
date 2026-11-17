@@ -158,7 +158,7 @@ static SDL_Surface* thumbOf(SDL_Surface* image) {
 // As stock's thumbnail worker loads it.
 static SDL_Surface* decodeThumb(const char* path) {
 	if (access(path, F_OK) != 0) return NULL;
-	SDL_Surface* image = IMG_Load(path);
+	SDL_Surface* image = PluginDraw_loadImage("art cache", path);
 	if (!image) return NULL;
 	SDL_Surface* thumb = thumbOf(image);
 	SDL_FreeSurface(image);
@@ -171,6 +171,13 @@ static SDL_Surface* decodeImage(const char* path) {
 	void* data = PluginDraw_readImageFile(path, &size);
 	if (!data) {
 		LOG_warn("art cache: can't load %s: not a readable file up to 16 MiB\n", path);
+		return NULL;
+	}
+	char why[96];
+	const char* no = PluginDraw_imageRefusal(data, size, why, sizeof(why));
+	if (no) {
+		LOG_warn("art cache: can't load %s: %s\n", path, no);
+		free(data);
 		return NULL;
 	}
 	SDL_Surface* decoded = IMG_Load_RW(SDL_RWFromConstMem(data, (int)size), 1);

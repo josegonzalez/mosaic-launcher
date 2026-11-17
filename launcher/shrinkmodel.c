@@ -64,6 +64,40 @@ int Shrink_allowed(int w, int h) {
 	return w >= 1 && h >= 1 && w <= SHRINK_MAX_SIDE && h <= SHRINK_MAX_SIDE && (long long)w * h <= SHRINK_MAX_PIXELS;
 }
 
+int Shrink_headerCheck(const unsigned char* data, size_t size, int* w, int* h) {
+	static const unsigned char png[4] = { 0x89, 'P', 'N', 'G' };
+	if (!data || !w || !h) return -1;
+	// what SDL_image takes for a PNG or a JPEG
+	int known = (size >= 4 && memcmp(data, png, 4) == 0) || (size >= 2 && data[0] == 0xFF && data[1] == 0xD8);
+	return known ? Shrink_headerSize(data, size, w, h) : SHRINK_UNKNOWN;
+}
+
+int Shrink_readCheck(ShrinkRead reader, void* ctx, int* w, int* h) {
+	if (!reader || !w || !h) return -1;
+	unsigned char* buf = NULL;
+	size_t have = 0, want = 16 * 1024;
+	int rc = -1, end = 0;
+	for (;;) {
+		unsigned char* more = realloc(buf, want);
+		if (!more) break;
+		buf = more;
+		while (have < want) {
+			size_t n = reader(ctx, buf + have, want - have);
+			if (n == 0 || n > want - have) {
+				end = 1;
+				break;
+			}
+			have += n;
+		}
+		rc = Shrink_headerCheck(buf, have, w, h);
+		// a JPEG's size can come after other segments, so it reads on
+		if (rc != -1 || end || want >= SHRINK_HEADER_MAX) break;
+		want = want * 2 > SHRINK_HEADER_MAX ? SHRINK_HEADER_MAX : want * 2;
+	}
+	free(buf);
+	return rc;
+}
+
 int Shrink_fit(int sw, int sh, int max_w, int max_h, int* dw, int* dh) {
 	if (sw < 1 || sh < 1 || max_w < 1 || max_h < 1 || !dw || !dh) return -1;
 	if (sw <= max_w && sh <= max_h) {

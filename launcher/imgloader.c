@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "plugindraw.h"
 
 static TaskNode* taskBGQueueHead = NULL;
 static TaskNode* taskBGQueueTail = NULL;
@@ -134,7 +135,7 @@ static int BGLoadWorker(void* unused) {
 
         SDL_Surface* result = NULL;
         if (access(task->imagePath, F_OK) == 0) {
-            SDL_Surface* image = IMG_Load(task->imagePath);
+            SDL_Surface* image = PluginDraw_loadImage("backgrounds", task->imagePath);
             if (image) {
                 SDL_Surface* imageRGBA = SDL_ConvertSurfaceFormat(image, screen->format->format, 0);
                 SDL_FreeSurface(image);
