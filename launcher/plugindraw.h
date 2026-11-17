@@ -48,16 +48,10 @@ int PluginDraw_button(MosaicSurface* target, const char* glyph, int x, int y, Mo
 // the main thread.
 void* PluginDraw_readImageFile(const char* path, size_t* size);
 
-// Images are checked by their header before they're decoded (see
-// shrinkmodel.h), so a small file can't decode to more than the launcher
-// allows: a PNG or JPEG over SHRINK_MAX_SIDE a side or SHRINK_MAX_PIXELS,
-// or one whose header can't be read, is refused, and other formats decode
-// as before. PluginDraw_imageRefusal checks data, the whole file: NULL
-// when it can be decoded, or why not, written in why.
-const char* PluginDraw_imageRefusal(const void* data, size_t size, char* why, size_t why_size);
-
-// IMG_Load(path) after checking the file's header, for images the launcher
-// didn't make. NULL, as IMG_Load returns, for a file it can't open or
+// IMG_Load(path) after checking the file's header (Shrink_readRefusal in
+// shrinkmodel.h), for images the launcher didn't make, so a small file
+// can't decode to more than the launcher allows; other formats decode as
+// before. NULL, as IMG_Load returns, for a file it can't open or
 // decode, logging one it refuses as "<who>: can't load <path>: <why>".
 // Safe off the main thread.
 SDL_Surface* PluginDraw_loadImage(const char* who, const char* path);

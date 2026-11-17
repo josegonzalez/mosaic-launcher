@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "shrinkmodel.h"
@@ -96,6 +97,29 @@ int Shrink_readCheck(ShrinkRead reader, void* ctx, int* w, int* h) {
 	}
 	free(buf);
 	return rc;
+}
+
+const char* Shrink_refusal(int rc, int w, int h, int max_side, char* why, size_t size) {
+	if (rc == SHRINK_UNKNOWN) return NULL;
+	if (rc != 0) snprintf(why, size, "its PNG or JPEG header can't be read");
+	else if (!Shrink_allowed(w, h)) snprintf(why, size, "%ix%i is over %i a side or %i pixels", w, h, SHRINK_MAX_SIDE, SHRINK_MAX_PIXELS);
+	else if (w > max_side || h > max_side) snprintf(why, size, "%ix%i is over %i a side", w, h, max_side);
+	else return NULL;
+	return why;
+}
+
+// The check and the reading of the size it writes stay separate
+// statements: gcc evaluates a call's arguments right to left.
+const char* Shrink_dataRefusal(const unsigned char* data, size_t size, char* why, size_t why_size) {
+	int w = 0, h = 0;
+	int rc = Shrink_headerCheck(data, size, &w, &h);
+	return Shrink_refusal(rc, w, h, SHRINK_MAX_SIDE, why, why_size);
+}
+
+const char* Shrink_readRefusal(ShrinkRead reader, void* ctx, char* why, size_t why_size) {
+	int w = 0, h = 0;
+	int rc = Shrink_readCheck(reader, ctx, &w, &h);
+	return Shrink_refusal(rc, w, h, SHRINK_MAX_SIDE, why, why_size);
 }
 
 int Shrink_fit(int sw, int sh, int max_w, int max_h, int* dw, int* dh) {

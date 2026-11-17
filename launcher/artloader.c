@@ -2,6 +2,7 @@
 #include "artcache.h"
 #include "drawmodel.h"
 #include "plugindraw.h"
+#include "shrinkmodel.h"
 #include "selmodel.h"
 
 static ArtCache cache;
@@ -174,7 +175,7 @@ static SDL_Surface* decodeImage(const char* path) {
 		return NULL;
 	}
 	char why[96];
-	const char* no = PluginDraw_imageRefusal(data, size, why, sizeof(why));
+	const char* no = Shrink_dataRefusal(data, size, why, sizeof(why));
 	if (no) {
 		LOG_warn("art cache: can't load %s: %s\n", path, no);
 		free(data);

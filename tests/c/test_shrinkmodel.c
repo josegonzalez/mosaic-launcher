@@ -319,12 +319,49 @@ static void testReadCheck(void) {
 	CHECK(Shrink_readCheck(memRead, &m, &w, NULL) == -1);
 }
 
+// The whole check, header and refusal together, as the launcher's loads
+// use it: ordinary art isn't refused, and a refusal names the real size
+// (gcc once read the size before the check had written it, refusing every
+// PNG as 0x0).
+static void testRefusal(void) {
+	unsigned char d[64];
+	char why[96];
+	size_t n = png(d, 4, 2);
+	CHECK(Shrink_dataRefusal(d, n, why, sizeof(why)) == NULL);
+	n = png(d, 900, 1200);
+	CHECK(Shrink_dataRefusal(d, n, why, sizeof(why)) == NULL);
+	Mem m = { d, n, 0, 7, 0, 0, 0 };
+	CHECK(Shrink_readRefusal(memRead, &m, why, sizeof(why)) == NULL);
+	unsigned char* j = malloc(3 * 65537 + 64);
+	n = bigJpeg(j, 3, 640, 480);
+	m = (Mem){ j, n, 0, 4096, 0, 0, 0 };
+	CHECK(Shrink_readRefusal(memRead, &m, why, sizeof(why)) == NULL);
+	free(j);
+	CHECK(Shrink_dataRefusal((const unsigned char*)"BM\x46\0\0\0", 6, why, sizeof(why)) == NULL);
+	n = png(d, 100000, 100000);
+	const char* no = Shrink_dataRefusal(d, n, why, sizeof(why));
+	CHECK(no && !strcmp(no, "100000x100000 is over 8192 a side or 40000000 pixels"));
+	m = (Mem){ d, n, 0, 7, 0, 0, 0 };
+	no = Shrink_readRefusal(memRead, &m, why, sizeof(why));
+	CHECK(no && !strcmp(no, "100000x100000 is over 8192 a side or 40000000 pixels"));
+	no = Shrink_dataRefusal(d, 20, why, sizeof(why));
+	CHECK(no && !strcmp(no, "its PNG or JPEG header can't be read"));
+	// image_load's own 4096 a side, from the same answer
+	CHECK(Shrink_refusal(0, 4096, 4096, 4096, why, sizeof(why)) == NULL);
+	no = Shrink_refusal(0, 4097, 1, 4096, why, sizeof(why));
+	CHECK(no && !strcmp(no, "4097x1 is over 4096 a side"));
+	no = Shrink_refusal(0, 9000, 1, 4096, why, sizeof(why));
+	CHECK(no && !strcmp(no, "9000x1 is over 8192 a side or 40000000 pixels"));
+	CHECK(Shrink_refusal(SHRINK_UNKNOWN, 0, 0, 4096, why, sizeof(why)) == NULL);
+}
+
 int main(void) {
 	testPng();
 	testJpeg();
 	testAllowed();
 	testCheck();
 	testReadCheck();
+	testRefusal();
 	testFit();
 	testShrink();
 	CHECK_DONE();

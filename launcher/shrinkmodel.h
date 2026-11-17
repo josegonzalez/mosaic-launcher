@@ -43,6 +43,17 @@ typedef size_t (*ShrinkRead)(void* ctx, void* buf, size_t n);
 // bytes. -1 also when it can't allocate.
 int Shrink_readCheck(ShrinkRead reader, void* ctx, int* w, int* h);
 
+// Why an image the header check answered rc, w and h for is refused,
+// written in why, or NULL when it isn't: a PNG or JPEG over
+// SHRINK_MAX_SIDE a side or SHRINK_MAX_PIXELS, over max_side a side when
+// that's less, or whose header can't be read. Other formats aren't.
+const char* Shrink_refusal(int rc, int w, int h, int max_side, char* why, size_t size);
+
+// Shrink_refusal for a whole file in data, and for a file read with
+// reader, each checked with SHRINK_MAX_SIDE as its max_side.
+const char* Shrink_dataRefusal(const unsigned char* data, size_t size, char* why, size_t why_size);
+const char* Shrink_readRefusal(ShrinkRead reader, void* ctx, char* why, size_t why_size);
+
 // The size a sw by sh image is shrunk to so it fits inside max_w by max_h,
 // keeping its shape, rounded to the nearest pixel and at least 1 a side;
 // an image that fits already keeps its size, as it's never enlarged.

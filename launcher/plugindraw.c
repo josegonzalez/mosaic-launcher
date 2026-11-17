@@ -96,19 +96,6 @@ void* PluginDraw_readImageFile(const char* path, size_t* size) {
 	return data;
 }
 
-// Why Shrink_headerCheck's answer refuses an image, or NULL.
-static const char* refusal(int rc, int w, int h, char* why, size_t size) {
-	if (rc == SHRINK_UNKNOWN || (rc == 0 && Shrink_allowed(w, h))) return NULL;
-	if (rc == 0) snprintf(why, size, "%ix%i is over %i a side or %i pixels", w, h, SHRINK_MAX_SIDE, SHRINK_MAX_PIXELS);
-	else snprintf(why, size, "its PNG or JPEG header can't be read");
-	return why;
-}
-
-const char* PluginDraw_imageRefusal(const void* data, size_t size, char* why, size_t why_size) {
-	int w = 0, h = 0;
-	return refusal(Shrink_headerCheck(data, size, &w, &h), w, h, why, why_size);
-}
-
 static size_t readRW(void* rw, void* buf, size_t n) {
 	return SDL_RWread(rw, buf, 1, n);
 }
@@ -116,9 +103,8 @@ static size_t readRW(void* rw, void* buf, size_t n) {
 SDL_Surface* PluginDraw_loadImage(const char* who, const char* path) {
 	SDL_RWops* rw = SDL_RWFromFile(path, "rb");
 	if (!rw) return NULL;
-	int w = 0, h = 0;
 	char why[96];
-	const char* no = refusal(Shrink_readCheck(readRW, rw, &w, &h), w, h, why, sizeof(why));
+	const char* no = Shrink_readRefusal(readRW, rw, why, sizeof(why));
 	if (no || SDL_RWseek(rw, 0, RW_SEEK_SET) != 0) {
 		if (no) LOG_warn("%s: can't load %s: %s\n", who, path, no);
 		SDL_RWclose(rw);
@@ -142,11 +128,7 @@ MosaicSurface* PluginDraw_imageLoad(const char* owner, const char* path) {
 	int w = 0, h = 0;
 	int rc = Shrink_headerCheck(data, size, &w, &h);
 	char why[96];
-	const char* no = refusal(rc, w, h, why, sizeof(why));
-	if (!no && rc == 0 && (w > DRAW_MAX_SIDE || h > DRAW_MAX_SIDE)) {
-		snprintf(why, sizeof(why), "%ix%i is over %i a side", w, h, DRAW_MAX_SIDE);
-		no = why;
-	}
+	const char* no = Shrink_refusal(rc, w, h, DRAW_MAX_SIDE, why, sizeof(why));
 	if (no) {
 		LOG_warn("plugins: %s can't load %s: %s\n", owner, path, no);
 		free(data);
