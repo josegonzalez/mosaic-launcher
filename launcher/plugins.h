@@ -53,7 +53,7 @@ int Plugins_bindButton(int screen, int button, int trigger, const char* action_i
 const char* Plugins_fnName(int index);
 const char* Plugins_fnAction(int index);
 
-#define PLUGIN_BINDING_MAX 16
+#define PLUGIN_BINDING_MAX 64 // across every plugin
 #define PLUGIN_OVERRIDE_MAX 16
 
 // Bindings plugins put on a screen's buttons in place of the screen's own
