@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled sort-modes, with jump-letter's strip for the sections,
 # multi-disc, numeric-prefix and guest-profile, seeker pressing the keys,
