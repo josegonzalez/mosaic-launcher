@@ -1844,6 +1844,13 @@ typedef struct MosaicHost {
 	// report.crash, with that plugin's keep_network setting. Check for it
 	// with MOSAIC_HOST_HAS(host, bug_report).
 	int (*bug_report)(int flags, char* out, size_t size);
+
+	// The screen tint (see screen_tint in MosaicPlugin): tint_shown writes
+	// the colour the launcher multiplied the frame on screen by, every
+	// plugin's screen_tint together, into out and returns 1, or writes
+	// white and returns 0 when that frame has no tint. A NULL out only
+	// returns which. Check for both with MOSAIC_HOST_HAS(host, tint_shown).
+	int (*tint_shown)(MosaicColor* out);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -2299,6 +2306,23 @@ typedef struct MosaicPlugin {
 	// it doesn't order. Entries the sort keeps together share a key. The
 	// first plugin in load order to answer wins.
 	int (*section_key)(const MosaicEntry* entry, const char* dir_path, char* out, size_t size);
+
+	// A tint over the whole screen, such as a blue light filter. Every
+	// plugin's screen_tint runs, in load order, each frame the launcher
+	// redraws, on every screen: the game list, the quick menu, the game
+	// switcher, dialogs, the lock screen and plugin screens, those with
+	// MOSAIC_SCREEN_FULL too. Write a colour into *tint and return 1, or
+	// return 0 for none. The launcher multiplies each pixel's red, green
+	// and blue by the colour's over 255 (its alpha is ignored), as the very
+	// last step of every frame it shows, after toasts, dialogs, overlays
+	// and transitions, so white turns into the colour and black stays
+	// black; two plugins' tints multiply together. Screenshots from
+	// capture_screen and save_screenshot have it, as seen. Games don't.
+	// Call host->request_redraw from tick to change it. It only answers,
+	// as overlay_render only draws. Anything but 0 or 1 is an error, after
+	// which the launcher logs it and leaves this plugin's tint out until it
+	// restarts. Check for it with MOSAIC_HOST_HAS(host, tint_shown).
+	int (*screen_tint)(MosaicColor* tint);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

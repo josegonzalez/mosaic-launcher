@@ -34,7 +34,7 @@ MODULES = main.c state.c containers.c library.c launch.c nav.c imgloader.c \
 	drawmodel.c plugindraw.c layoutmodel.c artcache.c artloader.c selmodel.c openmodel.c \
 	statusmodel.c statuspill.c infomodel.c indexmodel.c cardindex.c transmodel.c background.c playmodel.c playhistory.c \
 	inputmodel.c pin.c profiles.c report.c reportmodel.c ramodel.c rahash.c rachd.c raprogress.c audiomodel.c audio.c screenmodel.c screen_plugin.c hintmodel.c wifi.c lockmodel.c ambientmodel.c \
-	theme.c thememodel.c palettes.c fallback.c fallbackmodel.c smooth.c scalemodel.c shrinkmodel.c
+	theme.c thememodel.c palettes.c fallback.c fallbackmodel.c smooth.c scalemodel.c shrinkmodel.c tint.c tintmodel.c
 
 # Which lib/<arch>/plugin.so a plugin directory provides for this build. Every
 # current device is aarch64, so one plugin build covers all of them.
@@ -67,9 +67,10 @@ PRODUCT = $(BUILD_DIR)/$(TARGET).elf
 # patch no longer applies to fails here; scripts/upstream-drift.sh shows
 # it with upstream's changes to api.c. fallbackttf.h, included ahead of
 # that, sends every file's SDL_ttf text calls through fallback.c, for the
-# fallback font.
+# fallback font, and tintpresent.h sends every frame the platform shows
+# through tint.c, for plugins' screen tint.
 API_C = $(BUILD_DIR)/api.c
-UISIZES = -include $(CURDIR)/fallbackttf.h -include $(CURDIR)/uisizes.h
+UISIZES = -include $(CURDIR)/fallbackttf.h -include $(CURDIR)/tintpresent.h -include $(CURDIR)/uisizes.h
 CALLSITE_O = $(BUILD_DIR)/callsite.o
 
 # rcheevos and libchdr, for RetroAchievements hashing; its rules mustn't

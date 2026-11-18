@@ -3,12 +3,14 @@
 #include "launcher.h"
 #include "capturemodel.h"
 #include "capture.h"
+#include "tint.h"
 
 static CaptureFrames frames;
 static SDL_Surface* held = NULL; // the frame shown before a menu opened
 
 // What's on screen now, read back from every layer as stock's
-// PLAT_captureScreenshot composites them, made opaque as a screenshot is.
+// PLAT_captureScreenshot composites them, made opaque as a screenshot is,
+// with plugins' screen tint as it's shown.
 static SDL_Surface* grab(void) {
 	if (!screen) return NULL;
 	SDL_Surface* s = SDL_CreateRGBSurfaceWithFormat(0, screen->w, screen->h, 32, SDL_PIXELFORMAT_ARGB8888);
@@ -18,11 +20,7 @@ static SDL_Surface* grab(void) {
 		SDL_FreeSurface(s);
 		return NULL;
 	}
-	Uint32* pixels = (Uint32*)s->pixels;
-	for (int y = 0; y < s->h; y++) {
-		Uint32* row = (Uint32*)((Uint8*)pixels + y * s->pitch);
-		for (int x = 0; x < s->w; x++) row[x] |= 0xFF000000u;
-	}
+	Tint_capture(s);
 	SDL_SetSurfaceBlendMode(s, SDL_BLENDMODE_NONE);
 	return s;
 }

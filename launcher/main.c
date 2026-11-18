@@ -1,5 +1,6 @@
 #include "launcher.h"
 #include "playhistory.h"
+#include "tint.h"
 
 // The built-in list's thumbnail on its layer, sized and placed as stock
 // does, where art decorators were told it is (ListArt_rect).
@@ -226,12 +227,14 @@ int main (int argc, char *argv[]) {
 		if(state.dirty) {
 			// what's on screen now, before it's cleared, for plugins' captures
 			Plugins_frameBegin();
+			// plugins' screen tint, for this frame and those shown until the next
+			Plugins_tint();
 			tmpOldScreen = NULL;
 			switcherSur = NULL;
 			// NOTE:22 This causes slowdown when CFG_getMenuTransitions is set to false because animationdirection turns > 0 somewhere but is never set back to 0 and so this code runs on every action, will fix later
 			if(state.animationdirection != ANIM_NONE || (lastScreen==SCREEN_GAMELIST && currentScreen == SCREEN_GAMESWITCHER)) {
 				if(tmpOldScreen) SDL_FreeSurface(tmpOldScreen);
-				tmpOldScreen = GFX_captureRendererToSurface();
+				tmpOldScreen = Tint_captureShown();
 				SDL_SetSurfaceBlendMode(tmpOldScreen,SDL_BLENDMODE_BLEND);
 				Transition_keepSelection();
 			}

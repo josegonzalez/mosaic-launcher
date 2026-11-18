@@ -1048,6 +1048,17 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   char path[256];
   if (MOSAIC_HOST_HAS(host, bug_report) && host->bug_report(0, path, sizeof(path)) == 0) host->toast(path);
   ```
+- A screen tint, such as a blue light filter: every plugin's `screen_tint(tint)` in `MosaicPlugin` runs, in load order, each frame the launcher redraws, on every screen: the game list, the quick menu, the game switcher, dialogs, the lock screen and plugin screens, those with `MOSAIC_SCREEN_FULL` too, such as ambient screens. It writes a colour into `*tint` and returns 1, or returns 0 for none. The launcher multiplies each pixel's red, green and blue by the colour's over 255 (its alpha is ignored), so white turns into the colour and black stays black, and two plugins' tints multiply together. It's the very last step of every frame the launcher shows, after toasts, dialogs, overlays and transitions: as the platform's video code hands each frame over (`SDL_RenderPresent`), the launcher fills the whole frame with the colour once on the GPU, blended by multiplying (`SDL_BLENDMODE_MOD`), so it costs the same whatever's on screen. A transition that starts from the frame on screen starts from it without the tint, which goes on again as each of its frames is shown, so nothing is tinted twice. Screenshots from `capture_screen` and `save_screenshot` have the tint as seen. Games don't: the launcher isn't running. Call `request_redraw` from `tick` to change it; the tint stays the same on the frames shown in between. It only answers, as `overlay_render` only draws: `select_index`, `open_screen`, `close_screen` and the captures refuse from it. Anything but 0 or 1 is an error, after which the launcher logs it and leaves that plugin's tint out until it restarts. The launcher logs the tint each time it changes, as `plugins: screen tint RRGGBB` or `plugins: screen tint off`. `tint_shown(out)` writes the tint on the frame on screen, every plugin's together, into `out` and returns 1, or writes white and returns 0 when it has none; a `NULL` `out` only returns which. Check for both with `MOSAIC_HOST_HAS(host, tint_shown)`. With no plugin's tint, frames are stock's. The bundled `blue-light` gives one.
+
+  ```c
+  static int screenTint(MosaicColor* tint) {
+      if (!on) return 0;
+      *tint = (MosaicColor){ 255, 223, 127, 255 }; // white turns amber
+      return 1;
+  }
+  // in MosaicPlugin, with MOSAIC_HOST_HAS(host, tint_shown) checked in init
+  .screen_tint = screenTint,
+  ```
 
 ## Without writing C
 

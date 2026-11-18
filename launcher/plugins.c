@@ -26,6 +26,8 @@
 #include "plugincfg.h"
 #include "fnbinds.h"
 #include "capture.h"
+#include "tint.h"
+#include "tintmodel.h"
 #include "hintmodel.h"
 #include "palettes.h"
 #include "entrysets.h"
@@ -76,6 +78,7 @@ typedef struct LoadedPlugin {
 	int owns_theme;      // claims the theme slot, so its theme is asked
 	int lock_text_off;   // its lock_text failed, so its lines are left off the lock screen
 	int note_off;        // its settings_note failed, so its notes are left off the Launcher pak's pages
+	int tint_off;        // its screen_tint failed, so its tint is left out
 } LoadedPlugin;
 
 // The plugins loaded, with room for every one deciding to load (start), so
@@ -104,7 +107,7 @@ static SelKey swap_key;                     // and the selection it was shown fo
 static int swap_drawn = 0;                  // the layout's last layout_render got it with art_replacement
 static ScreenSet screens;      // plugins' screens, and the stack of those open
 static int screen_hook = 0;    // while a screen's enter or exit runs, which can't open or close screens
-static int screen_drawing = 0; // while a screen's render or an overlay runs, which only draw
+static int screen_drawing = 0; // while a screen's render, an overlay or a screen_tint runs, which only draw
 static MosaicSurface* hints_screen = NULL;     // the screen lent to a screen's render, the only one draw_hints draws on
 static const MosaicScreenView* hints_view = NULL; // and its view
 static int switcher_declined = 0; // the switcher screen's enter declined, so the built-in switcher shows until it closes
@@ -2235,6 +2238,7 @@ static const MosaicHost host = {
 	.profile_clear = hostProfileClear,
 	.profile_path = hostProfilePath,
 	.bug_report = hostBugReport,
+	.tint_shown = Tint_shown,
 };
 
 ///////////////////////////////////////
@@ -4549,6 +4553,31 @@ void Plugins_overlays(SDL_Surface* surface, const MosaicScreenView* view) {
 	}
 	screen_drawing = 0;
 	PluginDraw_unlend(lent);
+}
+
+void Plugins_tint(void) {
+	static MosaicColor last = TINT_NONE; // the tint last logged
+	MosaicColor tint = TINT_NONE;
+	screen_drawing = 1;
+	for (int i = 0; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (loaded[i].tint_off || !Plugin_has(p, screen_tint) || !p->screen_tint) continue;
+		MosaicColor c = TINT_NONE;
+		int rc = 0;
+		AS_PLUGIN(i) rc = p->screen_tint(&c);
+		if (rc == 1) Tint_mix(&tint, c);
+		else if (rc != 0) {
+			loaded[i].tint_off = 1;
+			LOG_warn("plugins: %s's screen_tint returned %i, leaving its tint out until the launcher restarts\n",
+				loaded[i].id, rc);
+		}
+	}
+	screen_drawing = 0;
+	Tint_set(!Tint_isNone(tint), tint);
+	if (tint.r == last.r && tint.g == last.g && tint.b == last.b) return;
+	last = tint;
+	if (Tint_isNone(tint)) LOG_info("plugins: screen tint off\n");
+	else LOG_info("plugins: screen tint %02X%02X%02X\n", tint.r, tint.g, tint.b);
 }
 
 ///////////////////////////////////////

@@ -305,6 +305,11 @@ int Plugins_overlaysOver(int screen);
 // call. One that fails logs and is left out from then on.
 void Plugins_overlays(struct SDL_Surface* surface, const MosaicScreenView* view);
 
+// Every plugin's screen_tint, in load order, put together and set as the
+// tint for the frames shown from now on (see tint.h). One that fails logs
+// and is left out from then on.
+void Plugins_tint(void);
+
 void Plugins_beforeSleep(void);
 void Plugins_afterResume(void);
 void Plugins_beforePoweroff(void);

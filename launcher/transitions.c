@@ -1,5 +1,6 @@
 #include "launcher.h"
 #include "transmodel.h"
+#include "tint.h"
 
 static SDL_Surface* launchOldScreen = NULL; // the frame a launch transition starts from
 static ListSelection listShown;  // where the selection is on the game list's last frame
@@ -73,7 +74,7 @@ static int byPlugin(int kind, SDL_Surface* old_frame, SDL_Surface* new_frame, in
 
 void Transition_captureLaunch(void) {
 	if (launchOldScreen) SDL_FreeSurface(launchOldScreen);
-	launchOldScreen = GFX_captureRendererToSurface();
+	launchOldScreen = Tint_captureShown();
 	launchOld = onScreen();
 }
 
