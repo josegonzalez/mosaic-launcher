@@ -74,6 +74,10 @@ static void load(PluginCfg* cfg) {
 	fclose(f);
 }
 
+void PluginCfg_load(PluginCfg* cfg) {
+	load(cfg);
+}
+
 const char* PluginCfg_get(PluginCfg* cfg, const char* key, const char* fallback) {
 	if (!key) return fallback;
 	load(cfg);

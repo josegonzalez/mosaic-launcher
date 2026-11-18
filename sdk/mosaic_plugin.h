@@ -1822,6 +1822,28 @@ typedef struct MosaicHost {
 	int (*profile_switch)(const char* name);
 	int (*profile_clear)(const char* name);
 	int (*profile_path)(const char* file, char* out, size_t size);
+
+	// Bug reports: bug_report writes one zip in Reports/ on the card,
+	// Reports/mosaic-<date>.zip, with the launcher's and plugins' logs,
+	// plugins.txt, the Launcher page's and each plugin's settings, the
+	// device, NextUI's and the launcher's versions, every plugin, free
+	// space and each system's game count, without file names. Settings
+	// plugin.txt marks protected or secret are left out, and their values
+	// taken out wherever they show, as are user names and passwords in
+	// URLs, tokens, API keys and passwords, and, unless flags has
+	// MOSAIC_REPORT_KEEP_NETWORK, IP and MAC addresses, Wi-Fi names and
+	// Syncthing device IDs. It writes the zip's path from the card, such
+	// as "Reports/mosaic-2026-11-17-153012.zip", into out and returns 0,
+	// or returns -1 for a call where cfg_get is refused, a full card or a
+	// file that couldn't be written, which the launcher logs. Only the
+	// newest 10 reports are kept: making one removes the oldest past that,
+	// and the launcher logs which. It runs on the launcher's thread and
+	// takes as long as reading the logs does, about a second, so show
+	// something first. When the crash guard pauses plugins, the launcher
+	// makes one itself if a plugin that would have loaded provides
+	// report.crash, with that plugin's keep_network setting. Check for it
+	// with MOSAIC_HOST_HAS(host, bug_report).
+	int (*bug_report)(int flags, char* out, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -1850,6 +1872,9 @@ typedef struct MosaicHost {
 
 // What index_count returns before the card index is first ready.
 #define MOSAIC_INDEX_NOT_READY -1
+
+// bug_report's flags.
+#define MOSAIC_REPORT_KEEP_NETWORK 1 // keep IP and MAC addresses, Wi-Fi names and Syncthing device IDs
 
 // True when the launcher's host table has this field, so a plugin can use
 // newer features when they're there and do without on older launchers.

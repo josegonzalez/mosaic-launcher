@@ -181,6 +181,8 @@ The launcher in `launcher/` started as upstream's `nextui.c`, split into modules
 | `ambientmodel.c` | the SDL-free half of ambient screens: the ones registered (the lock first, then `register_ambient`'s), their order from the Launcher page's setting, and moving one up or down without losing the place of one whose plugin is off; `plugins.c` asks each before the one showing whether it wants to show, once a frame over the game list, home or an ambient screen, and opens the first that does |
 | `pin.c` | the launcher's PIN file (`pin.txt` beside `plugins.txt`): reading, checking and saving it, and taking over simple mode's old one |
 | `profiles.c` | profiles (`profile_switch`): swapping `recent.txt`, `game_logs.sqlite` and `Collections` in place with a profile's parked copies, finishing a switch a power cut stopped, clearing a profile, and the path of a plugin's file in a profile |
+| `reportmodel.c` | the SDL-free half of bug reports (`bug_report`): taking private details out of text, a stored zip writer, a plugin's settings without its protected and secret ones, the game list summary, and which reports to keep |
+| `report.c` | writing a bug report's zip in `Reports/` from the logs, settings and details `plugins.c` gives it, and removing the oldest past the newest 10 |
 | `listsort.c` | sorting a list by plugins' chained `sort_compare` hooks, and taking a plugin's `section_key` answer for `entry_section` |
 | `launchcmd.c` | checking and quoting the command a plugin replaces a launch with |
 | `stocktoggles.c` | the stock settings plugins can read and set, through `CFG_get*` and `CFG_set*` |

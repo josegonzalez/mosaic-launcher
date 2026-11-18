@@ -34,12 +34,15 @@ status=$?
 
 # A normal exit is 0, including every game or pak launch. SIGTERM and
 # SIGKILL come from shutdown, not from a bug, so they don't count. Anything
-# else is a crash, and two in a row hands the session back to stock.
+# else is a crash, and two in a row hands the session back to stock. The
+# crashed run's log is kept as nextui-crash.txt, for bug reports, as
+# launch.sh starts the next run's log over it.
 case "$status" in
 	0 | 137 | 143)
 		[ -f "$STATE_DIR/crashes" ] && rm -f "$STATE_DIR/crashes"
 		;;
 	*)
+		[ -n "$LOGS_PATH" ] && [ -f "$LOGS_PATH/nextui.txt" ] && cp "$LOGS_PATH/nextui.txt" "$LOGS_PATH/nextui-crash.txt"
 		crashes=0
 		[ -f "$STATE_DIR/crashes" ] && crashes="$(cat "$STATE_DIR/crashes")"
 		crashes=$((crashes + 1))

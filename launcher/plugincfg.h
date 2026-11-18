@@ -19,6 +19,9 @@ typedef struct PluginCfg {
 void PluginCfg_init(PluginCfg* cfg, const char* path);
 void PluginCfg_free(PluginCfg* cfg);
 
+// Reads the file, unless it has been, so keys and values hold its settings.
+void PluginCfg_load(PluginCfg* cfg);
+
 // The value for key, or fallback when it isn't set. It stays valid until
 // the next PluginCfg_set on cfg.
 const char* PluginCfg_get(PluginCfg* cfg, const char* key, const char* fallback);

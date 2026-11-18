@@ -1,0 +1,14 @@
+id=bug-report
+name=Bug report
+api=1
+category=Extras
+summary=Saves the launcher's logs, settings and device details in one zip on the card, for a bug report.
+description=Saves the launcher's and plugins' logs, settings and device details in one zip in Reports on the card, to attach to a bug report, with private details taken out. One is also made when plugins are paused after a crash.
+# the launcher makes a report itself when the crash guard pauses plugins
+provides=report.crash
+# a Bug report tile on the quick menu
+setting.tile=toggle|Quick menu tile|on
+# a game list button that makes a bug report
+setting.button=choice|Bug report button|none|none,Y,L2,R2,SELECT|button:bug-report.make
+# keep IP and MAC addresses, Wi-Fi names and Syncthing device IDs in reports
+setting.keep_network=toggle|Keep network details|off

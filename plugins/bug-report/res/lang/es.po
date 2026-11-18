@@ -1,0 +1,53 @@
+# Spanish for the bug-report plugin, from po/bug-report.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Bug report"
+msgstr "Informe"
+
+msgid "Bug report button"
+msgstr "Botón de informe de error"
+
+msgid "Couldn't make a bug report"
+msgstr "No se pudo crear el informe de error"
+
+msgid "It goes in Reports on the card"
+msgstr "Se guarda en Reports en la tarjeta"
+
+msgid "Keep network details"
+msgstr "Conservar los datos de red"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "Making a bug report..."
+msgstr "Creando un informe de error..."
+
+msgid "Quick menu tile"
+msgstr "Icono del menú rápido"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+#, c-format
+msgid "Saved %s"
+msgstr "Guardado %s"
+
+msgid "Saves the launcher's and plugins' logs, settings and device details in one zip in Reports on the card, to attach to a bug report, with private details taken out. One is also made when plugins are paused after a crash."
+msgstr "Guarda los registros, los ajustes y los datos del dispositivo del launcher y sus plugins en un zip en Reports en la tarjeta, para adjuntarlo a un informe de error, sin los datos privados. También se crea uno cuando los plugins se pausan tras un fallo."
+
+msgid "Y"
+msgstr "Y"
+
+msgid "none"
+msgstr "ninguno"

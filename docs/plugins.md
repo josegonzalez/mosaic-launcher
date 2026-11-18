@@ -119,6 +119,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 
 ## Extras
 
+- [bug-report](../plugins/bug-report/README.md) - Saves the launcher's logs, settings and device details in one zip on the card, for a bug report.
 - [music](../plugins/music/README.md) - A music player that keeps playing while you play a game.
 - [screensaver](../plugins/screensaver/README.md) - Cycles through images when the game list sits idle.
 - [screenshot-viewer](../plugins/screenshot-viewer/README.md) - Browses the screenshots you took in games.

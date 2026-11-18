@@ -39,6 +39,7 @@
 #include "cardindex.h"
 #include "openmodel.h"
 #include "profiles.h"
+#include "report.h"
 
 #ifndef PLUGIN_ARCH
 #error "build with -DPLUGIN_ARCH=\"...\" (eg. aarch64)"
@@ -1482,6 +1483,149 @@ static int hostProfilePath(const char* file, char* out, size_t size) {
 	return Profile_filePath(PLUGIN_STATE_DIR, live_profile, file, out, size);
 }
 
+///////////////////////////////////////
+// bug reports
+
+static void reportLog(const char* message) {
+	if (!strncmp(message, "saved ", 6)) LOG_info("bug report: %s\n", message);
+	else if (!strncmp(message, "warning: ", 9)) LOG_warn("bug report: %s\n", message + 9);
+	else LOG_warn("bug report: %s\n", message);
+}
+
+// Which discovered plugins load, as start decided, in load order. Returns
+// how many, or -1 when out of memory.
+static int reportDecisions(PluginDecision** out) {
+	discover();
+	*out = NULL;
+	if (manifest_list.count == 0) return 0;
+	*out = calloc((size_t)manifest_list.count, sizeof(PluginDecision));
+	if (!*out) return -1;
+	char* choices = readText(PLUGIN_CHOICES_PATH);
+	int n = PluginSet_resolve(manifest_list.items, manifest_list.count, choices, *out);
+	free(choices);
+	return n;
+}
+
+static const PluginDecision* decisionFor(const PluginDecision* decisions, int n, const PluginManifest* m) {
+	for (int i = 0; i < n; i++) {
+		if (decisions[i].manifest == m) return &decisions[i];
+	}
+	return NULL;
+}
+
+// A plugin's setting as saved, else its plugin.txt's default, else fallback.
+static void reportSetting(const PluginManifest* m, const char* key, const char* fallback, char* out, size_t size) {
+	for (int i = 0; i < m->setting_count; i++) {
+		if (!strcmp(m->settings[i].key, key)) fallback = m->settings[i].fallback;
+	}
+	char path[600];
+	snprintf(path, sizeof(path), PLUGIN_STATE_DIR "/%s.cfg", m->id);
+	Cfg_get(path, key, fallback, out, size);
+}
+
+// Makes a bug report (report.c) from what the launcher knows now: with
+// plugins paused, nothing that comes from a loaded plugin or the Wi-Fi
+// worker. Returns 0, or -1.
+static int makeReport(int keep_network, const char* made_by, int paused, char* out, size_t size) {
+	PluginDecision* decisions = NULL;
+	int n = reportDecisions(&decisions);
+	int count = manifest_list.count;
+	char (*states)[700] = count ? calloc((size_t)count, sizeof(*states)) : NULL;
+	const char** state_list = count ? calloc((size_t)count, sizeof(char*)) : NULL;
+	if (n < 0 || (count && (!states || !state_list))) {
+		LOG_warn("bug report: out of memory\n");
+		free(decisions);
+		free(states);
+		free(state_list);
+		return -1;
+	}
+	char theme[256];
+	snprintf(theme, sizeof(theme), "stock");
+	for (int i = 0; i < count; i++) {
+		const PluginManifest* m = &manifest_list.items[i];
+		const PluginDecision* d = decisionFor(decisions, n, m);
+		if (!d) snprintf(states[i], sizeof(states[i]), "not decided");
+		else if (!d->load) snprintf(states[i], sizeof(states[i]), "off: %s", d->reason);
+		else if (paused) snprintf(states[i], sizeof(states[i]), "on, paused after a crash");
+		else snprintf(states[i], sizeof(states[i]), "%s", loadedById(m->id) ? "on, loaded" : "on, but its init declined");
+		state_list[i] = states[i];
+		if (d && d->load && csvHas(m->slots, THEME_SLOT) && !strcmp(theme, "stock")) {
+			char value[128];
+			reportSetting(m, "theme", "", value, sizeof(value));
+			snprintf(theme, sizeof(theme), "%s%s%s%s", m->id, value[0] ? ", theme " : "", value,
+				paused ? ", not loaded as plugins are paused" : "");
+		}
+	}
+	free(decisions);
+
+	CardIndex kept;
+	Index_init(&kept);
+	const CardIndex* index = paused ? NULL : CardIndex_get();
+	if (!index && Index_load(&kept, PLUGIN_STATE_DIR "/card-index.txt", ROMS_PATH) == 0) index = &kept;
+
+	MosaicWifi wifi;
+	memset(&wifi, 0, sizeof(wifi));
+	wifi.size = sizeof(wifi);
+	const char* wifi_name = !paused && hostWifiConnection(&wifi) == 1 ? wifi.ssid : NULL;
+
+	char pak[512], os[256] = "";
+	int has_pak = Plugins_pakDir(pak, sizeof(pak));
+	PLAT_getOsVersionInfo(os, sizeof(os));
+	ReportSource src = {
+		.sdcard = SDCARD_PATH,
+		.userdata = USERDATA_PATH,
+		.state = PLUGIN_STATE_DIR,
+		.platform = PLATFORM,
+		.model = PLAT_getModel(),
+		.os_version = os,
+		.pak = has_pak ? pak : NULL,
+		.profile = live_profile,
+		.theme = theme,
+		.made_by = made_by,
+		.manifests = manifest_list.items,
+		.states = state_list,
+		.manifest_count = count,
+		.index = index,
+		.wifi_name = wifi_name,
+		.keep_network = keep_network,
+		.now = time(NULL),
+		.log = reportLog,
+	};
+	int rc = Report_make(&src, out, size);
+	Index_free(&kept);
+	free(states);
+	free(state_list);
+	return rc;
+}
+
+static int hostBugReport(int flags, char* out, size_t size) {
+	LoadedPlugin* p = callingPlugin("bug_report");
+	if (!p) return -1;
+	char made_by[128];
+	snprintf(made_by, sizeof(made_by), "the %s plugin", p->id);
+	LOG_info("plugins: %s asked for a bug report\n", p->id);
+	return makeReport((flags & MOSAIC_REPORT_KEEP_NETWORK) != 0, made_by, 0, out, size);
+}
+
+// Plugins were just paused after a crash: a bug report, when a plugin that
+// would have loaded provides report.crash, with its keep_network setting.
+// Plugins stay paused whatever happens here, so a crash while making it
+// can't make another.
+static void crashReport(void) {
+	PluginDecision* decisions = NULL;
+	int n = reportDecisions(&decisions);
+	const PluginManifest* asker = NULL;
+	for (int i = 0; i < n && !asker; i++) {
+		if (decisions[i].load && csvHas(decisions[i].manifest->provides, "report.crash")) asker = decisions[i].manifest;
+	}
+	free(decisions);
+	if (!asker) return;
+	char keep[16];
+	reportSetting(asker, "keep_network", "off", keep, sizeof(keep));
+	LOG_info("plugins: %s provides report.crash, so the launcher makes a bug report\n", asker->id);
+	makeReport(!strcmp(keep, "on"), "the crash guard, which paused plugins after a crash", 1, NULL, 0);
+}
+
 // -1 before the first check, so the screen the launcher starts on isn't an opening
 static int quick_shown = -1;
 
@@ -2090,6 +2234,7 @@ static const MosaicHost host = {
 	.profile_switch = hostProfileSwitch,
 	.profile_clear = hostProfileClear,
 	.profile_path = hostProfilePath,
+	.bug_report = hostBugReport,
 };
 
 ///////////////////////////////////////
@@ -2487,6 +2632,8 @@ static void start(void) {
 		unlink(LOADING_MARKER);
 		Plugins_ensureStateDir();
 		putFile(PAUSED_MARKER, "");
+		sync();
+		crashReport();
 		return;
 	}
 

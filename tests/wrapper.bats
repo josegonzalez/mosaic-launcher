@@ -41,6 +41,18 @@ setup() {
 	[ "$(ran_last)" = stock ]
 }
 
+@test "a crash keeps its log for bug reports" {
+	mkdir -p "$LOGS_PATH"
+	echo "the crashed run" >"$LOGS_PATH/nextui.txt"
+	echo 139 >"$BATS_TEST_TMPDIR/ours.exit"
+	start_launcher || true
+	[ "$(cat "$LOGS_PATH/nextui-crash.txt")" = "the crashed run" ]
+	echo "a clean run" >"$LOGS_PATH/nextui.txt"
+	rm "$BATS_TEST_TMPDIR/ours.exit"
+	start_launcher
+	[ "$(cat "$LOGS_PATH/nextui-crash.txt")" = "the crashed run" ]
+}
+
 @test "a clean exit resets the crash count" {
 	echo 139 >"$BATS_TEST_TMPDIR/ours.exit"
 	start_launcher || true
