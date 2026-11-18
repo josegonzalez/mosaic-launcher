@@ -17,7 +17,10 @@
 // without case, accents or spaces), unplayed (games.played says it
 // wasn't, or without that service, it isn't in recents) and system:<name>
 // (a system folder's tag or the start of its name), so "fav: system:gb
-// mario" or "-tag:beaten". A set nobody registered, as when its plugin is
+// mario" or "-tag:beaten", genre:<name>, year:<year>, decade:<decade>
+// (from the card index's .info fields), played:<days> and hours:<hours>
+// (from the play history) and added:<days> (the file's times on the
+// card; see search_model.h). A set nobody registered, as when its plugin is
 // off, holds nothing. The results are searched again when a set changes
 // (launcher.set_changed). The best matches come
 // first: the name itself, then names starting with the query, then names
@@ -37,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #include "mosaic_plugin.h"
@@ -119,7 +123,7 @@ static int listGames(void) {
 		MosaicIndexEntry e = { .size = sizeof(e) };
 		if (host->index_entry(NULL, i, &e) != 0) break;
 		if (e.kind != MOSAIC_INDEX_GAME || !e.emulator || e.depth > MAX_DEPTH) continue;
-		if (SE_indexAdd(&index_, e.path, e.name, e.type) != 0) break;
+		if (SE_indexAddInfo(&index_, e.path, e.name, e.type, e.genre, e.year) != 0) break;
 		if (strcmp(e.system, last_system) != 0) systems++;
 		last_system = e.system;
 	}
@@ -216,9 +220,27 @@ static int played(const SEGame* game) {
 	return 0;
 }
 
+// played:'s last played time, hours:' seconds played and added:'s time
+// the file was put on the card: the later of its modified and changed
+// times, which on a FAT card is when it was copied there.
+static long long askPlay(int kind, const char* path, void* data) {
+	(void)data;
+	if (kind == SE_FILTER_ADDED) {
+		struct stat st;
+		if (stat(path, &st) != 0) return 0;
+		return (long long)(st.st_mtime > st.st_ctime ? st.st_mtime : st.st_ctime);
+	}
+	if (!MOSAIC_HOST_HAS(host, play_time)) return 0;
+	return kind == SE_FILTER_PLAYED ? host->last_played(path) : host->play_time(path);
+}
+
 static int passesFilter(const SEGame* game, int filter, const SEFilter* f, void* data) {
 	(void)data;
 	switch (f->kind) {
+	case SE_FILTER_PLAYED:
+	case SE_FILTER_HOURS:
+	case SE_FILTER_ADDED:
+		return SE_timeMatches(f, SE_playValue(game, game->type == MOSAIC_ENTRY_DIR, f->kind, askPlay, NULL), (long long)time(NULL));
 	case SE_FILTER_FAV:
 	case SE_FILTER_TAG:
 		return inSet(&members[filter], game);

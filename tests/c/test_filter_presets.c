@@ -38,6 +38,13 @@ static int test_in_set(int kind, const char* arg, const SEGame* game, void* data
 	return SE_tagMatches("tags:rpg", arg) && strstr(game->path, "Zelda") != NULL;
 }
 
+// Tetris was played an hour ago for 20 hours; the rest never were
+static long long test_play_value(int kind, const char* path, void* data) {
+	(void)data;
+	if (!strstr(path, "Tetris")) return 0;
+	return kind == SE_FILTER_HOURS ? 20 * 3600 : 1000000 - 3600;
+}
+
 static int keeps_table[8];
 static int keepsTable(int i, void* data) {
 	(void)data;
@@ -54,11 +61,11 @@ static void testModel(void) {
 
 	FPFolder folder;
 	FP_folderInit(&folder, GB);
-	CHECK(FP_folderAdd(&folder, GB "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM, "Puzzle", "1-2") == 0);
-	CHECK(FP_folderAdd(&folder, GB "/Super Mario Land.gb", "Super Mario Land", MOSAIC_ENTRY_ROM, "Platform", "1") == 0);
-	CHECK(FP_folderAdd(&folder, GB "/Kirby.gb", "Kirby's Dream Land", MOSAIC_ENTRY_ROM, "platform", NULL) == 0);
-	CHECK(FP_folderAdd(&folder, GB "/Zelda.gb", "Link's Awakening", MOSAIC_ENTRY_ROM, "", "4") == 0);
-	CHECK(FP_folderAdd(&folder, GB "/Dr. Mario.gb", "Dr. Mario", MOSAIC_ENTRY_ROM, "Puzzle", "2") == 0);
+	CHECK(FP_folderAdd(&folder, GB "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM, "Puzzle", "1-2", "1989") == 0);
+	CHECK(FP_folderAdd(&folder, GB "/Super Mario Land.gb", "Super Mario Land", MOSAIC_ENTRY_ROM, "Platform", "1", NULL) == 0);
+	CHECK(FP_folderAdd(&folder, GB "/Kirby.gb", "Kirby's Dream Land", MOSAIC_ENTRY_ROM, "platform", NULL, NULL) == 0);
+	CHECK(FP_folderAdd(&folder, GB "/Zelda.gb", "Link's Awakening", MOSAIC_ENTRY_ROM, "", "4", NULL) == 0);
+	CHECK(FP_folderAdd(&folder, GB "/Dr. Mario.gb", "Dr. Mario", MOSAIC_ENTRY_ROM, "Puzzle", "2", "1990") == 0);
 	CHECK(folder.games.game_count == 5);
 
 	// built-ins, genres by name, players from 2, then the user's that aren't empty
@@ -98,6 +105,18 @@ static void testModel(void) {
 	CHECK(FP_match(&folder, &q, &tests, m) == 0);
 	snprintf(q.query, sizeof(q.query), "-unplayed");
 	CHECK(FP_match(&folder, &q, &tests, m) == 1 && m[0]);
+	// and genre:, year:, decade:, played: and hours:
+	snprintf(q.query, sizeof(q.query), "genre:puzzle decade:80s");
+	CHECK(FP_match(&folder, &q, &tests, m) == 1 && m[0]);
+	snprintf(q.query, sizeof(q.query), "year:1990");
+	CHECK(FP_match(&folder, &q, &tests, m) == 1 && m[4]);
+	snprintf(q.query, sizeof(q.query), "played:1 hours:10");
+	CHECK(FP_match(&folder, &q, &tests, m) == 0); // no play history without play_value
+	tests.play_value = test_play_value;
+	tests.now = 1000000;
+	CHECK(FP_match(&folder, &q, &tests, m) == 1 && m[0]);
+	snprintf(q.query, sizeof(q.query), "-hours:50");
+	CHECK(FP_match(&folder, &q, &tests, m) == 5);
 	// a plugin that's off keeps nothing
 	FPTests none = { NULL, NULL, NULL, NULL, NULL };
 	CHECK(FP_match(&folder, &presets[1], &none, m) == 0);

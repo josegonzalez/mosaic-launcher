@@ -243,6 +243,141 @@ static void testFilters(void) {
 	SE_indexFree(&index);
 }
 
+// genre:, year: and decade:, from the index alone
+static void testInfoFilters(void) {
+	CHECK(SE_year("1991") == 1991);
+	CHECK(SE_year("1991-03-21") == 1991);
+	CHECK(SE_year("03/21/1994") == 1994);
+	CHECK(SE_year("19911") == 0); // five digits aren't a year
+	CHECK(SE_year("1850") == 0);
+	CHECK(SE_year("") == 0 && SE_year(NULL) == 0 && SE_year("unknown") == 0);
+
+	SEQuery q;
+	SE_parse("genre:rpg -year:1990-1994 decade:90s played:7 hours:10 added:30 x", &q);
+	CHECK(q.filter_count == 6 && !q.bad[0] && !q.dropped);
+	CHECK(q.filters[0].kind == SE_FILTER_GENRE);
+	CHECK_STR(q.filters[0].arg, "rpg");
+	CHECK(q.filters[1].kind == SE_FILTER_YEAR && q.filters[1].negate && q.filters[1].from == 1990 && q.filters[1].to == 1994);
+	CHECK(q.filters[2].kind == SE_FILTER_YEAR && q.filters[2].from == 1990 && q.filters[2].to == 1999);
+	CHECK(q.filters[3].kind == SE_FILTER_PLAYED && q.filters[3].from == 7);
+	CHECK(q.filters[4].kind == SE_FILTER_HOURS && q.filters[4].from == 10);
+	CHECK(q.filters[5].kind == SE_FILTER_ADDED && q.filters[5].from == 30);
+	CHECK_STR(q.words, "x");
+	// each way to name a decade
+	const char* decades[][2] = { { "1990s", "1990" }, { "1990", "1990" }, { "90S", "1990" }, { "00s", "2000" },
+		{ "10s", "2010" }, { "2020s", "2020" } };
+	for (size_t i = 0; i < sizeof(decades) / sizeof(decades[0]); i++) {
+		char text[32];
+		snprintf(text, sizeof(text), "DECADE:%s", decades[i][0]);
+		SE_parse(text, &q);
+		CHECK(q.filter_count == 1 && q.filters[0].from == atoi(decades[i][1]) && q.filters[0].to == atoi(decades[i][1]) + 9);
+	}
+	// what isn't one is a word, and the first is kept
+	const char* bad[] = { "played:x", "played:0", "hours:", "added:-3", "added:100001", "year:94", "year:1995-1990",
+		"year:1990-", "decade:1995", "decade:9", "decade:s", "genre:", "tag:" };
+	for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+		SE_parse(bad[i], &q);
+		CHECK(q.filter_count == 0);
+		CHECK_STR(q.bad, bad[i]);
+		CHECK_STR(q.words, bad[i]);
+	}
+	SE_parse("played:x hours:y", &q);
+	CHECK_STR(q.bad, "played:x");
+	SE_parse("fav: fav: fav: fav: fav: fav: fav: fav: genre:a decade:90s", &q);
+	CHECK(q.filter_count == SE_FILTERS_MAX && q.dropped == 2);
+	CHECK(!SE_filterNeedsTest(SE_FILTER_GENRE) && !SE_filterNeedsTest(SE_FILTER_YEAR));
+	CHECK(SE_filterNeedsTest(SE_FILTER_PLAYED) && SE_filterNeedsTest(SE_FILTER_UNPLAYED));
+
+	SEIndex index;
+	SE_indexInit(&index);
+	CHECK(SE_indexAddInfo(&index, "/r/a.gb", "Alpha", MOSAIC_ENTRY_ROM, "Role-Playing (RPG)", "1991") == 0);
+	CHECK(SE_indexAddInfo(&index, "/r/b.gb", "Bravo", MOSAIC_ENTRY_ROM, "Action RPG", "1999-12-01") == 0);
+	CHECK(SE_indexAddInfo(&index, "/r/c.gb", "Charlie", MOSAIC_ENTRY_ROM, "Beat 'em Up / Action", "2004") == 0);
+	CHECK(SE_indexAddInfo(&index, "/r/d.gb", "Delta", MOSAIC_ENTRY_ROM, "", "") == 0);
+	CHECK(SE_indexAddInfo(&index, "/r/e.gb", "Echo", MOSAIC_ENTRY_ROM, "Platformer", NULL) == 0);
+	CHECK_STR(index.games[0].genre, "role playing rpg");
+	CHECK(index.games[3].genre == NULL && index.games[3].year == 0);
+	CHECK(index.games[1].year == 1999);
+	SEHit hits[5];
+	// no test needed for them
+	CHECK(find(&index, "genre:rpg", hits) == 2);
+	CHECK(find(&index, "genre:role-playing", hits) == 1);
+	CHECK(find(&index, "genre:beatemup", hits) == 0); // a part, compacted, is only words
+	CHECK(find(&index, "genre:beatemupaction", hits) == 1); // the whole genre, compacted
+	CHECK(find(&index, "genre:act", hits) == 2); // words start words
+	CHECK(find(&index, "genre:latform", hits) == 0); // not inside one
+	CHECK(find(&index, "-genre:rpg", hits) == 3); // no genre isn't an RPG
+	CHECK(find(&index, "decade:1990s", hits) == 2);
+	CHECK(find(&index, "year:1991", hits) == 1);
+	CHECK(find(&index, "year:1992-2010", hits) == 2);
+	CHECK(find(&index, "-decade:90s", hits) == 3); // with no year too
+	CHECK(find(&index, "genre:rpg decade:90s bravo", hits) == 1);
+	CHECK_STR(index.games[hits[0].game].name, "Bravo");
+	SE_indexFree(&index);
+}
+
+// played:, hours: and added:, from a test's answers
+static long long play_values[4];
+static int play_asked = 0;
+static long long askValue(int kind, const char* path, void* data) {
+	(void)data;
+	play_asked++;
+	if (strstr(path, ".m3u")) return kind == SE_FILTER_HOURS ? 50 * 3600 : 0;
+	if (strstr(path, ".cue")) return 1000;
+	int i = path[strlen(path) - 1] - '0';
+	return i >= 0 && i < 4 && kind != SE_FILTER_HOURS ? play_values[i] : 0;
+}
+
+static int timeTest(const SEGame* game, int filter, const SEFilter* f, void* data) {
+	(void)filter;
+	return SE_timeMatches(f, SE_playValue(game, game->type == MOSAIC_ENTRY_DIR, f->kind, askValue, NULL), *(long long*)data);
+}
+
+static void testTimeFilters(void) {
+	long long now = 1800000000LL;
+	SEFilter played = { .kind = SE_FILTER_PLAYED, .from = 7 };
+	CHECK(SE_timeMatches(&played, now - 7 * 86400, now));
+	CHECK(!SE_timeMatches(&played, now - 7 * 86400 - 1, now));
+	CHECK(!SE_timeMatches(&played, 0, now) && !SE_timeMatches(&played, -1, now));
+	SEFilter hours = { .kind = SE_FILTER_HOURS, .from = 10 };
+	CHECK(SE_timeMatches(&hours, 10 * 3600 + 1, now));
+	CHECK(!SE_timeMatches(&hours, 10 * 3600, now)); // more than, not as much as
+	SEFilter added = { .kind = SE_FILTER_ADDED, .from = 30 };
+	CHECK(SE_timeMatches(&added, now - 86400, now) && !SE_timeMatches(&added, now - 31 * 86400, now));
+	SEFilter fav = { .kind = SE_FILTER_FAV };
+	CHECK(!SE_timeMatches(&fav, now, now));
+
+	SEIndex index;
+	SE_indexInit(&index);
+	SE_indexAdd(&index, "/r/g0", "Zero", MOSAIC_ENTRY_ROM);
+	SE_indexAdd(&index, "/r/g1", "One", MOSAIC_ENTRY_ROM);
+	SE_indexAdd(&index, "/r/g2", "Two", MOSAIC_ENTRY_ROM);
+	SE_indexAdd(&index, "/r/Disc Game", "Disc Game", MOSAIC_ENTRY_DIR);
+	play_values[0] = now - 86400;      // played yesterday...
+	play_values[1] = now - 30 * 86400; // ...a month ago...
+	play_values[2] = 0;                // ...never
+	SEHit hits[4];
+	SEQuery q;
+	SE_parse("played:7", &q);
+	CHECK(SE_search(&index, &q, timeTest, &now, hits) == 1);
+	CHECK_STR(index.games[hits[0].game].name, "Zero");
+	SE_parse("-played:7", &q);
+	CHECK(SE_search(&index, &q, timeTest, &now, hits) == 3);
+	// a game folder's hours are its .m3u's, as stock plays it
+	SE_parse("hours:10", &q);
+	CHECK(SE_search(&index, &q, timeTest, &now, hits) == 1);
+	CHECK_STR(index.games[hits[0].game].name, "Disc Game");
+	// asked after the cheaper filters, of the games passing them
+	play_asked = 0;
+	SE_parse("played:7 zero", &q);
+	CHECK(SE_search(&index, &q, timeTest, &now, hits) == 1 && play_asked == 1);
+	SE_parse("-genre:x played:7", &q);
+	CHECK(SE_search(&index, &q, NULL, NULL, hits) == 0); // played: needs a test
+	SE_parse("-genre:x", &q);
+	CHECK(SE_search(&index, &q, NULL, NULL, hits) == 4);
+	SE_indexFree(&index);
+}
+
 static void testRecents(void) {
 	char text[32] = "  tetris  ";
 	SE_trim(text);
@@ -925,8 +1060,21 @@ static void checkCount(const char* text, int want) {
 	freeList(list);
 }
 
+// Kirby was played yesterday, for 11 hours in all; the Crash folder's
+// .cue a month ago.
+static long long fakePlayTime(const char* path) {
+	return strstr(path, "Kirby") ? 11 * 3600 : 0;
+}
+static long long fakeLastPlayed(const char* path) {
+	if (strstr(path, "Kirby")) return (long long)time(NULL) - 86400;
+	return strstr(path, "Crash (USA).cue") ? (long long)time(NULL) - 30 * 86400 : 0;
+}
+
 static void testPluginFilters(void) {
 	makeCard();
+	CHECK(system("mkdir -p '" GB "/.media'") == 0);
+	writeText(GB "/.media/Kirby.info", "genre=Platform\nyear=1992\n");
+	writeText(GB "/.media/Tetris (World) (Rev 1).info", "genre=Puzzle\nyear=1989-06-14\n");
 	fakeIndexDrop();
 	cfg_count = 0;
 	fakeCfgSet("recents", "off");
@@ -978,6 +1126,24 @@ static void testPluginFilters(void) {
 	recent_total = 0;
 	fake.call = fakeCall;
 
+	// the .info fields, through the card index
+	checkCount("genre:platform", 1);
+	checkCount("decade:80s", 1);
+	checkCount("year:1989-1992", 2);
+	checkCount("-genre:puzzle system:gb", 5);
+	// and the play history: none without it
+	checkCount("played:7", 0);
+	fake.play_time = fakePlayTime;
+	fake.last_played = fakeLastPlayed;
+	checkCount("played:7", 1);
+	checkCount("hours:10", 1);
+	checkCount("hours:11", 0);
+	checkCount("played:31 system:ps", 1); // a game folder by its .cue
+	// and the card: every file was just made
+	checkCount("added:1 system:ps", 2);
+	fake.play_time = NULL;
+	fake.last_played = NULL;
+
 	// a set that changes searches again, and lists the folder again while it's open
 	run("fav:");
 	snprintf(current, sizeof(current), "%s", SEARCH);
@@ -1014,6 +1180,8 @@ int main(void) {
 	testSearch();
 	testParse();
 	testFilters();
+	testInfoFilters();
+	testTimeFilters();
 	testRecents();
 	testTiming();
 	testPlugin();

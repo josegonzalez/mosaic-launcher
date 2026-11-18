@@ -26,9 +26,10 @@ typedef struct FPFolder {
 void FP_folderInit(FPFolder* folder, const char* dir);
 // Frees everything and leaves it empty, for no folder.
 void FP_folderFree(FPFolder* folder);
-// Adds a game with its .info genre and players (either can be NULL).
+// Adds a game with its .info genre, players and year (any can be NULL).
 // Returns 0, or -1 when out of memory.
-int FP_folderAdd(FPFolder* folder, const char* path, const char* name, int type, const char* genre, const char* players);
+int FP_folderAdd(FPFolder* folder, const char* path, const char* name, int type, const char* genre, const char* players,
+	const char* year);
 
 // The highest number in a players value, so "1-4" and "4" are 4, or 0
 // when it has none.
@@ -76,6 +77,10 @@ typedef struct FPTests {
 	int (*has_save)(const SEGame* game, void* data);
 	const char* roms; // <card>/Roms, for system:
 	void* data;
+	// played:'s last played time, hours:' seconds played or added:'s time
+	// on the card, for a path (see SE_playValue), or NULL for none
+	long long (*play_value)(int filter_kind, const char* path, void* data);
+	long long now; // the time it is, for played: and added:, or 0 for time()
 } FPTests;
 
 // Which of the folder's games a preset keeps: matched[i] is set to 1 or 0

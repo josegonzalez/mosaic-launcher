@@ -22,8 +22,16 @@ Words can be mixed with filters, and a game has to match every word and pass eve
 | `tag:<name>` | Games with that [tag](../tags/README.md), the name typed without spaces, case or accents, so `tag:beatemup` finds "Beat 'em Up" |
 | `unplayed` | Games you haven't played, as [`row-badges`](../row-badges/README.md) counts them while it's on, and otherwise games not in Recently Played |
 | `system:<name>` | Games in a system, by the tag in its folder's name (`system:gb` for `Game Boy (GB)`) or the start of its name (`system:gameboy`) |
+| `genre:<name>` | Games whose genre, from their `.info` file, is that name typed without spaces, case or accents (`genre:beatemup` for "Beat 'em Up"), or has each of its words starting a word (`genre:rpg` for "Action RPG", `genre:role-playing` for "Role-Playing") |
+| `year:<year>` | Games from that year, or a range such as `year:1990-1994`, from their `.info` file |
+| `decade:<decade>` | Games from that decade, from their `.info` file: `decade:1990s`, `decade:1990` and `decade:90s` are the same, and `00s` to `40s` are 2000 to 2049 |
+| `played:<days>` | Games last played in that many days, such as `played:7` |
+| `hours:<hours>` | Games played for more than that many hours in all, such as `hours:10` |
+| `added:<days>` | Games put on the card in that many days, such as `added:30` |
 
-So `fav: system:gb mario` finds your Game Boy favorites with Mario in the name, and `-tag:beaten` every game without the Beaten tag. A filter on its own lists every game that passes it. While the plugin a filter needs is off, `fav:` and `tag:` find nothing.
+So `fav: system:gb mario` finds your Game Boy favorites with Mario in the name, `-tag:beaten` every game without the Beaten tag, and `genre:rpg unplayed` the RPGs you haven't played. A filter on its own lists every game that passes it. While the plugin a filter needs is off, `fav:` and `tag:` find nothing.
+
+Days count back from now, 24 hours each. `played:` and `hours:` come from the play history the Game Tracker keeps, and a game with no play history never passes them. `added:` goes by the times on the game's file (a game folder's own), the later of when it was last changed and modified, which on a FAT card is usually when it was copied there. A game whose `.info` file has no genre or year never passes `genre:`, `year:` or `decade:`, so `-genre:rpg` finds those too. A filter that isn't written as one, such as `played:x`, is searched for as a word.
 
 The best matches come first, each by name:
 
@@ -60,9 +68,10 @@ Results for "tobu".
 - Keeps the query in `.userdata/<platform>/launcher/search.cfg`.
 - Reads the `favorites` and `tags:<name>` entry sets for `fav:` and `tag:`, and searches again on `launcher.set_changed`.
 - Calls the `games.played` service for `unplayed`, from row-badges.
+- Reads `played:` and `hours:` from the play history (`last_played` and `play_time`), `genre:`, `year:` and `decade:` from the card index's `.info` fields, and `added:` from the game's file times on the card (`stat`).
 - Games any plugin's filter hides, such as [`hidden`](../hidden/README.md)'s, are left out of the results.
 - Searches the games in the launcher's card index (`index_count` and `index_entry`, see [plugin-api.md](../../docs/plugin-api.md#features-added-since-the-first-api)), in systems with an emulator, three folders deep. It asks for the index from `init` and searches again on `launcher.index_ready`. A search before the index is first ready finds nothing and says nothing, and runs again once it's ready.
-- Its query parsing and matching, `search_model.c`, is built into [`filter-presets`](../filter-presets/README.md) too, for its presets written as queries.
+- Its query parsing and matching, `search_model.c`, is built into [`filter-presets`](../filter-presets/README.md) and [`smart-collections`](../smart-collections/README.md) too, for their queries.
 
 ## Credits
 

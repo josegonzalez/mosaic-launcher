@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include "mosaic_plugin.h"
 #include "presets_model.h"
 
 ///////////////////////////////////////
@@ -38,7 +40,8 @@ int FP_players(const char* value) {
 	return most;
 }
 
-int FP_folderAdd(FPFolder* folder, const char* path, const char* name, int type, const char* genre, const char* players) {
+int FP_folderAdd(FPFolder* folder, const char* path, const char* name, int type, const char* genre, const char* players,
+		const char* year) {
 	int n = folder->games.game_count;
 	if (n >= folder->cap) {
 		int next = folder->cap ? folder->cap * 2 : 64;
@@ -52,7 +55,7 @@ int FP_folderAdd(FPFolder* folder, const char* path, const char* name, int type,
 	}
 	char* copy = strdup(genre ? genre : "");
 	if (!copy) return -1;
-	if (SE_indexAdd(&folder->games, path, name, type) != 0) {
+	if (SE_indexAddInfo(&folder->games, path, name, type, genre, year) != 0) {
 		free(copy);
 		return -1;
 	}
@@ -164,6 +167,12 @@ static int passes(const SEGame* game, int filter, const SEFilter* f, void* data)
 		return tests->played ? !tests->played(game, tests->data) : 0;
 	case SE_FILTER_SYSTEM:
 		return tests->roms && SE_systemMatches(tests->roms, game->path, f->arg);
+	case SE_FILTER_PLAYED:
+	case SE_FILTER_HOURS:
+	case SE_FILTER_ADDED:
+		if (!tests->play_value) return 0;
+		return SE_timeMatches(f, SE_playValue(game, game->type == MOSAIC_ENTRY_DIR, f->kind, tests->play_value, tests->data),
+			tests->now ? tests->now : (long long)time(NULL));
 	}
 	return 0;
 }

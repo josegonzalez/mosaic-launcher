@@ -28,6 +28,8 @@ typedef struct SEGame {
 	char* name;   // as the game list shows it
 	char* folded; // name, folded
 	int type;     // the host's entry type
+	char* genre;  // its .info genre, folded, or NULL for none
+	int year;     // the year its .info year names (see SE_year), or 0 for none
 } SEGame;
 
 typedef struct SEIndex {
@@ -41,6 +43,13 @@ void SE_indexInit(SEIndex* index);
 void SE_indexFree(SEIndex* index);
 // Returns 0, or -1 when out of memory.
 int SE_indexAdd(SEIndex* index, const char* path, const char* name, int type);
+// The same, with the game's .info genre and year as the card index gives
+// them (either can be NULL or "" for none), for genre:, year: and decade:.
+int SE_indexAddInfo(SEIndex* index, const char* path, const char* name, int type, const char* genre, const char* year);
+
+// The year a .info year names: its first four digits in a row, from 1900
+// to 2099, so "1991" and "1991-03-21" are 1991, or 0 when it has none.
+int SE_year(const char* text);
 
 ///////////////////////////////////////
 // matching
@@ -62,20 +71,36 @@ int SE_rank(const char* folded_name, const char* folded_query);
 
 // What a term of a query can ask for besides the name, each one negated
 // by a leading '-': fav: (in the favorites set), tag:<name> (in that
-// tag's set), unplayed (not played) and system:<name> (in that system).
+// tag's set), unplayed (not played), system:<name> (in that system),
+// genre:<name> (its .info genre is that name, ignoring case, accents,
+// spaces and punctuation, or has each of its words starting a word),
+// year:<year> or year:<from>-<to> (its .info year is that one or in that
+// range), decade:<decade> (its .info year is in that decade: 1990s, 1990
+// and 90s are all 1990 to 1999, two digits under 50 being the 2000s),
+// played:<days> (last played in the last that many days), hours:<hours>
+// (played for more than that many hours in all) and added:<days> (put on
+// the card in the last that many days). Days count back from now in 24
+// hours each.
 enum {
 	SE_FILTER_FAV,
 	SE_FILTER_TAG,
 	SE_FILTER_UNPLAYED,
 	SE_FILTER_SYSTEM,
+	SE_FILTER_GENRE,
+	SE_FILTER_YEAR,   // year: and decade:, as a range of years
+	SE_FILTER_PLAYED, // played:
+	SE_FILTER_HOURS,  // hours:
+	SE_FILTER_ADDED,  // added:
 };
 
 #define SE_FILTERS_MAX 8
+#define SE_NUMBER_MAX 100000 // the most days or hours a filter takes
 
 typedef struct SEFilter {
 	int kind;   // an SE_FILTER_ value
 	int negate; // it had a leading '-'
-	char arg[SE_QUERY_LEN]; // tag:'s and system:'s name, as typed
+	char arg[SE_QUERY_LEN]; // tag:'s, system:'s and genre:'s name, as typed
+	int from, to; // year: and decade:'s years; played:, hours: and added:'s number in from
 } SEFilter;
 
 // A query split into the words a name has to match and its filters.
@@ -83,13 +108,34 @@ typedef struct SEQuery {
 	char words[SE_QUERY_LEN]; // the rest of the terms, as typed, space-separated
 	SEFilter filters[SE_FILTERS_MAX];
 	int filter_count;
+	int dropped;            // filters past SE_FILTERS_MAX, which went to words
+	char bad[SE_QUERY_LEN]; // the first term that starts as a filter but isn't one, such as played:x, or ""
 } SEQuery;
 
 // Splits a query at its spaces into filters, matched ignoring case (fav:,
-// tag:<name>, unplayed and system:<name>, each with an optional leading
-// '-'), and words, which is every other term, past SE_FILTERS_MAX
-// filters too. A tag: or system: with no name is a word.
+// tag:<name>, unplayed, system:<name>, genre:<name>, year:<year>,
+// decade:<decade>, played:<days>, hours:<hours> and added:<days>, each
+// with an optional leading '-'), and words, which is every other term,
+// past SE_FILTERS_MAX filters too. A filter's name missing, or a number
+// that isn't one from 1 to SE_NUMBER_MAX or a year that isn't one, makes
+// the term a word, and the first such term is kept in bad.
 void SE_parse(const char* query, SEQuery* out);
+
+// Whether a filter needs the caller's test, as SE_search asks it: every
+// kind but genre:, year: and decade:, which it answers from the index.
+int SE_filterNeedsTest(int kind);
+
+// Whether a played:, hours: or added: filter passes for value, before its
+// negation: the last time played or the time added, as a Unix time, or
+// the seconds played, with now the time it is. 0 and less, for not
+// played or not known, never pass.
+int SE_timeMatches(const SEFilter* f, long long value, long long now);
+
+// What a played:, hours: or added: filter compares for a game: ask's
+// answer for its path, or for a game folder (is_dir) whose answer is 0 or
+// less, the first above 0 of its .m3u's and .cue's, as stock plays it.
+long long SE_playValue(const SEGame* game, int is_dir, int kind, long long (*ask)(int kind, const char* path, void* data),
+	void* data);
 
 // Text folded as SE_fold does, with its spaces dropped too, so "tag:beatemup"
 // matches "Beat 'em Up".
@@ -118,11 +164,13 @@ typedef struct SEHit {
 
 // Every game matching query, best first: by rank, then by folded name,
 // then by path. A game matches when its name has every word (folded here)
-// and it passes every filter as test says, negated ones failing it,
-// unplayed ones asked last as they cost the most. With filters and no
-// words every game that passes them matches, as SE_RANK_EXACT. With
-// neither, or filters and no test, nothing matches. hits needs room for
-// every game. Returns how many matched.
+// and it passes every filter, negated ones failing it: genre:, year: and
+// decade: as its genre and year say, and the rest as test says, played:
+// and hours: after those and unplayed and added: last, as they cost the
+// most. With filters and no words every game that passes them matches,
+// as SE_RANK_EXACT. With neither, or filters that need test and no test,
+// nothing matches. hits needs room for every game. Returns how many
+// matched.
 int SE_search(const SEIndex* index, const SEQuery* query, SEFilterFn test, void* data, SEHit* hits);
 
 ///////////////////////////////////////

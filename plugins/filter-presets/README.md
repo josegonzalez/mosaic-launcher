@@ -25,7 +25,7 @@ Open a system or collection and press R2 for the next filter or L2 for the previ
 
 A Filter tile on the [quick menu](../../docs/glossary.md#quick-menu) lists All games and every filter with how many games it shows. Pick one to turn it on. An [FN button](../../docs/glossary.md#fn-button) set to `action:filter-presets.next`, `action:filter-presets.prev` or `action:filter-presets.pick` does the same as the buttons and the tile.
 
-Your own filters go in the Your filter settings, written as search writes queries: `fav:` for favorites, `tag:<name>` for a [tag](../tags/README.md), `unplayed`, `system:<name>` for a system by its tag or name, each turned around by a leading `-`, and words a game's name has to have. For example `-fav: unplayed` is the unplayed games that aren't favorites, and `mario` the games with mario in their name. The filter shows in the header as you wrote it.
+Your own filters go in the Your filter settings, written as [search](../search/README.md) writes queries: `fav:` for favorites, `tag:<name>` for a [tag](../tags/README.md), `unplayed`, `system:<name>` for a system by its tag or name, `genre:<name>`, `year:<year>`, `decade:<decade>`, `played:<days>`, `hours:<hours>` and `added:<days>`, each turned around by a leading `-`, and words a game's name has to have. For example `-fav: unplayed` is the unplayed games that aren't favorites, and `mario` the games with mario in their name. The filter shows in the header as you wrote it.
 
 ## Screenshots
 
@@ -55,7 +55,7 @@ With favorites: the Homebrew collection filtered to the favorites.
 - Registers the `filter-presets.prev` and `filter-presets.next` actions, bound with `bind_button` on the first `tick`, once every plugin has loaded, and only to a button no other action has on the game list, as `action_info` lists them. `prev_button` and `next_button` are marked `button:` for them.
 - Registers `filter-presets.pick`, which lists the filters with `choose`, and its quick menu tile.
 - Keeps each folder's games from `list_ready` while no filter is on, other plugins' filters applied, and hides the rest of a filter's folder with its `filter` hook, in that folder only, so `is_filtered` says so too while it's on. Draws a header widget while a filter is on.
-- Reads favorites and tags with `set_has` (a game folder by its `.m3u` or `.cue` too), unplayed from `games.played` (or recents without it), Has save from `states.last`, and genre and players from the card index (`index_find`). It works the filter's games out again on `launcher.set_changed` and `launcher.index_ready`.
+- Reads favorites and tags with `set_has` (a game folder by its `.m3u` or `.cue` too), unplayed from `games.played` (or recents without it), Has save from `states.last`, genre, year and players from the card index (`index_find`), `played:` and `hours:` from the play history (`last_played` and `play_time`), and `added:` from the game's file times (`stat`). It works the filter's games out again on `launcher.set_changed` and `launcher.index_ready`.
 - Parses and matches its queries with search's own model, `plugins/search/search_model.c`, built into its `plugin.so` through its `plugin.mk`.
 - Reads and writes no files of its own.
 

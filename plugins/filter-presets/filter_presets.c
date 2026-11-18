@@ -5,9 +5,11 @@
 // The presets are Unplayed, Favorites, Has save, one for each genre the
 // folder's games have and one for each player count they reach (at
 // least 2, 3 and so on), then the user's own, up to FP_USER_MAX of them,
-// each written as a search query (fav:, tag:<name>, unplayed and
-// system:<name>, each negated by a leading '-', and words a name has to
-// have), parsed and matched by search's own model. A preset that keeps
+// each written as a search query (fav:, tag:<name>, unplayed,
+// system:<name>, genre:<name>, year:<year>, decade:<decade>,
+// played:<days>, hours:<hours> and added:<days>, each negated by a
+// leading '-', and words a name has to have), parsed and matched by
+// search's own model. A preset that keeps
 // none of the folder's games is stepped past, and past the last one the
 // folder shows all its games again. The filter-presets.pick action lists
 // them with how many games each keeps, from a Filter tile on the quick
@@ -16,8 +18,9 @@
 // Favorites and tags come from their entry sets (set_has), unplayed from
 // row-badges' games.played (without it, as search does, a game is played
 // when it's in recents), Has save from save-state-manager's states.last,
-// and genre and players from the card index's .info fields, so nothing is
-// read from the card here. A preset whose plugin is off keeps nothing.
+// genre, year and players from the card index's .info fields, and
+// played: and hours: from the play history, so nothing is read from the
+// card here but added:'s file times. A preset whose plugin is off keeps nothing.
 //
 // The folder's games are the ones its list showed with no preset on, as
 // list_ready saw them, so other plugins' filters, such as hidden's, still
@@ -36,6 +39,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "mosaic_plugin.h"
 #include "presets_model.h"
 
@@ -152,7 +156,8 @@ static void listReady(const MosaicList* list, const char* dir_path) {
 		int known = indexed(path, &e);
 		// a file is a game; a folder or pak only when the index says so
 		if (type != MOSAIC_ENTRY_ROM && (!known || e.kind != MOSAIC_INDEX_GAME)) continue;
-		if (FP_folderAdd(folder, path, host->entry_name(entry), type, known ? e.genre : NULL, known ? e.players : NULL) != 0) {
+		if (FP_folderAdd(folder, path, host->entry_name(entry), type, known ? e.genre : NULL, known ? e.players : NULL,
+				known ? e.year : NULL) != 0) {
 			say("out of memory listing a folder");
 			break;
 		}
@@ -224,7 +229,21 @@ static int hasSave(const SEGame* game, void* data) {
 		&& host->event_value(reply, "count", value, sizeof(value)) > 0 && atoi(value) > 0;
 }
 
-static const FPTests tests = { inSet, played, hasSave, roms_path, NULL };
+// played:'s last played time, hours:' seconds played and added:'s time
+// the file was put on the card: the later of its modified and changed
+// times, which on a FAT card is when it was copied there.
+static long long playValue(int kind, const char* path, void* data) {
+	(void)data;
+	if (kind == SE_FILTER_ADDED) {
+		struct stat st;
+		if (stat(path, &st) != 0) return 0;
+		return (long long)(st.st_mtime > st.st_ctime ? st.st_mtime : st.st_ctime);
+	}
+	if (!MOSAIC_HOST_HAS(host, play_time)) return 0;
+	return kind == SE_FILTER_PLAYED ? host->last_played(path) : host->play_time(path);
+}
+
+static const FPTests tests = { inSet, played, hasSave, roms_path, NULL, playValue, 0 };
 
 // Which of folder's games preset keeps, into matched, or -1.
 static int match(const FPFolder* folder, const FPPreset* preset, unsigned char* matched) {
