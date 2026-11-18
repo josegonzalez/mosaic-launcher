@@ -16,7 +16,8 @@
 #   JOBS=8 SHARD=2/3 scripts/docker-test.sh test-plugins
 #
 # TEST_JOBS (for test-all), JOBS, SHARD, CASES and PLUGIN_TEST_SECONDS are
-# passed through.
+# passed through. DOCKER_TEST_CPUS limits the container's
+# CPUs, such as 4 for a run like CI's.
 
 set -u
 
@@ -33,6 +34,7 @@ mkdir -p "$OUT"
 # shellcheck disable=SC2016 # the container's shell expands them
 "$RUNTIME" run --rm --privileged --init \
 	-v "$ROOT":/src:ro -v "$OUT":/out \
+	${DOCKER_TEST_CPUS:+--cpus "$DOCKER_TEST_CPUS"} \
 	-e TEST_JOBS -e JOBS -e SHARD -e CASES -e PLUGIN_TEST_SECONDS -e SMOKE_STACKS=1 \
 	"$IMAGE" sh -c '
 		rsync -a --exclude /build --exclude /tmp /src/ /work/

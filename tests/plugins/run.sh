@@ -396,6 +396,11 @@ mkdir -p "$WORK"
 if [ "$JOBS" -gt 1 ]; then
 	[ "$(uname -s)" = Linux ] || { echo "JOBS needs Linux's namespaces; run scripts/docker-test.sh on macOS" >&2; exit 2; }
 	mkdir -p "$CARD"
+	# the bundled plugins once, so the parts they share outside a case's
+	# folder (such as romm's BearSSL in build/bearssl) are built before
+	# workers build those plugins at once
+	make -s -j"$JOBS" -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/bundled" CC="$CC" >"$WORK/bundled.log" 2>"$WORK/bundled.err" \
+		|| { cat "$WORK/bundled.err" >&2; fail "building the bundled plugins"; }
 	k=1
 	while [ "$k" -le "$JOBS" ]; do
 		mine=$(printf '%s\n' "$run_cases" | pick "$k" "$JOBS" | tr '\n' ' ')
