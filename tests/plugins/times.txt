@@ -48,7 +48,9 @@
 480-video-previews 18
 490-stay-awake 3
 500-plugins-page 48
-510-screens 168
+510-screens 79
+511-screens-home 45
+512-screens-switcher 91
 520-home-dashboard 14
 530-screenshot-viewer 12
 540-tags 5
