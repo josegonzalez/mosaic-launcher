@@ -152,9 +152,10 @@ test-profiles: desktop plugins-desktop
 # Everything CI checks, on Linux with a display (scripts/docker-test.sh runs
 # it in CI's image on any host): lint and the unit tests, then smoke and the
 # profiles on the fake card beside the plugin cases in TEST_JOBS workers,
-# each on a card of its own.
+# each on a card of its own: one fewer than the CPUs, as the cases that
+# count frames or time audio miss under full load.
 NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
-TEST_JOBS ?= $(NPROC)
+TEST_JOBS ?= $(shell [ $(NPROC) -gt 1 ] && echo $$(($(NPROC) - 1)) || echo 1)
 test-all:
 	$(MAKE) lint
 	$(MAKE) -j$(NPROC) test

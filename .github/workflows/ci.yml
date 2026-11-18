@@ -125,7 +125,11 @@ jobs:
           fi
         env:
           SHARD: ${{ matrix.shard }}/3
-          JOBS: 4
+          # 3 of the runner's 4 CPUs, as with 4 the cases that count frames
+          # or time audio miss under the load; a start that's ready stops
+          # waiting, so the longer wait only slows one that fails
+          JOBS: 3
+          PLUGIN_TEST_SECONDS: 20
           SMOKE_STACKS: 1
 
       - name: Times

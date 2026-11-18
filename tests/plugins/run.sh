@@ -81,9 +81,9 @@
 #
 #   tests/plugins/run.sh
 #   SHARD=2/3 tests/plugins/run.sh
-#   JOBS=4 SHARD=2/3 tests/plugins/run.sh
+#   JOBS=3 SHARD=2/3 tests/plugins/run.sh
 #   CASES="010-hello 940-jump-letter" tests/plugins/run.sh
-#   LIST=1 JOBS=4 SHARD=2/3 tests/plugins/run.sh   what each worker would run
+#   LIST=1 JOBS=3 SHARD=2/3 tests/plugins/run.sh   what each worker would run
 
 set -u
 
