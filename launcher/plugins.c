@@ -3471,6 +3471,16 @@ static int hostEntrySection(const MosaicEntry* entry, const char* dir_path, char
 	return found;
 }
 
+int Plugins_sectionsAny(void) {
+	int any = 0;
+	EACH_PLUGIN_WITH(section_key) any = 1;
+	return any;
+}
+
+int Plugins_entrySection(const Entry* entry, const char* dir_path, char* out, size_t size) {
+	return hostEntrySection((const MosaicEntry*)entry, dir_path, out, size) == 1;
+}
+
 // The card index with plugins' dir_entries rows: each folder in it with
 // games is listed to the plugins as the game list would list it, from
 // what the index has, and each row they add that isn't on the card yet

@@ -277,19 +277,34 @@ void Listing_markDuplicates(Array* entries) {
 	}
 }
 
-// One letter group per run of entries sharing a first letter, for L1/R1.
+// One letter group per run of entries sharing a first letter, for L1/R1,
+// or per run sharing a section where a plugin's section_key gives one,
+// as a plugin that orders the list by year gives years.
 void Listing_buildIndex(Directory* self) {
+	int sections = Plugins_sectionsAny();
 	int alpha = -1;
 	int index = 0;
+	char key[256], prior[256];
+	prior[0] = '\0';
 	for (int i = 0; i < self->entries->count; i++) {
 		Entry* entry = self->entries->items[i];
-		int a = getIndexChar(entry->name);
-		if (a != alpha) {
-			index = self->alphas->count;
-			IntArray_push(self->alphas, i);
+		int changed;
+		if (sections && Plugins_entrySection(entry, self->path, key, sizeof(key))) {
+			changed = strcmp(key, prior) != 0;
+			alpha = -2; // no letter's
+		}
+		else {
+			key[0] = '\0';
+			int a = getIndexChar(entry->name);
+			changed = a != alpha || prior[0];
 			alpha = a;
 		}
+		if (changed) {
+			index = self->alphas->count;
+			IntArray_push(self->alphas, i);
+		}
 		entry->alpha = index;
+		strcpy(prior, key);
 	}
 }
 

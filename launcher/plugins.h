@@ -93,6 +93,12 @@ void Plugins_sort(Array* entries, const char* dir_path);
 // if any name changed.
 int Plugins_listReady(Array* entries, const char* dir_path);
 
+// 1 when a plugin has a section_key, so a list's letter index asks them.
+int Plugins_sectionsAny(void);
+// The entry's section from plugins' section_key, as entry_section gives
+// it: 1 with the key in out, or 0 with out empty when none answers.
+int Plugins_entrySection(const Entry* entry, const char* dir_path, char* out, size_t size);
+
 // Asks plugins' hide_name about each entry: one byte per entry, 1 where
 // one hid its name, or NULL when none did. The caller frees it.
 unsigned char* Plugins_hideNames(Array* entries, const char* dir_path);

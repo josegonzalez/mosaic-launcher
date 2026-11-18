@@ -69,6 +69,14 @@ void Plugins_sort(Array* entries, const char* dir_path) {
 int Plugins_listReady(Array* entries, const char* dir_path) {
 	return stub_list_ready ? stub_list_ready(entries, dir_path) : 0;
 }
+// A test sets this to stand in for plugins' section_key.
+int (*stub_section_key)(const MosaicEntry* entry, const char* dir_path, char* out, size_t size) = NULL;
+int Plugins_sectionsAny(void) { return stub_section_key != NULL; }
+// entry is an Entry, which this file doesn't see
+int Plugins_entrySection(const void* entry, const char* dir_path, char* out, size_t size) {
+	out[0] = '\0';
+	return stub_section_key && stub_section_key((const MosaicEntry*)entry, dir_path, out, size) && out[0];
+}
 // A test sets this to stand in for plugins' hide_name.
 ListHideName stub_hide_name = NULL;
 unsigned char* Plugins_hideNames(Array* entries, const char* dir_path) {

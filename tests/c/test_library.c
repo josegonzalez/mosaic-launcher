@@ -821,6 +821,49 @@ static void test_plugin_sort_runs_after_names(void) {
 	Directory_free(dir);
 }
 
+// a section by the last word of a name, such as a year, and none for a
+// name with one word
+static int lastWordSection(const MosaicEntry* entry, const char* dir_path, char* out, size_t size) {
+	(void)dir_path;
+	const char* space = strrchr(((const Entry*)entry)->name, ' ');
+	if (!space) return 0;
+	snprintf(out, size, "%s", space + 1);
+	return 1;
+}
+
+static void test_letter_index_follows_plugin_sections(void) {
+	resetCard();
+	addEmu("GB");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Alpha 1991.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Avenger 1991.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Bravo 1993.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Banana.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Bongo.gb", "");
+	writeFile(ROMS_PATH "/Game Boy (GB)/Cherry.gb", "");
+
+	// 1991, 1993, then the letters B and C for the names with no section
+	stub_section_key = lastWordSection;
+	Directory* dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	stub_section_key = NULL;
+	CHECK_STR(names(dir->entries), "Alpha 1991,Avenger 1991,Banana,Bongo,Bravo 1993,Cherry");
+	// in name order the sections run 1991, B, 1993, C
+	CHECK(dir->alphas->count == 4);
+	if (dir->entries->count == 6 && dir->alphas->count == 4) {
+		CHECK(at(dir, 1)->alpha == 0);
+		CHECK(at(dir, 3)->alpha == 1);
+		CHECK(at(dir, 4)->alpha == 2);
+		CHECK(at(dir, 5)->alpha == 3);
+		CHECK(dir->alphas->items[1] == 2);
+		CHECK(dir->alphas->items[2] == 4);
+	}
+	Directory_free(dir);
+
+	// without a plugin's sections, letters as stock: A, B, C
+	dir = Directory_new(ROMS_PATH "/Game Boy (GB)", 0);
+	CHECK(dir->alphas->count == 3);
+	Directory_free(dir);
+}
+
 static void test_plugin_sort_reorders_collections(void) {
 	resetCard();
 	writeFile(ROMS_PATH "/Game Boy (GB)/Alleyway.gb", "");
@@ -1273,6 +1316,7 @@ int main(void) {
 	test_reload_follows_the_selected_entry();
 	test_reload_keeps_the_selection_in_view();
 	test_sort_chain_first_opinion_wins();
+	test_letter_index_follows_plugin_sections();
 	test_plugin_sort_runs_after_names();
 	test_plugin_sort_reorders_collections();
 	test_list_ready_names_are_drawn_and_indexed();

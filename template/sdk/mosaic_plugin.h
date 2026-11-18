@@ -2300,8 +2300,10 @@ typedef struct MosaicPlugin {
 
 	// An entry's section in a list this plugin orders with sort_compare,
 	// such as its year for a sort by year, so jumping through the list by
-	// section stops at each year in place of each letter. Asked through
-	// host->entry_section, with the list's folder as sort_compare gets it:
+	// section stops at each year in place of each letter, L1 and R1's
+	// letter index included. Asked through host->entry_section, and by the
+	// launcher for each entry as it builds a list's letter index, with the
+	// list's folder as sort_compare gets it:
 	// write a short key, on one line, and return 1, or return 0 for a list
 	// it doesn't order. Entries the sort keeps together share a key. The
 	// first plugin in load order to answer wins.

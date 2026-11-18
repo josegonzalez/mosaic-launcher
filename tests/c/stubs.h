@@ -14,6 +14,7 @@ extern int stub_root_with_entries;
 extern void (*stub_root_entries)(Array* root);
 extern Array* (*stub_quick_items)(void);
 extern ListSortCompare stub_sort_compare;
+extern int (*stub_section_key)(const MosaicEntry* entry, const char* dir_path, char* out, size_t size);
 extern int (*stub_list_ready)(Array* entries, const char* dir_path);
 extern ListHideName stub_hide_name;
 extern void (*stub_dir_entries)(Array* entries, const char* dir_path);
