@@ -47,13 +47,14 @@ jobs:
       contents: read
       packages: read
     # privileged, so gdb can attach to a launcher that doesn't stop on
-    # SIGTERM to take its stacks (SMOKE_STACKS)
+    # SIGTERM to take its stacks (SMOKE_STACKS), with an init that reaps
+    # orphans, as the tests check that what they stopped is gone
     container:
       image: ${{ needs.image.outputs.image }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-      options: --privileged
+      options: --privileged --init
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -85,7 +86,8 @@ jobs:
   # tests/plugins/times.txt, and each shard's cases across JOBS workers, each
   # with its own fake card (see tests/plugins/run.sh); the first shard also
   # runs smoke, beside its workers on the card they don't use. Privileged,
-  # for the workers' namespaces and gdb (SMOKE_STACKS)
+  # for the workers' namespaces and gdb (SMOKE_STACKS), with an init that
+  # reaps orphans
   desktop:
     needs: image
     runs-on: ubuntu-24.04
@@ -97,7 +99,7 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-      options: --privileged
+      options: --privileged --init
     strategy:
       fail-fast: false
       matrix:

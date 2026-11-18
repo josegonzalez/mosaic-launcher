@@ -421,6 +421,9 @@ if [ "$JOBS" -gt 1 ]; then
 else
 	for case_name in $run_cases; do
 		case_started=$(now_ms)
+		# where the cases write the shared settings and recents, which only a
+		# launch makes on a new card
+		mkdir -p "$(dirname "$RECENTS")"
 		# shellcheck source=/dev/null
 		. "$ROOT/tests/plugins/cases/$case_name.sh"
 		case_ms=$(($(now_ms) - case_started))

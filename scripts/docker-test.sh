@@ -3,7 +3,8 @@
 # Runs the tests in CI's image (docker/ci/Dockerfile), on any host with
 # Docker: by default `make test-all`, everything CI checks, or the make
 # targets given. The image is built here (tagged mosaic-launcher-ci) and
-# runs privileged, for the plugin test workers' namespaces and gdb.
+# runs privileged, for the plugin test workers' namespaces and gdb, with an
+# init that reaps orphans, as the tests check that what they stopped is gone.
 #
 # The checkout is copied into the container (without build/ and tmp/), so
 # the Linux build never mixes with the host's. Afterwards the logs and
@@ -30,7 +31,7 @@ mkdir -p "$OUT"
 
 [ $# -gt 0 ] || set -- test-all
 # shellcheck disable=SC2016 # the container's shell expands them
-"$RUNTIME" run --rm --privileged \
+"$RUNTIME" run --rm --privileged --init \
 	-v "$ROOT":/src:ro -v "$OUT":/out \
 	-e TEST_JOBS -e JOBS -e SHARD -e CASES -e PLUGIN_TEST_SECONDS -e SMOKE_STACKS=1 \
 	"$IMAGE" sh -c '
