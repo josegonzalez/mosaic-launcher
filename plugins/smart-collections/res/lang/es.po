@@ -24,6 +24,24 @@ msgstr "3"
 msgid "5"
 msgstr "5"
 
+msgid "7"
+msgstr "7"
+
+msgid "14"
+msgstr "14"
+
+msgid "20"
+msgstr "20"
+
+msgid "30"
+msgstr "30"
+
+msgid "50"
+msgstr "50"
+
+msgid "90"
+msgstr "90"
+
 #, c-format
 msgid "Bring back %d dismissed collection?"
 msgid_plural "Bring back %d dismissed collections?"
@@ -76,8 +94,53 @@ msgid_plural "Saved %d games as %s"
 msgstr[0] "Se guardó %d juego como %s"
 msgstr[1] "Se guardaron %d juegos como %s"
 
-msgid "Sorts your games into franchise collections, such as Mario, Zelda and Sonic, without you building any lists."
-msgstr "Ordena tus juegos en colecciones por franquicia, como Mario, Zelda y Sonic, sin que tengas que crear listas."
+msgid "Sorts your games into collections without you building any lists: franchises such as Mario and Zelda, games never or recently played, genres, decades and rules of your own."
+msgstr "Ordena tus juegos en colecciones sin que tengas que crear listas: sagas como Mario y Zelda, juegos nunca o recién jugados, géneros, décadas y reglas propias."
 
 msgid "Tag name"
 msgstr "Nombre de la etiqueta"
+
+msgid "Never played"
+msgstr "Nunca jugados"
+
+msgid "Recently played"
+msgstr "Jugados hace poco"
+
+msgid "Recently played (days)"
+msgstr "Jugados hace poco (días)"
+
+msgid "Long played"
+msgstr "Muy jugados"
+
+msgid "Long played (hours)"
+msgstr "Muy jugados (horas)"
+
+msgid "Recently added"
+msgstr "Añadidos hace poco"
+
+msgid "Recently added (days)"
+msgstr "Añadidos hace poco (días)"
+
+msgid "By decade"
+msgstr "Por década"
+
+msgid "By genre"
+msgstr "Por género"
+
+#, c-format
+msgid "Played in the last %d day"
+msgid_plural "Played in the last %d days"
+msgstr[0] "Jugados en el último %d día"
+msgstr[1] "Jugados en los últimos %d días"
+
+#, c-format
+msgid "Over %d hour"
+msgid_plural "Over %d hours"
+msgstr[0] "Más de %d hora"
+msgstr[1] "Más de %d horas"
+
+#, c-format
+msgid "Added in the last %d day"
+msgid_plural "Added in the last %d days"
+msgstr[0] "Añadidos en el último %d día"
+msgstr[1] "Añadidos en los últimos %d días"

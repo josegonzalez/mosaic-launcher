@@ -24,7 +24,15 @@ msgid "10"
 msgstr ""
 
 #: plugin.txt
+msgid "14"
+msgstr ""
+
+#: plugin.txt
 msgid "2"
+msgstr ""
+
+#: plugin.txt
+msgid "20"
 msgstr ""
 
 #: plugin.txt
@@ -32,13 +40,36 @@ msgid "3"
 msgstr ""
 
 #: plugin.txt
+msgid "30"
+msgstr ""
+
+#: plugin.txt
 msgid "5"
+msgstr ""
+
+#: plugin.txt
+msgid "50"
+msgstr ""
+
+#: plugin.txt
+msgid "7"
+msgstr ""
+
+#: plugin.txt
+msgid "90"
 msgstr ""
 
 #: smart_collections.c
 #, c-format
 msgid "A tag named %s already exists"
 msgstr ""
+
+#: smart_collections.c
+#, c-format
+msgid "Added in the last %d day"
+msgid_plural "Added in the last %d days"
+msgstr[0] ""
+msgstr[1] ""
 
 #: smart_collections.c
 #, c-format
@@ -49,6 +80,14 @@ msgstr[1] ""
 
 #: plugin.txt
 msgid "Built-in franchises"
+msgstr ""
+
+#: plugin.txt
+msgid "By decade"
+msgstr ""
+
+#: plugin.txt
+msgid "By genre"
 msgstr ""
 
 #: smart_collections.c
@@ -74,7 +113,19 @@ msgid "Dismissed collections are back"
 msgstr ""
 
 #: plugin.txt
+msgid "Long played"
+msgstr ""
+
+#: plugin.txt
+msgid "Long played (hours)"
+msgstr ""
+
+#: plugin.txt
 msgid "More franchises"
+msgstr ""
+
+#: plugin.txt smart_collections.c
+msgid "Never played"
 msgstr ""
 
 #: smart_collections.c
@@ -82,7 +133,37 @@ msgid "Not a tag name"
 msgstr ""
 
 #: smart_collections.c
+#, c-format
+msgid "Over %d hour"
+msgid_plural "Over %d hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: smart_collections.c
+#, c-format
+msgid "Played in the last %d day"
+msgid_plural "Played in the last %d days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: smart_collections.c
 msgid "RESTORE"
+msgstr ""
+
+#: plugin.txt
+msgid "Recently added"
+msgstr ""
+
+#: plugin.txt
+msgid "Recently added (days)"
+msgstr ""
+
+#: plugin.txt
+msgid "Recently played"
+msgstr ""
+
+#: plugin.txt
+msgid "Recently played (days)"
 msgstr ""
 
 #: smart_collections.c
@@ -105,7 +186,7 @@ msgid "Smart Collections"
 msgstr ""
 
 #: plugin.txt
-msgid "Sorts your games into franchise collections, such as Mario, Zelda and Sonic, without you building any lists."
+msgid "Sorts your games into collections without you building any lists: franchises such as Mario and Zelda, games never or recently played, genres, decades and rules of your own."
 msgstr ""
 
 #: smart_collections.c

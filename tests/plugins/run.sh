@@ -42,8 +42,9 @@
 # two that provide their own, one that reads the keys the bundled theme
 # plus passes on with its theme, one that opens a toast, a dialog and the
 # PIN keyboard for the bundled UI sounds plugin to play sounds for, one
-# that reads the bundled blue light tint back off the screen, and one
-# that crashes
+# that reads the bundled blue light tint back off the screen, one that
+# opens and dismisses the bundled smart collections' rule collections,
+# and one that crashes
 # during startup. A preloaded library,
 # presser, drives the Launcher pak's Plugins page through the bundled play
 # time limit's protected settings and scrolls a long one, reads back those
