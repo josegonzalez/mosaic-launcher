@@ -1,0 +1,160 @@
+# The sort-modes plugin's name, description, setting labels and choice
+# options, from its plugin.txt, and the fixed text its code hands the
+# launcher. Written by make pot.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: sort-modes\n"
+"Report-Msgid-Bugs-To: https://github.com/josegonzalez/mosaic-launcher/issues\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: sort_model.c
+msgid "100h+"
+msgstr ""
+
+#: sort_model.c
+msgid "10h+"
+msgstr ""
+
+#: sort_model.c
+msgid "1h+"
+msgstr ""
+
+#: plugin.txt
+msgid "L2"
+msgstr ""
+
+#: sort_model.c
+msgid "Last 30 days"
+msgstr ""
+
+#: sort_model.c
+msgid "Last 7 days"
+msgstr ""
+
+#: sort_model.c
+msgid "Last played"
+msgstr ""
+
+#: sort_model.c
+msgid "Most played"
+msgstr ""
+
+#: sort_model.c
+msgid "Name"
+msgstr ""
+
+#: sort_model.c
+msgid "No date"
+msgstr ""
+
+#: sort_model.c
+msgid "No publisher"
+msgstr ""
+
+#: sort_model.c
+msgid "No year"
+msgstr ""
+
+#: sort_model.c
+msgid "Not played"
+msgstr ""
+
+#: sort_model.c
+msgid "Publisher"
+msgstr ""
+
+#: plugin.txt
+msgid "R2"
+msgstr ""
+
+#: sort_model.c
+msgid "Recently added"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: sort_modes.c
+msgid "SORT"
+msgstr ""
+
+#: sort_modes.c
+msgid "Sort"
+msgstr ""
+
+#: plugin.txt
+msgid "Sort button"
+msgstr ""
+
+#: plugin.txt sort_modes.c
+msgid "Sort by"
+msgstr ""
+
+#: plugin.txt
+msgid "Sort modes"
+msgstr ""
+
+#: plugin.txt
+msgid "Sort tile on the quick menu"
+msgstr ""
+
+#: sort_modes.c
+#, c-format
+msgid "Sort: %s"
+msgstr ""
+
+#: plugin.txt
+msgid "Sorts systems and collections by name, most played, last played, year, publisher or recently added, from a Sort tile on the quick menu. Games with nothing to sort by go last, by name."
+msgstr ""
+
+#: sort_model.c
+msgid "Today"
+msgstr ""
+
+#: sort_model.c
+msgid "Under 1h"
+msgstr ""
+
+#: plugin.txt
+msgid "Y"
+msgstr ""
+
+#: sort_model.c
+msgid "Year"
+msgstr ""
+
+#: plugin.txt
+msgid "last played"
+msgstr ""
+
+#: plugin.txt
+msgid "most played"
+msgstr ""
+
+#: plugin.txt
+msgid "name"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
+msgstr ""
+
+#: plugin.txt
+msgid "publisher"
+msgstr ""
+
+#: plugin.txt
+msgid "recently added"
+msgstr ""
+
+#: plugin.txt
+msgid "year"
+msgstr ""

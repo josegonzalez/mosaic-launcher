@@ -1,0 +1,14 @@
+id=sort-modes
+name=Sort modes
+api=1
+category=Library
+summary=Sorts every game list by name, most played, last played, year, publisher or recently added.
+description=Sorts systems and collections by name, most played, last played, year, publisher or recently added, from a Sort tile on the quick menu. Games with nothing to sort by go last, by name.
+# after favorites' pins and collections-plus' file order, which keep their place
+optional=favorites,collections-plus
+# the order, kept when the tile or button changes it
+setting.mode=choice|Sort by|name|name,most played,last played,year,publisher,recently added
+# steps to the next order; taken only when no other action has the button on the game list
+setting.button=choice|Sort button|none|none,Y,L2,R2,SELECT|button:sort-modes.next
+# a Sort tile on the quick menu that lists the orders
+setting.tile=toggle|Sort tile on the quick menu|on

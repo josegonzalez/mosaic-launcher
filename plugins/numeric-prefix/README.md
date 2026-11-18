@@ -8,6 +8,7 @@ Names starting with `1) `, `01. ` or `[1] ` sort by that number, and the number 
 
 - On the first screen only consoles move, staying between Recently Played and Collections. A first screen another plugin replaced, such as [`all-games`](../all-games/README.md)' or [`focus-mode`](../focus-mode/README.md)'s, keeps its owner's order.
 - Recently Played and [collections](../../docs/glossary.md#collection) keep their own order.
+- With [`sort-modes`](../sort-modes/README.md) on an order other than name, its order decides for games, and the number only orders folders. The number still comes off the names.
 
 ## Turn it on
 
@@ -28,6 +29,7 @@ Systems named `1)`, `2)` and `10)` in that order, with the default settings.
 ## For plugin authors
 
 - Uses the `display_name`, `sort_compare` and `list_ready` hooks.
+- Lists `optional=sort-modes`, so it loads after sort-modes, whose `sort_compare` comes first.
 - Has no slot, service or file of its own.
 
 ## Credits

@@ -78,6 +78,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [path-repair](../plugins/path-repair/README.md) - Keeps recents and collections pointing at games after you rename them.
 - [search](../plugins/search/README.md) - Finds games from every system by typing part of a name.
 - [smart-collections](../plugins/smart-collections/README.md) - Sorts your games into collections by franchise, play history, genre and decade.
+- [sort-modes](../plugins/sort-modes/README.md) - Sorts every game list by name, most played, last played, year, publisher or recently added.
 - [tags](../plugins/tags/README.md) - Lets you put your own tags on games, shown as folders.
 - [title-disambiguation](../plugins/title-disambiguation/README.md) - Adds what tells two same-named games apart, only when needed.
 

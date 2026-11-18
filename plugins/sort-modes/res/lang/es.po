@@ -1,0 +1,118 @@
+# Spanish for the sort-modes plugin, from po/sort-modes.pot. Not reviewed by a native
+# speaker.
+msgid ""
+msgstr ""
+"Project-Id-Version: mosaic-launcher\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "100h+"
+msgstr "100h+"
+
+msgid "10h+"
+msgstr "10h+"
+
+msgid "1h+"
+msgstr "1h+"
+
+msgid "L2"
+msgstr "L2"
+
+msgid "Last 30 days"
+msgstr "Últimos 30 días"
+
+msgid "Last 7 days"
+msgstr "Últimos 7 días"
+
+msgid "Last played"
+msgstr "Último jugado"
+
+msgid "Most played"
+msgstr "Más jugados"
+
+msgid "Name"
+msgstr "Nombre"
+
+msgid "No date"
+msgstr "Sin fecha"
+
+msgid "No publisher"
+msgstr "Sin editor"
+
+msgid "No year"
+msgstr "Sin año"
+
+msgid "Not played"
+msgstr "Sin jugar"
+
+msgid "Publisher"
+msgstr "Editor"
+
+msgid "R2"
+msgstr "R2"
+
+msgid "Recently added"
+msgstr "Añadidos"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "SORT"
+msgstr "ORDEN"
+
+msgid "Sort"
+msgstr "Orden"
+
+msgid "Sort button"
+msgstr "Botón de orden"
+
+msgid "Sort by"
+msgstr "Ordenar por"
+
+msgid "Sort modes"
+msgstr "Modos de orden"
+
+msgid "Sort tile on the quick menu"
+msgstr "Mosaico Orden en el menú rápido"
+
+msgid "Sort: %s"
+msgstr "Orden: %s"
+
+msgid "Sorts systems and collections by name, most played, last played, year, publisher or recently added, from a Sort tile on the quick menu. Games with nothing to sort by go last, by name."
+msgstr "Ordena los sistemas y las colecciones por nombre, más jugados, último jugado, año, editor o añadidos recientemente, desde un mosaico Orden en el menú rápido. Los juegos sin nada por lo que ordenar van al final, por nombre."
+
+msgid "Today"
+msgstr "Hoy"
+
+msgid "Under 1h"
+msgstr "Menos de 1h"
+
+msgid "Y"
+msgstr "Y"
+
+msgid "Year"
+msgstr "Año"
+
+msgid "last played"
+msgstr "último jugado"
+
+msgid "most played"
+msgstr "más jugados"
+
+msgid "name"
+msgstr "nombre"
+
+msgid "none"
+msgstr "ninguno"
+
+msgid "publisher"
+msgstr "editor"
+
+msgid "recently added"
+msgstr "añadidos recientemente"
+
+msgid "year"
+msgstr "año"

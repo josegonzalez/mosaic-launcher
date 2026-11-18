@@ -4,5 +4,7 @@ api=1
 category=Library
 summary=Sorts names that start with a number by that number.
 description=Sorts names that start with a number by that number, so 2 comes before 10.
+# after sort-modes, whose orders put games by their values first
+optional=sort-modes
 # leave the number off names like "1) Foo" while sorting by it
 setting.hide=toggle|Hide the number|on
