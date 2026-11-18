@@ -136,7 +136,9 @@ grep -qF "plugins: bug-report provides report.crash, so the launcher makes a bug
 	|| fail "the launcher didn't say why it made a crash report"
 [ -f "$STATE/plugins_paused" ] || fail "plugins weren't paused"
 zip=$(br_newest)
-[ -n "$zip" ] && [ "$zip" != "$before" ] || fail "no report after the crash"
+if [ -z "$zip" ] || [ "$zip" = "$before" ]; then
+	fail "no report after the crash"
+fi
 out="$WORK/bug-report-crash.txt"
 br_unzip "$zip" "$out" || fail "the crash report isn't a zip python can read"
 grep -qF "by the crash guard, which paused plugins after a crash" "$out" || fail "the crash report doesn't say where it came from"
