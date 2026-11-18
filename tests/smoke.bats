@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
 setup() {
 	ROOT="$BATS_TEST_TMPDIR/repo"
 	mkdir -p "$ROOT/scripts" "$ROOT/build/desktop" "$ROOT/vendor/NextUI/workspace/desktop"
-	cp "$REPO_ROOT/scripts/desktop-smoke.sh" "$ROOT/scripts/"
+	cp "$REPO_ROOT/scripts/desktop-smoke.sh" "$REPO_ROOT/scripts/timing.sh" "$ROOT/scripts/"
 	printf '#!/bin/sh\n' >"$ROOT/vendor/NextUI/workspace/desktop/prepare_fake_sd_root.sh"
 	LOG="$BATS_TEST_TMPDIR/smoke.log"
 }
@@ -55,6 +55,21 @@ smoke() {
 	[ "$status" -eq 0 ]
 	[ "$output" = "ready, stopped it; log in $LOG" ]
 	[ $(($(date +%s) - start)) -lt 10 ]
+}
+
+@test "with SMOKE_TIMES each start appends its times and how it ended" {
+	fake_launcher 'trap "exit 0" TERM; sleep 0.3; echo one; while :; do sleep 0.1; done'
+	times="$BATS_TEST_TMPDIR/starts.tsv"
+	SMOKE_TIMES="$times" SMOKE_CASE=010-x SMOKE_UNTIL=one SMOKE_SETTLE=0 run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30
+	[ "$status" -eq 0 ]
+	fake_launcher 'exit 3'
+	SMOKE_TIMES="$times" run "$ROOT/scripts/desktop-smoke.sh" "$LOG" 30
+	[ "$(wc -l <"$times" | tr -d ' ')" -eq 2 ]
+	# case, log, all, card, until ready, settle, stop, how it ended
+	IFS="$(printf '\t')" read -r name log all card up settle stop how <"$times"
+	[ "$name" = 010-x ] && [ "$log" = smoke ] && [ "$how" = ready ]
+	[ "$up" -ge 200 ] && [ "$all" -ge $((card + up + settle + stop)) ]
+	[ "$(sed -n 2p "$times" | cut -f1,8)" = "$(printf -- '-\texited')" ]
 }
 
 @test "with SMOKE_UNTIL_GONE it also waits for the file to go" {

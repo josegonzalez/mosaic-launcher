@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled layout-hero-rail draws peeker's folder as a rail of cards
 # under the selected game's hero: Apple's thumbnail from .media fills its

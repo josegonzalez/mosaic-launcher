@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled playtime-limit refuses a game once today's play, from a
 # fixture game_logs.sqlite with 40 minutes played an hour ago, reaches the

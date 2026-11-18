@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled jump-letter, with seeker pressing the keys: the launcher
 # starts on Delta in a test system (the last path). Holding SELECT opens

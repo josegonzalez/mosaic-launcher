@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the bundled gamification, over a fixture game_logs.sqlite with 40 minutes
 # of Tetris today and 10 minutes on each of the two days before: screener

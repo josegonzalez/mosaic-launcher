@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled layout-grid draws peeker's folder as a grid: Apple's
 # thumbnail from .media fills its cell's art, scaled from 8x8, and banana

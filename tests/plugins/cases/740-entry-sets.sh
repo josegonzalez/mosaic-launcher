@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # entry sets: the bundled favorites and hidden plugins register theirs, and
 # setter reads them through the host: set_has and set_list see the

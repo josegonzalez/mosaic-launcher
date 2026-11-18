@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled blue-light, read back by warmer: its toggle action tints the
 # game list, the quick menu, a plugin screen and a MOSAIC_SCREEN_FULL

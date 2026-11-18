@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # hider hides Apple's and Cherry's names, which have art, in its own
 # folder: the built-in list leaves those rows blank, the selected Apple

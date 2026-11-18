@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # capabilities: asker names hello and decliner in optional=, so although
 # plugins.txt lists it first it loads after them, and before adder. From

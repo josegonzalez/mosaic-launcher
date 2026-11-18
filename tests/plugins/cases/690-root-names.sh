@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # sayer owns the strings slot and translates Recently Played and the Game
 # Boy system: the root shows them translated, in stock's order, with their

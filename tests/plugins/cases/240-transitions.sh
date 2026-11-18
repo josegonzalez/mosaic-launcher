@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled transitions plugin draws wiper's push from Wiper's red
 # background into Inner's blue one, and the pop back out when wiper

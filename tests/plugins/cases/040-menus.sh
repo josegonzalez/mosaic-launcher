@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # two actions share Y, plugin tiles join the quick menu and Games is hidden,
 # a replaced root takes other plugins' entries only when its owner asks,

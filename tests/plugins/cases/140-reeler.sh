@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # reeler shows a surface in place of the selected game's art under the
 # bundled layout-grid, which draws it in the selected tile, and

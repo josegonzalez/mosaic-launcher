@@ -1,6 +1,12 @@
 # shellcheck shell=sh
-# shard: 2
-# uses the presser 500-plugins-page builds, so it shares its shard
+
+PRESSER="$WORK/presser.so"
+if [ "$(uname -s)" = Darwin ]; then
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror -undefined dynamic_lookup "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" \
+		|| fail "building presser"
+else
+	"$CC" -shared -fPIC -std=gnu99 -Wall -Werror "$ROOT/tests/plugins/presser/presser.c" -o "$PRESSER" -ldl || fail "building presser"
+fi
 
 # plugin screens: screener's Y action opens screener.main over the game
 # list, sliding in as a push whose old frame has layerer's overlay over the

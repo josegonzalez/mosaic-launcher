@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # action paths: reader runs pather.show, which takes an entry's path, on a
 # game with run_action, and pather.plain, which doesn't, gets no path. With

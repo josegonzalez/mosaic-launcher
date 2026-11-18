@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the bundled localization owns the strings slot: off by default, so the
 # game list draws OPEN; with language=es its bundled Spanish pack draws

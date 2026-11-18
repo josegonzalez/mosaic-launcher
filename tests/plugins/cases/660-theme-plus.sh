@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled theme-plus owns the theme slot: a bundled theme, a theme
 # folder on the card with its own font, fallback font, a palette and sizes

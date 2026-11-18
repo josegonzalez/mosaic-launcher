@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # binder and racer both want FN3: the first to bind it keeps it, the user's
 # own choice in Settings wins over both, and binder's binding is released

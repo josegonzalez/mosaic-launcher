@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # drawer tries every drawing call on surfaces of its own, reading pixels
 # back, and has bad arguments, a FIFO, a folder, a file that isn't an

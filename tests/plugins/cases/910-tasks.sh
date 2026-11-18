@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled tasks plugin, with seeker: first in a test system, where
 # seeker runs the game task on its game, whose name has spaces and quotes,

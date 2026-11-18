@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled activity-stats, over a fixture game_logs.sqlite made with
 # gametimectl's schema: screener runs its action, steps from the week's

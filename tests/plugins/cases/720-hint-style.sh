@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # hinter owns the theme slot and draws single buttons: hint_style is the
 # user's Settings style until a theme sets one, which then wins, and

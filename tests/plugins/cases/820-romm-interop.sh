@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # romm with save-state-manager, gamification and home-dashboard, against
 # tests/plugins/romm-server, the stand-in RomM. A download from the RomM

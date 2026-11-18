@@ -1,6 +1,6 @@
 # shellcheck shell=sh
-# shard: 1
-# reads 290-tracker's log, so it shares its shard
+# after: 290-tracker
+# reads its log
 
 # achiever reads local RetroAchievements progress from fixture .ra files
 # in minarch's format: Hit has a cached set of 3 (unlocks 1, and 2 in

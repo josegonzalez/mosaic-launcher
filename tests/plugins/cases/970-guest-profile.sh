@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled guest-profile, with favorites and tags, seeker running its
 # actions: switching to the guest parks the owner's recents, play history

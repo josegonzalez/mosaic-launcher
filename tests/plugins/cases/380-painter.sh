@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # painter generates art with art_surface: art_get hands it out read-only,
 # off the plugin's budget, asked for once; a real file wins and art_find

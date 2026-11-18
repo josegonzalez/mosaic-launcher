@@ -22,7 +22,7 @@ Rules for agents working on mosaic-launcher.
   - its `plugin.txt` has a `category=` (one of the groups `scripts/plugin-table.sh` lists) a one-sentence plain `summary=` and a `description=` of a sentence or two for someone new to CFW, at most 255 bytes, which first-run shows; run `./scripts/plugin-table.sh` to regenerate the index in docs/plugins.md, which `make lint` checks;
   - its page is `plugins/<name>/README.md`, starting with a `# <name>` heading and written for someone new to CFW: what it does, how to turn it on and use it, a settings table that matches `plugin.txt` (name, choices, default, what it does), a "For plugin authors" section (provides, slots, services, files it reads or writes, requires and conflicts) and credits to the forks the idea came from. Link terms such as pak, slot and quick menu to docs/glossary.md rather than explaining them again;
   - its unit test is `tests/c/test_<name>.c`, found by the makefile's wildcard, with a `tests/c/<name>.mk` holding its rule when it needs more than its own source and the SDK header;
-  - its desktop cases go in `tests/plugins/cases/<number>-<name>.sh`, after the last case number and before `990-crash.sh`, with a `# shard: <1-3>` line picking the CI shard with the least time (each case prints its time in the CI log);
+  - its desktop cases go in `tests/plugins/cases/<number>-<name>.sh`, after the last case number and before `990-crash.sh`. They need no shard line: CI balances the shards by `tests/plugins/times.txt`. A case should set up what it needs itself; one that must use what an earlier case left gets an `# after: <case>` line;
   - a plugin with visible UI gets screenshots: its shots in `tests/screenshots/shots/<name>.sh`, taken with `make screenshots SHOTS=<name>` into `plugins/<name>/docs/`, each embedded in its README with a caption (see "Screenshots" in docs/DEVELOPMENT.md).
 - SDK changes:
   - fields are only ever added at the end of `MosaicHost` and `MosaicPlugin`;
@@ -37,7 +37,8 @@ Rules for agents working on mosaic-launcher.
 - CI runs `make smoke`, `make test-plugins` and `make test-profiles` on every PR, so they don't run locally before a PR. A PR is ready once CI passes. When it fails, the job's `desktop-logs-<shard>` artifact has the logs; fix it with a new commit.
 - Device builds: run `make devices` (Docker) only when you changed launcher or plugin C code that might not build for aarch64, and say whether you did.
 - When main moves, rerun the full tier only if the new commits touched files your change depends on.
-- `make test-plugins`, `make smoke`, `make test-profiles` and `tests/plugins/run.sh` all use the one shared fake card at `/var/tmp/nextui/sdcard`, so run them locally only to look into a CI failure, and never two at once.
+- `make test-plugins`, `make smoke`, `make test-profiles` and `tests/plugins/run.sh` on the host all use the one shared fake card at `/var/tmp/nextui/sdcard`, so run them there only to look into a CI failure, and never two at once. `scripts/docker-test.sh` runs them in CI's image instead, with a card per worker, and doesn't touch the host's card; `CASES="<case> ..."` runs just the cases you name.
+- Docker runs (`scripts/docker-test.sh`, `make devices`, any image build) are heavy: they slow every other test on the machine, which can make a plugin case miss its wait and fail. Don't run one beside another heavy run.
 - There are no device tests. Don't ssh to a device.
 
 ## Git and PRs

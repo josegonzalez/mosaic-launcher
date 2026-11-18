@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # gridder owns the layout slot and draws the game list as a grid on the
 # screen it's lent, inside the area above the hints; its input moves the

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled save-state-manager: the launcher starts on Alpha (the last
 # path), where screener runs the game action, steps to slot 3, opens its

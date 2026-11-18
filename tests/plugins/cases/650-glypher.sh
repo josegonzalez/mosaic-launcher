@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # glypher owns the strings and theme slots and supplies fallback fonts
 # (glyphs.ttf has boxes for ASCII and for Hangul, which the stock font

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # badger decorates the built-in list's rows and adds a header widget beside
 # the status pill; its drawing lands in the row or widget and is clipped to

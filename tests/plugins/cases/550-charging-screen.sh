@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled charging-screen: on desktop, with no battery, it loads and
 # does nothing. With the test battery charging and idle=1, the launcher

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # events: herald publishes from init and from a thread of its own, and
 # listener hears them, as itself, on the launcher's thread. A name outside

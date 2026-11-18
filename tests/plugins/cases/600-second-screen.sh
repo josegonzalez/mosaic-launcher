@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the bundled second-screen shows the selection in a second window, drawn
 # by its own second-screen-display program: clipper opens a folder and

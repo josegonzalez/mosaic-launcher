@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 # leaves crasher in and plugins paused, so it runs last
 
 # a crash while starting pauses plugins on the next start

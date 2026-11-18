@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # backer owns the background slot: its background_render gets a lent
 # screen-sized surface over stock's background, which it draws over, with

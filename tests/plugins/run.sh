@@ -58,22 +58,47 @@
 # makes the run slower.
 #
 # The cases are in tests/plugins/cases/, run in name order with the helpers
-# here. With SHARD=<i>/<n>, only the cases whose "# shard:" line is i (or
-# all, or i plus a multiple of n) run, so CI can split them across jobs;
-# each prints how long it took.
+# here; each prints how long it took. A case with a "# shard: all" line runs
+# everywhere: in every shard and every worker. A case with an
+# "# after: <case>" line uses what that case left (a log, a build) and
+# always runs with it, after it; CASES adds the cases they're after.
+#
+# With SHARD=<i>/<n>, only shard i of n runs, so CI can split the cases
+# across jobs. The shards are balanced by each case's seconds in
+# tests/plugins/times.txt (a case that isn't there counts as the median),
+# biggest first into the shard with the least time so far.
+#
+# With JOBS=<n> (Linux only), the cases are split the same way across n
+# workers that run at once, each in its own mount and network namespace
+# with its own fake card mounted at the card's path, its own /tmp and
+# loopback, and its own virtual display. Its logs are in
+# build/tests/plugins/w<k>, and its output is printed when it's done.
+#
+# Every run writes build/tests/plugins/cases.tsv (each case and its
+# milliseconds) and starts.tsv (each launcher start, from
+# desktop-smoke.sh's SMOKE_TIMES), and prints the slowest of them;
+# scripts/test-times.sh summarises them and updates times.txt.
 #
 #   tests/plugins/run.sh
 #   SHARD=2/3 tests/plugins/run.sh
+#   JOBS=4 SHARD=2/3 tests/plugins/run.sh
+#   CASES="010-hello 940-jump-letter" tests/plugins/run.sh
+#   LIST=1 JOBS=4 SHARD=2/3 tests/plugins/run.sh   what each worker would run
 
 set -u
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORK="$ROOT/build/tests/plugins"
+# a worker's is under the run's, which it's given
+WORK="${PLUGIN_TEST_WORK:-$ROOT/build/tests/plugins}"
+# shellcheck source=scripts/timing.sh
+. "$ROOT/scripts/timing.sh"
 CARD=/var/tmp/nextui/sdcard
 STATE="$CARD/.userdata/desktop/launcher"
 ARCH="desktop-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)"
 CC="${CC:-cc}"
 WAIT="${PLUGIN_TEST_SECONDS:-10}"
+JOBS="${JOBS:-1}"
+TIMES_FILE="$ROOT/tests/plugins/times.txt"
 failures=0
 case_log=""
 
@@ -121,6 +146,7 @@ start_launcher() {
 	tries=0
 	while :; do
 		MOSAIC_LAUNCHER_PLUGIN_PATH="$WORK/plugins" SMOKE_UNTIL="$until" SMOKE_UNTIL_GONE="$STATE/loading" \
+			SMOKE_TIMES="$WORK/starts.tsv" SMOKE_CASE="$case_name" \
 			"$ROOT/scripts/desktop-smoke.sh" "$case_log" "$WAIT" >/dev/null 2>"$WORK/smoke.err"
 		status=$?
 		tries=$((tries + 1))
@@ -213,45 +239,200 @@ drew() {
 # seen: the screens screener says it's on in $log, in order
 seen() { sed -n 's/.*plugin screener: now //p' "$log" | tr '\n' ' '; }
 
-# in_shard <case file>: 0 when the case's "# shard:" line puts it in $SHARD
-in_shard() {
-	[ -z "${SHARD:-}" ] && return 0
-	case_shard=$(sed -n 's/^# shard: //p' "$1" | head -n 1)
-	[ "$case_shard" = all ] && return 0
-	case "$case_shard" in
-	'' | *[!0-9]*)
-		fail "$(basename "$1") has no \"# shard: <n>\" line"
-		return 1
-		;;
-	esac
-	[ $(((case_shard - 1) % shard_count)) -eq $((shard_index - 1)) ]
+# everywhere <case name>: 0 when its "# shard:" line says all
+everywhere() {
+	grep -qx '# shard: all' "$ROOT/tests/plugins/cases/$1.sh"
 }
 
-if [ -n "${SHARD:-}" ]; then
-	shard_index=${SHARD%/*}
-	shard_count=${SHARD#*/}
-	case "$shard_index/$shard_count" in
-	*[!0-9/]* | /* | */ | */*/*)
-		echo "SHARD must be <i>/<n>, eg. 1/3: $SHARD" >&2
-		exit 2
-		;;
+# after <case name>: the case its "# after:" line names, if any
+after() {
+	sed -n 's/^# after: //p' "$ROOT/tests/plugins/cases/$1.sh" | head -n 1
+}
+
+# group <case name>: the first case of the chain of "# after:" lines it's in
+group() {
+	group_name="$1"
+	while group_after=$(after "$group_name") && [ -n "$group_after" ]; do group_name="$group_after"; done
+	echo "$group_name"
+}
+
+# balance <n>: reads "<name> <group>" lines on stdin and prints "<bin>
+# <name>" for each, putting the groups biggest first (by the sum of their
+# cases' times.txt seconds) into the one of n bins with the least time so far
+balance() {
+	awk -v bins="$1" -v times="$TIMES_FILE" '
+		BEGIN { while ((getline line < times) > 0) if (split(line, f, " ") == 2) { secs[f[1]] = f[2]; known[++k] = f[2] } }
+		NF { names[++n] = $1; group_of[$1] = $2 }
+		END {
+			# unknown cases count as the median
+			for (i = 1; i <= k; i++) for (j = i + 1; j <= k; j++) if (known[j] < known[i]) { t = known[i]; known[i] = known[j]; known[j] = t }
+			median = k ? known[int((k + 1) / 2)] : 10
+			for (i = 1; i <= n; i++) {
+				g = group_of[names[i]]
+				if (!(g in g_time)) groups[++m] = g
+				g_time[g] += (names[i] in secs) ? secs[names[i]] : median
+			}
+			# biggest first, then by name, so the split is the same every run
+			for (i = 1; i <= m; i++) for (j = i + 1; j <= m; j++) {
+				a = groups[i]; b = groups[j]
+				if (g_time[b] > g_time[a] || (g_time[b] == g_time[a] && b < a)) { groups[i] = b; groups[j] = a }
+			}
+			for (b = 1; b <= bins; b++) load[b] = 0
+			for (i = 1; i <= m; i++) {
+				best = 1
+				for (b = 2; b <= bins; b++) if (load[b] < load[best]) best = b
+				load[best] += g_time[groups[i]]
+				bin_of[groups[i]] = best
+			}
+			for (i = 1; i <= n; i++) print bin_of[group_of[names[i]]], names[i]
+		}
+	'
+}
+
+# pick <i> <n>: of the case names on stdin, those balance puts in bin i of n,
+# after the ones every bin runs, in name order
+pick() {
+	pick_all=""
+	pick_rest=""
+	while read -r pick_name; do
+		[ -n "$pick_name" ] || continue
+		if everywhere "$pick_name"; then
+			pick_all="$pick_all$pick_name
+"
+		else
+			pick_rest="$pick_rest$pick_name $(group "$pick_name")
+"
+		fi
+	done
+	{
+		printf '%s' "$pick_all"
+		printf '%s' "$pick_rest" | balance "$2" | awk -v i="$1" '$1 == i { print $2 }'
+	} | sort
+}
+
+# check_count <i>/<n> <what>: dies unless it's i of n with 1 <= i <= n
+check_count() {
+	check_index=${1%/*}
+	check_total=${1#*/}
+	case "$check_index/$check_total" in
+		*[!0-9/]* | /* | */ | */*/*)
+			echo "$2 must be <i>/<n>, eg. 1/3: $1" >&2
+			exit 2
+			;;
 	esac
-	if [ "$shard_index" -lt 1 ] || [ "$shard_index" -gt "$shard_count" ]; then
-		echo "SHARD must be <i>/<n> with i from 1 to n: $SHARD" >&2
+	if [ "$check_index" -lt 1 ] || [ "$check_index" -gt "$check_total" ]; then
+		echo "$2 must be <i>/<n> with i from 1 to n: $1" >&2
 		exit 2
 	fi
+}
+
+# worker <k> <cases>: runs this script on just those cases in a namespace of
+# its own, its output in $WORK/w<k>.out and .err; the exit status is the
+# script's
+worker() {
+	worker_card="$ROOT/build/tests/cards/w$1"
+	rm -rf "$worker_card"
+	mkdir -p "$worker_card"
+	# what upstream's prepare script puts on a new card
+	skeleton="$ROOT/vendor/NextUI/skeleton"
+	cp -R "$skeleton/BASE/." "$worker_card/"
+	[ -d "$skeleton/EXTRAS" ] && cp -R "$skeleton/EXTRAS/." "$worker_card/"
+	mkdir -p "$worker_card/.system"
+	cp -R "$skeleton/SYSTEM/." "$worker_card/.system/"
+	# without root, as root in a user namespace of its own
+	map_root=--map-root-user
+	[ "$(id -u)" -eq 0 ] && map_root=
+	# shellcheck disable=SC2016 # the inner shell expands them
+	unshare --mount --net --propagation private ${map_root:+"$map_root"} sh -c '
+		ip link set lo up
+		mount --bind "$1" "$2"
+		mount -t tmpfs tmpfs /tmp
+		shift 2
+		exec "$@"
+	' worker "$worker_card" "$CARD" env PLUGIN_TEST_WORK="$WORK/w$1" CASES="$2" JOBS=1 SHARD= \
+		xvfb-run -a sh "$0" >"$WORK/w$1.out" 2>"$WORK/w$1.err"
+}
+
+# the cases this run has, by name
+all_cases=$(for case_file in "$ROOT"/tests/plugins/cases/*.sh; do basename "$case_file" .sh; done)
+if [ -n "${CASES:-}" ]; then
+	run_cases=""
+	for case_name in $CASES; do
+		[ -f "$ROOT/tests/plugins/cases/$case_name.sh" ] || { echo "no case $case_name" >&2; exit 2; }
+		# and the cases it's after
+		while [ -n "$case_name" ]; do
+			run_cases="$run_cases$case_name
+"
+			case_name=$(after "$case_name")
+		done
+	done
+	run_cases=$(printf '%s' "$run_cases" | sort -u)
+elif [ -n "${SHARD:-}" ]; then
+	check_count "$SHARD" SHARD
+	run_cases=$(printf '%s\n' "$all_cases" | pick "${SHARD%/*}" "${SHARD#*/}")
+else
+	run_cases=$all_cases
+fi
+
+# LIST=1: the cases, and each worker's with JOBS, with their seconds in
+# times.txt, and nothing run
+if [ -n "${LIST:-}" ]; then
+	k=1
+	while [ "$k" -le "$JOBS" ]; do
+		[ "$JOBS" -gt 1 ] && echo "worker $k:"
+		printf '%s\n' "$run_cases" | pick "$k" "$JOBS" | awk -v times="$TIMES_FILE" '
+			BEGIN { while ((getline line < times) > 0) if (split(line, f, " ") == 2) secs[f[1]] = f[2] }
+			{ t += secs[$1]; printf "  %4ss  %s\n", ($1 in secs) ? secs[$1] : "?", $1 }
+			END { printf "  %4ds  in all\n", t }
+		'
+		k=$((k + 1))
+	done
+	exit 0
 fi
 
 rm -rf "$WORK" "$STATE"
-for case_file in "$ROOT"/tests/plugins/cases/*.sh; do
-	in_shard "$case_file" || continue
-	case_started=$(date +%s)
-	# shellcheck source=/dev/null
-	. "$case_file"
-	echo "case $(basename "$case_file" .sh): $(($(date +%s) - case_started))s"
-done
+mkdir -p "$WORK"
 
-rm -rf "$STATE"
+if [ "$JOBS" -gt 1 ]; then
+	[ "$(uname -s)" = Linux ] || { echo "JOBS needs Linux's namespaces; run scripts/docker-test.sh on macOS" >&2; exit 2; }
+	mkdir -p "$CARD"
+	k=1
+	while [ "$k" -le "$JOBS" ]; do
+		mine=$(printf '%s\n' "$run_cases" | pick "$k" "$JOBS" | tr '\n' ' ')
+		worker "$k" "$mine" &
+		eval "pid_$k=\$!"
+		k=$((k + 1))
+	done
+	k=1
+	while [ "$k" -le "$JOBS" ]; do
+		eval "wait \$pid_$k"
+		status=$?
+		echo "worker $k:"
+		cat "$WORK/w$k.out"
+		cat "$WORK/w$k.err" >&2
+		if [ "$status" -ne 0 ]; then
+			worker_failures=$(grep -c '^FAIL' "$WORK/w$k.err")
+			failures=$((failures + (worker_failures > 0 ? worker_failures : 1)))
+		fi
+		cat "$WORK/w$k/cases.tsv" >>"$WORK/cases.tsv" 2>/dev/null
+		cat "$WORK/w$k/starts.tsv" >>"$WORK/starts.tsv" 2>/dev/null
+		k=$((k + 1))
+	done
+else
+	for case_name in $run_cases; do
+		case_started=$(now_ms)
+		# shellcheck source=/dev/null
+		. "$ROOT/tests/plugins/cases/$case_name.sh"
+		case_ms=$(($(now_ms) - case_started))
+		printf '%s\t%d\n' "$case_name" "$case_ms" >>"$WORK/cases.tsv"
+		echo "case $case_name: $((case_ms / 1000))s"
+	done
+	rm -rf "$STATE"
+fi
+
+# a worker's are printed by the run that started it
+[ -z "${PLUGIN_TEST_WORK:-}" ] && "$ROOT/scripts/test-times.sh" summary "$WORK" 10
+
 if [ "$failures" -gt 0 ]; then
 	echo "$failures plugin check(s) failed" >&2
 	exit 1

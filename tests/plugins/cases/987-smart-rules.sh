@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # smart-collections' rules, with row-badges for games.played, over a
 # fixture play history: Bravo played an hour ago for 12 hours and

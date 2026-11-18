@@ -10,26 +10,61 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  # The image the check and desktop jobs run in, from docker/ci/Dockerfile,
+  # tagged with a hash of it: built and pushed only when no image has that
+  # tag yet, so the other jobs don't install packages every run
+  image:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          sparse-checkout: docker/ci
+
+      - name: Image
+        id: image
+        run: |
+          repo=$(echo "$GITHUB_REPOSITORY" | tr A-Z a-z)
+          image="ghcr.io/$repo-ci:$(sha256sum docker/ci/Dockerfile | cut -c1-16)"
+          echo "image=$image" >>"$GITHUB_OUTPUT"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          if docker manifest inspect "$image" >/dev/null; then
+            echo "$image is there"
+          else
+            docker build -t "$image" docker/ci
+            docker push "$image"
+          fi
+
+  check:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    # privileged, so gdb can attach to a launcher that doesn't stop on
+    # SIGTERM to take its stacks (SMOKE_STACKS)
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --privileged
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
         with:
           submodules: true # the C tests build against vendor/NextUI's headers
 
-      - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y bats shellcheck gettext libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb gdb
-
-      # so a launcher that doesn't stop on SIGTERM can have its stacks taken (SMOKE_STACKS)
-      - name: Allow attaching gdb
-        run: sudo sysctl -w kernel.yama.ptrace_scope=0
-
       - name: Lint
         run: make lint
 
       - name: Test
-        run: make test
+        run: make -j"$(nproc)" test
 
       # the bundled plugins together, in both slot profiles, on a virtual display
       - name: Plugin profiles
@@ -46,12 +81,23 @@ jobs:
           if-no-files-found: ignore
 
   # the desktop build on its own and with the test plugins, on a virtual
-  # display; ffmpeg and sqlite3 make the clips and play history some cases use.
-  # The plugin cases are split into 3 shards by the "# shard:" line in each
-  # tests/plugins/cases file, each with its own fake card; the first also
-  # runs smoke
+  # display. The plugin cases are split into 3 shards, balanced by
+  # tests/plugins/times.txt, and each shard's cases across JOBS workers, each
+  # with its own fake card (see tests/plugins/run.sh); the first shard also
+  # runs smoke, beside its workers on the card they don't use. Privileged,
+  # for the workers' namespaces and gdb (SMOKE_STACKS)
   desktop:
+    needs: image
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --privileged
     strategy:
       fail-fast: false
       matrix:
@@ -65,26 +111,41 @@ jobs:
         with:
           submodules: true
 
-      # rclone and syncthing are the sync plugin's stand-ins for its bundled ones
-      - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev pkg-config libgl-dev libsamplerate0-dev xvfb ffmpeg libavformat-dev libavcodec-dev libavutil-dev sqlite3 gdb rclone syncthing
-
-      # so a start that stalls, or a launcher that doesn't stop on SIGTERM,
-      # can have its stacks taken (SMOKE_STACKS)
-      - name: Allow attaching gdb
-        run: sudo sysctl -w kernel.yama.ptrace_scope=0
-
-      - name: Smoke
-        if: matrix.shard == 1
-        run: xvfb-run -a make smoke
-        env:
-          SMOKE_STACKS: 1
+      - name: Build
+        run: make -j"$(nproc)" desktop
 
       - name: Plugin tests
-        run: xvfb-run -a make test-plugins
+        run: |
+          if [ "${{ matrix.shard }}" = 1 ]; then
+            xvfb-run -a make -j2 smoke test-plugins
+          else
+            xvfb-run -a make test-plugins
+          fi
         env:
           SHARD: ${{ matrix.shard }}/3
+          JOBS: 4
           SMOKE_STACKS: 1
+
+      - name: Times
+        if: always()
+        run: |
+          {
+            echo '### Shard ${{ matrix.shard }}'
+            echo '```'
+            ./scripts/test-times.sh summary build/tests/plugins 15
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      # for scripts/test-times.sh fetch, which updates tests/plugins/times.txt
+      - name: Upload times
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: plugin-times-${{ matrix.shard }}
+          path: |
+            build/tests/plugins/cases.tsv
+            build/tests/plugins/starts.tsv
+          if-no-files-found: ignore
 
       - name: Upload logs
         if: failure()

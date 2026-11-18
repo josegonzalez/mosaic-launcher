@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # home-dashboard owns the home slot: the launcher starts on it, with a
 # continue card for the last game (which has a save state to resume) and

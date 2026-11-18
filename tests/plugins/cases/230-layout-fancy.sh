@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled layout-fancy draws glancer's folder as stock's rows beside a
 # panel, which glancer reads down a column on each selected row: Alpha has

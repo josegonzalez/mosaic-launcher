@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # a plugin orders and renames a folder's entries, then reads the list and
 # moves the selection

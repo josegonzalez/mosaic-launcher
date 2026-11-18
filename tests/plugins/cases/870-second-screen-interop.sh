@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # second-screen's panel from the other bundled plugins: clipper opens a
 # folder and moves from Apple (art, a .info sidecar, a favorite tagged

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the card index: indexer and lister read it from a card the launcher
 # hasn't kept one for, so it isn't ready from init (nor ever from a

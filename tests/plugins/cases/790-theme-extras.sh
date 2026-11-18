@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # theme extras: the bundled theme-plus passes on a theme's keys with a dot
 # in them, the launcher refuses a bad one, and dresser reads its own key

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # first-run sets other plugins up through their setup services: with the
 # bundled favorites, theme-plus and localization on, screener walks the

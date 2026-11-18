@@ -28,8 +28,14 @@ CARD_CFLAGS = -std=gnu99 -Wall -Iplatform -I. -I$(LAUNCHER) -I$(SDK) -I$(NEXTUI)
 
 .PHONY: test clean
 
+# Runs them one at a time (some share the fixture card), each one's
+# milliseconds going to $(BUILD)/unit.tsv for scripts/test-times.sh slowest.
 test: $(addprefix $(BUILD)/,$(TESTS))
-	@for t in $^; do $$t || exit 1; done
+	@. ../../scripts/timing.sh; : >$(BUILD)/unit.tsv; \
+	for t in $^; do \
+		started=$$(now_ms); $$t || exit 1; \
+		printf '%s\t%d\n' "$${t##*/}" $$(($$(now_ms) - started)) >>$(BUILD)/unit.tsv; \
+	done
 
 # rcheevos' hashing and libchdr, built as the launcher builds them.
 RCHEEVOS := $(abspath ../../vendor/rcheevos)

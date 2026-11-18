@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # rect_at <kind> <old|new> [log]: slider's line for where the selection is
 # in that frame of the first transition of kind in log ($log by default), as

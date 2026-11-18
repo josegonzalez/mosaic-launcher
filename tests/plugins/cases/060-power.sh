@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # decliner registers actions, a binding, an override, tiles, a sleep hold
 # and a power-off, then declines; none of it stays behind, where its

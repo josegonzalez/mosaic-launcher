@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled video-previews plays a game's .videos clip a second (its
 # delay setting) after the selection settles, in place of the thumbnail,

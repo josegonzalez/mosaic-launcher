@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # metadata-band draws the year, publisher and genre from a game's .info
 # sidecar in a pill under its art, which dater, after it in load order,

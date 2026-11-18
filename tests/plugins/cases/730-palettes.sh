@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # stock's palettes through the host: paletter's list is the one stock's
 # Settings builds (its own, then the card's, a card palette among them, in

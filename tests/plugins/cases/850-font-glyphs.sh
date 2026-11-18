@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the bundled localization checks the UI font has every character the
 # language's translations use: with language=es and the bundled theme-plus

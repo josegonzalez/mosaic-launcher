@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled system-info: screener runs its action, presses A (the
 # graph's own page where it doesn't fit under the rows) and backs out. Desktop

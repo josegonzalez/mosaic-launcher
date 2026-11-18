@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # providers: patron calls each bundled provider's service for the games in
 # a folder of its own: captions.text from playtime-captions (Played has 2h

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # snapper captures and saves the screen: refused from init, its own thread
 # and its overlay, the game list's frame with its overlay on it, and the

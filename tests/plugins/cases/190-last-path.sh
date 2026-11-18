@@ -1,6 +1,6 @@
 # shellcheck shell=sh
-# shard: 3
-# follows the last path 080-drawer's launch saved, so it shares its shard
+# after: 080-drawer
+# follows the last path its launch saved
 
 # a saved last path the launcher can't follow up to the card's root, such as
 # the pak off the card drawer's launch left, starts at the root rather than

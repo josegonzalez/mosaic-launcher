@@ -5,7 +5,7 @@
 # LoveRetro toolchain images; the desktop build uses the host compiler.
 ###########################################################
 
-.PHONY: all desktop run-desktop plugins-desktop screenshots plugins-device ffmpeg-device sync-tools-device build-% devices pak test smoke test-plugins test-profiles lint pot drift clean
+.PHONY: all desktop run-desktop plugins-desktop screenshots plugins-device ffmpeg-device sync-tools-device build-% devices pak test smoke test-plugins test-profiles test-all test-all-card test-all-plugins lint pot drift clean
 
 PLATFORMS ?= tg5040 tg5050 h700
 NEXTUI := vendor/NextUI
@@ -124,7 +124,7 @@ pak:
 # checks
 
 test:
-	bats tests
+	bats --timing tests
 	$(MAKE) -C tests/c
 
 # Starts the desktop build for a few seconds, then the Launcher pak's
@@ -148,6 +148,25 @@ test-plugins: desktop
 # or the loader refuses a plugin the profile didn't turn off.
 test-profiles: desktop plugins-desktop
 	./scripts/plugin-profiles.sh
+
+# Everything CI checks, on Linux with a display (scripts/docker-test.sh runs
+# it in CI's image on any host): lint and the unit tests, then smoke and the
+# profiles on the fake card beside the plugin cases in TEST_JOBS workers,
+# each on a card of its own.
+NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+TEST_JOBS ?= $(NPROC)
+test-all:
+	$(MAKE) lint
+	$(MAKE) -j$(NPROC) test
+	$(MAKE) -j$(NPROC) desktop plugins-desktop
+	$(MAKE) -j2 test-all-card test-all-plugins
+
+test-all-card:
+	$(MAKE) smoke
+	$(MAKE) test-profiles
+
+test-all-plugins:
+	JOBS=$(TEST_JOBS) ./tests/plugins/run.sh
 
 lint:
 	shellcheck -x pak/launch.sh pak/bin/*.sh scripts/*.sh tests/plugins/run.sh template/launch.sh plugins/video-previews/ffmpeg/build.sh plugins/sync/tools/build.sh

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the launcher's built-in lock: with its chord set on the Launcher page,
 # holding SELECT and START locks every button, so locker's down doesn't

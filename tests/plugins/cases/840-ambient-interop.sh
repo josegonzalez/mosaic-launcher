@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the ambient plugins together, with music's daemon and SDL's dummy audio
 # driver. Music adds what plays to the launcher's lock screen and X plays

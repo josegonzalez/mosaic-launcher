@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled first-run: on a card where it hasn't been seen it opens by
 # itself over the game list, and screener walks it: on to the toggles,

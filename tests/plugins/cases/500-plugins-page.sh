@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the Launcher pak's Plugins page (nextui.elf --settings plugins), driven
 # by presser, which presses buttons and writes down every text drawn, with

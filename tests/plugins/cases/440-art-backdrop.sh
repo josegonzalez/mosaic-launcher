@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled art-backdrop draws the selected game's art behind the list,
 # which dimmer reads back from each push's old frame down the left edge and

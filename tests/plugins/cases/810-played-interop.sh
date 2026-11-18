@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # play data interop, over a fixture game_logs.sqlite with 40 minutes of
 # Played an hour ago and nothing of Fresh. home-dashboard's continue card

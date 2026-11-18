@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled romm against tests/plugins/romm-server, a stand-in RomM
 # serving responses recorded from RomM 5.4.1: inert without a server; the

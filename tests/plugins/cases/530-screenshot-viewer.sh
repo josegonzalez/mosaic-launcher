@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled screenshot-viewer: screener runs its action, steps through
 # the grid, opens the full view, steps on and deletes the oldest after the

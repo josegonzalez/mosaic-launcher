@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # bander decorates the built-in list's thumbnail: it's called once the
 # selected game's art is in, with the art's rect as the list places it and

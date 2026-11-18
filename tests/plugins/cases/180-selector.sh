@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # selector hears about the selection once it settles: the starting one, a
 # folder it opens, the end of a scroll through it a row a frame, nothing

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # ambient screens and the lock: ambler registers two ambient screens that
 # both want to show after a second idle, and the user's order puts its

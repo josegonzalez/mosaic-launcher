@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # writer copies RGBA8888 pixels into surfaces of its own and reads them
 # back; writes into its lent row, an art cache image and, under hello's id,

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the root slot owner replaces the root, and the open, recents and reload
 # calls work; the card's own recents are put back afterwards

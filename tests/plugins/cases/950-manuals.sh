@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the bundled manuals, with row-badges and seeker pressing the keys: a
 # test system's .manuals folder has Paged's pages (a 900x1200 sample page

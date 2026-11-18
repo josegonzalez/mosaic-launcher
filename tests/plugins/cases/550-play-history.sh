@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # tracker, with history=1, lists the whole play history from a fixture
 # game_logs.sqlite made with gametimectl's schema: every game with a

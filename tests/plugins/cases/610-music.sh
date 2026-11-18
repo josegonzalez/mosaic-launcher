@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the bundled music plugin and its daemon, with SDL's dummy audio driver:
 # the player opens from its button and lists the music folder (folders

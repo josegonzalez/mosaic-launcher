@@ -18,6 +18,12 @@
 # lines) and every thread's stack added to the end of its log before the
 # SIGKILL. It still fails.
 #
+# With SMOKE_TIMES naming a file, it appends one tab-separated line for the
+# start to it: the log, then milliseconds in all, preparing the card, until
+# it was ready (or the wait ran out, or it exited), settling and stopping,
+# then how it ended (ready, not-ready, ran, exited or killed). SMOKE_CASE,
+# if set, goes before the log, so a run's lines can be grouped by case.
+#
 # SMOKE_PRELOAD names a library to preload into nextui.elf alone (LD_PRELOAD,
 # or DYLD_INSERT_LIBRARIES on macOS, which drops DYLD_ variables on the way
 # through /bin/sh and env, so it's set here).
@@ -35,8 +41,11 @@ UNTIL_GONE="${SMOKE_UNTIL_GONE:-}"
 PRELOAD="${SMOKE_PRELOAD:-}"
 SETTLE="${SMOKE_SETTLE:-1}"
 STACKS="${SMOKE_STACKS:-}"
+TIMES="${SMOKE_TIMES:-}"
 shift
 [ $# -gt 0 ] && shift
+# shellcheck source=scripts/timing.sh
+. "$ROOT/scripts/timing.sh"
 
 case "$(uname -s)" in
 	Darwin)
@@ -89,8 +98,20 @@ tree() {
 	'
 }
 
+# timed <how it ended>: the SMOKE_TIMES line, when there's a file for it
+timed() {
+	[ -n "$TIMES" ] || return 0
+	t_stopped=$(now_ms)
+	: "${t_ready:=$t_stopped}" "${t_settled:=$t_ready}"
+	printf '%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\n' "${SMOKE_CASE:--}" "$(basename "$LOG" .log)" \
+		$((t_stopped - t_begin)) $((t_started - t_begin)) $((t_ready - t_started)) \
+		$((t_settled - t_ready)) $((t_stopped - t_settled)) "$1" >>"$TIMES"
+}
+
+t_begin=$(now_ms)
 bash "$ROOT/vendor/NextUI/workspace/desktop/prepare_fake_sd_root.sh" >/dev/null
 rm -f "$LOG.stopping"
+t_started=$(now_ms)
 
 if [ -n "$PRELOAD" ]; then
 	# not through env, which macOS also strips DYLD_ variables from
@@ -109,12 +130,16 @@ is_ready=0
 while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt $((SECONDS_TO_RUN * 10)) ]; do
 	if ready; then
 		is_ready=1
+		t_ready=$(now_ms)
 		sleep "$SETTLE"
+		t_settled=$(now_ms)
 		break
 	fi
 	sleep 0.1
 	waited=$((waited + 1))
 done
+
+[ "$is_ready" -eq 0 ] && t_ready=$(now_ms)
 
 if kill -0 "$pid" 2>/dev/null; then
 	# where a start that isn't ready waits, before the SIGTERM ends it
@@ -142,6 +167,7 @@ if kill -0 "$pid" 2>/dev/null; then
 		fi
 		kill -KILL "$pid"
 		wait "$pid" 2>/dev/null
+		timed killed
 		echo "still running ${STOP_SECONDS}s after SIGTERM, killed it; log in $LOG" >&2
 		if [ -f "$LOG.stopping" ]; then
 			{
@@ -156,22 +182,26 @@ if kill -0 "$pid" 2>/dev/null; then
 	fi
 	wait "$pid" 2>/dev/null
 	if [ "$is_ready" -eq 1 ]; then
+		timed ready
 		echo "ready, stopped it; log in $LOG"
 		exit 0
 	fi
 	# check once more, in case the last line came in as the wait ran out
 	if [ -n "$UNTIL" ] && ! ready; then
+		timed not-ready
 		echo "not ready after ${SECONDS_TO_RUN}s; log in $LOG" >&2
 		missing | sed 's/^/  missing line: /' >&2
 		[ -n "$UNTIL_GONE" ] && [ -e "$UNTIL_GONE" ] && echo "  still there: $UNTIL_GONE" >&2
 		[ "$stacks" -eq 1 ] && echo "  stacks in $LOG.stacks" >&2
 		exit 3
 	fi
+	timed ran
 	echo "still running after ${SECONDS_TO_RUN}s; log in $LOG"
 	exit 0
 fi
 
 wait "$pid"
 status=$?
+timed exited
 echo "exited early with status $status; log in $LOG" >&2
 exit 1

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # filter presets with favorites and search: the launcher starts in a test
 # system (the last path), where seeker steps through the presets with

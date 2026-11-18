@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled art-placeholder makes a thumbnail and a box for games with no
 # art: by default a title card in the theme's colours with the name on it,

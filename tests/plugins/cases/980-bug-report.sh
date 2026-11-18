@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled bug-report, seeker running its action: the zip in Reports
 # has the README, info, the game list summary, the settings and the logs,

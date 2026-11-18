@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # sets interop: the bundled plugins read each other's entry sets through
 # the host. search's fav: lists the favorites plugin's set and -fav: the

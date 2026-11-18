@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # tags: the launcher starts on Alpha (the last path), where presser opens
 # the checklist with Y, tags Alpha with Puzzle, deletes the unused tag after

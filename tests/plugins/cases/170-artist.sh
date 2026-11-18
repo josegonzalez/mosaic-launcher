@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # artist supplies art of every kind and loads it through the art cache: a
 # provider answering each kind, a load then a hit, the entries either side

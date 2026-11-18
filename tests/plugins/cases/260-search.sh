@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # search: seeker runs search.open and types qz on the keyboard (a types
 # the q it starts on, two downs reach z), and the results open in the

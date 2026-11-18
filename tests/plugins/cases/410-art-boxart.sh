@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled art-boxart answers art from each fork's folder convention, as
 # looker sees it through art_find: nx-redux's .media/boxart2d and

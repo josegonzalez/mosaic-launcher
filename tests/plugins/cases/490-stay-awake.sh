@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # /tmp/stay_awake holds off auto-sleep
 touch /tmp/stay_awake

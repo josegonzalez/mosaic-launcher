@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled ui-sounds, with SDL's dummy driver, seeker pressing the keys
 # and chimer opening a toast, a dialog and the PIN keyboard: moves, the

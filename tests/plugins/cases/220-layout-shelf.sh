@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled layout-shelf draws peeker's folder as GB cartridges on
 # shelves, as its games are .gb: Apple's thumbnail from .media fills its

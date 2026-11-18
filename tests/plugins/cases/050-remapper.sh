@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # remapper overrides buttons ahead of rival, relabels a tile, and replaces a
 # launch, which rival can't also do; the launcher writes the replaced

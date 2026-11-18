@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # themer owns the theme slot (and the transition slot, to read the screen
 # back): its colours, background colour, font, text step and UI sizes take

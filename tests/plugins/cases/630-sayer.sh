@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # sayer owns the strings slot: the game list's hints, its own action's hint
 # (under its id) and a status pill's format show its French, each string

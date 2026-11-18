@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the bundled arcade-names, with search, seeker and looker, and a made-up
 # Logiqx XML DAT, ClrMamePro text DAT and catver.ini in DATs/: a test

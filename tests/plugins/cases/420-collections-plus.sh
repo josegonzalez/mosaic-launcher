@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled collections-plus puts every collection on the root in the
 # order setting's order, with the Collections folder off it and the

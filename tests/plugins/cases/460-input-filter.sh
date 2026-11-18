@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # filterer's input_filter runs every frame, before its tick; the desktop
 # has no hold switch; the new buttons follow the d-pad; and bind_button and

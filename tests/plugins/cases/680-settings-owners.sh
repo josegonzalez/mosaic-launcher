@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the Launcher pak's settings load only the strings and theme slots'
 # owners: with sayer (strings) and themer (theme) on, the Plugins page's

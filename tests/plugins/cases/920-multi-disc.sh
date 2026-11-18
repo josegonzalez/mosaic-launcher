@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the bundled multi-disc, with favorites, tags, search, random-game, seeker
 # and looker: a test system's loose discs show as one row per game at its

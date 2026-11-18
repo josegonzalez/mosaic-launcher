@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # playtime-captions puts a caption at the right of played games' rows, which
 # subtitler, after it in load order, reads back off the screen: Tetris was

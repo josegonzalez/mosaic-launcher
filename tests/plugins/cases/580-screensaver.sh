@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # the bundled screensaver: with idle=1 and a folder of two images and a
 # broken one, it opens over the list a second after start, slides from

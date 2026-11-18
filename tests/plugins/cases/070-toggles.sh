@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # toggler reads stock toggles, has a name off the list refused, and flips
 # Show clock, which stock saves to minuisettings.txt (in the folder named by

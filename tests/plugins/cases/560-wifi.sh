@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # wifier finds no Wi-Fi on desktop, and nothing looks for it
 printf 'wifier=on\n' >"$STATE/plugins.txt"

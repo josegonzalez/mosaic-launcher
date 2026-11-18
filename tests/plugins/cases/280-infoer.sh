@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # infoer reads .info sidecars through entry_info: display_name names games
 # by them, each entry reads its sidecar once, and an oversized sidecar or a

@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 3
 
 # the plugin template builds and loads as it ships, starting its example
 # helper from beside plugin.so, which answers a ping, logs to the plugin's

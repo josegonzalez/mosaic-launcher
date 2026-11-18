@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # the Launcher pak's Plugins page with more rows than fit: twelve plugins
 # (only manifests, which is all the page reads) and the PIN row, each in a

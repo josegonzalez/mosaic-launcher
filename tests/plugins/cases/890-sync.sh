@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 2
 
 # sync with local stand-ins for the remote, each part run only where this
 # computer has the program: rclone through an alias remote to a folder,

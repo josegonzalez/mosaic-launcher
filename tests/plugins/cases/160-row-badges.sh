@@ -1,5 +1,4 @@
 # shellcheck shell=sh
-# shard: 1
 
 # row-badges puts an unplayed dot and tier dots after rows' names, which
 # dotter, after it in load order, reads back off the screen. Alpha is
