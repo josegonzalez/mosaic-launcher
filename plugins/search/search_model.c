@@ -248,11 +248,8 @@ static int compactEquals(const char* folded, const char* compact) {
 static int infoPasses(const SEGame* game, const SEFilter* f) {
 	if (f->kind == SE_FILTER_YEAR) return game->year && game->year >= f->from && game->year <= f->to;
 	if (!game->genre) return 0;
-	char folded[SE_QUERY_LEN * 2], compact[SE_QUERY_LEN * 2];
-	SE_fold(f->arg, folded, sizeof(folded));
-	SE_compact(f->arg, compact, sizeof(compact));
-	if (compact[0] && compactEquals(game->genre, compact)) return 1;
-	int rank = SE_rank(game->genre, folded);
+	if (f->compact[0] && compactEquals(game->genre, f->compact)) return 1;
+	int rank = SE_rank(game->genre, f->folded);
 	return rank >= 0 && rank <= SE_RANK_WORDS;
 }
 
@@ -418,6 +415,10 @@ void SE_parse(const char* query, SEQuery* out) {
 			snprintf(f->arg, sizeof(f->arg), "%s", arg);
 			f->from = from;
 			f->to = to;
+			if (kind == SE_FILTER_GENRE) {
+				SE_fold(arg, f->folded, sizeof(f->folded));
+				SE_compact(arg, f->compact, sizeof(f->compact));
+			}
 			continue;
 		}
 		if (len + 1 + strlen(term) >= sizeof(out->words)) continue;

@@ -101,6 +101,8 @@ typedef struct SEFilter {
 	int negate; // it had a leading '-'
 	char arg[SE_QUERY_LEN]; // tag:'s, system:'s and genre:'s name, as typed
 	int from, to; // year: and decade:'s years; played:, hours: and added:'s number in from
+	char folded[SE_QUERY_LEN * 2];  // genre:'s name, folded
+	char compact[SE_QUERY_LEN * 2]; // and compacted (see SE_compact)
 } SEFilter;
 
 // A query split into the words a name has to match and its filters.
