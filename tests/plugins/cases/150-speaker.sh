@@ -1,4 +1,5 @@
 # shellcheck shell=sh
+# alone
 
 # speaker plays audio through the host's audio calls with SDL's dummy
 # driver: refusals before it opens, a queue from its own thread that falls

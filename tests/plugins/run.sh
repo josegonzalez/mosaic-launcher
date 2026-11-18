@@ -61,7 +61,10 @@
 # here; each prints how long it took. A case with a "# shard: all" line runs
 # everywhere: in every shard and every worker. A case with an
 # "# after: <case>" line uses what that case left (a log, a build) and
-# always runs with it, after it; CASES adds the cases they're after.
+# always runs with it, after it; CASES adds the cases they're after. A case
+# with an "# alone" line counts frames or times audio, which misses when
+# other launchers share the CPUs, so with JOBS it runs after the workers,
+# one at a time.
 #
 # With SHARD=<i>/<n>, only shard i of n runs, so CI can split the cases
 # across jobs. The shards are balanced by each case's seconds in
@@ -249,6 +252,12 @@ after() {
 	sed -n 's/^# after: //p' "$ROOT/tests/plugins/cases/$1.sh" | head -n 1
 }
 
+# alone <case name>: 0 when it, or the first case of its chain of "# after:"
+# lines, has an "# alone" line
+alone() {
+	grep -qx '# alone' "$ROOT/tests/plugins/cases/$1.sh" "$ROOT/tests/plugins/cases/$(group "$1").sh"
+}
+
 # group <case name>: the first case of the chain of "# after:" lines it's in
 group() {
 	group_name="$1"
@@ -256,13 +265,14 @@ group() {
 	echo "$group_name"
 }
 
-# balance <n>: reads "<name> <group>" lines on stdin and prints "<bin>
-# <name>" for each, putting the groups biggest first (by the sum of their
-# cases' times.txt seconds) into the one of n bins with the least time so far
+# balance <n>: reads "<name> <group> <weight>" lines on stdin and prints
+# "<bin> <name>" for each, putting the groups biggest first (by the sum of
+# their cases' times.txt seconds, times their weight) into the one of n bins
+# with the least time so far
 balance() {
 	awk -v bins="$1" -v times="$TIMES_FILE" '
 		BEGIN { while ((getline line < times) > 0) if (split(line, f, " ") == 2) { secs[f[1]] = f[2]; known[++k] = f[2] } }
-		NF { names[++n] = $1; group_of[$1] = $2 }
+		NF { names[++n] = $1; group_of[$1] = $2; weight[$1] = $3 }
 		END {
 			# unknown cases count as the median
 			for (i = 1; i <= k; i++) for (j = i + 1; j <= k; j++) if (known[j] < known[i]) { t = known[i]; known[i] = known[j]; known[j] = t }
@@ -270,7 +280,7 @@ balance() {
 			for (i = 1; i <= n; i++) {
 				g = group_of[names[i]]
 				if (!(g in g_time)) groups[++m] = g
-				g_time[g] += (names[i] in secs) ? secs[names[i]] : median
+				g_time[g] += ((names[i] in secs) ? secs[names[i]] : median) * weight[names[i]]
 			}
 			# biggest first, then by name, so the split is the same every run
 			for (i = 1; i <= m; i++) for (j = i + 1; j <= m; j++) {
@@ -289,8 +299,10 @@ balance() {
 	'
 }
 
-# pick <i> <n>: of the case names on stdin, those balance puts in bin i of n,
-# after the ones every bin runs, in name order
+# pick <i> <n> [workers]: of the case names on stdin, those balance puts in
+# bin i of n, after the ones every bin runs, in name order. For workers it
+# leaves out the cases that run alone; for shards they weigh JOBS times
+# their seconds, as no other case runs beside them.
 pick() {
 	pick_all=""
 	pick_rest=""
@@ -299,8 +311,11 @@ pick() {
 		if everywhere "$pick_name"; then
 			pick_all="$pick_all$pick_name
 "
-		else
-			pick_rest="$pick_rest$pick_name $(group "$pick_name")
+		elif ! alone "$pick_name"; then
+			pick_rest="$pick_rest$pick_name $(group "$pick_name") 1
+"
+		elif [ -z "${3:-}" ]; then
+			pick_rest="$pick_rest$pick_name $(group "$pick_name") $JOBS
 "
 		fi
 	done
@@ -374,19 +389,35 @@ else
 	run_cases=$all_cases
 fi
 
+# alone_cases: the run's cases that run alone with JOBS, one per line
+alone_cases() {
+	for alone_name in $run_cases; do
+		if ! everywhere "$alone_name" && alone "$alone_name"; then echo "$alone_name"; fi
+	done
+}
+
 # LIST=1: the cases, and each worker's with JOBS, with their seconds in
 # times.txt, and nothing run
 if [ -n "${LIST:-}" ]; then
-	k=1
-	while [ "$k" -le "$JOBS" ]; do
-		[ "$JOBS" -gt 1 ] && echo "worker $k:"
-		printf '%s\n' "$run_cases" | pick "$k" "$JOBS" | awk -v times="$TIMES_FILE" '
+	list() {
+		awk -v times="$TIMES_FILE" '
 			BEGIN { while ((getline line < times) > 0) if (split(line, f, " ") == 2) secs[f[1]] = f[2] }
-			{ t += secs[$1]; printf "  %4ss  %s\n", ($1 in secs) ? secs[$1] : "?", $1 }
+			NF { t += secs[$1]; printf "  %4ss  %s\n", ($1 in secs) ? secs[$1] : "?", $1 }
 			END { printf "  %4ds  in all\n", t }
 		'
-		k=$((k + 1))
-	done
+	}
+	if [ "$JOBS" -gt 1 ]; then
+		k=1
+		while [ "$k" -le "$JOBS" ]; do
+			echo "worker $k:"
+			printf '%s\n' "$run_cases" | pick "$k" "$JOBS" workers | list
+			k=$((k + 1))
+		done
+		echo "alone, after the workers:"
+		alone_cases | list
+	else
+		printf '%s\n' "$run_cases" | list
+	fi
 	exit 0
 fi
 
@@ -401,9 +432,22 @@ if [ "$JOBS" -gt 1 ]; then
 	# workers build those plugins at once
 	make -s -j"$JOBS" -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/bundled" CC="$CC" >"$WORK/bundled.log" 2>"$WORK/bundled.err" \
 		|| { cat "$WORK/bundled.err" >&2; fail "building the bundled plugins"; }
+	# done_worker <k> <status> <title>: prints worker k's output and adds its
+	# failures and times to the run's
+	done_worker() {
+		echo "$3:"
+		cat "$WORK/w$1.out"
+		cat "$WORK/w$1.err" >&2
+		if [ "$2" -ne 0 ]; then
+			worker_failures=$(grep -c '^FAIL' "$WORK/w$1.err")
+			failures=$((failures + (worker_failures > 0 ? worker_failures : 1)))
+		fi
+		cat "$WORK/w$1/cases.tsv" >>"$WORK/cases.tsv" 2>/dev/null
+		cat "$WORK/w$1/starts.tsv" >>"$WORK/starts.tsv" 2>/dev/null
+	}
 	k=1
 	while [ "$k" -le "$JOBS" ]; do
-		mine=$(printf '%s\n' "$run_cases" | pick "$k" "$JOBS" | tr '\n' ' ')
+		mine=$(printf '%s\n' "$run_cases" | pick "$k" "$JOBS" workers | tr '\n' ' ')
 		worker "$k" "$mine" &
 		eval "pid_$k=\$!"
 		k=$((k + 1))
@@ -411,18 +455,16 @@ if [ "$JOBS" -gt 1 ]; then
 	k=1
 	while [ "$k" -le "$JOBS" ]; do
 		eval "wait \$pid_$k"
-		status=$?
-		echo "worker $k:"
-		cat "$WORK/w$k.out"
-		cat "$WORK/w$k.err" >&2
-		if [ "$status" -ne 0 ]; then
-			worker_failures=$(grep -c '^FAIL' "$WORK/w$k.err")
-			failures=$((failures + (worker_failures > 0 ? worker_failures : 1)))
-		fi
-		cat "$WORK/w$k/cases.tsv" >>"$WORK/cases.tsv" 2>/dev/null
-		cat "$WORK/w$k/starts.tsv" >>"$WORK/starts.tsv" 2>/dev/null
+		done_worker "$k" $? "worker $k"
 		k=$((k + 1))
 	done
+	# then the ones that run alone, in one more worker with the CPUs to
+	# itself, after the ones every worker runs (whose logs they may check)
+	mine=$(alone_cases | tr '\n' ' ')
+	if [ -n "$mine" ]; then
+		worker "$k" "$(for every_name in $run_cases; do if everywhere "$every_name"; then printf '%s ' "$every_name"; fi; done)$mine"
+		done_worker "$k" $? "alone, after the workers"
+	fi
 else
 	for case_name in $run_cases; do
 		case_started=$(now_ms)

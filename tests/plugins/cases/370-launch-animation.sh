@@ -1,4 +1,5 @@
 # shellcheck shell=sh
+# alone
 
 # launch-animation (built in whole by glider, which reads its frames back)
 # owns the launch slot: launching a pak from the root, the selection pill

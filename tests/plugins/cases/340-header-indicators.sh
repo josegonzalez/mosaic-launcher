@@ -1,4 +1,5 @@
 # shellcheck shell=sh
+# alone
 
 # the bundled header-indicators shows free storage and a profile badge in a
 # pill in the theme's accent with hint-coloured text, a gap left of the
