@@ -41,6 +41,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [art-backdrop](../plugins/art-backdrop/README.md) - Draws the selected game's art behind the game list.
 - [art-boxart](../plugins/art-boxart/README.md) - Finds box art in the art folders other firmware uses.
 - [art-placeholder](../plugins/art-placeholder/README.md) - Gives games with no art a generated thumbnail and box.
+- [blue-light](../plugins/blue-light/README.md) - Puts a warm tint over the launcher's screens for evenings, by hand or on a schedule.
 - [header-indicators](../plugins/header-indicators/README.md) - Shows free storage, an SSH dot, a profile badge and the FPS in the header.
 - [home-dashboard](../plugins/home-dashboard/README.md) - A home screen before the game list, with your last game ready to resume.
 - [launch-animation](../plugins/launch-animation/README.md) - Animates a game starting from the game list.

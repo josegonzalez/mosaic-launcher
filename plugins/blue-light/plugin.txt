@@ -1,0 +1,18 @@
+id=blue-light
+name=Blue light tint
+api=1
+category=Looks
+summary=Puts a warm tint over the launcher's screens for evenings, by hand or on a schedule.
+description=Puts a warm amber, orange or red tint over every launcher screen to cut blue light in the evening, turned on from the quick menu or at set times. Games aren't tinted.
+# the tint without a schedule; the Warm tint tile and button flip it too
+setting.on=toggle|Warm tint|off
+setting.colour=choice|Colour|amber|amber,orange,red
+setting.strength=choice|Strength (%)|50|10,20,30,40,50,60,70,80,90,100
+# on and off at set times, crossing midnight when the off time is earlier; the tile and button flip it until the next of them
+setting.schedule=toggle|Schedule|off
+setting.from=choice|Turn on at|21:00|00:00,01:00,02:00,03:00,04:00,05:00,06:00,07:00,08:00,09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00,21:00,22:00,23:00
+setting.to=choice|Turn off at|07:00|00:00,01:00,02:00,03:00,04:00,05:00,06:00,07:00,08:00,09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00,21:00,22:00,23:00
+# a Warm tint tile on the quick menu that turns it on and off
+setting.tile=toggle|Quick menu tile|on
+# a game list button that turns it on and off
+setting.button=choice|Warm tint button|none|none,Y,L2,R2,SELECT|button:blue-light.toggle
