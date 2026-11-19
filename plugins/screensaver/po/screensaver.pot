@@ -67,6 +67,10 @@ msgid "AM"
 msgstr ""
 
 #: plugin.txt
+msgid "Analog clock"
+msgstr ""
+
+#: plugin.txt
 msgid "Change"
 msgstr ""
 
@@ -107,7 +111,15 @@ msgid "Show after idle (seconds)"
 msgstr ""
 
 #: plugin.txt
+msgid "Style"
+msgstr ""
+
+#: plugin.txt
 msgid "box"
+msgstr ""
+
+#: plugin.txt
+msgid "clock"
 msgstr ""
 
 #: plugin.txt
@@ -119,11 +131,31 @@ msgid "folder"
 msgstr ""
 
 #: plugin.txt
+msgid "full"
+msgstr ""
+
+#: plugin.txt
 msgid "games"
 msgstr ""
 
 #: plugin.txt
+msgid "images"
+msgstr ""
+
+#: plugin.txt
+msgid "logo"
+msgstr ""
+
+#: plugin.txt
 msgid "off"
+msgstr ""
+
+#: plugin.txt
+msgid "over"
+msgstr ""
+
+#: plugin.txt
+msgid "random"
 msgstr ""
 
 #: plugin.txt

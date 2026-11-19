@@ -10,8 +10,8 @@ optional=favorites
 ambient=screensaver.main
 # how long the game list or home is left alone before the screensaver shows
 setting.idle=choice|Show after idle (seconds)|30|off,15,30,45,60,120,300,600
-# where the images come from: recent and favorite games' art, the Screenshots folder, the folder setting's folder, or the games' art with their clips played through video-previews
-setting.source=choice|Images|games|games,screenshots,folder,videos
+# where the images come from: recent and favorite games' art, the Screenshots folder, the folder setting's folder, the games' art with their clips played through video-previews, or a random game from the card each time, which A launches
+setting.source=choice|Images|games|games,screenshots,folder,videos,random
 # which of the games' art: box art (else the thumbnail) or screenshots
 setting.art=choice|Game art|box|box,screenshot
 # a folder on the card, for the folder source
@@ -22,3 +22,7 @@ setting.interval=choice|Seconds per image|10|5,10,20,30,60,120
 setting.effect=choice|Change|fade|fade,slide
 # a dim clock in the bottom right corner
 setting.clock=choice|Clock|off|off,24h,12h
+# what shows: the images, the game's wheel logo (or its name) bouncing on black, or an analog clock face
+setting.style=choice|Style|images|images,logo,clock
+# the clock style's face: full screen on black, drifting against burn-in, or over the dimmed images
+setting.face=choice|Analog clock|full|full,over

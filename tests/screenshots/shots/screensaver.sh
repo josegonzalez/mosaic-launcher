@@ -58,3 +58,33 @@ ffmpeg -loglevel error -loop 1 -i "$CARD/Screenshots/Tobu Tobu Girl Deluxe.2026-
 idle
 shot with-video-previews
 nomusic
+
+# the random source: a random game's box art and its name
+begin
+on screensaver
+cfg screensaver idle=15 source=random
+idle
+shot random
+
+# the logo style, with a wheel for µCity made from its art
+begin
+on screensaver
+cfg screensaver idle=15 style=logo
+mkdir -p "$CARD/Roms/Game Boy Color (GBC)/.media/wheel"
+cp "$CARD/Roms/Game Boy Color (GBC)/.media/µCity.png" "$CARD/Roms/Game Boy Color (GBC)/.media/wheel/µCity.png"
+idle
+shot style-logo
+
+# the full analog clock face
+begin
+on screensaver
+cfg screensaver idle=15 style=clock
+idle
+shot style-clock
+
+# the analog clock face over the dimmed images
+begin
+on screensaver
+cfg screensaver idle=15 style=clock face=over
+idle
+shot style-clock-over

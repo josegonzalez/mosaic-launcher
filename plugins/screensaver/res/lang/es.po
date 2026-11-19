@@ -48,6 +48,9 @@ msgstr "600"
 msgid "AM"
 msgstr "a. m."
 
+msgid "Analog clock"
+msgstr "Reloj analógico"
+
 msgid "Change"
 msgstr "Cambiar"
 
@@ -78,8 +81,14 @@ msgstr "Segundos por imagen"
 msgid "Show after idle (seconds)"
 msgstr "Mostrar tras inactividad (segundos)"
 
+msgid "Style"
+msgstr "Estilo"
+
 msgid "box"
 msgstr "caja"
+
+msgid "clock"
+msgstr "reloj"
 
 msgid "fade"
 msgstr "fundido"
@@ -87,11 +96,26 @@ msgstr "fundido"
 msgid "folder"
 msgstr "carpeta"
 
+msgid "full"
+msgstr "completo"
+
 msgid "games"
 msgstr "juegos"
 
+msgid "images"
+msgstr "imágenes"
+
+msgid "logo"
+msgstr "logotipo"
+
 msgid "off"
 msgstr "desactivado"
+
+msgid "over"
+msgstr "sobre imágenes"
+
+msgid "random"
+msgstr "al azar"
 
 msgid "screenshot"
 msgstr "captura"

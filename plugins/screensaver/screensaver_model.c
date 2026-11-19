@@ -59,6 +59,7 @@ int SS_parseSource(const char* setting) {
 	if (setting && !strcmp(setting, "screenshots")) return SS_SOURCE_SCREENSHOTS;
 	if (setting && !strcmp(setting, "folder")) return SS_SOURCE_FOLDER;
 	if (setting && !strcmp(setting, "videos")) return SS_SOURCE_VIDEOS;
+	if (setting && !strcmp(setting, "random")) return SS_SOURCE_RANDOM;
 	return SS_SOURCE_GAMES;
 }
 
@@ -66,11 +67,32 @@ const char* SS_sourceName(int source) {
 	if (source == SS_SOURCE_SCREENSHOTS) return "screenshots";
 	if (source == SS_SOURCE_FOLDER) return "folder";
 	if (source == SS_SOURCE_VIDEOS) return "videos";
+	if (source == SS_SOURCE_RANDOM) return "random";
 	return "games";
 }
 
 int SS_parseArt(const char* setting) {
 	return setting && !strcmp(setting, "screenshot") ? SS_ART_SCREENSHOT : SS_ART_BOX;
+}
+
+int SS_parseStyle(const char* setting) {
+	if (setting && !strcmp(setting, "logo")) return SS_STYLE_LOGO;
+	if (setting && !strcmp(setting, "clock")) return SS_STYLE_CLOCK;
+	return SS_STYLE_IMAGES;
+}
+
+const char* SS_styleName(int style) {
+	if (style == SS_STYLE_LOGO) return "logo";
+	if (style == SS_STYLE_CLOCK) return "clock";
+	return "images";
+}
+
+int SS_parseFace(const char* setting) {
+	return setting && !strcmp(setting, "over") ? SS_FACE_OVER : SS_FACE_FULL;
+}
+
+const char* SS_faceName(int face) {
+	return face == SS_FACE_OVER ? "over" : "full";
 }
 
 int SS_parseEffect(const char* setting) {
@@ -157,6 +179,10 @@ unsigned int SsFilter_frame(SsFilter* f, int open, unsigned int pressed, unsigne
 	return ~keep;
 }
 
+int SS_pressedAlone(unsigned int pressed, unsigned int keep, unsigned int button) {
+	return button && (pressed & ~keep) == button;
+}
+
 ///////////////////////////////////////
 // The images
 
@@ -177,13 +203,26 @@ int SS_poolAdd(SsPool* pool, const char* path) {
 }
 
 int SS_poolAddGame(SsPool* pool, const char* path, const char* game) {
+	return SS_poolAddNamed(pool, path, game, NULL, 0);
+}
+
+int SS_poolAddNamed(SsPool* pool, const char* path, const char* game, const char* name, int text) {
 	if (!path || !path[0] || strlen(path) >= SS_PATH_MAX || pool->count >= SS_POOL_MAX) return 0;
 	if (game && strlen(game) >= SS_PATH_MAX) return 0;
 	if (SS_poolFind(pool, path) >= 0) return 0;
-	snprintf(pool->paths[pool->count], SS_PATH_MAX, "%s", path);
-	snprintf(pool->games[pool->count], SS_PATH_MAX, "%s", game ? game : "");
-	pool->bad[pool->count] = 0;
 	pool->count++;
+	return SS_poolPut(pool, pool->count - 1, path, game, name, text);
+}
+
+int SS_poolPut(SsPool* pool, int index, const char* path, const char* game, const char* name, int text) {
+	if (index < 0 || index >= SS_POOL_MAX || !path || strlen(path) >= SS_PATH_MAX) return 0;
+	if (game && strlen(game) >= SS_PATH_MAX) return 0;
+	snprintf(pool->paths[index], SS_PATH_MAX, "%s", path);
+	snprintf(pool->games[index], SS_PATH_MAX, "%s", game ? game : "");
+	snprintf(pool->names[index], SS_NAME_MAX, "%s", name ? name : "");
+	pool->text[index] = text ? 1 : 0;
+	pool->bad[index] = 0;
+	if (pool->count <= index) pool->count = index + 1;
 	return 1;
 }
 
@@ -199,6 +238,34 @@ int SS_isImage(const char* name) {
 	if (!dot || dot == name) return 0;
 	return !strcasecmp(dot, ".png") || !strcasecmp(dot, ".jpg") || !strcasecmp(dot, ".jpeg")
 		|| !strcasecmp(dot, ".bmp");
+}
+
+void SS_gameName(const char* path, int is_dir, char* out, size_t size) {
+	if (!size) return;
+	const char* name = SS_baseName(path);
+	size_t len = strlen(name);
+	const char* dot = is_dir ? NULL : strrchr(name, '.');
+	if (dot && dot != name) len = (size_t)(dot - name);
+	snprintf(out, size, "%.*s", (int)len, name);
+}
+
+int SS_mediaPath(const char* game, int is_dir, const char* kind, int ext, char* out, size_t size) {
+	static const char* const exts[SS_MEDIA_EXTS] = { ".png", ".jpg", ".jpeg" };
+	if (!size) return -1;
+	out[0] = '\0';
+	if (!game || !kind || ext < 0 || ext >= SS_MEDIA_EXTS) return -1;
+	const char* slash = strrchr(game, '/');
+	if (!slash) return -1;
+	char name[SS_PATH_MAX];
+	SS_gameName(game, is_dir, name, sizeof(name));
+	if (!name[0]) return -1;
+	int n = snprintf(out, size, "%.*s/.media/%s%s%s%s", (int)(slash - game), game, kind, kind[0] ? "/" : "", name,
+		exts[ext]);
+	if (n < 0 || (size_t)n >= size) {
+		out[0] = '\0';
+		return -1;
+	}
+	return 0;
 }
 
 static int byName(const void* a, const void* b) {
@@ -284,6 +351,137 @@ int SsCycle_progress(const SsCycle* c, unsigned long now) {
 	long long p = (long long)(now - c->change_at) * 1000 / (long long)c->change_ms;
 	// smoothstep: 3p^2 - 2p^3, in thousandths
 	return (int)((3 * p * p * 1000 - 2 * p * p * p) / 1000000);
+}
+
+///////////////////////////////////////
+// The random source
+
+int SS_randomPick(int count, int avoid, int tries, SsRandom random, void* random_data, SsAccept accept,
+		void* accept_data) {
+	if (count <= 0 || !random || !accept) return -1;
+	if (count == 1) avoid = -1;
+	int fallback = -1;
+	for (int t = 0; t < tries; t++) {
+		int i = (int)random((unsigned long)count, random_data);
+		if (i < 0 || i >= count || i == avoid) continue;
+		int fit = accept(i, accept_data);
+		if (fit >= 2) return i;
+		if (fit == 1 && fallback < 0) fallback = i;
+	}
+	if (fallback >= 0) return fallback;
+	int start = (int)random((unsigned long)count, random_data);
+	if (start < 0 || start >= count) start = 0;
+	for (int step = 0; step < count; step++) {
+		int i = (start + step) % count;
+		if (i != avoid && accept(i, accept_data) > 0) return i;
+	}
+	return avoid >= 0 && avoid < count && accept(avoid, accept_data) > 0 ? avoid : -1;
+}
+
+unsigned long long SS_xorshift(unsigned long long* state) {
+	unsigned long long x = *state ? *state : 0x9E3779B97F4A7C15ULL;
+	x ^= x << 13;
+	x ^= x >> 7;
+	x ^= x << 17;
+	*state = x;
+	return x;
+}
+
+///////////////////////////////////////
+// Bouncing and drifting
+
+void SsBounce_init(SsBounce* b, int x, int y, int dx, int dy) {
+	b->x = (long)x * 1000;
+	b->y = (long)y * 1000;
+	b->dx = dx < 0 ? -1 : 1;
+	b->dy = dy < 0 ? -1 : 1;
+}
+
+// one axis: moves *pos by dist (thousandths) the way *dir goes, inside 0
+// to range (thousandths), and returns the edges it turned at
+static int bounceAxis(long* pos, int* dir, long long dist, long range) {
+	if (range <= 0) {
+		*pos = 0;
+		return 0;
+	}
+	if (*pos < 0) *pos = 0;
+	if (*pos > range) *pos = range;
+	int turns = 0;
+	// whole trips there and back change nothing but the count
+	long long trip = 2LL * range;
+	turns += (int)(dist / trip) * 2;
+	long long p = *pos + (long long)*dir * (dist % trip);
+	while (p < 0 || p > range) {
+		if (p < 0) {
+			p = -p;
+			*dir = 1;
+		}
+		else {
+			p = 2LL * range - p;
+			*dir = -1;
+		}
+		turns++;
+	}
+	*pos = (long)p;
+	return turns;
+}
+
+int SsBounce_step(SsBounce* b, unsigned long ms, int speed, int range_w, int range_h) {
+	long long dist = speed > 0 ? (long long)speed * (long long)ms : 0; // pixels a second for ms, in thousandths
+	int turns = bounceAxis(&b->x, &b->dx, dist, (long)range_w * 1000);
+	return turns + bounceAxis(&b->y, &b->dy, dist, (long)range_h * 1000);
+}
+
+int SsBounce_x(const SsBounce* b) {
+	return (int)(b->x / 1000);
+}
+
+int SsBounce_y(const SsBounce* b) {
+	return (int)(b->y / 1000);
+}
+
+///////////////////////////////////////
+// The analog clock
+
+void SS_handAngles(int hour, int minute, int second, int* hour_deg, int* minute_deg, int* second_deg) {
+	hour = ((hour % 12) + 12) % 12;
+	minute = minute < 0 ? 0 : minute % 60;
+	second = second < 0 ? 0 : second % 60;
+	*hour_deg = hour * 30 + minute / 2;
+	*minute_deg = minute * 6 + second / 10;
+	*second_deg = second * 6;
+}
+
+// sin of 0 to 90 degrees, in ten thousandths
+static const short sines[91] = {
+	0, 175, 349, 523, 698, 872, 1045, 1219, 1392, 1564, 1736, 1908, 2079, 2250, 2419, 2588, 2756, 2924, 3090,
+	3256, 3420, 3584, 3746, 3907, 4067, 4226, 4384, 4540, 4695, 4848, 5000, 5150, 5299, 5446, 5592, 5736, 5878,
+	6018, 6157, 6293, 6428, 6561, 6691, 6820, 6947, 7071, 7193, 7314, 7431, 7547, 7660, 7771, 7880, 7986, 8090,
+	8192, 8290, 8387, 8480, 8572, 8660, 8746, 8829, 8910, 8988, 9063, 9135, 9205, 9272, 9336, 9397, 9455, 9511,
+	9563, 9613, 9659, 9703, 9744, 9781, 9816, 9848, 9877, 9903, 9925, 9945, 9962, 9976, 9986, 9994, 9998, 10000,
+};
+
+static int sine(int degrees) {
+	degrees = ((degrees % 360) + 360) % 360;
+	if (degrees <= 90) return sines[degrees];
+	if (degrees <= 180) return sines[180 - degrees];
+	if (degrees <= 270) return -sines[degrees - 180];
+	return -sines[360 - degrees];
+}
+
+static int rounded(long long n) {
+	return (int)(n >= 0 ? (n + 5000) / 10000 : -((-n + 5000) / 10000));
+}
+
+void SS_handPoint(int degrees, int length, int* dx, int* dy) {
+	*dx = rounded((long long)length * sine(degrees));
+	*dy = -rounded((long long)length * sine(degrees + 90));
+}
+
+int SS_faceRadius(int w, int h, int face) {
+	int side = w < h ? w : h;
+	if (side <= 0) return 0;
+	return face == SS_FACE_OVER ? side * 9 / 20 : side * 2 / 5;
 }
 
 ///////////////////////////////////////

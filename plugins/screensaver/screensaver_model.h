@@ -45,9 +45,11 @@ enum SsSource {
 	SS_SOURCE_SCREENSHOTS, // the card's Screenshots folder
 	SS_SOURCE_FOLDER,      // the folder setting's folder
 	SS_SOURCE_VIDEOS,      // as games, playing the games' clips through video-previews
+	SS_SOURCE_RANDOM,      // a random game from the card index each time
 };
 
-// "games", "screenshots", "folder" or "videos", or games for anything else.
+// "games", "screenshots", "folder", "videos" or "random", or games for
+// anything else.
 int SS_parseSource(const char* setting);
 const char* SS_sourceName(int source);
 
@@ -58,6 +60,25 @@ enum SsArt {
 
 // "box" or "screenshot", or box for anything else.
 int SS_parseArt(const char* setting);
+
+enum SsStyle {
+	SS_STYLE_IMAGES, // the source's images, full screen
+	SS_STYLE_LOGO,   // the game's wheel logo, or its name, bouncing on black
+	SS_STYLE_CLOCK,  // an analog clock face
+};
+
+// "images", "logo" or "clock", or images for anything else.
+int SS_parseStyle(const char* setting);
+const char* SS_styleName(int style);
+
+enum SsFace {
+	SS_FACE_FULL, // the face alone on black, drifting
+	SS_FACE_OVER, // the face over the source's dimmed images
+};
+
+// "full" or "over", or full for anything else.
+int SS_parseFace(const char* setting);
+const char* SS_faceName(int face);
 
 enum SsEffect {
 	SS_EFFECT_FADE,
@@ -116,6 +137,10 @@ typedef struct SsFilter {
 unsigned int SsFilter_frame(SsFilter* f, int open, unsigned int pressed, unsigned int held, unsigned int keep,
 	unsigned int toggle, int* close, int* toggled);
 
+// 1 when a frame's press, leaving out keep, is button alone, as A alone
+// launches the random source's game as it closes the screen.
+int SS_pressedAlone(unsigned int pressed, unsigned int keep, unsigned int button);
+
 ///////////////////////////////////////
 // The images
 
@@ -123,9 +148,13 @@ unsigned int SsFilter_frame(SsFilter* f, int open, unsigned int pressed, unsigne
 #define SS_PATH_MAX 512
 #define SS_SCAN_MAX 4096 // names looked at in a folder, at most
 
+#define SS_NAME_MAX 128
+
 typedef struct SsPool {
 	char paths[SS_POOL_MAX][SS_PATH_MAX];
 	char games[SS_POOL_MAX][SS_PATH_MAX]; // the game an image is art of, or ""
+	char names[SS_POOL_MAX][SS_NAME_MAX]; // that game's name, or ""
+	unsigned char text[SS_POOL_MAX]; // 1 when it shows the name in place of an image
 	unsigned char bad[SS_POOL_MAX]; // 1 when it couldn't be loaded, so it's skipped
 	int count;
 } SsPool;
@@ -138,6 +167,14 @@ int SS_poolAdd(SsPool* pool, const char* path);
 // The same, for a game's art: game is the game's full path (NULL or "" for
 // none), kept beside the image for its clip. Too long a game isn't added.
 int SS_poolAddGame(SsPool* pool, const char* path, const char* game);
+// The same, with the game's name (NULL or "" for none, cut to fit), and
+// text 1 when the name shows in place of an image: path is then the
+// game's own, so it's still one entry per game.
+int SS_poolAddNamed(SsPool* pool, const char* path, const char* game, const char* name, int text);
+// Puts an entry at index, below SS_POOL_MAX, whatever was there, and
+// grows count to cover it: the random source's two places, one showing
+// and one next. Returns 1, or 0 for a bad index or too long a path.
+int SS_poolPut(SsPool* pool, int index, const char* path, const char* game, const char* name, int text);
 
 // The index of path, or -1.
 int SS_poolFind(const SsPool* pool, const char* path);
@@ -149,6 +186,18 @@ const char* SS_baseName(const char* path);
 // case) with something before the extension, not hidden (a leading dot,
 // as macOS's ._ files have) and with no slash.
 int SS_isImage(const char* name);
+
+// The name of a game for when nothing better is known: its file name
+// without its last extension, or a folder's whole name (is_dir 1).
+void SS_gameName(const char* path, int is_dir, char* out, size_t size);
+
+#define SS_MEDIA_EXTS 3 // .png, .jpg and .jpeg
+
+// <dir>/.media/<kind>/<name><ext> for a game in dir, its name as
+// SS_gameName has it and ext 0 to SS_MEDIA_EXTS - 1, such as kind "wheel"
+// for its logo, or <dir>/.media/<name><ext> for kind "", stock's art. Returns 0, or -1 for no name, a bad ext or a path that
+// doesn't fit (writing "").
+int SS_mediaPath(const char* game, int is_dir, const char* kind, int ext, char* out, size_t size);
 
 // Adds dir's images to pool in name order, regular files only (a link to
 // one counts), up to the pool's room. Returns how many were added, or -1
@@ -192,6 +241,66 @@ int SsCycle_step(SsCycle* c, unsigned long now, int next_ready);
 
 // How far a change has gone, from 0 to 1000, eased in and out.
 int SsCycle_progress(const SsCycle* c, unsigned long now);
+
+///////////////////////////////////////
+// The random source
+
+// A random source: a number from 0 to below - 1.
+typedef unsigned long (*SsRandom)(unsigned long below, void* data);
+
+// How well index suits: 0 not at all, 1 it can show, 2 it has all the
+// style shows, such as art.
+typedef int (*SsAccept)(int index, void* data);
+
+// Picks an index below count: up to tries random ones, the first that
+// accept gives 2, else the first it gave 1; when none did, the first it
+// takes going round from a random index. avoid (the game showing, or -1)
+// is left out while there's another. -1 when accept takes none.
+int SS_randomPick(int count, int avoid, int tries, SsRandom random, void* random_data, SsAccept accept,
+	void* accept_data);
+
+// A small generator (xorshift64): state is the seed, then kept between
+// calls. A zero state is replaced with a fixed one.
+unsigned long long SS_xorshift(unsigned long long* state);
+
+///////////////////////////////////////
+// Bouncing and drifting
+
+// Something moving inside a box and turning at its edges, as a DVD logo
+// does: its top left, in thousandths of a pixel from the box's, and which
+// way it goes on each axis (1 or -1).
+typedef struct SsBounce {
+	long x, y;
+	int dx, dy;
+} SsBounce;
+
+void SsBounce_init(SsBounce* b, int x, int y, int dx, int dy);
+
+// Moves it speed pixels a second for ms, with its top left kept from 0 to
+// range_w and 0 to range_h (the box less its size; 0 or less holds it at
+// 0), turning at each edge it reaches. A range smaller than before moves
+// it inside first. Returns how many edges it turned at.
+int SsBounce_step(SsBounce* b, unsigned long ms, int speed, int range_w, int range_h);
+
+// Its top left in whole pixels.
+int SsBounce_x(const SsBounce* b);
+int SsBounce_y(const SsBounce* b);
+
+///////////////////////////////////////
+// The analog clock
+
+// The hands' angles in degrees, clockwise from 12: the hour hand moves
+// on through the hour and the minute hand through the minute, each by
+// whole degrees, and the second hand by the second.
+void SS_handAngles(int hour, int minute, int second, int* hour_deg, int* minute_deg, int* second_deg);
+
+// Where a hand of length ends at degrees from 12, from the centre, with y
+// going down.
+void SS_handPoint(int degrees, int length, int* dx, int* dy);
+
+// The face's radius in a w by h area: two fifths of the shorter side, so
+// a full face has room to drift, or nine twentieths over the images.
+int SS_faceRadius(int w, int h, int face);
 
 ///////////////////////////////////////
 // Drawing

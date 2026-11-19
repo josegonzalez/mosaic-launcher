@@ -7,7 +7,7 @@
 # closes it. It opens and closes the same over screener's home screen.
 # 840-ambient-interop.sh has it with charging-screen
 SS_DIR="$CARD/Screensaver Case"
-mkdir -p "$SS_DIR"
+mkdir -p "$SS_DIR" "$STATE"
 cp "$ROOT/tests/plugins/peeker/art.png" "$SS_DIR/a.png"
 cp "$ROOT/tests/plugins/peeker/art.png" "$SS_DIR/b.png"
 printf 'not an image\n' >"$SS_DIR/broken.png"
