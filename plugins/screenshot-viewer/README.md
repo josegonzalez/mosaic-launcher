@@ -54,6 +54,10 @@ A screenshot across the screen.
 
 ![A screenshot across the screen](docs/full.png)
 
+A game's media, from Y on Tobu Tobu Girl Deluxe in the game list, on its screenshot.
+
+![A game's media, from Y on Tobu Tobu Girl Deluxe in the game list, on its screenshot](docs/media.png)
+
 The Screenshots tile on the quick menu (on by default).
 
 ![The Screenshots tile on the quick menu (on by default)](docs/tile.png)
