@@ -146,3 +146,48 @@ msgstr "Hoy"
 
 msgid "Yesterday"
 msgstr "Ayer"
+
+msgid "12h"
+msgstr "12 h"
+
+msgid "24h"
+msgstr "24 h"
+
+msgid "RESUME"
+msgstr "CONTINUAR"
+
+msgid "Consoles"
+msgstr "Consolas"
+
+msgid "Home rows"
+msgstr "Filas de inicio"
+
+msgid "Minimal clock"
+msgstr "Reloj del modo mínimo"
+
+msgid "No games on the card"
+msgstr "No hay juegos en la tarjeta"
+
+msgid "RANDOM"
+msgstr "AL AZAR"
+
+msgid "NEWLY ADDED"
+msgstr "NUEVOS"
+
+msgid "RECENT"
+msgstr "RECIENTES"
+
+msgid "Reading the card"
+msgstr "Leyendo la tarjeta"
+
+msgid "SHORTCUTS"
+msgstr "ATAJOS"
+
+msgid "Shortcuts"
+msgstr "Atajos"
+
+msgid "consoles"
+msgstr "consolas"
+
+msgid "minimal"
+msgstr "mínimo"

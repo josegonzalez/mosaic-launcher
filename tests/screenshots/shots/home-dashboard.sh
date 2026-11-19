@@ -19,6 +19,31 @@ on home-dashboard
 cfg home-dashboard mode=minui
 shot mode-minui
 
+# every game row, down on the third: Recently added
+begin
+on home-dashboard
+cfg home-dashboard "rows=continue, recent, added, played, random"
+press "down down down"
+shot rows
+
+begin
+on search random-game activity-stats system-info home-dashboard
+cfg random-game tile=on
+cfg home-dashboard "rows=recent, shortcuts"
+press "down down"
+shot shortcuts
+
+begin
+on home-dashboard
+cfg home-dashboard mode=minimal
+shot mode-minimal
+
+begin
+on home-dashboard
+cfg home-dashboard mode=consoles
+press "wait"
+shot mode-consoles
+
 begin
 on playtime-captions home-dashboard
 shot with-playtime-captions

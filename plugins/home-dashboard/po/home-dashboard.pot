@@ -61,6 +61,14 @@ msgstr ""
 msgid "%s played"
 msgstr ""
 
+#: plugin.txt
+msgid "12h"
+msgstr ""
+
+#: plugin.txt
+msgid "24h"
+msgstr ""
+
 #: home_model.c
 msgid "<1m"
 msgstr ""
@@ -79,6 +87,10 @@ msgstr ""
 
 #: home_dashboard.c
 msgid "Checking achievements"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Consoles"
 msgstr ""
 
 #: home_dashboard.c
@@ -102,12 +114,24 @@ msgstr ""
 msgid "Home mode"
 msgstr ""
 
+#: plugin.txt
+msgid "Home rows"
+msgstr ""
+
 #: home_dashboard.c
 msgid "Its emulator isn't installed"
 msgstr ""
 
-#: home_dashboard.c
+#: home_dashboard.c home_model.c
 msgid "MOST PLAYED"
+msgstr ""
+
+#: plugin.txt
+msgid "Minimal clock"
+msgstr ""
+
+#: home_model.c
+msgid "NEWLY ADDED"
 msgstr ""
 
 #: home_dashboard.c
@@ -120,6 +144,10 @@ msgstr ""
 
 #: home_dashboard.c
 msgid "No favorites yet"
+msgstr ""
+
+#: home_dashboard.c
+msgid "No games on the card"
 msgstr ""
 
 #: home_dashboard.c
@@ -146,12 +174,36 @@ msgstr ""
 msgid "Played today"
 msgstr ""
 
+#: home_model.c
+msgid "RANDOM"
+msgstr ""
+
+#: home_model.c
+msgid "RECENT"
+msgstr ""
+
 #: home_dashboard.c
 msgid "RECENTLY DOWNLOADED"
 msgstr ""
 
+#: home_model.c
+msgid "RESUME"
+msgstr ""
+
+#: home_dashboard.c
+msgid "Reading the card"
+msgstr ""
+
 #: home_dashboard.c
 msgid "Recently played"
+msgstr ""
+
+#: home_model.c
+msgid "SHORTCUTS"
+msgstr ""
+
+#: plugin.txt
+msgid "Shortcuts"
 msgstr ""
 
 #: home_model.c
@@ -179,7 +231,15 @@ msgid "Yesterday"
 msgstr ""
 
 #: plugin.txt
+msgid "consoles"
+msgstr ""
+
+#: plugin.txt
 msgid "dashboard"
+msgstr ""
+
+#: plugin.txt
+msgid "minimal"
 msgstr ""
 
 #: plugin.txt

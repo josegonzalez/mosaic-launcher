@@ -28,7 +28,7 @@ static const char* trPlural(const char* singular, const char* plural, unsigned l
 	return n == 1 ? singular : plural;
 }
 
-static const char* const mode_names[] = { "dashboard", "minui", "retroachievements", "pico8" };
+static const char* const mode_names[] = { "dashboard", "minui", "retroachievements", "pico8", "minimal", "consoles" };
 
 int HD_modeOf(const char* name) {
 	if (!name) return HD_MODE_DASHBOARD;
@@ -89,22 +89,244 @@ int HD_tabStep(int index, int count, int delta) {
 	return next < 0 ? next + count : next;
 }
 
-int HD_homeMove(int focus, int shelf_count, int button) {
-	if (shelf_count <= 0) return HD_FOCUS_CONTINUE;
-	if (focus >= shelf_count) focus = shelf_count - 1;
+void HD_rowsMove(HDFocus* focus, const int* counts, int rows, int button) {
+	if (rows <= 0 || focus->row >= rows) {
+		focus->row = rows > 0 ? rows - 1 : HD_FOCUS_CONTINUE;
+		focus->col = 0;
+	}
+	if (focus->row == HD_FOCUS_CONTINUE) {
+		focus->col = 0;
+		if (rows > 0 && (button == MOSAIC_BUTTON_DOWN || button == MOSAIC_BUTTON_RIGHT)) focus->row = 0;
+		return;
+	}
+	int last = counts[focus->row] - 1;
+	if (focus->col > last) focus->col = last > 0 ? last : 0;
 	switch (button) {
 		case MOSAIC_BUTTON_DOWN:
-			return focus == HD_FOCUS_CONTINUE ? 0 : focus;
+			if (focus->row + 1 < rows) focus->row++;
+			break;
 		case MOSAIC_BUTTON_UP:
-			return HD_FOCUS_CONTINUE;
+			focus->row--;
+			break;
 		case MOSAIC_BUTTON_LEFT:
-			if (focus == HD_FOCUS_CONTINUE) return focus;
-			return focus - 1 < 0 ? HD_FOCUS_CONTINUE : focus - 1;
+			if (focus->col > 0) focus->col--;
+			else if (focus->row == 0) focus->row = HD_FOCUS_CONTINUE;
+			break;
 		case MOSAIC_BUTTON_RIGHT:
-			if (focus == HD_FOCUS_CONTINUE) return 0;
-			return focus + 1 < shelf_count ? focus + 1 : focus;
+			if (focus->col < last) focus->col++;
+			break;
 	}
-	return focus;
+	if (focus->row == HD_FOCUS_CONTINUE) focus->col = 0;
+	else if (focus->col > counts[focus->row] - 1) focus->col = counts[focus->row] > 0 ? counts[focus->row] - 1 : 0;
+}
+
+int HD_listNext(const char** p, char* out, size_t size) {
+	if (size) out[0] = '\0';
+	if (!p || !*p) return 0;
+	const char* s = *p;
+	for (;;) {
+		while (*s == ',' || isspace((unsigned char)*s)) s++;
+		if (!*s) {
+			*p = s;
+			return 0;
+		}
+		const char* start = s;
+		while (*s && *s != ',') s++;
+		const char* end = s;
+		while (end > start && isspace((unsigned char)end[-1])) end--;
+		if (end > start) {
+			snprintf(out, size, "%.*s", (int)(end - start), start);
+			*p = s;
+			return 1;
+		}
+	}
+}
+
+static const char* const row_names[HD_ROW_KINDS] = { "continue", "recent", "added", "played", "random", "shortcuts" };
+
+int HD_parseRows(const char* text, int* out, int max, char* unknown, size_t size) {
+	if (size) unknown[0] = '\0';
+	int n = 0;
+	char name[64];
+	const char* p = text;
+	while (HD_listNext(&p, name, sizeof(name))) {
+		int row = -1;
+		for (int i = 0; i < HD_ROW_KINDS && row < 0; i++) {
+			if (!strcasecmp(name, row_names[i])) row = i;
+		}
+		if (row < 0) {
+			size_t used = strlen(unknown);
+			if (used < size) snprintf(unknown + used, size - used, "%s%s", used ? "," : "", name);
+			continue;
+		}
+		int seen = 0;
+		for (int i = 0; i < n && !seen; i++) seen = out[i] == row;
+		if (!seen && n < max) out[n++] = row;
+	}
+	return n;
+}
+
+const char* HD_rowName(int row) {
+	return row >= 0 && row < HD_ROW_KINDS ? row_names[row] : "";
+}
+
+const char* HD_rowLabel(int row) {
+	switch (row) {
+		case HD_ROW_CONTINUE: return TR_MARK("RESUME");
+		case HD_ROW_RECENT: return TR_MARK("RECENT");
+		case HD_ROW_ADDED: return TR_MARK("NEWLY ADDED");
+		case HD_ROW_PLAYED: return TR_MARK("MOST PLAYED");
+		case HD_ROW_RANDOM: return TR_MARK("RANDOM");
+		case HD_ROW_SHORTCUTS: return TR_MARK("SHORTCUTS");
+	}
+	return "";
+}
+
+int HD_recentPick(int row, const int* can_resume, const int* available, int count, int* out, int max) {
+	int n = 0;
+	for (int i = 1; i < count && n < max; i++) {
+		if (row == HD_ROW_CONTINUE && (!can_resume[i] || !available[i])) continue;
+		out[n++] = i;
+	}
+	return n;
+}
+
+int HD_topAdd(long long* keys, int* ids, int n, int max, long long key, int id) {
+	if (max <= 0) return 0;
+	int at = n;
+	while (at > 0 && keys[at - 1] < key) at--;
+	if (at >= max) return n;
+	int last = n < max ? n : max - 1;
+	for (int k = last; k > at; k--) {
+		keys[k] = keys[k - 1];
+		ids[k] = ids[k - 1];
+	}
+	keys[at] = key;
+	ids[at] = id;
+	return n < max ? n + 1 : n;
+}
+
+unsigned int HD_random(unsigned int* state) {
+	unsigned int x = *state ? *state : 1;
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	*state = x;
+	return x;
+}
+
+int HD_reservoir(int* out, int want, int seen, int id, unsigned int* state) {
+	if (want <= 0 || seen < 0) return 0;
+	if (seen < want) {
+		out[seen] = id;
+		return seen + 1;
+	}
+	unsigned int at = HD_random(state) % (unsigned int)(seen + 1);
+	if (at < (unsigned int)want) out[at] = id;
+	return want;
+}
+
+void HD_systemName(const char* folder, char* out, size_t size) {
+	snprintf(out, size, "%s", folder ? folder : "");
+	char* open = strrchr(out, '(');
+	if (!open || open == out || !strchr(open, ')')) return;
+	while (open > out && open[-1] == ' ') open--;
+	if (open > out) *open = '\0';
+}
+
+int HD_consoleAdd(HDConsole* list, int count, int max, int kind, int emulator, const char* system, const char* path,
+		const char* name, int counts) {
+	if (!system) return count;
+	if (kind == MOSAIC_INDEX_SYSTEM) {
+		if (!emulator || count >= max || !path) return count;
+		HDConsole* c = &list[count];
+		memset(c, 0, sizeof(*c));
+		snprintf(c->system, sizeof(c->system), "%s", system);
+		snprintf(c->path, sizeof(c->path), "%s", path);
+		HD_systemName(name && name[0] ? name : system, c->name, sizeof(c->name));
+		return count + 1;
+	}
+	if (kind != MOSAIC_INDEX_GAME || !counts) return count;
+	// a system's entries follow it, so its console is the last, or near it
+	for (int i = count - 1; i >= 0; i--) {
+		if (!strcmp(list[i].system, system)) {
+			list[i].games++;
+			break;
+		}
+	}
+	return count;
+}
+
+int HD_consolesKeep(HDConsole* list, int count) {
+	int n = 0;
+	for (int i = 0; i < count; i++) {
+		if (list[i].games <= 0) continue;
+		if (n != i) list[n] = list[i];
+		n++;
+	}
+	return n;
+}
+
+static void trimEnd(char* text) {
+	size_t len = strlen(text);
+	while (len && text[len - 1] == ' ') text[--len] = '\0';
+}
+
+int HD_wrap(const char* text, int width, int (*measure)(const char* text, void* data), void* data,
+		char lines[][HD_LINE_MAX], int max_lines) {
+	int n = 0;
+	if (!text || max_lines <= 0) return 0;
+	const char* p = text;
+	while (*p == ' ') p++;
+	while (*p && n < max_lines) {
+		char* line = lines[n];
+		line[0] = '\0';
+		if (n == max_lines - 1) {
+			// the rest, cut when it's drawn
+			snprintf(line, HD_LINE_MAX, "%s", p);
+			trimEnd(line);
+			n++;
+			break;
+		}
+		// as many words as fit, at least one
+		const char* end = p;
+		for (;;) {
+			const char* next = end;
+			while (*next == ' ') next++;
+			while (*next && *next != ' ') next++;
+			char trial[HD_LINE_MAX];
+			snprintf(trial, sizeof(trial), "%.*s", (int)(next - p), p);
+			if (end != p && measure(trial, data) > width) break;
+			end = next;
+			if (!*end) break;
+		}
+		snprintf(line, HD_LINE_MAX, "%.*s", (int)(end - p), p);
+		trimEnd(line);
+		n++;
+		p = end;
+		while (*p == ' ') p++;
+	}
+	return n;
+}
+
+int HD_linesFit(char lines[][HD_LINE_MAX], int count, int width, int (*measure)(const char* text, void* data), void* data) {
+	for (int i = 0; i < count; i++) {
+		if (measure(lines[i], data) > width) return 0;
+	}
+	return 1;
+}
+
+int HD_linesTop(const MosaicRect* box, int lines, int line_h) {
+	return box->y + (box->h - lines * line_h) / 2;
+}
+
+void HD_clock(int hour, int minute, int h24, char* out, size_t size) {
+	if (h24) {
+		snprintf(out, size, "%02i:%02i", hour, minute);
+		return;
+	}
+	int h = hour % 12;
+	snprintf(out, size, "%i:%02i %s", h ? h : 12, minute, hour < 12 ? "AM" : "PM");
 }
 
 int HD_listMove(int selected, int count, int delta, int wrap) {
@@ -250,6 +472,18 @@ int HD_cellsFit(int width, int cell, int gap) {
 	return (width + gap) / (cell + gap);
 }
 
+// the continue card's art, square at its left, and its text beside it
+static void cardParts(HDLayout* out, int pad) {
+	int art = out->card.h - 2 * pad;
+	if (art > out->card.w / 2) art = out->card.w / 2;
+	if (art < 0) art = 0;
+	out->art = (MosaicRect){ out->card.x + pad, out->card.y + (out->card.h - art) / 2, art, art };
+	out->text.x = out->art.x + out->art.w + pad;
+	out->text.y = out->card.y + pad;
+	out->text.w = out->card.x + out->card.w - pad - out->text.x;
+	out->text.h = out->card.h - 2 * pad;
+}
+
 int HD_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int top_h, int hints_y,
 		int scale, int name_h, int shelf_on, HDLayout* out) {
 	memset(out, 0, sizeof(*out));
@@ -289,14 +523,59 @@ int HD_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect
 		}
 	}
 
-	int art = out->card.h - 2 * pad;
-	if (art > out->card.w / 2) art = out->card.w / 2;
-	if (art < 0) art = 0;
-	out->art = (MosaicRect){ out->card.x + pad, out->card.y + (out->card.h - art) / 2, art, art };
-	out->text.x = out->art.x + out->art.w + pad;
-	out->text.y = out->card.y + pad;
-	out->text.w = out->card.x + out->card.w - pad - out->text.x;
-	out->text.h = out->card.h - 2 * pad;
+	cardParts(out, pad);
+	return 0;
+}
+
+void HD_layoutTitle(HDLayout* layout, int title_h, int card_min_h, int name_h, int scale) {
+	if (!layout->cells || title_h <= 0) return;
+	if (scale < 1) scale = 1;
+	int from_card = layout->card.h - card_min_h;
+	if (from_card > title_h) from_card = title_h;
+	if (from_card < 0) from_card = 0;
+	int from_shelf = title_h - from_card;
+	HDLayout titled = *layout;
+	titled.card.h -= from_card;
+	titled.shelf.y += from_shelf;
+	titled.shelf.h -= from_shelf;
+	titled.cell = titled.shelf.h - name_h - 4 * scale;
+	if (titled.cell < 16 * scale) return; // no room: no heading
+	titled.cells = HD_cellsFit(titled.shelf.w, titled.cell, titled.gap);
+	if (!titled.cells) return;
+	cardParts(&titled, titled.gap);
+	*layout = titled;
+}
+
+int HD_minimalLayout(const MosaicRect* content, int clock_h, int scale, HDLayout* out) {
+	memset(out, 0, sizeof(*out));
+	if (scale < 1) scale = 1;
+	int pad = 10 * scale;
+	out->content = *content;
+	out->gap = pad;
+	int room = content->h - clock_h - pad;
+	if (content->w <= 0 || room < 40 * scale) return -1;
+	int h = content->h * 55 / 100;
+	if (h > room) h = room;
+	int w = content->w * 80 / 100;
+	int top = content->y + clock_h + pad;
+	out->card = (MosaicRect){ content->x + (content->w - w) / 2, top + (room - h) / 2, w, h };
+	cardParts(out, pad);
+	return 0;
+}
+
+int HD_grid(const MosaicRect* content, int scale, int name_h, int* cell, int* cols, int* rows) {
+	if (scale < 1) scale = 1;
+	int gap = 10 * scale;
+	*rows = 2;
+	*cell = (content->h - *rows * name_h - gap * (*rows - 1)) / *rows;
+	if (*cell < 16 * scale) {
+		*rows = 1;
+		*cell = content->h - name_h;
+	}
+	*cols = 0;
+	if (*cell < 8 * scale) return -1;
+	*cols = HD_cellsFit(content->w, *cell, gap);
+	if (*cols < 1) *cols = 1;
 	return 0;
 }
 

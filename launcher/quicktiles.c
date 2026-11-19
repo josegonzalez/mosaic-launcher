@@ -107,6 +107,21 @@ int QuickTile_isOff(const QuickTile* tile) {
 	return !on;
 }
 
+int QuickTiles_icon(const char* action_id, char* out, size_t size) {
+	if (!out || !size) return -1;
+	out[0] = '\0';
+	if (!action_id) return -1;
+	for (int i = 0; i < tile_count; i++) {
+		if (strcmp(tiles[i].action->id, action_id) != 0) continue;
+		const char* icon = QuickTile_isOff(&tiles[i]) && tiles[i].icon_off ? tiles[i].icon_off : tiles[i].icon;
+		if (!icon) return 0;
+		if (strlen(icon) >= size) return -1;
+		snprintf(out, size, "%s", icon);
+		return 0;
+	}
+	return -1;
+}
+
 void QuickTiles_apply(Array* entries, int row) {
 	if (!QuickTiles_any()) return;
 	for (int i = entries->count - 1; i >= 0; i--) {

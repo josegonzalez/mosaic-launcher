@@ -727,6 +727,9 @@ static int hostQuickTile(const char* action_id, int row, const char* icon, const
 	state.rebuild_quick = 1;
 	return 0;
 }
+static int hostQuickTileIcon(const char* action_id, char* out, size_t size) {
+	return QuickTiles_icon(action_id, out, size);
+}
 static int hostHideQuickTile(const char* name, int hidden) {
 	if (QuickTiles_hide(name, hidden) != 0) return -1;
 	state.rebuild_quick = 1;
@@ -2387,6 +2390,7 @@ static const MosaicHost host = {
 	.screen_buttons = hostScreenButtons,
 	.surface_blur = hostSurfaceBlur,
 	.draw_ring = PluginDraw_drawRing,
+	.quick_tile_icon = hostQuickTileIcon,
 };
 
 ///////////////////////////////////////

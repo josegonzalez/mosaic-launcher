@@ -1,8 +1,9 @@
-// Home dashboard, without the host: the home modes and their tabs, moving
-// through a tab, the text the dashboard shows (play time, time left,
-// RetroAchievements progress), which games are most played, which
-// folders hold Pico-8 carts, and where things go on the screen. No SDL and no file access, so it's tested on
-// the host.
+// Home dashboard, without the host: the home modes and their tabs, the
+// home tab's rows and which games each picks, moving through them, the
+// text the dashboard shows (play time, time left, RetroAchievements
+// progress, the clock), which games are most played, which folders hold
+// Pico-8 carts, the consoles and their game counts, and where things go on
+// the screen. No SDL and no file access, so it's tested on the host.
 
 #ifndef HOME_MODEL_H
 #define HOME_MODEL_H
@@ -27,6 +28,8 @@ enum HDMode {
 	HD_MODE_MINUI,            // a plain list of recent games, then Games
 	HD_MODE_RETROACHIEVEMENTS, // recent and pinned games with their achievements
 	HD_MODE_PICO8,            // the card's Pico-8 carts as a grid
+	HD_MODE_MINIMAL,          // the continue card and the clock
+	HD_MODE_CONSOLES,         // every system as a tile with its game count
 };
 
 // The dashboard's tabs.
@@ -38,8 +41,9 @@ enum HDTab {
 
 #define HD_TABS_MAX 3
 
-// The mode a setting names: "dashboard", "minui", "retroachievements" or
-// "pico8", or HD_MODE_DASHBOARD for anything else.
+// The mode a setting names: "dashboard", "minui", "retroachievements",
+// "pico8", "minimal" or "consoles", or HD_MODE_DASHBOARD for anything
+// else.
 int HD_modeOf(const char* name);
 const char* HD_modeName(int mode);
 
@@ -60,16 +64,102 @@ int HD_tabIndex(const int* tabs, int count, int tab);
 // The tab index after moving by delta (-1 or 1), wrapping around.
 int HD_tabStep(int index, int count, int delta);
 
-// The home tab's focus: HD_FOCUS_CONTINUE for the continue card, or a top
-// shelf card's index from 0.
-#define HD_FOCUS_CONTINUE -1
+// The rows under the home tab's continue card the "rows" setting names.
+enum HDRow {
+	HD_ROW_CONTINUE,  // continue: the other recent games with a save state to resume
+	HD_ROW_RECENT,    // recent: the games played before the last one (the top shelf)
+	HD_ROW_ADDED,     // added: the games put on the card last
+	HD_ROW_PLAYED,    // played: the most played games
+	HD_ROW_RANDOM,    // random: games picked at random
+	HD_ROW_SHORTCUTS, // shortcuts: tiles that run the actions the "shortcuts" setting names
+	HD_ROW_KINDS,
+};
 
-// Where the home tab's focus goes for a d-pad button (MOSAIC_BUTTON_UP,
-// DOWN, LEFT or RIGHT): down from the card to the shelf's first card, up
-// back to the card, and left and right along the shelf, stopping at its
-// ends (left from the first card goes to the continue card). With no
-// shelf, the focus stays on the card.
-int HD_homeMove(int focus, int shelf_count, int button);
+#define HD_ROWS_DEFAULT "continue, recent"
+#define HD_SHORTCUTS_DEFAULT "search, random-game, activity-stats, system-info"
+
+// The next name in a comma-separated list from *p, without spaces round
+// it, written to out, moving *p past it. Returns 1, or 0 at the end. Empty
+// names are skipped.
+int HD_listNext(const char** p, char* out, size_t size);
+
+// The rows a "rows" setting names, in its order, each once, ignoring case,
+// written to out; up to max. The names it doesn't know go to unknown,
+// comma-separated, for the log. Returns how many.
+int HD_parseRows(const char* text, int* out, int max, char* unknown, size_t size);
+// A row's name in the setting ("recent"), and its heading as drawn
+// ("RECENTLY PLAYED").
+const char* HD_rowName(int row);
+const char* HD_rowLabel(int row);
+
+// The recent games a continue or recent row shows, by their index in the
+// recents: every one after the first (which is on the continue card), and
+// for continue only those available with a save state to resume. Returns
+// how many, up to max.
+int HD_recentPick(int row, const int* can_resume, const int* available, int count, int* out, int max);
+
+// Keeps the max largest keys, largest first, ties in the order added, with
+// each one's id beside it in ids: adds key and id to the n kept so far and
+// returns how many are kept now. For the games added last, by time.
+int HD_topAdd(long long* keys, int* ids, int n, int max, long long key, int id);
+
+// A random number from *state, which it moves on (a xorshift); a state of
+// 0 is taken as 1.
+unsigned int HD_random(unsigned int* state);
+// Picks want of a stream of ids at random, each as likely (reservoir
+// sampling): seen is how many came before id. Returns how many of out are
+// filled now.
+int HD_reservoir(int* out, int want, int seen, int id, unsigned int* state);
+
+// A system as the consoles mode shows it.
+typedef struct HDConsole {
+	char system[128]; // its folder's name, as the card index gives it
+	char name[128];   // the name to show, without its tag
+	char path[512];   // its full path
+	int games;        // its games, leaving out what a filter hides
+} HDConsole;
+
+// A system folder's name without its last "(...)" tag and the spaces
+// before it: "Game Boy" for "Game Boy (GB)".
+void HD_systemName(const char* folder, char* out, size_t size);
+// Adds one card index entry to the consoles, as the index lists them, each
+// system folder before what's in it: a system folder with an emulator
+// starts one, and a game (kind MOSAIC_INDEX_GAME) that counts (not hidden)
+// adds to its system's. Returns how many consoles there are now, up to max.
+int HD_consoleAdd(HDConsole* list, int count, int max, int kind, int emulator, const char* system, const char* path,
+	const char* name, int counts);
+// Drops the consoles with no games, keeping the order. Returns how many
+// are left.
+int HD_consolesKeep(HDConsole* list, int count);
+
+// The text a tile without art shows, its name broken into at most
+// max_lines lines no wider than width, as measure(text, data) gives a
+// text's width: at spaces, a word too wide on a line of its own (cut when
+// it's drawn), and the rest on the last line. Returns how many lines.
+#define HD_LINE_MAX 128
+int HD_wrap(const char* text, int width, int (*measure)(const char* text, void* data), void* data,
+	char lines[][HD_LINE_MAX], int max_lines);
+// 1 when each of count lines is at most width wide, as measure gives it.
+int HD_linesFit(char lines[][HD_LINE_MAX], int count, int width, int (*measure)(const char* text, void* data), void* data);
+// Where a tile's first line goes so lines of line_h are centred in box.
+int HD_linesTop(const MosaicRect* box, int lines, int line_h);
+
+// The home tab's focus: the continue card (row HD_FOCUS_CONTINUE), or a
+// card in one of the rows under it, by their index from 0.
+#define HD_FOCUS_CONTINUE -1
+typedef struct HDFocus {
+	int row; // HD_FOCUS_CONTINUE or a row
+	int col; // the card in it
+} HDFocus;
+
+// Moves the home tab's focus for a d-pad button (MOSAIC_BUTTON_UP, DOWN,
+// LEFT or RIGHT), with counts[i] cards in each of rows rows: down from the
+// card to the first row's first card and on to the next row, up back the
+// same way, and left and right along a row, stopping at its ends, left
+// from the first row's first card going to the continue card. A row
+// change keeps the column as far as the row reaches. With no rows, the
+// focus stays on the card.
+void HD_rowsMove(HDFocus* focus, const int* counts, int rows, int button);
 
 // A selection in a list of count after moving by delta, stopping at the
 // ends, or wrapping around when wrap is set and the move was one step.
@@ -113,6 +203,9 @@ void HD_achievementLine(int unlocked, int total, int points_unlocked, int points
 // in index order, leaving out times of 0 or less. Returns how many.
 int HD_mostPlayed(const long long* times, int count, int* out, int max);
 
+// The clock as text: "14:05" in 24h, or "2:05 PM" in 12h.
+void HD_clock(int hour, int minute, int h24, char* out, size_t size);
+
 // A system folder's tag, the text inside its name's last "(...)", eg. "P8"
 // for "Pico-8 (P8)", written to out; 0 (writing "") when it has none.
 int HD_tagOf(const char* folder, char* out, size_t size);
@@ -149,6 +242,22 @@ typedef struct HDLayout {
 // when there's no room.
 int HD_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int top_h, int hints_y,
 	int scale, int name_h, int shelf_on, HDLayout* out);
+
+// Makes room for a heading of title_h over the shelf, as when it shows one
+// of several rows: from the continue card as far as it stays card_min_h
+// tall, and the rest from the shelf, whose cards shrink. Leaves layout as
+// it was when the shelf's cards wouldn't fit then.
+void HD_layoutTitle(HDLayout* layout, int title_h, int card_min_h, int name_h, int scale);
+
+// The minimal mode's layout: the clock's row of clock_h at the top of the
+// content and the continue card centred under it, in layout's card, art
+// and text. Returns 0, or -1 when there's no room.
+int HD_minimalLayout(const MosaicRect* content, int clock_h, int scale, HDLayout* out);
+
+// A grid of square tiles in content, each with a line of name_h under it:
+// two rows of them when they fit, else one. Writes the tile size, columns
+// and rows in view. Returns 0, or -1 when there's no room.
+int HD_grid(const MosaicRect* content, int scale, int name_h, int* cell, int* cols, int* rows);
 
 // src_w by src_h fitted inside box, keeping its shape and centred. Returns
 // 0, or -1 for an empty size.

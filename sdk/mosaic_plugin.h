@@ -1975,6 +1975,14 @@ typedef struct MosaicHost {
 	MosaicSurface* (*surface_blur)(const char* plugin_id, const MosaicSurface* src, const MosaicRect* src_rect, int w,
 		int h, int radius);
 	int (*draw_ring)(MosaicSurface* target, const MosaicRect* rect, int radius, int thickness, MosaicColor color);
+
+	// A quick menu tile's icon, such as for a plugin that shows the tiles
+	// elsewhere: the PNG the plugin gave quick_tile for action_id, icon_off
+	// while is_on says it's off, written to out, or "" when it gave none.
+	// Returns 0, or -1 when the action has no tile, out is NULL or the path
+	// doesn't fit in size (writing ""). Check for it with
+	// MOSAIC_HOST_HAS(host, quick_tile_icon).
+	int (*quick_tile_icon)(const char* action_id, char* out, size_t size);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include "check.h"
+#include "fakeindex.h"
 #include "fakeloaded.h"
 #include "fakeproviders.h"
 #include "fakesets.h"
@@ -20,6 +21,9 @@ static void testModes(void) {
 	CHECK(HD_modeOf("minui") == HD_MODE_MINUI);
 	CHECK(HD_modeOf("retroachievements") == HD_MODE_RETROACHIEVEMENTS);
 	CHECK(HD_modeOf("pico8") == HD_MODE_PICO8);
+	CHECK(HD_modeOf("minimal") == HD_MODE_MINIMAL);
+	CHECK(HD_modeOf("consoles") == HD_MODE_CONSOLES);
+	CHECK_STR(HD_modeName(HD_MODE_CONSOLES), "consoles");
 	CHECK(HD_modeOf("nope") == HD_MODE_DASHBOARD);
 	CHECK(HD_modeOf(NULL) == HD_MODE_DASHBOARD);
 	CHECK_STR(HD_modeName(HD_MODE_PICO8), "pico8");
@@ -50,23 +54,243 @@ static void testTabs(void) {
 	CHECK(HD_tabStep(0, 0, 1) == 0);
 }
 
-static void testHomeMove(void) {
+static void testRowsMove(void) {
 	const int C = HD_FOCUS_CONTINUE;
-	CHECK(HD_homeMove(C, 3, MOSAIC_BUTTON_DOWN) == 0);
-	CHECK(HD_homeMove(C, 3, MOSAIC_BUTTON_RIGHT) == 0);
-	CHECK(HD_homeMove(C, 3, MOSAIC_BUTTON_LEFT) == C);
-	CHECK(HD_homeMove(C, 3, MOSAIC_BUTTON_UP) == C);
-	CHECK(HD_homeMove(1, 3, MOSAIC_BUTTON_UP) == C);
-	CHECK(HD_homeMove(1, 3, MOSAIC_BUTTON_DOWN) == 1);
-	CHECK(HD_homeMove(1, 3, MOSAIC_BUTTON_RIGHT) == 2);
-	CHECK(HD_homeMove(2, 3, MOSAIC_BUTTON_RIGHT) == 2); // stops at the end
-	CHECK(HD_homeMove(1, 3, MOSAIC_BUTTON_LEFT) == 0);
-	CHECK(HD_homeMove(0, 3, MOSAIC_BUTTON_LEFT) == C);
-	// no shelf: always the card
-	CHECK(HD_homeMove(C, 0, MOSAIC_BUTTON_DOWN) == C);
-	CHECK(HD_homeMove(2, 0, MOSAIC_BUTTON_RIGHT) == C);
-	// a shelf that shrank
-	CHECK(HD_homeMove(5, 2, MOSAIC_BUTTON_LEFT) == 0);
+	int counts[] = { 3, 2 };
+	HDFocus f = { C, 0 };
+	// one row: as the top shelf always went
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_DOWN);
+	CHECK(f.row == 0 && f.col == 0);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_UP);
+	CHECK(f.row == C);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_RIGHT);
+	CHECK(f.row == 0 && f.col == 0);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_RIGHT);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_RIGHT);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_RIGHT);
+	CHECK(f.row == 0 && f.col == 2); // stops at the end
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_DOWN);
+	CHECK(f.row == 0 && f.col == 2);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_LEFT);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_LEFT);
+	CHECK(f.col == 0);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_LEFT);
+	CHECK(f.row == C);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_LEFT);
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_UP);
+	CHECK(f.row == C && f.col == 0);
+
+	// two rows: down to the next, keeping the column as far as it reaches
+	f = (HDFocus){ 0, 2 };
+	HD_rowsMove(&f, counts, 2, MOSAIC_BUTTON_DOWN);
+	CHECK(f.row == 1 && f.col == 1);
+	HD_rowsMove(&f, counts, 2, MOSAIC_BUTTON_DOWN);
+	CHECK(f.row == 1);
+	HD_rowsMove(&f, counts, 2, MOSAIC_BUTTON_UP);
+	CHECK(f.row == 0 && f.col == 1);
+	f = (HDFocus){ 1, 0 };
+	HD_rowsMove(&f, counts, 2, MOSAIC_BUTTON_LEFT);
+	CHECK(f.row == 1 && f.col == 0); // only the first row's left goes to the card
+
+	// no rows: always the card; rows that went away
+	f = (HDFocus){ C, 0 };
+	HD_rowsMove(&f, counts, 0, MOSAIC_BUTTON_DOWN);
+	CHECK(f.row == C);
+	f = (HDFocus){ 4, 9 };
+	HD_rowsMove(&f, counts, 2, MOSAIC_BUTTON_LEFT);
+	CHECK(f.row == 1 && f.col == 0);
+	f = (HDFocus){ 0, 9 };
+	HD_rowsMove(&f, counts, 1, MOSAIC_BUTTON_LEFT);
+	CHECK(f.row == 0 && f.col == 1);
+}
+
+static void testRows(void) {
+	int rows[HD_ROW_KINDS];
+	char unknown[64];
+	CHECK(HD_parseRows(HD_ROWS_DEFAULT, rows, HD_ROW_KINDS, unknown, sizeof(unknown)) == 2);
+	CHECK(rows[0] == HD_ROW_CONTINUE && rows[1] == HD_ROW_RECENT && !unknown[0]);
+	CHECK(HD_parseRows(" Random,played ,, nope, added, random, shortcuts,recent,bad", rows, HD_ROW_KINDS, unknown,
+		sizeof(unknown)) == 5);
+	CHECK(rows[0] == HD_ROW_RANDOM && rows[1] == HD_ROW_PLAYED && rows[2] == HD_ROW_ADDED && rows[3] == HD_ROW_SHORTCUTS
+		&& rows[4] == HD_ROW_RECENT);
+	CHECK_STR(unknown, "nope,bad");
+	CHECK(HD_parseRows("", rows, HD_ROW_KINDS, unknown, sizeof(unknown)) == 0);
+	CHECK(HD_parseRows(NULL, rows, HD_ROW_KINDS, unknown, sizeof(unknown)) == 0);
+	CHECK(HD_parseRows("played, random", rows, 1, unknown, sizeof(unknown)) == 1);
+	CHECK_STR(HD_rowName(HD_ROW_ADDED), "added");
+	CHECK_STR(HD_rowName(42), "");
+	CHECK_STR(HD_rowLabel(HD_ROW_RECENT), "RECENT");
+	CHECK_STR(HD_rowLabel(HD_ROW_SHORTCUTS), "SHORTCUTS");
+
+	const char* p = " search ,random-game,,  system-info ";
+	char name[16];
+	CHECK(HD_listNext(&p, name, sizeof(name)) && !strcmp(name, "search"));
+	CHECK(HD_listNext(&p, name, sizeof(name)) && !strcmp(name, "random-game"));
+	CHECK(HD_listNext(&p, name, sizeof(name)) && !strcmp(name, "system-info"));
+	CHECK(!HD_listNext(&p, name, sizeof(name)) && !name[0]);
+
+	// continue: the other recents with a state to resume; recent: all after the first
+	int resume[] = { 1, 0, 1, 1, 1 }, available[] = { 1, 1, 1, 0, 1 }, out[4];
+	CHECK(HD_recentPick(HD_ROW_CONTINUE, resume, available, 5, out, 4) == 2);
+	CHECK(out[0] == 2 && out[1] == 4);
+	CHECK(HD_recentPick(HD_ROW_RECENT, resume, available, 5, out, 4) == 4);
+	CHECK(out[0] == 1 && out[3] == 4);
+	CHECK(HD_recentPick(HD_ROW_RECENT, resume, available, 5, out, 2) == 2);
+	CHECK(HD_recentPick(HD_ROW_RECENT, resume, available, 1, out, 4) == 0);
+}
+
+static void testPicks(void) {
+	// the newest kept, ties in the order added
+	long long keys[3];
+	int ids[3], n = 0;
+	long long times[] = { 5, 9, 1, 9, 7, 3 };
+	for (int i = 0; i < 6; i++) n = HD_topAdd(keys, ids, n, 3, times[i], i);
+	CHECK(n == 3);
+	CHECK(ids[0] == 1 && ids[1] == 3 && ids[2] == 4);
+	CHECK(keys[0] == 9 && keys[2] == 7);
+	CHECK(HD_topAdd(keys, ids, 0, 0, 1, 0) == 0);
+
+	// random picks: all of a short stream, and spread over a long one
+	unsigned int state = 0;
+	CHECK(HD_random(&state) != 0 && state != 0);
+	int picks[4], got = 0;
+	state = 42;
+	for (int i = 0; i < 3; i++) got = HD_reservoir(picks, 4, i, i * 10, &state);
+	CHECK(got == 3 && picks[0] == 0 && picks[2] == 20);
+	int hits[100] = { 0 };
+	for (int round = 0; round < 500; round++) {
+		got = 0;
+		for (int i = 0; i < 100; i++) got = HD_reservoir(picks, 4, i, i, &state);
+		CHECK(got == 4);
+		for (int k = 0; k < 4; k++) hits[picks[k]]++;
+		// never the same one twice
+		CHECK(picks[0] != picks[1] && picks[0] != picks[2] && picks[1] != picks[3] && picks[2] != picks[3]);
+	}
+	int late = 0, early = 0;
+	for (int i = 0; i < 50; i++) early += hits[i];
+	for (int i = 50; i < 100; i++) late += hits[i];
+	CHECK(early > 800 && late > 800); // 1000 each, about
+	CHECK(HD_reservoir(picks, 0, 0, 1, &state) == 0);
+}
+
+static void testConsoles(void) {
+	char name[64];
+	HD_systemName("Game Boy (GB)", name, sizeof(name));
+	CHECK_STR(name, "Game Boy");
+	HD_systemName("Pico-8", name, sizeof(name));
+	CHECK_STR(name, "Pico-8");
+	HD_systemName("(GB)", name, sizeof(name));
+	CHECK_STR(name, "(GB)");
+
+	HDConsole list[3];
+	int n = 0;
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_SYSTEM, 1, "Game Boy (GB)", "/Roms/Game Boy (GB)", "Game Boy (GB)", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_GAME, 1, "Game Boy (GB)", "/Roms/Game Boy (GB)/a.gb", "a", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_FOLDER, 1, "Game Boy (GB)", "/Roms/Game Boy (GB)/Hacks", "Hacks", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_GAME, 1, "Game Boy (GB)", "/Roms/Game Boy (GB)/Hacks/b.gb", "b", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_GAME, 1, "Game Boy (GB)", "/Roms/Game Boy (GB)/c.gb", "c", 0); // hidden
+	// no emulator: not a console, and its games count nowhere
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_SYSTEM, 0, "Lynx (LYNX)", "/Roms/Lynx (LYNX)", "Lynx (LYNX)", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_GAME, 1, "Lynx (LYNX)", "/Roms/Lynx (LYNX)/x.lnx", "x", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_SYSTEM, 1, "NES (FC)", "/Roms/NES (FC)", "Famicom (FC)", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_SYSTEM, 1, "SNES (SFC)", "/Roms/SNES (SFC)", "SNES (SFC)", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_GAME, 1, "SNES (SFC)", "/Roms/SNES (SFC)/m.sfc", "m", 1);
+	n = HD_consoleAdd(list, n, 3, MOSAIC_INDEX_SYSTEM, 1, "PS (PS)", "/Roms/PS (PS)", "PS (PS)", 1); // past max
+	CHECK(n == 3);
+	CHECK_STR(list[0].name, "Game Boy");
+	CHECK(list[0].games == 2);
+	CHECK_STR(list[1].name, "Famicom"); // its map.txt name
+	CHECK(list[1].games == 0 && list[2].games == 1);
+	n = HD_consolesKeep(list, n);
+	CHECK(n == 2);
+	CHECK_STR(list[1].system, "SNES (SFC)");
+	CHECK_STR(list[1].path, "/Roms/SNES (SFC)");
+}
+
+// a font where every byte is 10 wide
+static int measureTen(const char* text, void* data) {
+	(void)data;
+	return (int)strlen(text) * 10;
+}
+
+static void testWrap(void) {
+	char lines[3][HD_LINE_MAX];
+	CHECK(HD_wrap("Game Boy Advance", 100, measureTen, NULL, lines, 3) == 2);
+	CHECK_STR(lines[0], "Game Boy");
+	CHECK_STR(lines[1], "Advance");
+	CHECK(HD_wrap("Nintendo Entertainment System Classic", 100, measureTen, NULL, lines, 2) == 2);
+	CHECK_STR(lines[0], "Nintendo");
+	CHECK_STR(lines[1], "Entertainment System Classic"); // the rest, cut when drawn
+	CHECK(HD_wrap("Supercalifragilistic NES", 100, measureTen, NULL, lines, 3) == 2);
+	CHECK_STR(lines[0], "Supercalifragilistic"); // too wide alone
+	CHECK_STR(lines[1], "NES");
+	CHECK(HD_wrap("  NES  ", 100, measureTen, NULL, lines, 3) == 1);
+	CHECK_STR(lines[0], "NES");
+	CHECK(HD_wrap("", 100, measureTen, NULL, lines, 3) == 0);
+	CHECK(HD_wrap("NES", 100, measureTen, NULL, lines, 0) == 0);
+	MosaicRect box = { 0, 10, 100, 100 };
+	CHECK(HD_linesTop(&box, 2, 20) == 40);
+	CHECK(HD_wrap("Game Boy Advance", 60, measureTen, NULL, lines, 3) == 3);
+	CHECK(!HD_linesFit(lines, 3, 60, measureTen, NULL)); // "Advance" is 70
+	CHECK(HD_linesFit(lines, 2, 60, measureTen, NULL));
+
+	char clock[16];
+	HD_clock(14, 5, 1, clock, sizeof(clock));
+	CHECK_STR(clock, "14:05");
+	HD_clock(14, 5, 0, clock, sizeof(clock));
+	CHECK_STR(clock, "2:05 PM");
+	HD_clock(0, 30, 0, clock, sizeof(clock));
+	CHECK_STR(clock, "12:30 AM");
+	HD_clock(12, 0, 0, clock, sizeof(clock));
+	CHECK_STR(clock, "12:00 PM");
+	HD_clock(7, 9, 1, clock, sizeof(clock));
+	CHECK_STR(clock, "07:09");
+}
+
+static void testGrids(void) {
+	// two rows of tiles when they fit, as the pico8 grid always had
+	MosaicRect content = { 10, 50, 620, 360 };
+	int cell, cols, rows;
+	CHECK(HD_grid(&content, 1, 20, &cell, &cols, &rows) == 0);
+	CHECK(rows == 2 && cell == (360 - 40 - 10) / 2 && cols == HD_cellsFit(620, cell, 10));
+	content.h = 60;
+	CHECK(HD_grid(&content, 1, 20, &cell, &cols, &rows) == 0);
+	CHECK(rows == 1 && cell == 40);
+	content.h = 25;
+	CHECK(HD_grid(&content, 1, 20, &cell, &cols, &rows) == -1);
+
+	// the minimal mode: the clock on top, the card centred under it
+	HDLayout layout;
+	content = (MosaicRect){ 10, 50, 620, 360 };
+	CHECK(HD_minimalLayout(&content, 30, 1, &layout) == 0);
+	CHECK(layout.card.w == 496 && layout.card.x == 10 + (620 - 496) / 2);
+	CHECK(layout.card.h == 198 && layout.card.y == 50 + 40 + (320 - 198) / 2);
+	CHECK(layout.art.x == layout.card.x + 10 && layout.text.x > layout.art.x + layout.art.w);
+	CHECK(layout.cells == 0);
+	content.h = 60;
+	CHECK(HD_minimalLayout(&content, 30, 1, &layout) == -1);
+
+	// a heading over the shelf takes its room from the card, as far as the
+	// card keeps its text, then from the shelf's cards
+	MosaicRect area = { 0, 0, 640, 480 }, status = { 500, 10, 130, 30 }, none = { 0, 0, 0, 0 };
+	CHECK(HD_layout(&area, &status, &none, 30, 440, 1, 20, 1, &layout) == 0);
+	HDLayout titled = layout;
+	HD_layoutTitle(&titled, 16, 40, 20, 1);
+	CHECK(titled.card.h == layout.card.h - 16 && titled.card.y == layout.card.y);
+	CHECK(titled.art.h == layout.art.h - 16);
+	CHECK(titled.shelf.y == layout.shelf.y && titled.cell == layout.cell && titled.cells == layout.cells);
+	titled = layout;
+	HD_layoutTitle(&titled, 16, layout.card.h - 6, 20, 1);
+	CHECK(titled.card.h == layout.card.h - 6);
+	CHECK(titled.shelf.y == layout.shelf.y + 10 && titled.cell == layout.cell - 10);
+	// not when the shelf's cards wouldn't fit, or with no shelf
+	HDLayout tall = layout;
+	HD_layoutTitle(&tall, layout.shelf.h, layout.card.h, 20, 1);
+	CHECK(tall.card.h == layout.card.h && tall.shelf.y == layout.shelf.y);
+	HDLayout bare = layout;
+	bare.cells = 0;
+	HD_layoutTitle(&bare, 16, 40, 20, 1);
+	CHECK(bare.card.h == layout.card.h);
 }
 
 static void testLists(void) {
@@ -308,12 +532,18 @@ struct MosaicEntry {
 };
 
 static char cfg_mode[32] = "dashboard";
+static const char* cfg_rows = NULL; // NULL for the default
+static const char* cfg_shortcuts = NULL;
+static const char* cfg_clock = NULL;
 static char logged[4096];
 static void fakeLog(const char* id, const char* m) {
 	snprintf(logged + strlen(logged), sizeof(logged) - strlen(logged), "%s\n", m);
 }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "mode")) return cfg_mode;
+	if (!strcmp(key, "rows") && cfg_rows) return cfg_rows;
+	if (!strcmp(key, "shortcuts") && cfg_shortcuts) return cfg_shortcuts;
+	if (!strcmp(key, "clock") && cfg_clock) return cfg_clock;
 	return fallback;
 }
 static int entries_made = 0;
@@ -409,6 +639,65 @@ static int fakeDrawHints(MosaicSurface* s, int group, const MosaicHint* hints, i
 static long long fakeToday(void) { return 600; }
 static long long fakePlayTime(const char* p) { return strstr(p, "Metroid") ? 7200 : strstr(p, "Tetris") ? 300 : 0; }
 
+// actions for the shortcuts: search's without a tile, random-game's tile
+// with an icon, activity-stats' that can't run now and one that needs a game
+static const struct {
+	const char* id;
+	const char* label;
+	const char* plugin;
+	int takes_path;
+	int available;
+	const char* icon; // its quick menu tile's, "" for a tile without one, NULL for no tile
+} fake_actions[] = {
+	{ "gamelist.open", "OPEN", "", 0, 1, NULL },
+	{ "search.open", "SEARCH", "search", 0, 1, NULL },
+	{ "random-game.pick", "RANDOM", "random-game", 0, 1, NULL },
+	{ "random-game.tile", "Random", "random-game", 0, 1, "/icons/dice.png" },
+	{ "activity-stats.open", "Activity", "activity-stats", 0, 0, "" },
+	{ "netplay.host", "HOST", "netplay", 1, 1, NULL },
+};
+#define FAKE_ACTIONS (int)(sizeof(fake_actions) / sizeof(fake_actions[0]))
+static int fakeActionsCount(void) { return FAKE_ACTIONS; }
+static int fakeActionInfo(int i, MosaicActionInfo* out) {
+	if (i < 0 || i >= FAKE_ACTIONS || !out) return -1;
+	snprintf(out->id, sizeof(out->id), "%s", fake_actions[i].id);
+	snprintf(out->label, sizeof(out->label), "%s", fake_actions[i].label);
+	snprintf(out->plugin_id, sizeof(out->plugin_id), "%s", fake_actions[i].plugin);
+	out->takes_path = fake_actions[i].takes_path;
+	return 0;
+}
+static int fakeActionAvailable(const char* id, const char* path) {
+	(void)path;
+	for (int i = 0; i < FAKE_ACTIONS; i++) {
+		if (!strcmp(fake_actions[i].id, id)) return fake_actions[i].available;
+	}
+	return -1;
+}
+static int fakeQuickTileIcon(const char* id, char* out, size_t size) {
+	out[0] = '\0';
+	for (int i = 0; i < FAKE_ACTIONS; i++) {
+		if (strcmp(fake_actions[i].id, id) != 0 || !fake_actions[i].icon) continue;
+		if (strlen(fake_actions[i].icon) >= size) return -1;
+		snprintf(out, size, "%s", fake_actions[i].icon);
+		return 0;
+	}
+	return -1;
+}
+// the play history: Zelda most, then one no longer on the card, then Tetris
+static int fakePlayGameInfo(int i, MosaicPlayGame* out) {
+	static const char* paths[] = { TEST_SDCARD_PATH "/Roms/NES/Zelda.nes", TEST_SDCARD_PATH "/Roms/NES/Gone.nes",
+		TEST_SDCARD_PATH "/Roms/GB/Tetris.gb" };
+	if (i < 0 || i >= 3) return -1;
+	snprintf(out->path, sizeof(out->path), "%s", paths[i]);
+	out->seconds = 1000 - i;
+	return 0;
+}
+static int subscribed = 0;
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	subscribed++;
+	return fakeIndexSubscribe(name, on_event, data);
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -462,7 +751,7 @@ static void reset(const char* m) {
 	snprintf(cfg_mode, sizeof(cfg_mode), "%s", m);
 	logged[0] = '\0';
 	tab = HD_TAB_HOME;
-	home_focus = HD_FOCUS_CONTINUE;
+	focus = (HDFocus){ HD_FOCUS_CONTINUE, 0 };
 	list_selected = 0;
 	cart_selected = 0;
 	opened_recent = opened_resume = -1;
@@ -502,8 +791,9 @@ static void testPlugin(void) {
 	CHECK(press(MOSAIC_BUTTON_A) == MOSAIC_SCREEN_STAY);
 	CHECK(opened_recent == 0 && opened_resume == 1);
 	CHECK_STR(openLabel(), "RESUME");
+	CHECK(home_row_count == 1 && home_rows[0].kind == HD_ROW_RECENT && home_rows[0].count == 2);
 	press(MOSAIC_BUTTON_DOWN);
-	CHECK(home_focus == 0);
+	CHECK(focus.row == 0 && focus.col == 0);
 	CHECK_STR(openLabel(), "PLAY");
 	press(MOSAIC_BUTTON_RIGHT);
 	CHECK_STR(openLabel(), "OPEN");
@@ -690,6 +980,176 @@ static void testDownloads(void) {
 	fake.event_value = NULL;
 }
 
+// the home tab's rows from the card index, the play history and the
+// shortcuts, then the minimal and consoles modes
+static void mostPlayedList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(TEST_SDCARD_PATH "/Roms/GB/Tetris.gb", ctx);
+	add(TEST_SDCARD_PATH "/Roms/GB/Hidden.gb", ctx);
+	add(TEST_SDCARD_PATH "/Roms/NES/Zelda.nes", ctx);
+}
+
+static int rowHas(int kind, const char* path) {
+	for (int i = 0; i < home_row_count; i++) {
+		if (home_rows[i].kind != kind) continue;
+		for (int k = 0; k < home_rows[i].count; k++) {
+			if (!strcmp(home_rows[i].items[k]->path, path)) return 1;
+		}
+	}
+	return 0;
+}
+
+static void testRowsAndModes(void) {
+	writeFile(TEST_SDCARD_PATH "/Emus/test/GB.pak/launch.sh", "");
+	writeFile(TEST_SDCARD_PATH "/Emus/test/NES.pak/launch.sh", "");
+	writeFile(TEST_SDCARD_PATH "/Roms/GB/Hidden.gb", "");
+	fakeIndexDrop();
+	fake_index_ready = 1;
+	fake.index_count = fakeIndexCount;
+	fake.index_entry = fakeIndexEntry;
+	fake.index_find = fakeIndexFind;
+	fake.index_refresh = fakeIndexRefresh;
+	fake.subscribe = fakeSubscribe;
+	fake.actions_count = fakeActionsCount;
+	fake.action_info = fakeActionInfo;
+	fake.action_available = fakeActionAvailable;
+	fake.quick_tile_icon = fakeQuickTileIcon;
+	fake.play_game_info = fakePlayGameInfo;
+	fake_loaded = "home-dashboard";
+	fake_set_count = 0;
+	hidden_path = TEST_SDCARD_PATH "/Roms/GB/Hidden.gb";
+	cfg_rows = "added, played, random, shortcuts, recent, bogus, added";
+	cfg_shortcuts = "search, random-game, activity-stats, nope, netplay.host";
+
+	reset("dashboard");
+	CHECK(strstr(logged, "rows: no such row bogus") != NULL);
+	CHECK(strstr(logged, "rows: added 3 played 2 random 3 shortcuts 2 recent 2") != NULL);
+	CHECK(subscribed > 0);
+	// added: what's hidden left out (the order is by the later of each
+	// file's times, and the ctime this test can't set)
+	CHECK(home_rows[0].kind == HD_ROW_ADDED);
+	CHECK(rowHas(HD_ROW_ADDED, TEST_SDCARD_PATH "/Roms/NES/Zelda.nes"));
+	CHECK(rowHas(HD_ROW_ADDED, TEST_SDCARD_PATH "/Roms/GB/stray.p8"));
+	CHECK(!rowHas(HD_ROW_ADDED, TEST_SDCARD_PATH "/Roms/GB/Hidden.gb"));
+	// played: without activity-stats, the history's still on the card
+	CHECK_STR(home_rows[1].items[0]->name, "Zelda");
+	CHECK_STR(home_rows[1].items[1]->name, "Tetris");
+	CHECK(!rowHas(HD_ROW_RANDOM, TEST_SDCARD_PATH "/Roms/GB/Hidden.gb"));
+	CHECK(rowHas(HD_ROW_RANDOM, TEST_SDCARD_PATH "/Roms/NES/Zelda.nes"));
+	// shortcuts: an action by id, or a plugin's tile, and what can't run is logged once
+	CHECK(shortcut_count == 2);
+	CHECK_STR(shortcuts[shortcut_shown[0]].id, "search.open");
+	CHECK_STR(shortcuts[shortcut_shown[0]].label, "SEARCH");
+	CHECK_STR(shortcuts[shortcut_shown[0]].icon, "");
+	CHECK_STR(shortcuts[shortcut_shown[1]].id, "random-game.tile");
+	CHECK_STR(shortcuts[shortcut_shown[1]].icon, "/icons/dice.png");
+	CHECK(strstr(logged, "shortcut activity-stats: activity-stats.open can't run now") != NULL);
+	CHECK(strstr(logged, "shortcut nope: no such action or plugin") != NULL);
+	CHECK(strstr(logged, "shortcut netplay.host: netplay.host can't run now") != NULL);
+	logged[0] = '\0';
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(strstr(logged, "shortcut ") == NULL);
+
+	// down through the rows to the shortcuts, which A runs
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(focus.row == 0);
+	press(MOSAIC_BUTTON_A);
+	CHECK_STR(opened_path, home_rows[0].items[0]->path);
+	press(MOSAIC_BUTTON_DOWN);
+	press(MOSAIC_BUTTON_DOWN);
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(focus.row == 3 && home_rows[3].kind == HD_ROW_SHORTCUTS);
+	CHECK_STR(openLabel(), "OPEN");
+	press(MOSAIC_BUTTON_A);
+	CHECK_STR(ran, "search.open");
+	press(MOSAIC_BUTTON_RIGHT);
+	press(MOSAIC_BUTTON_A);
+	CHECK_STR(ran, "random-game.tile");
+	CHECK(strstr(logged, "shortcut random-game.tile") != NULL);
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(focus.row == 4 && focus.col == 1);
+	CHECK_STR(openLabel(), "OPEN"); // the pak
+	press(MOSAIC_BUTTON_LEFT);
+	press(MOSAIC_BUTTON_A);
+	CHECK(opened_recent == 1);
+
+	// a card change while the home shows builds the rows again
+	hidden_path = TEST_SDCARD_PATH "/Roms/NES/Zelda.nes";
+	logged[0] = '\0';
+	fakeIndexRebuild();
+	CHECK(strstr(logged, "rows: added 3 played 1 random 3 shortcuts 2 recent 2") != NULL);
+	CHECK(!rowHas(HD_ROW_ADDED, TEST_SDCARD_PATH "/Roms/NES/Zelda.nes"));
+	hidden_path = TEST_SDCARD_PATH "/Roms/GB/Hidden.gb";
+	registered.exit(registered.data);
+
+	// played: activity-stats' most played set while it's on
+	fake_loaded = "activity-stats,home-dashboard";
+	fakeSetRegister("activity-stats.most-played", noHas, mostPlayedList);
+	cfg_rows = "played";
+	reset("dashboard");
+	CHECK(home_row_count == 1 && home_rows[0].count == 2);
+	CHECK_STR(home_rows[0].items[0]->name, "Tetris");
+	CHECK_STR(home_rows[0].items[1]->name, "Zelda");
+	// with nothing in any row, none
+	cfg_rows = "random";
+	fake.index_refresh = NULL;
+	reset("dashboard");
+	CHECK(home_row_count == 0 && strstr(logged, "rows: none") != NULL);
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(focus.row == HD_FOCUS_CONTINUE);
+	fake.index_refresh = fakeIndexRefresh;
+	cfg_rows = NULL;
+	fake_set_count = 0;
+
+	// minimal: A resumes the last game; the clock as the setting says
+	cfg_clock = "12h";
+	reset("minimal");
+	CHECK(clock24 == 0);
+	CHECK_STR(openLabel(), "RESUME");
+	press(MOSAIC_BUTTON_DOWN);
+	press(MOSAIC_BUTTON_A);
+	CHECK(opened_recent == 0 && opened_resume == 1);
+	cfg_clock = NULL;
+	reset("minimal");
+	CHECK(clock24 == 1);
+
+	// consoles: the systems with an emulator and games, counted without
+	// what's hidden; A opens one and closes on to it
+	reset("consoles");
+	CHECK(strstr(logged, "consoles 2: GB 2, NES 1") != NULL);
+	CHECK_STR(openLabel(), "OPEN");
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(console_selected == 1);
+	CHECK(press(MOSAIC_BUTTON_A) == MOSAIC_SCREEN_CLOSE);
+	CHECK_STR(opened_path, TEST_SDCARD_PATH "/Roms/NES");
+	// one that's all hidden goes when the card changes
+	hidden_path = TEST_SDCARD_PATH "/Roms/NES/Zelda.nes";
+	fakeIndexRebuild();
+	CHECK(console_count == 1 && console_selected == 0);
+	hidden_path = "";
+	// before the index is ready, none, then all as it comes in
+	fakeIndexDrop();
+	fake_index_ready = 0;
+	reset("consoles");
+	CHECK(console_count == 0 && card_dirty);
+	CHECK(strstr(logged, "card index not ready yet") != NULL);
+	fakeIndexRebuild();
+	CHECK(console_count == 2 && consoles[0].games == 3);
+
+	fake.index_count = NULL;
+	fake.index_entry = NULL;
+	fake.index_find = NULL;
+	fake.index_refresh = NULL;
+	fake.subscribe = NULL;
+	fake.actions_count = NULL;
+	fake.action_info = NULL;
+	fake.action_available = NULL;
+	fake.quick_tile_icon = NULL;
+	fake.play_game_info = NULL;
+	cfg_shortcuts = NULL;
+	fake_index_on_ready = NULL;
+}
+
 // home-dashboard.setup: a mode it has is saved, any other refused
 static void fakeCfgSetMode(const char* key, const char* value) {
 	CHECK_STR(key, "mode");
@@ -707,9 +1167,11 @@ static void testSetup(void) {
 	CHECK(fakeEventValue(out, "mode", value, sizeof(value)) > 0);
 	CHECK_STR(value, "dashboard");
 	CHECK(fakeEventValue(out, "mode.count", value, sizeof(value)) > 0);
-	CHECK_STR(value, "4");
+	CHECK_STR(value, "6");
 	CHECK(fakeEventValue(out, "mode.3", value, sizeof(value)) > 0);
 	CHECK_STR(value, "pico8");
+	CHECK(fakeEventValue(out, "mode.5", value, sizeof(value)) > 0);
+	CHECK_STR(value, "consoles");
 	CHECK(fakeEventValue(out, "mode.label.1", value, sizeof(value)) > 0);
 	CHECK_STR(value, "minui");
 	CHECK(fakeEventValue(out, "restart", value, sizeof(value)) > 0);
@@ -741,7 +1203,12 @@ int main(void) {
 	CHECK(system("rm -rf '" TEST_SDCARD_PATH "'") == 0);
 	testModes();
 	testTabs();
-	testHomeMove();
+	testRowsMove();
+	testRows();
+	testPicks();
+	testConsoles();
+	testWrap();
+	testGrids();
 	testLists();
 	testScroll();
 	testText();
@@ -754,5 +1221,6 @@ int main(void) {
 	testServices();
 	testDownloads();
 	testSetup();
+	testRowsAndModes();
 	CHECK_DONE();
 }

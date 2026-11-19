@@ -42,6 +42,11 @@ int QuickTiles_any(void);
 const QuickTile* QuickTiles_forEntry(const Entry* entry);
 int QuickTile_isOff(const QuickTile* tile);
 
+// The PNG a plugin tile draws for the action now, for its on/off state, in
+// out: "" when it has none. Returns 0, or -1 when the action has no tile,
+// out is NULL or the path doesn't fit (writing "").
+int QuickTiles_icon(const char* action_id, char* out, size_t size);
+
 // Drops hidden tiles from a row's entries (freeing them), then appends the
 // row's plugin tiles whose actions are available, in the order added.
 void QuickTiles_apply(Array* entries, int row);
