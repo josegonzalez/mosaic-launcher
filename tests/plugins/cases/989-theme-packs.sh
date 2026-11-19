@@ -118,7 +118,9 @@ drew "Theme"
 drew "Stock"
 drew "Sample row"
 picked=$(sed -n 's/.*plugin theme-plus: picked //p' "$log" | head -n 1)
-[ -n "$picked" ] && [ "$picked" != stock ] || fail "the picker didn't pick the theme after Stock: $(grep "picked" "$log")"
+case "$picked" in
+"" | stock) fail "the picker didn't pick the theme after Stock: $(grep "picked" "$log")" ;;
+esac
 grep -qx "theme=$picked" "$STATE/theme-plus.cfg" || fail "theme-plus didn't save the pick: $(cat "$STATE/theme-plus.cfg")"
 
 [ -f "$WORK/theme-packs-bg.png" ] && mv "$WORK/theme-packs-bg.png" "$CARD/bg.png"
