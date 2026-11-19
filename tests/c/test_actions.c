@@ -591,8 +591,8 @@ int main(void) {
 
 	// save and restore: what a declined plugin registered goes, and an
 	// action it replaced comes back
-	const Action* saved[ACTIONS_MAX];
-	int saved_count = Actions_list(saved, ACTIONS_MAX);
+	const Action* saved[8];
+	int saved_count = Actions_list(saved, 8);
 	CHECK(saved_count == 2);
 	static const Action added = { "test.added", "ADD", NULL, runOpen };
 	static const Action taken = { "test.back", "TAKEN", NULL, runBack };
@@ -604,9 +604,33 @@ int main(void) {
 	CHECK(Actions_find("test.added") == NULL);
 	CHECK(Actions_find("test.back") == &backAction);
 	CHECK(Actions_find("test.open") == &replacement);
-	const Action* now[ACTIONS_MAX];
-	CHECK(Actions_list(now, ACTIONS_MAX) == 2);
+	const Action* now[8];
+	CHECK(Actions_list(now, 8) == 2);
 	CHECK(Actions_list(now, 1) == 2); // the count, even when out is short
+	CHECK(Actions_count() == 2);
+	CHECK(Actions_at(0) == &replacement && Actions_at(1) == &backAction);
+	CHECK(Actions_at(2) == NULL && Actions_at(-1) == NULL);
+
+	// no fixed limit: well past the first 64, every one registers and is
+	// found, and putting the saved ones back drops them again
+	static Action many[200];
+	static char many_ids[200][16];
+	for (int i = 0; i < 200; i++) {
+		snprintf(many_ids[i], sizeof(many_ids[i]), "test.many%i", i);
+		many[i] = (Action){ many_ids[i], "MANY", NULL, runOpen };
+		CHECK(Actions_register(&many[i]) == 0);
+	}
+	CHECK(Actions_count() == 202);
+	CHECK(Actions_find("test.many0") == &many[0]);
+	CHECK(Actions_find("test.many199") == &many[199]);
+	CHECK(Actions_at(201) == &many[199]);
+	CHECK(Actions_find("test.open") == &replacement);
+	static const Action no_id = { NULL, "NONE", NULL, runOpen };
+	CHECK(Actions_register(&no_id) == -1);
+	CHECK(Actions_count() == 202);
+	Actions_restore(saved, saved_count);
+	CHECK(Actions_count() == 2);
+	CHECK(Actions_find("test.many0") == NULL);
 
 	test_shared_buttons();
 	test_fires();

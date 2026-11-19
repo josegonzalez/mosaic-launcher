@@ -1,26 +1,35 @@
 #include "launcher.h"
 #include "caller.h"
 
-static const Action* registry[ACTIONS_MAX];
+// every registered action, growing as they're added
+static const Action** registry = NULL;
 static int registered = 0;
+static int room = 0;
 
 char* Action_label(const Action* action) {
 	return action ? Tr_plugin(action->plugin_id, NULL, action->label) : NULL;
 }
 
-void Actions_register(const Action* action) {
-	if (!action || !action->id) return;
+int Actions_register(const Action* action) {
+	if (!action || !action->id) return -1;
 	for (int i = 0; i < registered; i++) {
 		if (!strcmp(registry[i]->id, action->id)) {
 			registry[i] = action; // re-registering replaces
-			return;
+			return 0;
 		}
 	}
-	if (registered >= ACTIONS_MAX) {
-		LOG_warn("too many actions, ignoring %s\n", action->id);
-		return;
+	if (registered >= room) {
+		int grown = room ? room * 2 : 64;
+		const Action** items = realloc(registry, sizeof(*registry) * (size_t)grown);
+		if (!items) {
+			LOG_warn("out of memory, ignoring action %s\n", action->id);
+			return -1;
+		}
+		registry = items;
+		room = grown;
 	}
 	registry[registered++] = action;
+	return 0;
 }
 
 int BindingList_add(BindingList* list, const Binding* binding, int owner) {
@@ -46,8 +55,12 @@ void BindingList_free(BindingList* list) {
 	memset(list, 0, sizeof(*list));
 }
 
-int Actions_full(void) {
-	return registered >= ACTIONS_MAX;
+int Actions_count(void) {
+	return registered;
+}
+
+const Action* Actions_at(int index) {
+	return index >= 0 && index < registered ? registry[index] : NULL;
 }
 
 const Action* Actions_find(const char* id) {
@@ -64,7 +77,9 @@ int Actions_list(const Action** out, int max) {
 }
 
 void Actions_restore(const Action* const* saved, int count) {
-	if (count > ACTIONS_MAX) count = ACTIONS_MAX;
+	// the registry only grows, so what was saved from it fits
+	if (count > room) count = room;
+	if (count < 0) count = 0;
 	for (int i = 0; i < count; i++) registry[i] = saved[i];
 	registered = count;
 }

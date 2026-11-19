@@ -396,11 +396,11 @@ static int hostRegisterAction(const char* id, const char* label, int flags,
 		int (*available)(const char* path, void* data), void (*run)(const char* path, void* data), void* data) {
 	if (!id || !run) return -1;
 	const char* owner = Caller_current();
-	if (!Actions_find(id) && Actions_full()) {
-		LOG_warn("plugins: %s can't register action %s: there are %i actions\n", owner ? owner : "?", id, ACTIONS_MAX);
+	Action* action = calloc(1, sizeof(Action));
+	if (!action) {
+		LOG_warn("plugins: %s can't register action %s: out of memory\n", owner ? owner : "?", id);
 		return -1;
 	}
-	Action* action = calloc(1, sizeof(Action));
 	action->takes_path = (flags & MOSAIC_ACTION_PATH) != 0;
 	action->id = strdup(id);
 	action->label = strdup(label ? label : id);
@@ -410,7 +410,14 @@ static int hostRegisterAction(const char* id, const char* label, int flags,
 	// its label is the plugin's own text, translated as its id's, and it
 	// runs as that plugin
 	action->plugin_id = owner ? strdup(owner) : NULL;
-	Actions_register(action);
+	if (!action->id || !action->label || (owner && !action->plugin_id) || Actions_register(action) != 0) {
+		LOG_warn("plugins: %s can't register action %s: out of memory\n", owner ? owner : "?", id);
+		free((char*)action->id);
+		free((char*)action->label);
+		free((char*)action->plugin_id);
+		free(action);
+		return -1;
+	}
 	return 0;
 }
 
@@ -2336,8 +2343,10 @@ static void load(const PluginManifest* m) {
 
 	// what init registers, to take back if it declines: its actions, tiles
 	// and bindings point into the code that's about to be unloaded
-	const Action* actions[ACTIONS_MAX];
-	int action_count = Actions_list(actions, ACTIONS_MAX);
+	int action_count = Actions_count();
+	const Action** actions = malloc(sizeof(*actions) * (size_t)(action_count > 0 ? action_count : 1));
+	if (actions) Actions_list(actions, action_count);
+	else LOG_warn("plugins: out of memory saving the actions before %s starts\n", m->id);
 	QuickTilesSaved* tiles = QuickTiles_save();
 	int bindings[SCREEN_COUNT];
 	saveBindings(bindings);
@@ -2353,20 +2362,21 @@ static void load(const PluginManifest* m) {
 		dropOverrides(loaded_count - 1);
 		dropBindings(bindings);
 		QuickTiles_restore(tiles);
-		const Action* now[ACTIONS_MAX];
-		int now_count = Actions_list(now, ACTIONS_MAX);
-		for (int i = 0; i < now_count && i < ACTIONS_MAX; i++) {
+		// without the copy, nothing says which actions were its, so they stay
+		for (int i = 0; actions && i < Actions_count(); i++) {
+			const Action* now = Actions_at(i);
 			int kept = 0;
-			for (int j = 0; j < action_count && !kept; j++) kept = now[i] == actions[j];
+			for (int j = 0; j < action_count && !kept; j++) kept = now == actions[j];
 			if (kept) continue;
 			// registered by this init, so made by hostRegisterAction
-			Action* action = (Action*)now[i];
+			Action* action = (Action*)now;
 			free((char*)action->id);
 			free((char*)action->label);
 			free((char*)action->plugin_id);
 			free(action);
 		}
-		Actions_restore(actions, action_count);
+		if (actions) Actions_restore(actions, action_count);
+		free(actions);
 		state.rebuild_quick = rebuild_quick;
 		state.power_off = power_off;
 		hostInhibitSleep(m->id, 0);
@@ -2385,6 +2395,7 @@ static void load(const PluginManifest* m) {
 		loaded_count--;
 		return;
 	}
+	free(actions);
 	QuickTiles_discard(tiles);
 	LOG_info("plugins: loaded %s\n", m->id);
 }
@@ -3092,17 +3103,13 @@ static int actionBinds(ActionBind* out) {
 
 static int hostActionsCount(void) {
 	if (!callingPlugin("actions_count")) return 0;
-	const Action* all[ACTIONS_MAX];
-	int count = Actions_list(all, ACTIONS_MAX);
-	return count < ACTIONS_MAX ? count : ACTIONS_MAX;
+	return Actions_count();
 }
 
 static int hostActionInfo(int index, MosaicActionInfo* out) {
 	if (!callingPlugin("action_info") || !out || out->size < sizeof(out->size)) return -1;
-	const Action* all[ACTIONS_MAX];
-	int count = Actions_list(all, ACTIONS_MAX);
-	if (index < 0 || index >= count || index >= ACTIONS_MAX) return -1;
-	const Action* action = all[index];
+	const Action* action = Actions_at(index);
+	if (!action) return -1;
 	ActionBind* binds = malloc(sizeof(ActionBind) * (size_t)actionBindsRoom());
 	if (!binds) {
 		LOG_warn("plugins: out of memory listing %s's buttons\n", action->id);

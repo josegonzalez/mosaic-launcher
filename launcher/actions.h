@@ -53,8 +53,6 @@ typedef struct Binding {
 	int (*allows)(int button); // when set, must also return 1 for it to fire, eg. stock's other shoulder check
 } Binding;
 
-#define ACTIONS_MAX 64
-
 // Bindings with their owners, as many as are added, such as plugins'
 // bind_button ones.
 typedef struct BindingList {
@@ -70,9 +68,13 @@ int BindingList_add(BindingList* list, const Binding* binding, int owner);
 // Frees the list, leaving it empty.
 void BindingList_free(BindingList* list);
 
-void Actions_register(const Action* action);
-// True when there are ACTIONS_MAX actions, so a new one can't register.
-int Actions_full(void);
+// Adds action, or replaces the one with its id. The registry grows as
+// actions are added, with no fixed limit. 0, or -1 for one without an id
+// or when out of memory, adding nothing.
+int Actions_register(const Action* action);
+// How many actions are registered, and the one at index (NULL past the end).
+int Actions_count(void);
+const Action* Actions_at(int index);
 const Action* Actions_find(const char* id);
 
 // The registered actions, in order, to put back later with Actions_restore.
