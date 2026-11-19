@@ -448,14 +448,22 @@ if [ "$JOBS" -gt 1 ]; then
 	k=1
 	while [ "$k" -le "$JOBS" ]; do
 		mine=$(printf '%s\n' "$run_cases" | pick "$k" "$JOBS" workers | tr '\n' ' ')
-		worker "$k" "$mine" &
-		eval "pid_$k=\$!"
+		# a worker with no cases would run them all, as CASES would be empty
+		if [ -n "${mine% }" ]; then
+			worker "$k" "$mine" &
+			eval "pid_$k=\$!"
+		else
+			eval "pid_$k="
+		fi
 		k=$((k + 1))
 	done
 	k=1
 	while [ "$k" -le "$JOBS" ]; do
-		eval "wait \$pid_$k"
-		done_worker "$k" $? "worker $k"
+		eval "worker_pid=\$pid_$k"
+		if [ -n "$worker_pid" ]; then
+			wait "$worker_pid"
+			done_worker "$k" $? "worker $k"
+		fi
 		k=$((k + 1))
 	done
 	# then the ones that run alone, in one more worker with the CPUs to
