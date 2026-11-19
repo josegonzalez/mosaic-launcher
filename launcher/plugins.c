@@ -330,6 +330,7 @@ static MosaicEntry* hostEntryNew(const char* path, int type, const char* name) {
 static const char* hostEntryPath(const MosaicEntry* e) { return e ? ((const Entry*)e)->path : NULL; }
 static const char* hostEntryName(const MosaicEntry* e) { return e ? ((const Entry*)e)->name : NULL; }
 static int hostEntryType(const MosaicEntry* e) { return e ? ((const Entry*)e)->type : -1; }
+static void hostEntryFree(MosaicEntry* e) { Entry_free((Entry*)e); }
 
 // An entry's .info sidecar, or NULL when it has none or it's ignored: only
 // a regular file, opened without blocking, of up to INFO_FILE_MAX bytes.
@@ -2239,6 +2240,7 @@ static const MosaicHost host = {
 	.profile_path = hostProfilePath,
 	.bug_report = hostBugReport,
 	.tint_shown = Tint_shown,
+	.entry_free = hostEntryFree,
 };
 
 ///////////////////////////////////////

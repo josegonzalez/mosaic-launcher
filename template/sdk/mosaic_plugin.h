@@ -1851,6 +1851,13 @@ typedef struct MosaicHost {
 	// white and returns 0 when that frame has no tint. A NULL out only
 	// returns which. Check for both with MOSAIC_HOST_HAS(host, tint_shown).
 	int (*tint_shown)(MosaicColor* out);
+
+	// Frees an entry the plugin made with entry_new and never pushed into
+	// a list, such as one made only to ask art_find about a game. A NULL
+	// entry does nothing. Never free an entry a list owns or one the
+	// launcher handed over. Check for it with
+	// MOSAIC_HOST_HAS(host, entry_free).
+	void (*entry_free)(MosaicEntry* entry);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

@@ -1291,8 +1291,18 @@ static void test_dir_entries_add_sorted_rows_to_card_folders(void) {
 	stub_dir_entries = NULL;
 }
 
+// entry_free's: a plugin's entry, info and all, and NULL doing nothing
+static void test_entry_free(void) {
+	Entry_free(NULL);
+	Entry* entry = Entry_newNamed(ROMS_PATH "/Game Boy (GB)/Tetris.gb", ENTRY_ROM, "Tetris");
+	CHECK(entry && !strcmp(entry->name, "Tetris"));
+	entry->unique = strdup("Tetris (GB)");
+	Entry_free(entry);
+}
+
 int main(void) {
 	state.recents = Array_new();
+	test_entry_free();
 	test_root_orders_collections_consoles_tools();
 	test_root_promotes_collections_without_consoles();
 	test_console_folder_sorted_and_hidden_files_skipped();

@@ -1059,6 +1059,7 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   // in MosaicPlugin, with MOSAIC_HOST_HAS(host, tint_shown) checked in init
   .screen_tint = screenTint,
   ```
+- `entry_free(entry)` frees an entry the plugin made with `entry_new` and never pushed into a list, such as one made only to ask `art_find` about a game, so a plugin that looks up many games' art doesn't keep an entry for each; a `NULL` entry does nothing. Never free an entry a list owns or one the launcher handed over. Check for it with `MOSAIC_HOST_HAS(host, entry_free)`. The bundled `screensaver` frees each random game's entry with it.
 
 ## Without writing C
 

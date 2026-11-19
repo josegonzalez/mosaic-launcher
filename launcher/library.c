@@ -23,6 +23,7 @@ Entry* Entry_newNamed(char* path, int type, char* displayName) {
 }
 
 void Entry_free(Entry* self) {
+	if (!self) return; // as a plugin's entry_free may ask
 	free(self->path);
 	free(self->name);
 	if (self->unique) free(self->unique);
