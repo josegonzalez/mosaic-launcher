@@ -67,6 +67,75 @@ int PpSleep_wokeByAlarm(long slept, long period);
 int PpSleep_alarmValue(long seconds, char* out, size_t size);
 
 ///////////////////////////////////////
+// The battery from its voltage
+
+#define PP_VOLTS_SMOOTH 8    // each reading moves the average an eighth of the way to it
+#define PP_VOLTS_STEP_MV 10  // the volts shown move in steps of 10 mV, as 3.85 V shows
+#define PP_PERCENT_STEP 10   // the percent shown moves once it's a whole point away, in tenths
+
+enum PpVoltsMode {
+	PP_VOLTS_OFF,
+	PP_VOLTS_PERCENT, // a percentage from the voltage, such as "V 85%"
+	PP_VOLTS_VOLTS,   // the voltage itself, such as "3.85 V"
+};
+
+// A battery's resting voltage against its charge: points in rising mV.
+typedef struct PpCurvePoint {
+	int mv;
+	int percent;
+} PpCurvePoint;
+
+typedef struct PpCurve {
+	const char* name;
+	const PpCurvePoint* points;
+	int count;
+} PpCurve;
+
+// The curve for a platform, as host->platform names it, or NULL for one
+// without. desktop gets the default, for its test voltage.
+const PpCurve* PpCurve_forPlatform(const char* platform);
+
+// The charge at mv along the curve, in tenths of a percent from 0 to
+// 1000, straight between its points and held at its ends.
+int PpCurve_tenths(const PpCurve* curve, int mv);
+
+// A power_supply voltage_now reading in mV: the class gives microvolts,
+// though some drivers give mV. 0 for a reading that's neither.
+int PpVolts_millivolts(long raw);
+
+typedef struct PpVolts {
+	const PpCurve* curve;
+	unsigned long next_sample;
+	int have;         // the average has a reading
+	long avg;         // mV times 16
+	int charging;     // as at the last reading
+	int shown_mv;     // what shows, once have
+	int shown_percent;
+} PpVolts;
+
+void PpVolts_init(PpVolts* v, const PpCurve* curve);
+
+// 1 when it's time to read the voltage again, every PP_SAMPLE_MS.
+int PpVolts_due(PpVolts* v, unsigned long now);
+
+// One reading in mV, 0 or below for a failed one, which counts for
+// nothing. The average starts again from it when charging starts or stops,
+// as the voltage jumps then. Returns 1 when what shows changed.
+int PpVolts_sample(PpVolts* v, int mv, int charging);
+
+// After a sleep, the next reading starts the average again.
+void PpVolts_resumed(PpVolts* v);
+
+// The shown percent, or -1 before a reading.
+int PpVolts_percent(const PpVolts* v);
+
+// The widget's text for mode, "" before a reading or with it off.
+void PpVolts_text(const PpVolts* v, int mode, char* out, size_t size);
+
+// The mode from the setting: off, percent or volts.
+int PpVolts_mode(const char* setting);
+
+///////////////////////////////////////
 // Settings
 
 // A whole number from a setting such as "5", "5%" or " 12 ", or fallback

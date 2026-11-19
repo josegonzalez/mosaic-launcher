@@ -101,7 +101,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [battery-logger](../plugins/battery-logger/README.md) - Logs how much battery each game used.
 - [charging-screen](../plugins/charging-screen/README.md) - Shows a full screen with the battery level while the device charges and sits idle.
 - [led-status](../plugins/led-status/README.md) - Colours the device's LEDs by the battery level or a theme colour.
-- [power-plus](../plugins/power-plus/README.md) - Warns and powers off cleanly on a low battery, and after a long sleep.
+- [power-plus](../plugins/power-plus/README.md) - Warns and powers off cleanly on a low battery and after a long sleep, and shows the battery from its voltage.
 
 ## Network
 

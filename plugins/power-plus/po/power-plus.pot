@@ -70,11 +70,19 @@ msgid "Battery at %d%%, powering off in %ds"
 msgstr ""
 
 #: plugin.txt
+msgid "Battery from its voltage"
+msgstr ""
+
+#: plugin.txt
 msgid "Hours asleep before powering off"
 msgstr ""
 
 #: plugin.txt
 msgid "Low battery guard"
+msgstr ""
+
+#: plugin.txt
+msgid "Low battery guard uses the voltage"
 msgstr ""
 
 #: plugin.txt
@@ -98,5 +106,17 @@ msgid "Power plus"
 msgstr ""
 
 #: plugin.txt
-msgid "Warns when the battery runs low and powers the device off cleanly, and can power it off after a long sleep."
+msgid "Warns when the battery runs low and powers the device off cleanly, can power it off after a long sleep, and can show the battery worked out from its voltage."
+msgstr ""
+
+#: plugin.txt
+msgid "off"
+msgstr ""
+
+#: plugin.txt
+msgid "percent"
+msgstr ""
+
+#: plugin.txt
+msgid "volts"
 msgstr ""

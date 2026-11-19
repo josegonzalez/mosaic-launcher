@@ -51,11 +51,17 @@ msgstr "Batería al %d%%, cárgala pronto"
 msgid "Battery at %d%%, powering off in %ds"
 msgstr "Batería al %d%%, apagando en %d s"
 
+msgid "Battery from its voltage"
+msgstr "Batería según su voltaje"
+
 msgid "Hours asleep before powering off"
 msgstr "Horas en suspensión antes de apagar"
 
 msgid "Low battery guard"
 msgstr "Protección de batería baja"
+
+msgid "Low battery guard uses the voltage"
+msgstr "La protección de batería baja usa el voltaje"
 
 msgid "Low battery power off at (%)"
 msgstr "Apagar con batería baja al (%)"
@@ -72,5 +78,14 @@ msgstr "Apagado cancelado"
 msgid "Power plus"
 msgstr "Energía plus"
 
-msgid "Warns when the battery runs low and powers the device off cleanly, and can power it off after a long sleep."
-msgstr "Avisa cuando queda poca batería y apaga el dispositivo de forma segura, y puede apagarlo tras una suspensión larga."
+msgid "Warns when the battery runs low and powers the device off cleanly, can power it off after a long sleep, and can show the battery worked out from its voltage."
+msgstr "Avisa cuando queda poca batería y apaga el dispositivo de forma segura, puede apagarlo tras una suspensión larga y puede mostrar la batería calculada a partir de su voltaje."
+
+msgid "off"
+msgstr "desactivado"
+
+msgid "percent"
+msgstr "porcentaje"
+
+msgid "volts"
+msgstr "voltios"
