@@ -46,6 +46,19 @@ void Switcher_handleInput(void) {
 	}
 }
 
+int Switcher_buttons(MosaicHint* out, int max) {
+	MosaicHint all[4];
+	int n = 0;
+	if (state.recents->count > 0) {
+		all[n++] = (MosaicHint){ MOSAIC_BUTTON_A, state.can_resume ? TR("RESUME") : TR("OPEN") };
+		all[n++] = (MosaicHint){ MOSAIC_BUTTON_Y, TR("REMOVE") };
+	}
+	all[n++] = (MosaicHint){ MOSAIC_BUTTON_B, TR("BACK") };
+	all[n++] = (MosaicHint){ MOSAIC_BUTTON_SELECT, TR("BACK") };
+	for (int i = 0; i < n && i < max; i++) out[i] = all[i];
+	return n;
+}
+
 // Loads the selected recent's resume state for the next render. Draws
 // nothing.
 void Switcher_update(void) {

@@ -5,6 +5,9 @@
 #include <string.h>
 #include "wizard_model.h"
 
+// English the plugin translates where it's shown, for make pot
+#define TR_MARK(text) (text)
+
 static void clear(FrWizard* w) {
 	memset(w, 0, sizeof(*w));
 	w->page = FR_WELCOME;
@@ -140,6 +143,31 @@ void FR_hints(const FrWizard* w, MosaicHint left[2], int* left_count, MosaicHint
 	if (FR_prevPage(w, w->page) >= 0) left[(*left_count)++] = (MosaicHint){ MOSAIC_BUTTON_B, "BACK" };
 	if (!last) left[(*left_count)++] = (MosaicHint){ MOSAIC_BUTTON_Y, "SKIP" };
 	right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_A, last ? "DONE" : "NEXT" };
+}
+
+int FR_wizardButtons(const FrWizard* w, MosaicHint* out, int max) {
+	MosaicHint all[6];
+	int n = 0;
+	int last = FR_nextPage(w, w->page) < 0;
+	if (w->alone) {
+		all[n++] = (MosaicHint){ MOSAIC_BUTTON_A, TR_MARK("CLOSE") };
+		all[n++] = (MosaicHint){ MOSAIC_BUTTON_B, TR_MARK("BACK") };
+	}
+	else {
+		all[n++] = (MosaicHint){ MOSAIC_BUTTON_A, last ? TR_MARK("DONE") : TR_MARK("NEXT") };
+		if (FR_prevPage(w, w->page) >= 0) all[n++] = (MosaicHint){ MOSAIC_BUTTON_B, TR_MARK("BACK") };
+		if (!last) all[n++] = (MosaicHint){ MOSAIC_BUTTON_Y, TR_MARK("SKIP") };
+	}
+	int rows = w->rows[w->page];
+	if (w->page == FR_BUTTONS) {
+		if (rows > w->visible) all[n++] = (MosaicHint){ MOSAIC_GLYPH_UP_DOWN, TR_MARK("SCROLL") };
+	}
+	else if (rows > 0 && (w->page == FR_TOGGLES || w->page == FR_SETUP || w->page == FR_PLUGINS)) {
+		all[n++] = (MosaicHint){ MOSAIC_GLYPH_UP_DOWN, TR_MARK("PICK") };
+		if (w->page != FR_PLUGINS) all[n++] = (MosaicHint){ MOSAIC_GLYPH_LEFT_RIGHT, TR_MARK("CHANGE") };
+	}
+	for (int i = 0; i < n && i < max; i++) out[i] = all[i];
+	return n;
 }
 
 static int isSpace(char c) {

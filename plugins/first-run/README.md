@@ -1,6 +1,6 @@
 # first-run
 
-A short setup wizard that shows the first time the launcher starts with it on.
+A short setup wizard that shows the first time the launcher starts with it on, and a help overlay of what each button does on the screen showing.
 
 ## Turn it on
 
@@ -32,6 +32,12 @@ Finishing or skipping turns the Already shown setting on, so it doesn't open by 
 
 A Buttons tile on the quick menu opens the Buttons page on its own, as does the `first-run.buttons` action, which the Buttons button setting puts on Y, L2, R2 or SELECT on the game list. **A** or **B** closes it, and it doesn't change the Already shown setting.
 
+## Help
+
+The help dims the screen showing and lists, one line per button, what each button does there: the screen's own buttons, such as A, B, X, MENU, SELECT, L1 and R1 on the game list, the actions plugins put on buttons, the shared button's menu with each action's label, and the FN buttons. On the game list it lists only what would run on the selected row. A plugin's screen lists the buttons it declares. Any button closes it, without acting on the screen under it.
+
+It opens from a Help tile on the quick menu, which shows the quick menu's help, from the `first-run.help` action, which the Help button setting puts on Y, L2 or R2 on the game list, or from SELECT or START held for a second on any screen, with the Help button setting on hold SELECT or hold START. An FN button or [`button-remap`](../button-remap/README.md) can run the action too. It doesn't open over a dialog.
+
 ## Screenshots
 
 The first page, with the default settings.
@@ -54,6 +60,14 @@ The Buttons page, with favorites on, scrolled down to its Y.
 
 ![The Buttons page](docs/buttons.png)
 
+The help over a game on the game list, with favorites on.
+
+![The help over a game on the game list](docs/help.png)
+
+The help over the Buttons page, which lists what that screen declares.
+
+![The help over the Buttons page](docs/help-screen.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
@@ -68,6 +82,8 @@ The Buttons page, with favorites on, scrolled down to its Y.
 | Buttons page (`buttons`) | on, off | on | The page of what's on each button |
 | Buttons tile (`buttons_tile`) | on, off | on | A Buttons tile on the quick menu that opens the Buttons page on its own |
 | Buttons button (`buttons_button`) | none, Y, L2, R2, SELECT | none | A game list button that opens the Buttons page on its own |
+| Help tile (`help_tile`) | on, off | on | A Help tile on the quick menu that shows what each button does on the screen under it |
+| Help button (`help_button`) | none, Y, L2, R2, hold SELECT, hold START | none | A game list button, or a button held for a second on any screen, that shows the help |
 
 ## For plugin authors
 
@@ -77,6 +93,7 @@ The Buttons page, with favorites on, scrolled down to its Y.
 - Sets other plugins' settings only through their services, `home-dashboard.setup`, `favorites.setup`, `theme-plus.setup` and `localization.setup` (see each plugin's page), which decide what they accept. It calls each with no arguments as the wizard opens, leaving out the ones nobody provides, and with `<key>=<value>` on each change.
 - Describes the suggested plugins by their `plugin.txt`'s `description`, from `plugin_info` while the plugin's loaded and otherwise from the `plugin.txt` beside its own folder (`Launcher.pak/plugins/*.plugin/`) or in `Tools/<platform>/*.pak/`, falling back to `summary` without one. Names and descriptions are translated as the plugin's own text, so a plugin that isn't loaded shows its English.
 - Lists the Buttons page from `actions_count` and `action_info`, and the FN buttons from `fn_name` and `fn_binding`.
+- Registers the `first-run.help` action, which the `help_button` setting follows for Y, L2 and R2. The help is an `overlay_render` overlay; while it shows, its `input_filter` takes every button but power, and it follows a held SELECT or START there too. It lists the screen's own buttons from `screen_buttons`, the game list's and FN buttons' actions from `action_info` that `action_available` says would run, and the FN buttons' paks from `fn_binding`. Its screens declare their buttons with `MosaicScreenHooks`' `buttons`, as other plugins' screens can for it to list.
 
 ## Credits
 

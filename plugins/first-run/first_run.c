@@ -26,6 +26,17 @@
 // action_info, under each button it's on, the FN buttons too (fn_name and
 // fn_binding), and last the actions on no button.
 //
+// The first-run.help action, from a Help tile on the quick menu (the
+// "help_tile" setting), a game list button or a held SELECT or START (the
+// "help_button" setting), an FN button or button-remap, dims the screen
+// under it and lists, one line per button, what each button does there:
+// the screen's own buttons (screen_buttons), the available actions on the
+// game list's buttons and the FN buttons (action_info and
+// action_available), the shared button's menu with each action's label,
+// and an FN button's pak. It's an overlay (overlay_render), and while it
+// shows input_filter takes every button but power, so any press closes it
+// without acting on the screen under it.
+//
 // It opens from tick, as open_screen is refused from init: on the first
 // frame showing the game list or the home slot's screen, which is where
 // the launcher starts, so closing it goes back there. It waits while the
@@ -38,6 +49,7 @@
 #include <string.h>
 #include "mosaic_plugin.h"
 #include "wizard_model.h"
+#include "help_model.h"
 
 #define ID "first-run"
 // English translated where it's drawn, for make pot
@@ -46,6 +58,9 @@
 #define ACTION_ID ID ".open"
 #define BUTTONS_SCREEN_ID ID ".buttons"
 #define BUTTONS_ACTION_ID ID ".buttons"
+#define HELP_ACTION_ID ID ".help"
+#define HELP_DIM 216
+#define HELP_OWN_MAX 32
 #define PADDING 10
 #define PILL_SIZE 30
 #define BUTTON_PADDING 12
@@ -100,6 +115,11 @@ static int seen = 0;
 static int opened = 0; // opened by itself this run
 static int tile_on = 1;
 static int last_page = -1;
+static FrHelp help;
+static FrHelpLine help_lines[FR_HELP_LINES];
+static int help_count = 0;
+static char help_under[80]; // the screen it opened over
+static char help_fn[3][128]; // the paks the FN buttons run
 
 static const char* const page_names[FR_PAGES] = { "welcome", "toggles", "setup", "pin", "plugins", "buttons", "done" };
 static const char* const page_titles[FR_PAGES] = { TR_MARK("Welcome"), TR_MARK("Settings"), TR_MARK("Plugin settings"),
@@ -225,20 +245,25 @@ static const char* buttonName(int button) {
 	return name ? name : "";
 }
 
-static void readButtons(void) {
-	line_count = 0;
-	if (!MOSAIC_HOST_HAS(host, action_info)) return;
+// Every action, from action_info, into a new array (NULL with none), and
+// how many into *got.
+static MosaicActionInfo* readActions(int* got) {
+	*got = 0;
+	if (!MOSAIC_HOST_HAS(host, action_info)) return NULL;
 	int count = host->actions_count();
 	MosaicActionInfo* actions = count > 0 ? calloc((size_t)count, sizeof(MosaicActionInfo)) : NULL;
-	int got = 0;
 	for (int i = 0; actions && i < count; i++) {
-		actions[got].size = sizeof(MosaicActionInfo);
-		if (host->action_info(i, &actions[got]) == 0) got++;
+		actions[*got].size = sizeof(MosaicActionInfo);
+		if (host->action_info(i, &actions[*got]) == 0) (*got)++;
 	}
-	MosaicFnBinding fn[3];
-	int fn_there[3] = { 0, 0, 0 };
-	memset(fn, 0, sizeof(fn));
+	return actions;
+}
+
+// The FN buttons the device has, their names and bindings.
+static void readFn(MosaicFnBinding fn[3], int fn_there[3]) {
+	memset(fn, 0, 3 * sizeof(fn[0]));
 	for (int i = 0; i < 3; i++) {
+		fn_there[i] = 0;
 		fn_names[i][0] = '\0';
 		fn[i].size = sizeof(fn[i]);
 		if (!MOSAIC_HOST_HAS(host, fn_release)) continue;
@@ -247,6 +272,16 @@ static void readButtons(void) {
 		snprintf(fn_names[i], sizeof(fn_names[i]), "%.31s", name);
 		fn_there[i] = host->fn_binding(MOSAIC_BUTTON_FN1 + i, &fn[i]) == 0;
 	}
+}
+
+static void readButtons(void) {
+	line_count = 0;
+	if (!MOSAIC_HOST_HAS(host, action_info)) return;
+	int got = 0;
+	MosaicActionInfo* actions = readActions(&got);
+	MosaicFnBinding fn[3];
+	int fn_there[3] = { 0, 0, 0 };
+	readFn(fn, fn_there);
 	line_count = FR_buttonLines(actions, got, fn, fn_there, lines, FR_LINES_MAX);
 	free(actions);
 }
@@ -683,6 +718,201 @@ static void leave(void* data) {
 }
 
 ///////////////////////////////////////
+// the help overlay
+
+// The launcher's own actions whose hints don't say what they do.
+static const struct {
+	const char* id;
+	const char* label;
+} own_labels[] = {
+	{ "gamelist.quick_menu", TR_MARK("QUICK MENU") },
+	{ "gamelist.prev_letter", TR_MARK("PREVIOUS LETTER") },
+	{ "gamelist.next_letter", TR_MARK("NEXT LETTER") },
+};
+
+static const char* helpLabel(const char* id, const char* label) {
+	for (size_t i = 0; i < sizeof(own_labels) / sizeof(own_labels[0]); i++) {
+		if (!strcmp(id, own_labels[i].id)) return tr(own_labels[i].label);
+	}
+	return label;
+}
+
+// A pak an FN button runs, by its folder's name without .pak, or "".
+static void fnPak(const MosaicFnBinding* fn, char* out, size_t size) {
+	out[0] = '\0';
+	if (fn->by == MOSAIC_FN_NONE || strncmp(fn->action, "pak:", 4) != 0) return;
+	const char* folder = fn->action + 4;
+	const char* slash = strrchr(folder, '/');
+	if (slash) folder = slash + 1;
+	size_t len = strlen(folder);
+	if (len > 4 && !strcmp(folder + len - 4, ".pak")) len -= 4;
+	snprintf(out, size, "%.*s", (int)len, folder);
+}
+
+// A help line's button as the device names it.
+static const char* helpButtonName(int button) {
+	if (button >= MOSAIC_BUTTON_FN1 && button <= MOSAIC_BUTTON_FN3) return buttonName(button);
+	const char* name = FR_helpButtonName(button);
+	return name ? name : "";
+}
+
+static void readHelp(const char* screen) {
+	int got = 0;
+	MosaicActionInfo* actions = readActions(&got);
+	int* available = got > 0 ? calloc((size_t)got, sizeof(int)) : NULL;
+	for (int i = 0; available && i < got; i++) available[i] = host->action_available(actions[i].id, NULL) == 1;
+	MosaicHint own[HELP_OWN_MAX];
+	int own_count = host->screen_buttons(own, HELP_OWN_MAX);
+	if (own_count > HELP_OWN_MAX) own_count = HELP_OWN_MAX;
+	MosaicFnBinding fn[3];
+	int fn_there[3] = { 0, 0, 0 };
+	readFn(fn, fn_there);
+	const char* paks[3];
+	for (int i = 0; i < 3; i++) {
+		fnPak(&fn[i], help_fn[i], sizeof(help_fn[i]));
+		paks[i] = help_fn[i];
+	}
+	FrHelpSource source = {
+		.screen = screen,
+		.actions = actions,
+		.available = available,
+		.count = available ? got : 0,
+		.own = own,
+		.own_count = own_count < 0 ? 0 : own_count,
+		.fn_there = fn_there,
+		.fn_pak = paks,
+		.label = helpLabel,
+		.menu = tr("MENU: %s"),
+	};
+	help_count = FR_helpLines(&source, help_lines, FR_HELP_LINES);
+	free(available);
+	free(actions);
+}
+
+static void openHelp(void) {
+	if (!MOSAIC_HOST_HAS(host, screen_buttons) || !MOSAIC_HOST_HAS(host, action_info)) {
+		say("this launcher can't list a screen's buttons");
+		return;
+	}
+	const char* current = host->current_screen();
+	if (help.open || !current || !strcmp(current, "dialog")) return;
+	snprintf(help_under, sizeof(help_under), "%s", current);
+	readHelp(help_under);
+	FR_helpOpen(&help);
+	host->request_redraw();
+	char line[FR_HELP_TEXT + 64];
+	snprintf(line, sizeof(line), "help over %s", help_under);
+	say(line);
+	for (int i = 0; i < help_count; i++) {
+		snprintf(line, sizeof(line), "help %s: %s", helpButtonName(help_lines[i].button), help_lines[i].text);
+		say(line);
+	}
+	if (!help_count) say("help: nothing");
+}
+
+static void helpClosed(void) {
+	host->request_redraw();
+	say("help closed");
+}
+
+static void runHelp(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	openHelp();
+}
+
+static int inputFilter(const MosaicInput* input, unsigned int* consumed) {
+	int closed = 0;
+	*consumed = FR_helpFilter(&help, input, &closed);
+	if (closed) helpClosed();
+	return 0;
+}
+
+static int overlayRender(MosaicSurface* overlay, const MosaicScreenView* view) {
+	if (!help.open) return 0;
+	FR_helpDrawn(&help);
+	const MosaicRect* a = &view->area;
+	host->fill_rect(overlay, a, mosaic_color(0x000000, HELP_DIM));
+	int scale = host->screen_scale();
+	if (scale < 1) scale = 1;
+	int pad = PADDING * scale, pill = PILL_SIZE * scale, inner = BUTTON_PADDING * scale;
+	int left = a->x + pad, right = a->x + a->w - pad;
+	MosaicColor ink = mosaic_color(0xFFFFFF, 255);
+	const char* title = tr("Help");
+	int tw = host->text_width(MOSAIC_FONT_LARGE, title) + 2 * inner;
+	if (tw > right - left) tw = right - left;
+	MosaicRect t = { left, a->y + pad, tw, pill };
+	if (tw > 2 * inner) drawTitle(overlay, &t, title);
+
+	// what closes it beside the title
+	int foot_h = host->text_height(MOSAIC_FONT_TINY);
+	int foot_x = left + tw + pad;
+	text(overlay, MOSAIC_FONT_TINY, tr("Any button closes this."), foot_x, t.y + (pill - foot_h) / 2, right - foot_x, ink);
+	int top = t.y + pill + pad;
+	int bottom = a->y + a->h - pad;
+	int th = host->text_height(MOSAIC_FONT_SMALL);
+	int has_button = MOSAIC_HOST_HAS(host, draw_button);
+	int bh = 0;
+	if (has_button) {
+		MosaicRect r = { 0, 0, 0, 0 };
+		if (host->draw_button(NULL, MOSAIC_BUTTON_A, 0, 0, &r) == 0) bh = r.h;
+	}
+	int row_h = (bh > th ? bh : th) + 4 * scale;
+	if (!help_count) {
+		paragraph(overlay, tr("Nothing on this screen lists its buttons."), left, top, right - left, bottom, ink);
+		return 0;
+	}
+	int fit = row_h > 0 ? (bottom - top) / row_h : 0;
+	if (fit <= 0) return 0;
+	// two columns side by side, the first one longer, when one doesn't hold them all
+	int columns = help_count > fit ? 2 : 1;
+	int rows = columns == 1 ? help_count : (help_count + 1) / 2 < fit ? (help_count + 1) / 2 : fit;
+	int room = rows * columns;
+	int shown = help_count <= room ? help_count : room - 1;
+	int column_w = (right - left - (columns - 1) * pad) / columns;
+	// each column's buttons as wide as its widest, the text beside them
+	int buttons_w[2] = { 0, 0 };
+	for (int i = 0; i < shown; i++) {
+		MosaicRect r = { 0, 0, 0, 0 };
+		int w = has_button && host->draw_button(NULL, help_lines[i].button, 0, 0, &r) == 0
+			? r.w
+			: host->text_width(MOSAIC_FONT_SMALL, helpButtonName(help_lines[i].button)) + 2 * inner;
+		if (w > buttons_w[i / rows]) buttons_w[i / rows] = w;
+	}
+	for (int i = 0; i <= shown && i < room; i++) {
+		int x = left + (i / rows) * (column_w + pad);
+		int y = top + (i % rows) * row_h;
+		int x_end = x + column_w;
+		if (i == shown) {
+			if (shown == help_count) break;
+			char more[64];
+			snprintf(more, sizeof(more), tr("And %i more"), help_count - shown);
+			text(overlay, MOSAIC_FONT_SMALL, more, x, y + (row_h - th) / 2, x_end - x, ink);
+			break;
+		}
+		const FrHelpLine* l = &help_lines[i];
+		MosaicRect drawn = { x, y, 0, 0 };
+		if (!has_button || host->draw_button(overlay, l->button, x, y + (row_h - bh) / 2, &drawn) != 0) {
+			MosaicRect r = { x, y + (row_h - th - 4 * scale) / 2, 0, th + 4 * scale };
+			const char* name = helpButtonName(l->button);
+			r.w = host->text_width(MOSAIC_FONT_SMALL, name) + 2 * inner;
+			drawHeading(overlay, &r, name);
+		}
+		int tx = x + buttons_w[i / rows] + inner;
+		text(overlay, MOSAIC_FONT_SMALL, l->text, tx, y + (row_h - th) / 2, x_end - tx, ink);
+	}
+	return 0;
+}
+
+// The wizard's buttons, for a help overlay over it.
+static int wizardButtons(MosaicHint* out, int max, void* data) {
+	(void)data;
+	int n = FR_wizardButtons(&wizard, out, max);
+	for (int i = 0; i < n && i < max; i++) out[i].label = tr(out[i].label);
+	return n;
+}
+
+///////////////////////////////////////
 // opening
 
 static void openWizard(const char* path, void* data) {
@@ -698,7 +928,14 @@ static void openButtons(const char* path, void* data) {
 }
 
 static void tick(unsigned long now) {
-	(void)now;
+	if (FR_helpTick(&help, now)) openHelp();
+	// opened while nothing drew overlays, such as during a transition
+	if (help.open && !help.drawn) host->request_redraw();
+	// a screen opened over it, such as a screensaver
+	if (help.open && strcmp(host->current_screen(), help_under) != 0) {
+		FR_helpClose(&help);
+		helpClosed();
+	}
 	const char* home = MOSAIC_HOST_HAS(host, home_screen) ? host->home_screen() : NULL;
 	const char* current = host->current_screen();
 	if (!FR_shouldOpen(seen, opened, current, home)) return;
@@ -756,6 +993,7 @@ static int init(const MosaicHost* h) {
 		.exit = leave,
 		.input = input,
 		.render = render,
+		.buttons = wizardButtons,
 	};
 	static const MosaicScreenHooks buttons_hooks = {
 		.size = sizeof(MosaicScreenHooks),
@@ -763,6 +1001,7 @@ static int init(const MosaicHost* h) {
 		.exit = leave,
 		.input = input,
 		.render = render,
+		.buttons = wizardButtons,
 	};
 	if (host->register_screen(SCREEN_ID, &hooks) != 0 || host->register_screen(BUTTONS_SCREEN_ID, &buttons_hooks) != 0) {
 		say("can't register the wizard's screens");
@@ -773,10 +1012,15 @@ static int init(const MosaicHost* h) {
 		say("couldn't register " ACTION_ID " or " BUTTONS_ACTION_ID);
 		return 1;
 	}
+	if (host->register_action(HELP_ACTION_ID, "Help", 0, NULL, runHelp, NULL) != 0) say("couldn't register " HELP_ACTION_ID);
 	if (tile_on) addTile(ACTION_ID);
 	if (setting("buttons_tile", "on")) addTile(BUTTONS_ACTION_ID);
+	if (setting("help_tile", "on")) addTile(HELP_ACTION_ID);
 	bindSetting("button", ACTION_ID);
 	bindSetting("buttons_button", BUTTONS_ACTION_ID);
+	bindSetting("help_button", HELP_ACTION_ID);
+	const char* hold = host->cfg_get("help_button", "none");
+	FR_helpInit(&help, !strcmp(hold, "hold SELECT") ? MOSAIC_BUTTON_SELECT : !strcmp(hold, "hold START") ? MOSAIC_BUTTON_START : -1);
 	say(seen ? "already seen" : "not seen yet");
 	return 0;
 }
@@ -787,6 +1031,8 @@ static const MosaicPlugin plugin = {
 	.id = ID,
 	.init = init,
 	.tick = tick,
+	.input_filter = inputFilter,
+	.overlay_render = overlayRender,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

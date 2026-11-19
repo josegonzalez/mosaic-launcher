@@ -349,6 +349,230 @@ static void testWrap(void) {
 	CHECK(FR_wrap("x", 50, charWidth, NULL, lines, 0) == 0);
 }
 
+
+static MosaicActionInfo helpAction(const char* id, const char* label, int count, const MosaicActionBinding* binds) {
+	MosaicActionInfo a;
+	memset(&a, 0, sizeof(a));
+	a.size = sizeof(a);
+	snprintf(a.id, sizeof(a.id), "%s", id);
+	snprintf(a.label, sizeof(a.label), "%s", label);
+	a.binding_count = count;
+	for (int i = 0; i < count && i < MOSAIC_ACTION_BINDINGS; i++) a.bindings[i] = binds[i];
+	return a;
+}
+
+static const char* helpWording(const char* id, const char* label) {
+	return !strcmp(id, "gamelist.quick_menu") ? "QUICK MENU" : label;
+}
+
+static void testHelpLines(void) {
+	MosaicActionBinding own_a = { MOSAIC_BIND_SCREEN, MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_A, MOSAIC_TRIGGER_PRESS, "", "" };
+	MosaicActionBinding own_b = { MOSAIC_BIND_SCREEN, MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_B, MOSAIC_TRIGGER_PRESS, "", "" };
+	MosaicActionBinding own_menu = { MOSAIC_BIND_SCREEN, MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_MENU, MOSAIC_TRIGGER_RELEASE, "", "" };
+	MosaicActionBinding y = { MOSAIC_BIND_BUTTON, MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "x", "" };
+	MosaicActionBinding a_shared = { MOSAIC_BIND_BUTTON, MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_A, MOSAIC_TRIGGER_PRESS, "x", "" };
+	MosaicActionBinding a_release = { MOSAIC_BIND_BUTTON, MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_A, MOSAIC_TRIGGER_RELEASE, "x", "" };
+	MosaicActionBinding x_over = { MOSAIC_BIND_OVERRIDE, MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_X, MOSAIC_TRIGGER_PRESS, "x", "" };
+	MosaicActionBinding fn1 = { MOSAIC_BIND_FN_PLUGIN, -1, MOSAIC_BUTTON_FN1, MOSAIC_TRIGGER_PRESS, "x", "" };
+	MosaicActionBinding two[2] = { y, fn1 };
+	MosaicActionInfo actions[] = {
+		helpAction("gamelist.open", "OPEN", 1, &own_a),
+		helpAction("gamelist.back", "BACK", 1, &own_b),
+		helpAction("gamelist.quick_menu", "MENU", 1, &own_menu),
+		helpAction("favorites.toggle", "FAVORITE", 2, two),
+		helpAction("hidden.hide", "HIDE", 1, &y),
+		helpAction("tags.edit", "", 1, &y),
+		helpAction("unavailable.y", "GONE", 1, &y),
+		helpAction("shared.a", "LOST", 1, &a_shared),
+		helpAction("release.a", "INFO", 1, &a_release),
+		helpAction("jump.x", "JUMP", 1, &x_over),
+	};
+	int count = (int)(sizeof(actions) / sizeof(actions[0]));
+	int available[] = { 1, 0, 1, 1, 1, 1, 0, 1, 1, 1 };
+	int fn_there[3] = { 1, 1, 0 };
+	const char* paks[3] = { "", "Clock", "Files" };
+	FrHelpSource s = { "gamelist", actions, available, count, NULL, 0, fn_there, paks, helpWording, "MENU: %s" };
+	FrHelpLine lines[FR_HELP_LINES];
+	int n = FR_helpLines(&s, lines, FR_HELP_LINES);
+	CHECK(n == 6);
+	// A's own wins its press over a shared one, but a release one shows beside it
+	CHECK(lines[0].button == MOSAIC_BUTTON_A);
+	CHECK_STR(lines[0].text, "OPEN, INFO");
+	// B's own isn't available, at the root, so B is left out
+	CHECK(lines[1].button == MOSAIC_BUTTON_X);
+	CHECK_STR(lines[1].text, "JUMP");
+	// three available on Y open the shared button's menu; the id stands in for no label
+	CHECK(lines[2].button == MOSAIC_BUTTON_Y);
+	CHECK_STR(lines[2].text, "MENU: FAVORITE, HIDE, tags.edit");
+	CHECK(lines[3].button == MOSAIC_BUTTON_MENU);
+	CHECK_STR(lines[3].text, "QUICK MENU");
+	// an FN button's action and pak; FN3 isn't on this device
+	CHECK(lines[4].button == MOSAIC_BUTTON_FN1);
+	CHECK_STR(lines[4].text, "FAVORITE");
+	CHECK(lines[5].button == MOSAIC_BUTTON_FN2);
+	CHECK_STR(lines[5].text, "Clock");
+	CHECK(FR_helpLines(&s, lines, 2) == 2);
+
+	// one left on a shared button is just its label
+	available[4] = available[5] = 0;
+	n = FR_helpLines(&s, lines, FR_HELP_LINES);
+	CHECK_STR(lines[2].text, "FAVORITE");
+
+	// elsewhere only the screen's own and the FN buttons
+	MosaicHint own[] = { { MOSAIC_BUTTON_A, "RESUME" }, { MOSAIC_BUTTON_B, "BACK" }, { MOSAIC_BUTTON_SELECT, "BACK" },
+		{ MOSAIC_BUTTON_B, "BACK" }, { MOSAIC_GLYPH_UP_DOWN, "PICK" } };
+	s.screen = "switcher";
+	s.own = own;
+	s.own_count = 5;
+	n = FR_helpLines(&s, lines, FR_HELP_LINES);
+	CHECK(n == 6);
+	CHECK_STR(lines[0].text, "RESUME");
+	CHECK_STR(lines[1].text, "BACK");
+	CHECK(lines[2].button == MOSAIC_BUTTON_SELECT);
+	CHECK(lines[3].button == MOSAIC_GLYPH_UP_DOWN);
+	CHECK(lines[4].button == MOSAIC_BUTTON_FN1);
+	// over a dialog, nothing
+	s.screen = "dialog";
+	CHECK(FR_helpLines(&s, lines, FR_HELP_LINES) == 0);
+	CHECK(FR_helpLines(NULL, lines, FR_HELP_LINES) == 0);
+	// no menu format keeps the list
+	s.screen = "gamelist";
+	s.own_count = 0;
+	s.menu = NULL;
+	available[4] = 1;
+	n = FR_helpLines(&s, lines, FR_HELP_LINES);
+	CHECK_STR(lines[2].text, "FAVORITE, HIDE");
+
+	CHECK_STR(FR_helpButtonName(MOSAIC_BUTTON_MENU), "MENU");
+	CHECK_STR(FR_helpButtonName(MOSAIC_GLYPH_LEFT_RIGHT), "LEFT/RIGHT");
+	CHECK(FR_helpButtonName(MOSAIC_BUTTON_FN1) == NULL);
+}
+
+static MosaicInput helpInput(unsigned int pressed, unsigned int released, unsigned int held) {
+	MosaicInput in = { sizeof(MosaicInput), pressed, pressed, released, held };
+	return in;
+}
+
+static void testHelpInput(void) {
+	FrHelp h;
+	FR_helpInit(&h, -1);
+	int closed = 0;
+	// closed, nothing is taken
+	MosaicInput in = helpInput(bit(MOSAIC_BUTTON_Y), 0, bit(MOSAIC_BUTTON_Y));
+	CHECK(FR_helpFilter(&h, &in, &closed) == 0);
+	// opened by Y, it takes Y's release
+	FR_helpOpen(&h);
+	FR_helpDrawn(&h);
+	in = helpInput(0, bit(MOSAIC_BUTTON_Y), 0);
+	CHECK(FR_helpFilter(&h, &in, &closed) == bit(MOSAIC_BUTTON_Y));
+	CHECK(h.open && !closed);
+	// any press closes it, taken with its release
+	in = helpInput(bit(MOSAIC_BUTTON_A), 0, bit(MOSAIC_BUTTON_A));
+	CHECK(FR_helpFilter(&h, &in, &closed) == bit(MOSAIC_BUTTON_A));
+	CHECK(!h.open && closed);
+	in = helpInput(0, 0, bit(MOSAIC_BUTTON_A));
+	in.repeated = bit(MOSAIC_BUTTON_A);
+	CHECK(FR_helpFilter(&h, &in, NULL) == bit(MOSAIC_BUTTON_A));
+	in = helpInput(0, bit(MOSAIC_BUTTON_A), 0);
+	CHECK(FR_helpFilter(&h, &in, NULL) == bit(MOSAIC_BUTTON_A));
+	in = helpInput(bit(MOSAIC_BUTTON_A), 0, bit(MOSAIC_BUTTON_A));
+	CHECK(FR_helpFilter(&h, &in, NULL) == 0);
+	in = helpInput(0, bit(MOSAIC_BUTTON_A), 0);
+	CHECK(FR_helpFilter(&h, &in, NULL) == 0);
+
+	// power closes it and goes through
+	FR_helpOpen(&h);
+	FR_helpDrawn(&h);
+	closed = 0;
+	in = helpInput(bit(MOSAIC_BUTTON_POWER), 0, bit(MOSAIC_BUTTON_POWER));
+	CHECK(FR_helpFilter(&h, &in, &closed) == 0);
+	CHECK(closed && !h.open);
+	in = helpInput(0, bit(MOSAIC_BUTTON_POWER), 0);
+	CHECK(FR_helpFilter(&h, &in, NULL) == 0);
+
+	// never drawn, as over a screen without overlays: a press closes it and goes through
+	FR_helpDrawn(&h);
+	CHECK(!h.drawn);
+	FR_helpOpen(&h);
+	closed = 0;
+	in = helpInput(bit(MOSAIC_BUTTON_B), 0, bit(MOSAIC_BUTTON_B));
+	CHECK(FR_helpFilter(&h, &in, &closed) == 0);
+	CHECK(closed && !h.open);
+	in = helpInput(0, bit(MOSAIC_BUTTON_B), 0);
+	CHECK(FR_helpFilter(&h, &in, NULL) == 0);
+
+	// closed by the plugin, what's down still has its release taken
+	FR_helpOpen(&h);
+	in = helpInput(0, 0, bit(MOSAIC_BUTTON_L1));
+	FR_helpFilter(&h, &in, NULL);
+	FR_helpClose(&h);
+	in = helpInput(0, bit(MOSAIC_BUTTON_L1), 0);
+	CHECK(FR_helpFilter(&h, &in, NULL) == bit(MOSAIC_BUTTON_L1));
+
+	// a hold of SELECT alone opens it once, after a second
+	FR_helpInit(&h, MOSAIC_BUTTON_SELECT);
+	unsigned int sel = bit(MOSAIC_BUTTON_SELECT);
+	CHECK(FR_helpTick(&h, 1000) == 0);
+	in = helpInput(sel, 0, sel);
+	FR_helpFilter(&h, &in, NULL);
+	in = helpInput(0, 0, sel);
+	FR_helpFilter(&h, &in, NULL);
+	CHECK(FR_helpTick(&h, 1500) == 0);
+	CHECK(FR_helpTick(&h, 2000) == 1);
+	FR_helpOpen(&h);
+	CHECK(FR_helpTick(&h, 3000) == 0);
+	// its release is taken, so the game switcher doesn't open
+	in = helpInput(0, sel, 0);
+	CHECK(FR_helpFilter(&h, &in, NULL) == sel);
+	// another button with it, or a release, stops the hold
+	FR_helpClose(&h);
+	in = helpInput(sel, 0, sel);
+	FR_helpFilter(&h, &in, NULL);
+	in = helpInput(bit(MOSAIC_BUTTON_START), 0, sel | bit(MOSAIC_BUTTON_START));
+	FR_helpFilter(&h, &in, NULL);
+	CHECK(FR_helpTick(&h, 9000) == 0);
+	in = helpInput(sel, 0, sel);
+	FR_helpFilter(&h, &in, NULL);
+	in = helpInput(0, sel, 0);
+	FR_helpFilter(&h, &in, NULL);
+	CHECK(FR_helpTick(&h, 20000) == 0);
+	// pressed with another already down, it isn't a hold
+	in = helpInput(sel, 0, sel | bit(MOSAIC_BUTTON_A));
+	FR_helpFilter(&h, &in, NULL);
+	CHECK(FR_helpTick(&h, 30000) == 0);
+}
+
+static void testWizardButtons(void) {
+	FrWizard w;
+	MosaicHint out[8];
+	FR_init(&w, 2, 0, 0, 0, 0);
+	int n = FR_wizardButtons(&w, out, 8);
+	CHECK(n == 2);
+	CHECK(out[0].button == MOSAIC_BUTTON_A);
+	CHECK_STR(out[0].label, "NEXT");
+	CHECK(out[1].button == MOSAIC_BUTTON_Y);
+	w.page = FR_TOGGLES;
+	n = FR_wizardButtons(&w, out, 8);
+	CHECK(n == 5);
+	CHECK(out[1].button == MOSAIC_BUTTON_B);
+	CHECK(out[3].button == MOSAIC_GLYPH_UP_DOWN);
+	CHECK_STR(out[4].label, "CHANGE");
+	w.page = FR_DONE;
+	n = FR_wizardButtons(&w, out, 8);
+	CHECK(n == 2);
+	CHECK_STR(out[0].label, "DONE");
+	CHECK(FR_wizardButtons(&w, out, 1) == 2);
+	// the buttons page alone scrolls while there's more than fits
+	FR_initButtons(&w, 20);
+	FR_setVisible(&w, 5);
+	n = FR_wizardButtons(&w, out, 8);
+	CHECK(n == 3);
+	CHECK_STR(out[0].label, "CLOSE");
+	CHECK_STR(out[2].label, "SCROLL");
+	FR_setVisible(&w, 30);
+	CHECK(FR_wizardButtons(&w, out, 8) == 2);
+}
+
 ///////////////////////////////////////
 // the plugin against a fake host
 
@@ -363,6 +587,7 @@ static int registered_count = 0;
 static char action_id[64], tile_id[64], tiles[160];
 static void (*action_run)(const char*, void*);
 static void (*buttons_run)(const char*, void*);
+static void (*help_run)(const char*, void*);
 static int bound_button = -1;
 static char all_log[16384];
 static int redraws = 0, opens = 0, open_rc = 0, pin = 0, renders_ok = 0;
@@ -374,6 +599,7 @@ static const char* cfg_pin = "on";
 static const char* cfg_suggest = NULL;
 static const char* cfg_setup = "on";
 static const char* cfg_buttons = "on";
+static const char* cfg_help_button = "none";
 static int toggle_value[4] = { 1, 0, 1, -1 }; // notify_adjustments unknown
 static char hint_text[256];
 
@@ -395,6 +621,7 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "suggest") && cfg_suggest) return cfg_suggest;
 	if (!strcmp(key, "setup")) return cfg_setup;
 	if (!strcmp(key, "buttons")) return cfg_buttons;
+	if (!strcmp(key, "help_button")) return cfg_help_button;
 	return fallback;
 }
 
@@ -453,6 +680,10 @@ static int fakeAction(const char* id, const char* label, int flags, int (*availa
 	(void)label;
 	if (!strcmp(id, BUTTONS_ACTION_ID)) {
 		buttons_run = run;
+		return 0;
+	}
+	if (!strcmp(id, HELP_ACTION_ID)) {
+		help_run = run;
 		return 0;
 	}
 	snprintf(action_id, sizeof(action_id), "%s", id);
@@ -653,6 +884,7 @@ static void reset(void) {
 	snprintf(cfg_seen, sizeof(cfg_seen), "off");
 	cfg_toggles = cfg_pin = cfg_setup = cfg_buttons = "on";
 	cfg_suggest = NULL;
+	cfg_help_button = "none";
 	toggle_value[0] = 1;
 	toggle_value[1] = 0;
 	toggle_value[2] = 1;
@@ -711,7 +943,7 @@ static void testPlugin(void) {
 	CHECK(p->init(&fake_host) == 0);
 	CHECK(registered_count == 2);
 	CHECK_STR(action_id, ACTION_ID);
-	CHECK_STR(tiles, ACTION_ID " " BUTTONS_ACTION_ID " ");
+	CHECK_STR(tiles, ACTION_ID " " BUTTONS_ACTION_ID " " HELP_ACTION_ID " ");
 	CHECK(logged("not seen yet"));
 
 	// opens itself on the first tick over the game list, once
@@ -889,6 +1121,134 @@ static void testPlugin(void) {
 	CHECK(p->init(&fake_host) != 0);
 }
 
+
+static int fakeAvailable(const char* id, const char* path) {
+	(void)path;
+	return strcmp(id, "favorites.toggle") == 0 || strcmp(id, "gamelist.open") == 0;
+}
+static MosaicHint fake_own[4];
+static int fake_own_count = 0;
+static int fakeScreenButtons(MosaicHint* out, int max) {
+	for (int i = 0; i < fake_own_count && i < max; i++) out[i] = fake_own[i];
+	return fake_own_count;
+}
+
+static unsigned int filter(unsigned int pressed, unsigned int released, unsigned int held) {
+	MosaicInput in = { sizeof(MosaicInput), pressed, pressed, released, held };
+	unsigned int consumed = 0;
+	CHECK(mosaic_plugin_get(&fake_host)->input_filter(&in, &consumed) == 0);
+	return consumed;
+}
+
+static int overlay(void) {
+	MosaicScreenView view = { sizeof(MosaicScreenView), { 0, 0, 1024, 768 }, { 800, 10, 214, 90 }, { 0, 0, 0, 0 }, current };
+	drawn_text[0] = '\0';
+	return mosaic_plugin_get(&fake_host)->overlay_render(&screen_surface, &view);
+}
+
+static void testHelp(void) {
+	reset();
+	fake_host.action_available = fakeAvailable;
+	fake_host.screen_buttons = fakeScreenButtons;
+	fake_own_count = 0;
+	snprintf(cfg_seen, sizeof(cfg_seen), "on");
+	cfg_help_button = "hold START";
+	help_run = NULL;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(help_run != NULL);
+	CHECK(p->overlay_render && p->input_filter);
+
+	// closed, it draws and takes nothing
+	CHECK(overlay() == 0);
+	CHECK(drawn_text[0] == '\0');
+	CHECK(filter(bit(MOSAIC_BUTTON_A), 0, bit(MOSAIC_BUTTON_A)) == 0);
+	filter(0, bit(MOSAIC_BUTTON_A), 0);
+
+	// over the game list: its own button and favorites' Y, available for the row
+	int was = redraws;
+	help_run(NULL, NULL);
+	CHECK(redraws > was);
+	CHECK(logged("help over gamelist"));
+	CHECK(logged("help A: OPEN"));
+	CHECK(logged("help Y: FAVORITE"));
+	CHECK(overlay() == 0);
+	CHECK(strstr(drawn_text, "Help|") != NULL);
+	CHECK(strstr(drawn_text, "OPEN|") != NULL);
+	CHECK(strstr(drawn_text, "FAVORITE|") != NULL);
+	CHECK(strstr(drawn_text, "Any button closes this.|") != NULL);
+	// any press closes it without reaching the game list, and its release too
+	CHECK(filter(bit(MOSAIC_BUTTON_X), 0, bit(MOSAIC_BUTTON_X)) == bit(MOSAIC_BUTTON_X));
+	CHECK(logged("help closed"));
+	CHECK(filter(0, bit(MOSAIC_BUTTON_X), 0) == bit(MOSAIC_BUTTON_X));
+	CHECK(overlay() == 0);
+	CHECK(drawn_text[0] == '\0');
+
+	// over the game switcher, its own buttons
+	snprintf(current, sizeof(current), "switcher");
+	fake_own[0] = (MosaicHint){ MOSAIC_BUTTON_A, "RESUME" };
+	fake_own[1] = (MosaicHint){ MOSAIC_BUTTON_SELECT, "BACK" };
+	fake_own_count = 2;
+	all_log[0] = '\0';
+	help_run(NULL, NULL);
+	CHECK(logged("help over switcher"));
+	CHECK(logged("help A: RESUME"));
+	CHECK(logged("help SELECT: BACK"));
+	CHECK(!logged("help Y: FAVORITE"));
+	// a screen opening over it closes it
+	snprintf(current, sizeof(current), "screensaver.main");
+	p->tick(5);
+	CHECK(logged("help closed"));
+	CHECK(!help.open);
+
+	// nothing listed
+	fake_own_count = 0;
+	all_log[0] = '\0';
+	help_run(NULL, NULL);
+	CHECK(logged("help: nothing"));
+	overlay();
+	CHECK(strstr(drawn_text, "Nothing on this screen lists its buttons.|") != NULL);
+	filter(bit(MOSAIC_BUTTON_B), 0, bit(MOSAIC_BUTTON_B));
+	filter(0, bit(MOSAIC_BUTTON_B), 0);
+
+	// not over a dialog
+	snprintf(current, sizeof(current), "dialog");
+	all_log[0] = '\0';
+	help_run(NULL, NULL);
+	CHECK(!logged("help over dialog"));
+
+	// START held a second opens it, anywhere
+	snprintf(current, sizeof(current), "gamelist");
+	unsigned int start = bit(MOSAIC_BUTTON_START);
+	p->tick(10000);
+	filter(start, 0, start);
+	p->tick(10500);
+	CHECK(!help.open);
+	filter(0, 0, start);
+	p->tick(11000);
+	CHECK(help.open);
+	CHECK(filter(0, start, 0) == start);
+	CHECK(help.open);
+	overlay();
+	filter(bit(MOSAIC_BUTTON_B), 0, bit(MOSAIC_BUTTON_B));
+	CHECK(!help.open);
+
+	// the wizard's screens list their buttons, translated
+	MosaicHint out[8];
+	FR_init(&wizard, 1, 0, 0, 0, 0);
+	CHECK(registered.buttons && registered_buttons.buttons);
+	CHECK(registered.buttons(out, 8, NULL) == 2);
+	CHECK_STR(out[0].label, "NEXT");
+
+	// a launcher without screen_buttons says so
+	reset();
+	snprintf(cfg_seen, sizeof(cfg_seen), "on");
+	CHECK(p->init(&fake_host) == 0);
+	help_run(NULL, NULL);
+	CHECK(logged("this launcher can't list a screen's buttons"));
+	CHECK(!help.open);
+}
+
 int main(void) {
 	testPages();
 	testInput();
@@ -899,6 +1259,10 @@ int main(void) {
 	testSetup();
 	testButtonLines();
 	testWrap();
+	testHelpLines();
+	testHelpInput();
+	testWizardButtons();
 	testPlugin();
+	testHelp();
 	CHECK_DONE();
 }

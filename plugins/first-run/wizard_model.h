@@ -84,6 +84,13 @@ int FR_shouldOpen(int seen, int opened, const char* current, const char* home);
 // alone has B BACK only.
 void FR_hints(const FrWizard* w, MosaicHint left[2], int* left_count, MosaicHint right[1], int* right_count);
 
+// The buttons the wizard does something with on its page, for its
+// screens' buttons hook, in English: A, B and Y as FR_input takes them,
+// then up and down to pick a row or scroll the buttons page while there's
+// more than fits, and left and right to change a toggle or a setup row.
+// Fills up to max of out and returns how many there are.
+int FR_wizardButtons(const FrWizard* w, MosaicHint* out, int max);
+
 // Suggested plugins, from a comma-separated list of ids (spaces around
 // them dropped, empty ones and repeats left out), up to FR_SUGGEST_MAX.
 #define FR_SUGGEST_MAX 8

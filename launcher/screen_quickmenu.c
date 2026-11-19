@@ -154,6 +154,18 @@ void QuickMenu_handleInput(void) {
 	}
 }
 
+int QuickMenu_buttons(MosaicHint* out, int max) {
+	MosaicHint all[4];
+	int n = 0;
+	if (selectedTile()) all[n++] = (MosaicHint){ MOSAIC_BUTTON_A, TR("OPEN") };
+	all[n++] = (MosaicHint){ MOSAIC_BUTTON_B, TR("BACK") };
+	all[n++] = (MosaicHint){ MOSAIC_BUTTON_MENU, TR("BACK") };
+	// as its hint says
+	all[n++] = (MosaicHint){ BTN_SLEEP == BTN_POWER ? MOSAIC_BUTTON_POWER : MOSAIC_BUTTON_MENU, TR("SLEEP") };
+	for (int i = 0; i < n && i < max; i++) out[i] = all[i];
+	return n;
+}
+
 // Picks and starts loading the selected tile's background. Draws nothing;
 // the loaded image is drawn by main()'s background flush.
 void QuickMenu_update(void) {

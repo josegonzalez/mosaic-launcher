@@ -24,7 +24,7 @@ msgid "A PIN keeps others out of simple mode and protected plugin settings. Set 
 msgstr ""
 
 #: plugin.txt
-msgid "A short setup wizard the first time the launcher starts, with a few settings, plugins to try and what each button does."
+msgid "A short setup wizard the first time the launcher starts, with a few settings, plugins to try and what each button does, and a help overlay of the buttons on any screen."
 msgstr ""
 
 #: first_run.c
@@ -36,7 +36,20 @@ msgid "Already shown"
 msgstr ""
 
 #: first_run.c
+#, c-format
+msgid "And %i more"
+msgstr ""
+
+#: first_run.c
+msgid "Any button closes this."
+msgstr ""
+
+#: first_run.c
 msgid "Anywhere"
+msgstr ""
+
+#: wizard_model.c
+msgid "BACK"
 msgstr ""
 
 #: first_run.c
@@ -53,6 +66,18 @@ msgstr ""
 
 #: plugin.txt
 msgid "Buttons tile"
+msgstr ""
+
+#: wizard_model.c
+msgid "CHANGE"
+msgstr ""
+
+#: wizard_model.c
+msgid "CLOSE"
+msgstr ""
+
+#: wizard_model.c
+msgid "DONE"
 msgstr ""
 
 #: first_run.c
@@ -80,6 +105,18 @@ msgid "Haptic feedback"
 msgstr ""
 
 #: first_run.c
+msgid "Help"
+msgstr ""
+
+#: plugin.txt
+msgid "Help button"
+msgstr ""
+
+#: plugin.txt
+msgid "Help tile"
+msgstr ""
+
+#: first_run.c
 msgid "Home mode"
 msgstr ""
 
@@ -104,11 +141,28 @@ msgid "Left and right change the selected setting, saved at once. Settings has t
 msgstr ""
 
 #: first_run.c
+#, c-format
+msgid "MENU: %s"
+msgstr ""
+
+#: wizard_model.c
+msgid "NEXT"
+msgstr ""
+
+#: first_run.c
+msgid "NEXT LETTER"
+msgstr ""
+
+#: first_run.c
 msgid "Not on a button"
 msgstr ""
 
 #: first_run.c
 msgid "Nothing is on a button."
+msgstr ""
+
+#: first_run.c
+msgid "Nothing on this screen lists its buttons."
 msgstr ""
 
 #: first_run.c
@@ -127,12 +181,20 @@ msgstr ""
 msgid "Once it's done or skipped it won't open by itself again. The First run tile on the quick menu opens it."
 msgstr ""
 
+#: wizard_model.c
+msgid "PICK"
+msgstr ""
+
 #: first_run.c
 msgid "PIN"
 msgstr ""
 
 #: plugin.txt
 msgid "PIN page"
+msgstr ""
+
+#: first_run.c
+msgid "PREVIOUS LETTER"
 msgstr ""
 
 #: first_run.c
@@ -148,6 +210,10 @@ msgid "Plugins"
 msgstr ""
 
 #: first_run.c
+msgid "QUICK MENU"
+msgstr ""
+
+#: first_run.c
 msgid "Quick menu"
 msgstr ""
 
@@ -159,8 +225,16 @@ msgstr ""
 msgid "R2"
 msgstr ""
 
+#: wizard_model.c
+msgid "SCROLL"
+msgstr ""
+
 #: plugin.txt
 msgid "SELECT"
+msgstr ""
+
+#: wizard_model.c
+msgid "SKIP"
 msgstr ""
 
 #: first_run.c
@@ -221,6 +295,14 @@ msgstr ""
 
 #: plugin.txt
 msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "hold SELECT"
+msgstr ""
+
+#: plugin.txt
+msgid "hold START"
 msgstr ""
 
 #: plugin.txt

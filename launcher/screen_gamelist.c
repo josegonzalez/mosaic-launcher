@@ -275,6 +275,13 @@ int GameList_ownBindings(const Binding** out, int max) {
 	return SCREEN_BINDINGS + BINDING_COUNT + LETTER_BINDINGS;
 }
 
+int GameList_buttons(MosaicHint* out, int max) {
+	// as its hint says
+	if (max > 0) out[0] = (MosaicHint){ BTN_SLEEP == BTN_POWER ? MOSAIC_BUTTON_POWER : MOSAIC_BUTTON_MENU,
+		BTN_SLEEP == BTN_POWER || state.simple_mode ? TR("SLEEP") : TR("INFO") };
+	return 1;
+}
+
 void GameList_registerActions(void) {
 	Actions_setSelected(selectedPath);
 	for (int i = 0; i < SCREEN_BINDINGS; i++) Actions_register(screenBindings[i].action);

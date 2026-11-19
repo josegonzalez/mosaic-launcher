@@ -42,6 +42,14 @@ void QuickMenu_handleInput(void);
 void QuickMenu_update(void);
 void QuickMenu_render(void);
 void Switcher_handleInput(void);
+// The buttons the built-in game switcher and quick menu handle, each with
+// what it does there, translated, as host->screen_buttons lists them. Fill
+// up to max of out and return how many there are.
+int Switcher_buttons(MosaicHint* out, int max);
+int QuickMenu_buttons(MosaicHint* out, int max);
+// The game list's own button that isn't an action: the SLEEP (or INFO)
+// its hint shows.
+int GameList_buttons(MosaicHint* out, int max);
 void Switcher_update(void);
 void Switcher_render(void);
 void GameList_handleInput(void);

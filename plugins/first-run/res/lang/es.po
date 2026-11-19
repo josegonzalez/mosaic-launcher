@@ -16,8 +16,8 @@ msgstr "%i de %i"
 msgid "A PIN keeps others out of simple mode and protected plugin settings. Set or change it on the PIN row in Tools > Launcher > Plugins."
 msgstr "Un PIN impide a otros salir del modo simple y cambiar los ajustes protegidos de los plugins. Ponlo o cámbialo en la fila PIN de Herramientas > Launcher > Plugins."
 
-msgid "A short setup wizard the first time the launcher starts, with a few settings, plugins to try and what each button does."
-msgstr "Un breve asistente de configuración la primera vez que arranca el launcher, con algunos ajustes, plugins para probar y lo que hace cada botón."
+msgid "A short setup wizard the first time the launcher starts, with a few settings, plugins to try and what each button does, and a help overlay of the buttons on any screen."
+msgstr "Un breve asistente de configuración la primera vez que arranca el launcher, con algunos ajustes, plugins para probar y lo que hace cada botón, y una ayuda de los botones en cualquier pantalla."
 
 msgid "All set"
 msgstr "Todo listo"
@@ -168,3 +168,65 @@ msgstr "Y"
 
 msgid "none"
 msgstr "ninguno"
+
+#, c-format
+msgid "And %i more"
+msgstr "Y %i más"
+
+msgid "Any button closes this."
+msgstr "Cualquier botón cierra esto."
+
+msgid "BACK"
+msgstr "ATRÁS"
+
+msgid "CHANGE"
+msgstr "CAMBIAR"
+
+msgid "CLOSE"
+msgstr "CERRAR"
+
+msgid "DONE"
+msgstr "LISTO"
+
+msgid "Help"
+msgstr "Ayuda"
+
+msgid "Help button"
+msgstr "Botón de ayuda"
+
+msgid "Help tile"
+msgstr "Icono de ayuda"
+
+#, c-format
+msgid "MENU: %s"
+msgstr "MENÚ: %s"
+
+msgid "NEXT"
+msgstr "SIGUIENTE"
+
+msgid "NEXT LETTER"
+msgstr "LETRA SIGUIENTE"
+
+msgid "Nothing on this screen lists its buttons."
+msgstr "Esta pantalla no indica sus botones."
+
+msgid "PICK"
+msgstr "ELEGIR"
+
+msgid "PREVIOUS LETTER"
+msgstr "LETRA ANTERIOR"
+
+msgid "QUICK MENU"
+msgstr "MENÚ RÁPIDO"
+
+msgid "SCROLL"
+msgstr "DESPLAZAR"
+
+msgid "SKIP"
+msgstr "SALTAR"
+
+msgid "hold SELECT"
+msgstr "mantener SELECT"
+
+msgid "hold START"
+msgstr "mantener START"

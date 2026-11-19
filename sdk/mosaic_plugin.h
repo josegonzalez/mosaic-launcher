@@ -667,6 +667,13 @@ typedef struct MosaicScreenHooks {
 	// Asked each frame while it's on top: 1 to redraw it every frame, such
 	// as while something moves, or 0 to redraw only when asked.
 	int (*animating)(void* data);
+	// The buttons it does something with, for a help overlay (see
+	// host->screen_buttons): fill up to max of out, each a button and what
+	// it does there, translated, in upper case like a hint, the label kept
+	// valid until the next call, and return how many it has. Asked while
+	// it's on top. Without it, a screen lists nothing, or B BACK when it
+	// has no input, as B closes it then.
+	int (*buttons)(MosaicHint* out, int max, void* data);
 } MosaicScreenHooks;
 
 ///////////////////////////////////////
@@ -1925,6 +1932,26 @@ typedef struct MosaicHost {
 	int (*play_sessions_count)(void);
 	int (*play_session_info)(int index, MosaicPlaySession* out);
 	int (*play_forget)(const char* path);
+
+	// For a help overlay. action_available returns 1 when an action from
+	// register_action, or one of the game list's own (see override_button),
+	// would run now on path, as a button would run it, 0 when it wouldn't,
+	// and -1 for no such action. With path NULL or "" it gets what a button
+	// would give it, the game list's selected entry while the game list
+	// shows, so a plugin can tell which of the actions on a button, such as
+	// a shared button's menu, the selected row has. screen_buttons fills up
+	// to max of out with the buttons the screen showing now handles itself
+	// that action_info doesn't list, each with what it does there,
+	// translated: the built-in game switcher's and quick menu's, as stock
+	// has them, and an open plugin screen's, from its MosaicScreenHooks'
+	// buttons, and the game list's SLEEP (or INFO) its hint shows, as its
+	// other buttons are actions. It returns how many there are, 0 over a
+	// dialog. The labels stay valid until the next call. They work where
+	// cfg_get does; elsewhere action_available returns -1 and
+	// screen_buttons 0. Check for them with
+	// MOSAIC_HOST_HAS(host, screen_buttons).
+	int (*action_available)(const char* action_id, const char* path);
+	int (*screen_buttons)(MosaicHint* out, int max);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

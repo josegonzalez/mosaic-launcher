@@ -70,8 +70,8 @@ msgctxt "systems"
 msgid "Atari Lynx"
 msgstr ""
 
-#: launcher/modal.c launcher/screen_gamelist.c launcher/screen_quickmenu.c
-#: launcher/screen_switcher.c launcher/settings.c
+#: launcher/modal.c launcher/plugins.c launcher/screen_gamelist.c
+#: launcher/screen_quickmenu.c launcher/screen_switcher.c launcher/settings.c
 msgid "BACK"
 msgstr ""
 

@@ -2184,6 +2184,8 @@ static int hostCloseScreen(const char* id);
 static int hostRunAction(const char* action_id, const char* path);
 static int hostActionsCount(void);
 static int hostActionInfo(int index, MosaicActionInfo* out);
+static int hostActionAvailable(const char* action_id, const char* path);
+static int hostScreenButtons(MosaicHint* out, int max);
 static int hostDrawHints(MosaicSurface* screen, int group, const MosaicHint* hints, int count, MosaicRect* drawn);
 
 static void playLog(const char* message) {
@@ -2377,6 +2379,8 @@ static const MosaicHost host = {
 	.play_sessions_count = PlayHistory_sessionCount,
 	.play_session_info = hostPlaySessionInfo,
 	.play_forget = hostPlayForget,
+	.action_available = hostActionAvailable,
+	.screen_buttons = hostScreenButtons,
 };
 
 ///////////////////////////////////////
@@ -4504,6 +4508,62 @@ static int hostRunAction(const char* action_id, const char* path) {
 	}
 	if (!Action_available(action, path)) return -1;
 	return Action_run(action, path);
+}
+
+static int hostActionAvailable(const char* action_id, const char* path) {
+	if (!callingPlugin("action_available")) return -1;
+	const Action* action = Actions_find(action_id);
+	if (!action) return -1;
+	if (!path || !path[0]) path = Action_buttonPath(action);
+	return Action_available(action, path) ? 1 : 0;
+}
+
+// The open plugin screen's buttons, from its buttons hook, or B BACK for
+// one without input, which B closes.
+#define SCREEN_BUTTONS_MAX 32
+static int pluginScreenButtons(MosaicHint* out, int max) {
+	int top = ScreenSet_top(&screens);
+	if (top < 0 || screens.screens[top].off) return 0;
+	PluginScreen* s = &screens.screens[top];
+	if (!s->hooks.buttons) {
+		if (s->hooks.input) return 0;
+		if (max > 0) out[0] = (MosaicHint){ MOSAIC_BUTTON_B, TR("BACK") };
+		return 1;
+	}
+	static int asking = 0; // its hook asking for its own buttons
+	if (asking) return 0;
+	MosaicHint got[SCREEN_BUTTONS_MAX];
+	memset(got, 0, sizeof(got));
+	int n = 0;
+	asking = 1;
+	AS_SCREEN(s) n = s->hooks.buttons(got, SCREEN_BUTTONS_MAX, s->hooks.data);
+	asking = 0;
+	if (n < 0) {
+		LOG_warn("plugins: %s's screen %s's buttons returned %i\n", SCREEN_OWNER(s), s->id, n);
+		return 0;
+	}
+	if (n > SCREEN_BUTTONS_MAX) n = SCREEN_BUTTONS_MAX;
+	// kept here, as the screen's labels last only until its next call
+	static char labels[SCREEN_BUTTONS_MAX][128];
+	int kept = 0;
+	for (int i = 0; i < n; i++) {
+		if (got[i].button < 0 || !got[i].label) continue;
+		snprintf(labels[kept], sizeof(labels[kept]), "%s", got[i].label);
+		if (kept < max) out[kept] = (MosaicHint){ got[i].button, labels[kept] };
+		kept++;
+	}
+	return kept;
+}
+
+static int hostScreenButtons(MosaicHint* out, int max) {
+	if (!callingPlugin("screen_buttons") || (!out && max > 0)) return 0;
+	switch (currentScreen) {
+		case SCREEN_PLUGIN: return pluginScreenButtons(out, max);
+		case SCREEN_GAMESWITCHER: return Switcher_buttons(out, max);
+		case SCREEN_QUICKMENU: return QuickMenu_buttons(out, max);
+		case SCREEN_MODAL: return 0;
+		default: return GameList_buttons(out, max);
+	}
 }
 
 // After an error the screen stays off until the launcher restarts; it
