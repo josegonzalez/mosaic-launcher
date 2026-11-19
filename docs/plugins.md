@@ -94,7 +94,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [activity-stats](../plugins/activity-stats/README.md) - Shows how long you played each day and which games you played most.
 - [gamification](../plugins/gamification/README.md) - Adds daily and weekly quests and a play streak.
 - [playtime-captions](../plugins/playtime-captions/README.md) - Shows play time and last played at the right of each game's row.
-- [playtime-limit](../plugins/playtime-limit/README.md) - Sets a daily limit on how long games can be played.
+- [playtime-limit](../plugins/playtime-limit/README.md) - Sets daily limits and a bedtime for playing games.
 
 ## Power
 

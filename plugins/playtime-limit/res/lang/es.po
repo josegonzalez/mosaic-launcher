@@ -25,6 +25,78 @@ msgstr "quedan %lld min"
 msgid "%s today"
 msgstr "%s hoy"
 
+msgid "00:00"
+msgstr "00:00"
+
+msgid "05:00"
+msgstr "05:00"
+
+msgid "05:30"
+msgstr "05:30"
+
+msgid "06:00"
+msgstr "06:00"
+
+msgid "06:30"
+msgstr "06:30"
+
+msgid "07:00"
+msgstr "07:00"
+
+msgid "07:30"
+msgstr "07:30"
+
+msgid "08:00"
+msgstr "08:00"
+
+msgid "08:30"
+msgstr "08:30"
+
+msgid "09:00"
+msgstr "09:00"
+
+msgid "09:30"
+msgstr "09:30"
+
+msgid "10:00"
+msgstr "10:00"
+
+msgid "18:00"
+msgstr "18:00"
+
+msgid "18:30"
+msgstr "18:30"
+
+msgid "19:00"
+msgstr "19:00"
+
+msgid "19:30"
+msgstr "19:30"
+
+msgid "20:00"
+msgstr "20:00"
+
+msgid "20:30"
+msgstr "20:30"
+
+msgid "21:00"
+msgstr "21:00"
+
+msgid "21:30"
+msgstr "21:30"
+
+msgid "22:00"
+msgstr "22:00"
+
+msgid "22:30"
+msgstr "22:30"
+
+msgid "23:00"
+msgstr "23:00"
+
+msgid "23:30"
+msgstr "23:30"
+
 msgid "10"
 msgstr "10"
 
@@ -55,23 +127,39 @@ msgstr "60"
 msgid "90"
 msgstr "90"
 
+msgid "Bedtime"
+msgstr "Hora de dormir"
+
+msgid "Bedtime ends"
+msgstr "Fin de la hora de dormir"
+
+msgid "Bedtime starts"
+msgstr "Inicio de la hora de dormir"
+
+msgid "Budget bar"
+msgstr "Barra de tiempo"
+
 msgid "CODE"
 msgstr "CÓDIGO"
 
 msgid "Code for extra time"
 msgstr "Código para tiempo extra"
 
-msgid "Daily limit (minutes)"
-msgstr "Límite diario (minutos)"
-
 msgid "Extra time (minutes)"
 msgstr "Tiempo extra (minutos)"
+
+msgid "It's bedtime"
+msgstr "Es hora de dormir"
+
+#, c-format
+msgid "It's bedtime. Enter the code for %i more minutes?"
+msgstr "Es hora de dormir. ¿Introducir el código para %i minutos más?"
 
 msgid "Play time limit"
 msgstr "Límite de tiempo de juego"
 
-msgid "Sets a daily limit on how long games can be played, from the play history stock keeps."
-msgstr "Pone un límite diario a cuánto tiempo se puede jugar, según el historial de juego que guarda NextUI original."
+msgid "Sets a daily limit on how long games can be played, from the play history stock keeps, with its own weekend limit and a bedtime."
+msgstr "Pone un límite diario a cuánto tiempo se puede jugar, según el historial de juego que guarda NextUI original, con su propio límite para el fin de semana y una hora de dormir."
 
 msgid "Time's up"
 msgstr "Se acabó el tiempo"
@@ -86,8 +174,17 @@ msgstr "Se acabó el tiempo por hoy. ¿Introducir el código para %i minutos má
 msgid "Warn at (minutes left)"
 msgstr "Avisar cuando queden (minutos)"
 
+msgid "Weekday limit (minutes)"
+msgstr "Límite entre semana (minutos)"
+
+msgid "Weekend limit (minutes)"
+msgstr "Límite el fin de semana (minutos)"
+
 msgid "Wrong code"
 msgstr "Código incorrecto"
 
 msgid "off"
 msgstr "desactivado"
+
+msgid "same"
+msgstr "el mismo"

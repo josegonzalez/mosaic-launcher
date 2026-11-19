@@ -20,6 +20,64 @@ int PL_parseMinutes(const char* setting, int fallback) {
 	return (int)value;
 }
 
+int PL_weekendLimit(const char* setting, int weekday) {
+	if (!setting) return weekday;
+	while (isBlank(*setting)) setting++;
+	size_t len = strlen(setting);
+	while (len > 0 && isBlank(setting[len - 1])) len--;
+	if (len == 0 || (len == 4 && !strncmp(setting, "same", 4))) return weekday;
+	return PL_parseMinutes(setting, 0);
+}
+
+int PL_isWeekend(int wday) {
+	return wday == 0 || wday == 6;
+}
+
+int PL_todayLimit(int weekday, int weekend, int wday) {
+	return PL_isWeekend(wday) ? weekend : weekday;
+}
+
+static int digit(char c) {
+	return c >= '0' && c <= '9';
+}
+
+int PL_parseClock(const char* setting, int fallback) {
+	if (!setting) return fallback;
+	while (isBlank(*setting)) setting++;
+	if (!digit(setting[0]) || !digit(setting[1]) || setting[2] != ':' || !digit(setting[3]) || !digit(setting[4]))
+		return fallback;
+	int hours = (setting[0] - '0') * 10 + setting[1] - '0';
+	int minutes = (setting[3] - '0') * 10 + setting[4] - '0';
+	const char* rest = setting + 5;
+	while (isBlank(*rest)) rest++;
+	if (*rest || hours > 23 || minutes > 59) return fallback;
+	return hours * 60 + minutes;
+}
+
+void PL_formatClock(int minutes, char out[PL_CLOCK_LEN]) {
+	minutes %= PL_MINUTES_MAX;
+	if (minutes < 0) minutes += PL_MINUTES_MAX;
+	snprintf(out, PL_CLOCK_LEN, "%02d:%02d", minutes / 60, minutes % 60);
+}
+
+int PL_inWindow(int start, int end, int now) {
+	if (start < 0 || end < 0 || start == end) return 0;
+	if (start < end) return now >= start && now < end;
+	return now >= start || now < end;
+}
+
+int PL_unlocked(long long until, long long now) {
+	return until > now && until - now <= PL_UNLOCK_MAX;
+}
+
+int PL_barFill(long long played, int limit, int grant, int width) {
+	if (limit <= 0 || played < 0 || width <= 0) return -1;
+	if (grant < 0) grant = 0;
+	long long total = ((long long)limit + grant) * 60;
+	if (played >= total) return width;
+	return (int)(played * width / total);
+}
+
 void PL_dayKey(const struct tm* local, char out[PL_DAY_LEN]) {
 	// the year is kept to four digits so it always fits
 	int year = (local->tm_year + 1900) % 10000;
@@ -84,14 +142,22 @@ const char* PL_stateName(int state) {
 	}
 }
 
-int PL_reply(int state, int limit, int granted, long long left, const char* text, char* out, size_t size) {
+int PL_reply(int state, int limit, int granted, long long left, const char* text, int bedtime, int bedtime_start,
+	int bedtime_end, char* out, size_t size) {
 	if (!out || !size) return -1;
 	int known = state != PL_OFF && state != PL_UNKNOWN;
 	if (state == PL_OFF) limit = 0;
 	if (state == PL_OFF || limit < 0) granted = 0;
 	if (granted < 0) granted = 0;
-	int n = snprintf(out, size, "state=%s\nlimit=%i\ngranted=%i\nleft=%lld\ntext=%s", PL_stateName(state), limit,
-		granted, known && left >= 0 ? left : -1, known && text ? text : "");
+	char start[PL_CLOCK_LEN] = "", end[PL_CLOCK_LEN] = "";
+	if (bedtime_start >= 0 && bedtime_end >= 0) {
+		PL_formatClock(bedtime_start, start);
+		PL_formatClock(bedtime_end, end);
+	}
+	else bedtime = 0;
+	int n = snprintf(out, size, "state=%s\nlimit=%i\ngranted=%i\nleft=%lld\ntext=%s\nbedtime=%i\nbedtime_start=%s\nbedtime_end=%s",
+		PL_stateName(state), limit, granted, known && left >= 0 ? left : -1, known && text ? text : "", bedtime ? 1 : 0,
+		start, end);
 	if (n < 0 || (size_t)n >= size) {
 		out[0] = '\0';
 		return -1;

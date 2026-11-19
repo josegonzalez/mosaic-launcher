@@ -2,18 +2,25 @@ id=playtime-limit
 name=Play time limit
 api=1
 category=Play time
-summary=Sets a daily limit on how long games can be played.
-description=Sets a daily limit on how long games can be played, from the play history stock keeps.
+summary=Sets daily limits and a bedtime for playing games.
+description=Sets a daily limit on how long games can be played, from the play history stock keeps, with its own weekend limit and a bedtime.
 # the limit.left service: the daily limit and the time left today
 provides=limit.left
-# minutes of games a day, across every game, from stock's play tracker; once they're used up, games don't launch.
-# Off by default, so turning the plugin on changes nothing until a limit is set.
+# minutes of games a day, Monday to Friday, across every game, from stock's play tracker; once they're used up, games don't launch.
+# Off by default, so turning the plugin on changes nothing until a limit or bedtime is set.
 # A game already running isn't stopped when the time runs out: stock minarch can't be told to save and quit.
 # With the launcher's PIN set, these settings, and turning the plugin off, ask for it first.
-setting.limit=choice|Daily limit (minutes)|off|off,15,30,45,60,90,120,180,240|protected
-# the time left in the header turns the warning colour at or under this many minutes
+setting.limit=choice|Weekday limit (minutes)|off|off,15,30,45,60,90,120,180,240|protected
+# Saturday and Sunday's limit; same follows the weekday limit
+setting.weekend=choice|Weekend limit (minutes)|same|same,off,15,30,45,60,90,120,180,240|protected
+# the time left in the header and the budget bar turn the warning colour at or under this many minutes
 setting.warn=choice|Warn at (minutes left)|10|off,5,10,15,30|protected
 # with a code set, a refused launch offers this many more minutes for today after typing it
 setting.extra=choice|Extra time (minutes)|15|15,30,60|protected
 # kept only in this plugin's cfg and never logged or shown; empty for no extra time
 setting.code=text|Code for extra time|||protected,secret
+# games don't launch from this time until Bedtime ends, across midnight; off for no bedtime
+setting.bedtime=choice|Bedtime starts|off|off,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,00:00|protected
+setting.wake=choice|Bedtime ends|07:00|05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00|protected
+# a thin bar across the top of the home screen: today's play against the limit
+setting.bar=toggle|Budget bar|on||protected

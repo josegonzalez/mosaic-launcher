@@ -4,13 +4,18 @@
 #include <stddef.h>
 #include <time.h>
 
-// The play time limit's sums: time left today, extra time granted for a
-// day, the warning threshold and the header widget's text. No SDL and no
-// host here, so the host tests can check it on its own.
+// The play time limit's sums: today's limit, weekday or weekend, time
+// left today, extra time granted for a day, the warning threshold, the
+// bedtime window, the budget bar's fill and the header widget's text. No
+// SDL and no host here, so the host tests can check it on its own.
 
 #define PL_DAY_LEN 11 // "YYYY-MM-DD" and its NUL
 #define PL_CODE_LEN 64
 #define PL_MINUTES_MAX (24 * 60)
+#define PL_CLOCK_LEN 6 // "HH:MM" and its NUL
+// a bedtime unlock further ahead than this is taken as from a clock that
+// went back, and doesn't count
+#define PL_UNLOCK_MAX (PL_MINUTES_MAX * 60LL)
 
 // Where today stands, for refusing launches and drawing the widget.
 enum PlState {
@@ -25,6 +30,42 @@ enum PlState {
 // spaces around it allowed, or fallback for anything else, such as "off",
 // "" or NULL.
 int PL_parseMinutes(const char* setting, int fallback);
+
+// The weekend limit's setting: "same" (or NULL or "") follows weekday,
+// the weekday limit in minutes, and otherwise minutes as
+// PL_parseMinutes reads them, with 0 for "off" or anything else.
+int PL_weekendLimit(const char* setting, int weekday);
+
+// 1 for Saturday and Sunday, as struct tm's tm_wday counts them (0 is
+// Sunday), else 0.
+int PL_isWeekend(int wday);
+
+// Today's limit in minutes: weekend on a weekend, else weekday.
+int PL_todayLimit(int weekday, int weekend, int wday);
+
+// Minutes after midnight from "HH:MM" (00:00 to 23:59, with spaces around
+// it allowed), or fallback for anything else, such as "off", "" or NULL.
+int PL_parseClock(const char* setting, int fallback);
+
+// "HH:MM" for minutes after midnight, wrapped into a day.
+void PL_formatClock(int minutes, char out[PL_CLOCK_LEN]);
+
+// 1 when minutes after midnight now falls from start up to (not
+// including) end, both minutes after midnight. A window whose end comes
+// before its start crosses midnight, such as 21:00 to 07:00. One that
+// starts and ends at the same minute, or with a start or end below 0
+// (off), is empty.
+int PL_inWindow(int start, int end, int now);
+
+// 1 while a bedtime unlock until the Unix time until still counts at the
+// Unix time now: until is after now, and no more than PL_UNLOCK_MAX
+// seconds after it.
+int PL_unlocked(long long until, long long now);
+
+// The budget bar's filled width out of width for played seconds against
+// a limit and a grant in minutes, from 0 to width. -1 with no limit (0
+// or less), an unknown played (below 0) or no width.
+int PL_barFill(long long played, int limit, int grant, int width);
 
 // The local day local falls on, as "YYYY-MM-DD".
 void PL_dayKey(const struct tm* local, char out[PL_DAY_LEN]);
@@ -66,10 +107,14 @@ void PL_formatIn(long long left, const char* const words[PL_WORDS_COUNT], char* 
 const char* PL_stateName(int state);
 
 // The limit.left service's reply: "state=<name>\nlimit=<minutes>\n
-// granted=<minutes>\nleft=<seconds>\ntext=<text>", with limit 0, left -1
+// granted=<minutes>\nleft=<seconds>\ntext=<text>\nbedtime=<0 or 1>\n
+// bedtime_start=<HH:MM>\nbedtime_end=<HH:MM>", with limit 0, left -1
 // and no text while the limit is off, and left -1 and no text while the
-// history is unknown. Returns 0, or -1 when it doesn't fit size.
-int PL_reply(int state, int limit, int granted, long long left, const char* text, char* out, size_t size);
+// history is unknown. bedtime is 1 while bedtime refuses games, and
+// bedtime_start and bedtime_end are empty with a start or end below 0
+// (bedtime off). Returns 0, or -1 when it doesn't fit size.
+int PL_reply(int state, int limit, int granted, long long left, const char* text, int bedtime, int bedtime_start,
+	int bedtime_end, char* out, size_t size);
 
 // 1 when typed is the code, both with spaces, tabs and line breaks
 // trimmed. An empty code never matches, and neither does a NULL typed

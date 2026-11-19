@@ -35,7 +35,55 @@ msgid "%s today"
 msgstr ""
 
 #: plugin.txt
+msgid "00:00"
+msgstr ""
+
+#: plugin.txt
+msgid "05:00"
+msgstr ""
+
+#: plugin.txt
+msgid "05:30"
+msgstr ""
+
+#: plugin.txt
+msgid "06:00"
+msgstr ""
+
+#: plugin.txt
+msgid "06:30"
+msgstr ""
+
+#: plugin.txt
+msgid "07:00"
+msgstr ""
+
+#: plugin.txt
+msgid "07:30"
+msgstr ""
+
+#: plugin.txt
+msgid "08:00"
+msgstr ""
+
+#: plugin.txt
+msgid "08:30"
+msgstr ""
+
+#: plugin.txt
+msgid "09:00"
+msgstr ""
+
+#: plugin.txt
+msgid "09:30"
+msgstr ""
+
+#: plugin.txt
 msgid "10"
+msgstr ""
+
+#: plugin.txt
+msgid "10:00"
 msgstr ""
 
 #: plugin.txt
@@ -48,6 +96,54 @@ msgstr ""
 
 #: plugin.txt
 msgid "180"
+msgstr ""
+
+#: plugin.txt
+msgid "18:00"
+msgstr ""
+
+#: plugin.txt
+msgid "18:30"
+msgstr ""
+
+#: plugin.txt
+msgid "19:00"
+msgstr ""
+
+#: plugin.txt
+msgid "19:30"
+msgstr ""
+
+#: plugin.txt
+msgid "20:00"
+msgstr ""
+
+#: plugin.txt
+msgid "20:30"
+msgstr ""
+
+#: plugin.txt
+msgid "21:00"
+msgstr ""
+
+#: plugin.txt
+msgid "21:30"
+msgstr ""
+
+#: plugin.txt
+msgid "22:00"
+msgstr ""
+
+#: plugin.txt
+msgid "22:30"
+msgstr ""
+
+#: plugin.txt
+msgid "23:00"
+msgstr ""
+
+#: plugin.txt
+msgid "23:30"
 msgstr ""
 
 #: plugin.txt
@@ -75,6 +171,22 @@ msgid "90"
 msgstr ""
 
 #: playtime_limit.c
+msgid "Bedtime"
+msgstr ""
+
+#: plugin.txt
+msgid "Bedtime ends"
+msgstr ""
+
+#: plugin.txt
+msgid "Bedtime starts"
+msgstr ""
+
+#: plugin.txt
+msgid "Budget bar"
+msgstr ""
+
+#: playtime_limit.c
 msgid "CODE"
 msgstr ""
 
@@ -83,11 +195,16 @@ msgid "Code for extra time"
 msgstr ""
 
 #: plugin.txt
-msgid "Daily limit (minutes)"
+msgid "Extra time (minutes)"
 msgstr ""
 
-#: plugin.txt
-msgid "Extra time (minutes)"
+#: playtime_limit.c
+msgid "It's bedtime"
+msgstr ""
+
+#: playtime_limit.c
+#, c-format
+msgid "It's bedtime. Enter the code for %i more minutes?"
 msgstr ""
 
 #: plugin.txt
@@ -95,7 +212,7 @@ msgid "Play time limit"
 msgstr ""
 
 #: plugin.txt
-msgid "Sets a daily limit on how long games can be played, from the play history stock keeps."
+msgid "Sets a daily limit on how long games can be played, from the play history stock keeps, with its own weekend limit and a bedtime."
 msgstr ""
 
 #: playtime_limit.c
@@ -115,10 +232,22 @@ msgstr ""
 msgid "Warn at (minutes left)"
 msgstr ""
 
+#: plugin.txt
+msgid "Weekday limit (minutes)"
+msgstr ""
+
+#: plugin.txt
+msgid "Weekend limit (minutes)"
+msgstr ""
+
 #: playtime_limit.c
 msgid "Wrong code"
 msgstr ""
 
 #: plugin.txt
 msgid "off"
+msgstr ""
+
+#: plugin.txt
+msgid "same"
 msgstr ""
