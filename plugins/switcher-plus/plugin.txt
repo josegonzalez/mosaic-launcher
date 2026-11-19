@@ -5,7 +5,7 @@ category=Looks
 summary=Replaces the game switcher with your recent games in a choice of styles.
 description=Replaces the game switcher with your recent games, in a choice of styles.
 slots=switcher
-# full is stock's preview across the screen, strip a row of previews, list the names beside a preview
-setting.style=choice|Style|full|full,strip,list
+# full is stock's preview across the screen, strip a row of previews, list the names beside a preview, boxart the box art across the screen
+setting.style=choice|Style|full|full,strip,list,boxart
 # each recent's play time captions, in the parts and format playtime-captions' settings pick while it's loaded
 setting.captions=toggle|Play time captions|off

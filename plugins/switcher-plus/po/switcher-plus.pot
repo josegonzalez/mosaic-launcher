@@ -35,6 +35,10 @@ msgid "Style"
 msgstr ""
 
 #: plugin.txt
+msgid "boxart"
+msgstr ""
+
+#: plugin.txt
 msgid "full"
 msgstr ""
 

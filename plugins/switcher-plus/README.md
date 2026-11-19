@@ -19,6 +19,11 @@ Turn on **Game switcher plus** in Launcher > Plugins ([how](../../docs/plugins.m
 | `full` (the default) | Stock's look: the selected recent's [save state](../../docs/glossary.md#save-state) preview fitted to the screen, or "No Preview" on the theme's background colour, with its name on a pill in the top left | Left and right step through the recents, wrapping at the ends |
 | `strip` | The selected preview large in the middle with its name on a pill under it and smaller previews of its neighbours either side, as many as fit (one either side at 1024 wide) | Left and right step and wrap on a press but stop at an end while held |
 | `list` | The recents' names in rows on the left with the selected one on a pill, and its preview in a panel on the right | Up and down step, and left and right go a page |
+| `boxart` | The selected recent's box art fitted to the screen on a dimmed copy of itself, with its name on a pill centred at the bottom | As `full` |
+
+In `boxart`, a recent with no box art shows its thumbnail (stock's `.media` image) the same way, then its save state preview, and "No Preview" on the theme's background colour when it has none of them. Box art comes from a plugin that finds it, such as [`art-boxart`](../art-boxart/README.md) or [`art-placeholder`](../art-placeholder/README.md).
+
+In every style, a name too long for its pill or row wraps onto a second line, which ends with "..." when it's still too long. In `strip`, once any recent's name needs a second line, every preview leaves room for one, so the previews don't move as you step.
 
 ## How to use
 
@@ -34,7 +39,7 @@ Only presses made while it shows count. The hints are stock's: B BACK, with Y RE
 
 ### Captions
 
-With the Play time captions setting on, it adds [`playtime-captions`](../playtime-captions/README.md)' caption for the selected recent, such as "2h 15m · 3 days ago". It sits on a smaller pill under the name in `full`, centred under the name pill in `strip`, and centred under the preview in `list`, fitted the same way as a row's, compact first and then dropping parts.
+With the Play time captions setting on, it adds [`playtime-captions`](../playtime-captions/README.md)' caption for the selected recent, such as "2h 15m · 3 days ago". It sits on a smaller pill under the name in `full`, centred under the name pill in `strip`, and centred under the preview in `list`, fitted the same way as a row's, compact first and then dropping parts. In `boxart` it's centred under the name pill.
 
 The caption is playtime-captions' own, in its settings' parts and format (achievements included), so it needs that plugin on: while it's off there are no captions. With no play history, no recent gets a caption. The built-in switcher, with no switcher slot owner, has no captions.
 
@@ -52,6 +57,14 @@ Style set to list.
 
 ![Style set to list](docs/style-list.png)
 
+Style set to boxart, with art-boxart finding the box art.
+
+![Style set to boxart, with art-boxart finding the box art](docs/style-boxart.png)
+
+Style set to list with longer names: each takes two lines, and Libbet and the Magic Floor ends with "...".
+
+![Style set to list with longer names: each takes two lines, and Libbet and the Magic Floor ends with "..."](docs/long-names.png)
+
 With playtime-captions and Play time captions on: the caption under the name.
 
 ![With playtime-captions and Play time captions on: the caption under the name](docs/captions-with-playtime-captions.png)
@@ -60,7 +73,7 @@ With playtime-captions and Play time captions on: the caption under the name.
 
 | Setting | Choices | Default | What it does |
 |---|---|---|---|
-| Style (`style`) | full, strip, list | full | `full` is stock's preview across the screen, `strip` a row of previews, `list` the names beside a preview |
+| Style (`style`) | full, strip, list, boxart | full | `full` is stock's preview across the screen, `strip` a row of previews, `list` the names beside a preview, `boxart` the box art across the screen |
 | Play time captions (`captions`) | on, off | off | Each recent's play time captions, in the parts and format playtime-captions' settings pick, while it's loaded |
 
 ## For plugin authors
@@ -68,6 +81,7 @@ With playtime-captions and Play time captions on: the caption under the name.
 - Owns the `switcher` slot (`slots=switcher`).
 - Asks `playtime-captions`' `captions.text` service for each caption, with the recent's path and the room there is. Without the service there are none.
 - Leaves out recents `is_filtered` says a plugin's filter hides, and asks again on `launcher.set_changed`.
+- In `boxart`, asks `art_get` for each recent's box and then thumbnail, through an entry it makes with `entry_new` and frees with `entry_free`, and `art_load` for its save state preview. The art and its dimmed copy are drawn into one surface the size of the screen, made again only when the selection moves.
 
 ## Credits
 

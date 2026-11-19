@@ -24,6 +24,9 @@ msgstr "Sustituye el selector de juegos por tus juegos recientes, con varios est
 msgid "Style"
 msgstr "Estilo"
 
+msgid "boxart"
+msgstr "carátula"
+
 msgid "full"
 msgstr "completo"
 

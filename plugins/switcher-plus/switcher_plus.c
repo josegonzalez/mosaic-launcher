@@ -13,6 +13,13 @@
 //   list   the recents' names in rows on the left, the selected one on a
 //          pill, and its preview in a panel on the right; up and down
 //          step and left and right go a page, wrapping on a press
+//   boxart the selected recent's box art fitted to the screen on a dimmed
+//          copy of itself, else its thumbnail, else its save state
+//          preview, else "No Preview", with its name on a pill centred at
+//          the bottom; left and right step as in full
+//
+// A name too wide for its pill or row wraps onto a second line, which
+// ends with "..." when it's still too wide (see SP_wrap).
 //
 // As stock's: A (on its release) opens the selected recent with
 // recent_open, resuming its save state when it has one, and the launcher
@@ -29,8 +36,10 @@
 // (launcher.set_changed), and asked again each time the switcher opens. Previews come from art_load, and
 // each is copied once with surface_scale to the size it's drawn at; the
 // copies, the plugin's own surfaces, are kept until it closes, the least
-// recently drawn going first. Everything is drawn around the status pill
-// and header widgets, which stay clear.
+// recently drawn going first. The boxart style's art and its dimmed copy
+// are drawn once each time the selection moves, into one surface the size
+// of the screen, kept until it moves again. Everything is drawn around the
+// status pill and header widgets, which stay clear.
 //
 // The captions setting (off by default) adds playtime-captions' caption,
 // such as "2h 15m · 3 days ago", for the selected recent: on a smaller
@@ -50,6 +59,7 @@
 #define SCREEN_ID ID ".switcher"
 #define COPIES 9
 #define TAP_MS 250 // stock's SELECT tap
+#define DIM_ALPHA 170 // the boxart style's black over its backdrop
 
 static const MosaicHost* host;
 
@@ -67,7 +77,7 @@ static char shown_caption[160];      // the selected recent's caption this frame
 static int caption_drawn = 0;
 
 static const char* styleName(int s) {
-	return s == SP_STYLE_STRIP ? "strip" : s == SP_STYLE_LIST ? "list" : "full";
+	return s == SP_STYLE_STRIP ? "strip" : s == SP_STYLE_LIST ? "list" : s == SP_STYLE_BOXART ? "boxart" : "full";
 }
 
 // Fixed text, translated in this plugin's id's context.
@@ -107,8 +117,14 @@ static void setChanged(const char* name, const char* payload, void* data) {
 	host->request_redraw();
 }
 
+static void linesForget(void);
+static void entriesFree(void);
+
 static void sync(void) {
-	SP_sync(&recents, host->recents_count(), pathOf, skipOf, NULL);
+	if (SP_sync(&recents, host->recents_count(), pathOf, skipOf, NULL)) {
+		linesForget();
+		entriesFree();
+	}
 	if (selected >= recents.count) selected = recents.count > 0 ? recents.count - 1 : 0;
 	if (selected < 0) selected = 0;
 }
@@ -124,6 +140,69 @@ static const char* nameOf(int index) {
 	if (index < 0 || index >= recents.count) return "";
 	const char* slash = strrchr(recents.path[index], '/');
 	return slash ? slash + 1 : recents.path[index];
+}
+
+// each row's name on up to two lines, at the width it was wrapped to
+typedef struct Lines {
+	int max_w; // -1 until it's wrapped
+	int n;
+	char line[2][SP_NAME_MAX];
+} Lines;
+
+static Lines lines_of[SP_MAX_RECENTS];
+
+static void linesForget(void) {
+	for (int i = 0; i < SP_MAX_RECENTS; i++) lines_of[i].max_w = -1;
+}
+
+static int measureLarge(const char* text, void* ctx) {
+	(void)ctx;
+	return host->text_width(MOSAIC_FONT_LARGE, text);
+}
+
+// the recent at index's name in at most lines lines max_w wide: wrapped
+// onto two, or cut to one with "..." when lines is 1
+static const Lines* nameLines(int index, int max_w, int lines) {
+	static Lines one;
+	memset(&one, 0, sizeof(one));
+	if (index < 0 || index >= recents.count) return &one;
+	Lines* l = &lines_of[index];
+	if (l->max_w != max_w) {
+		l->n = SP_wrap(nameOf(index), max_w, measureLarge, NULL, l->line);
+		l->max_w = max_w;
+	}
+	if (l->n <= lines) return l;
+	one.n = host->text_truncate(MOSAIC_FONT_LARGE, nameOf(index), max_w, one.line[0], sizeof(one.line[0])) < 0 ? 0 : 1;
+	return &one;
+}
+
+static int widest(const Lines* l) {
+	int w = 0;
+	for (int i = 0; i < l->n; i++) {
+		int lw = host->text_width(MOSAIC_FONT_LARGE, l->line[i]);
+		if (lw > w) w = lw;
+	}
+	return w;
+}
+
+// each row's entry, for its box art, made when it's first asked for
+static MosaicEntry* entries[SP_MAX_RECENTS];
+
+static void entriesFree(void) {
+	for (int i = 0; i < SP_MAX_RECENTS; i++) {
+		if (entries[i]) host->entry_free(entries[i]);
+		entries[i] = NULL;
+	}
+}
+
+static const MosaicEntry* entryOf(int index) {
+	if (index < 0 || index >= recents.count || !recents.path[index][0] || !MOSAIC_HOST_HAS(host, entry_free)) return NULL;
+	if (!entries[index]) {
+		const MosaicRecent* r = info(index);
+		int type = r && r->type == MOSAIC_ENTRY_PAK ? MOSAIC_ENTRY_PAK : MOSAIC_ENTRY_ROM;
+		entries[index] = host->entry_new(recents.path[index], type, NULL);
+	}
+	return entries[index];
 }
 
 ///////////////////////////////////////
@@ -220,14 +299,32 @@ static int drawPreview(MosaicSurface* screen, int index, const MosaicRect* box, 
 	return 1;
 }
 
-// a pill in color at rect with text in ink, BUTTON_PADDING in
-static void pill(MosaicSurface* screen, const MosaicRect* rect, const char* text, MosaicColor color, MosaicColor ink) {
+// l's lines in ink, from x and the middle of a line_top tall line at y,
+// each line under the one before, at most max_w wide, or each centred in
+// max_w when centre is 1
+static void drawLines(MosaicSurface* screen, const Lines* l, int x, int y, int line_top, int max_w, int centre,
+	MosaicColor ink) {
+	int h = host->text_height(MOSAIC_FONT_LARGE);
+	for (int i = 0; i < l->n && i < 2; i++) {
+		int at = x;
+		if (centre) {
+			int w = host->text_width(MOSAIC_FONT_LARGE, l->line[i]);
+			if (w >= 0 && w < max_w) at = x + (max_w - w) / 2;
+		}
+		host->draw_text(screen, MOSAIC_FONT_LARGE, l->line[i], at, y + (line_top - h + 1) / 2 + i * h, ink, max_w);
+	}
+}
+
+// a pill in color at rect with l's lines in ink, BUTTON_PADDING in, its
+// corners rounded as a one-line pill's
+static void pill(MosaicSurface* screen, const MosaicRect* rect, const Lines* l, int centre, MosaicColor color,
+	MosaicColor ink) {
 	int scale = host->screen_scale();
 	int inner = 12 * scale;
-	int h = host->text_height(MOSAIC_FONT_LARGE);
-	host->fill_round_rect(screen, rect, rect->h / 2, color);
-	host->draw_text(screen, MOSAIC_FONT_LARGE, text, rect->x + inner, rect->y + (rect->h - h + 1) / 2, ink,
-		rect->w - 2 * inner);
+	int top = SP_pillHeight(scale, 1, 0);
+	if (top > rect->h) top = rect->h;
+	host->fill_round_rect(screen, rect, top / 2, color);
+	drawLines(screen, l, rect->x + inner, rect->y, top, rect->w - 2 * inner, centre, ink);
 }
 
 ///////////////////////////////////////
@@ -296,10 +393,13 @@ static int renderFull(MosaicSurface* screen, const MosaicScreenView* view, const
 		fillAround(screen, area, hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
 		centred(screen, MOSAIC_FONT_LARGE, tr("No Preview"), area, mosaic_color(0xFFFFFF, 255));
 	}
-	const char* name = nameOf(selected);
-	MosaicRect title = SP_title(area, hole, host->screen_scale(), host->text_width(MOSAIC_FONT_LARGE, name));
+	int scale = host->screen_scale();
+	MosaicRect most = SP_title(area, hole, scale, area->w); // as wide as the title can be
+	const Lines* l = nameLines(selected, most.w - 2 * 12 * scale, 2);
+	MosaicRect title = SP_title(area, hole, scale, widest(l));
 	if (title.w > 0) {
-		pill(screen, &title, name, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257), themeColor(MOSAIC_COLOR_HINT, 0xFFFFFF));
+		title.h = SP_pillHeight(scale, l->n, host->text_height(MOSAIC_FONT_LARGE));
+		pill(screen, &title, l, 0, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257), themeColor(MOSAIC_COLOR_HINT, 0xFFFFFF));
 		if (captions_on) titleCaption(screen, area, hole, &title);
 	}
 	return got;
@@ -309,12 +409,26 @@ static int renderStrip(MosaicSurface* screen, const MosaicScreenView* view, cons
 	int scale = host->screen_scale();
 	MosaicRect room = SP_room(&view->area, hole, scale);
 	SPStrip strip;
-	int pill_h = 30 * scale;
-	// a caption line under the name pill, or none when the strip can't fit one
+	int inner = 12 * scale;
+	int max_w = room.w - 2 * inner;
+	int line_h = host->text_height(MOSAIC_FONT_LARGE);
+	// room for a second line under every preview when any recent's name
+	// needs it, so the previews don't move from one to the next
+	int lines = 1;
+	for (int i = 0; i < recents.count && lines < 2; i++) {
+		if (nameLines(i, max_w, 2)->n > 1) lines = 2;
+	}
+	// a caption line under the name pill, or none when the strip can't
+	// fit one, and one line when it can't fit two
 	int text_h = captions_on ? host->text_height(MOSAIC_FONT_SMALL) : 0;
-	int with_caption = captions_on && text_h > 0 &&
-		SP_strip(&room, view->area.w, view->area.h, scale, pill_h + 5 * scale + text_h, 32 * scale, &strip) == 0;
-	if (!with_caption && SP_strip(&room, view->area.w, view->area.h, scale, pill_h, 32 * scale, &strip) != 0) {
+	int pill_h = 0, with_caption = 0, fits = 0;
+	for (; lines >= 1 && !fits; lines--) {
+		pill_h = SP_pillHeight(scale, lines, line_h);
+		with_caption = captions_on && text_h > 0 &&
+			SP_strip(&room, view->area.w, view->area.h, scale, pill_h + 5 * scale + text_h, 32 * scale, &strip) == 0;
+		fits = with_caption || SP_strip(&room, view->area.w, view->area.h, scale, pill_h, 32 * scale, &strip) == 0;
+	}
+	if (!fits) {
 		*fell_back = 1;
 		return renderFull(screen, view, hole);
 	}
@@ -338,14 +452,13 @@ static int renderStrip(MosaicSurface* screen, const MosaicScreenView* view, cons
 			if (d == 0) got = drew;
 		}
 	}
-	const char* name = nameOf(selected);
-	int inner = 12 * scale;
-	int w = host->text_width(MOSAIC_FONT_LARGE, name) + 2 * inner;
+	const Lines* l = nameLines(selected, max_w, pill_h > SP_pillHeight(scale, 1, line_h) ? 2 : 1);
+	int w = widest(l) + 2 * inner;
 	if (w > strip.name.w) w = strip.name.w;
 	if (strip.name.h > 0 && w > 2 * inner) {
-		MosaicRect name_pill = { strip.cx - w / 2, strip.name.y, w, pill_h };
+		MosaicRect name_pill = { strip.cx - w / 2, strip.name.y, w, SP_pillHeight(scale, l->n, line_h) };
 		if (name_pill.x < strip.name.x) name_pill.x = strip.name.x;
-		pill(screen, &name_pill, name, themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF),
+		pill(screen, &name_pill, l, 1, themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF),
 			themeColor(MOSAIC_COLOR_LIST_TEXT_SELECTED, 0x000000));
 	}
 	if (with_caption) {
@@ -360,6 +473,17 @@ static int renderStrip(MosaicSurface* screen, const MosaicScreenView* view, cons
 	return got;
 }
 
+// how the list's rows are measured: a row whose name takes two lines is a
+// line taller, when a row that tall fits at all
+typedef struct Rows {
+	int max_w, lines, row_h, line_h;
+} Rows;
+
+static int rowHeight(int index, void* data) {
+	const Rows* rows = data;
+	return nameLines(index, rows->max_w, rows->lines)->n > 1 ? rows->row_h + rows->line_h : rows->row_h;
+}
+
 static int renderList(MosaicSurface* screen, const MosaicScreenView* view, const MosaicRect* hole, int* fell_back) {
 	int scale = host->screen_scale();
 	SPList list;
@@ -367,24 +491,27 @@ static int renderList(MosaicSurface* screen, const MosaicScreenView* view, const
 		*fell_back = 1;
 		return renderFull(screen, view, hole);
 	}
-	page_rows = list.count;
-	first = SP_window(first, selected, recents.count, list.count);
 	int inner = 12 * scale;
 	int h = host->text_height(MOSAIC_FONT_LARGE);
+	Rows rows = { list.rows.w - 2 * inner, list.row_h + (h > 0 ? h : 0) <= list.rows.h ? 2 : 1, list.row_h, h };
+	int shown = 0;
+	first = SP_windowRows(first, selected, recents.count, list.rows.h, rowHeight, &rows, &shown);
+	page_rows = shown > 0 ? shown : 1;
 	MosaicColor ink = themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF);
-	for (int i = first; i < recents.count && i < first + list.count; i++) {
-		int y = list.rows.y + (i - first) * list.row_h;
-		const char* name = nameOf(i);
+	int y = list.rows.y;
+	for (int i = first; i < recents.count && i < first + shown; i++) {
+		int row_h = rowHeight(i, &rows); // before l, which it can overwrite
+		const Lines* l = nameLines(i, rows.max_w, rows.lines);
 		if (i == selected) {
-			int w = host->text_width(MOSAIC_FONT_LARGE, name) + 2 * inner;
+			int w = widest(l) + 2 * inner;
 			if (w > list.rows.w) w = list.rows.w;
-			MosaicRect row = { list.rows.x, y, w, list.row_h };
-			pill(screen, &row, name, themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF),
+			MosaicRect row = { list.rows.x, y, w, row_h };
+			pill(screen, &row, l, 0, themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF),
 				themeColor(MOSAIC_COLOR_LIST_TEXT_SELECTED, 0x000000));
 		} else {
-			host->draw_text(screen, MOSAIC_FONT_LARGE, name, list.rows.x + inner, y + (list.row_h - h + 1) / 2, ink,
-				list.rows.w - 2 * inner);
+			drawLines(screen, l, list.rows.x + inner, y, list.row_h, rows.max_w, 0, ink);
 		}
+		y += row_h;
 	}
 	if (list.panel.w <= 0) return -1;
 	// the selected recent's caption along the panel's bottom, under its preview
@@ -397,6 +524,119 @@ static int renderList(MosaicSurface* screen, const MosaicScreenView* view, const
 	int cw = line.w > 0 ? captionOf(selected, line.w, text, sizeof(text)) : 0;
 	if (cw > 0) {
 		host->draw_text(screen, MOSAIC_FONT_SMALL, text, line.x + (line.w - cw) / 2, line.y,
+			captionInk(MOSAIC_COLOR_BACKGROUND, 0x000000), cw);
+	}
+	return got;
+}
+
+///////////////////////////////////////
+// the boxart style
+
+// the selected recent's art fitted across the screen on a dimmed copy of
+// itself, made once each time the selection moves, and which art it is
+static MosaicSurface* backdrop = NULL;
+static char backdrop_key[SP_PATH_MAX + 64];
+static const char* art_shown = "none";
+
+static void backdropFree(void) {
+	if (backdrop) host->surface_free(ID, backdrop);
+	backdrop = NULL;
+	backdrop_key[0] = '\0';
+}
+
+// image cropped to fill w by h, dimmed, with image fitted inside it on top;
+// NULL when it can't be made
+static MosaicSurface* makeBackdrop(const MosaicSurface* image, int iw, int ih, int w, int h) {
+	MosaicSurface* made = host->surface_scale(ID, image, w, h, MOSAIC_FIT_COVER);
+	if (!made) return NULL;
+	MosaicRect all = { 0, 0, w, h };
+	MosaicRect fit = SP_fit(iw, ih, &all);
+	if (host->fill_rect(made, &all, mosaic_color(0x000000, DIM_ALPHA)) != 0 || host->blit(made, image, NULL, &fit) != 0) {
+		host->surface_free(ID, made);
+		return NULL;
+	}
+	return made;
+}
+
+// What the recent at index's art is: 1 drawn across area, around hole, 0
+// still loading, -1 none. Its box, else its thumbnail, else its save
+// state's preview, each waited for while it loads.
+static int drawArt(MosaicSurface* screen, int index, const MosaicRect* area, const MosaicRect* hole) {
+	static const struct {
+		int kind;
+		const char* name;
+	} kinds[] = { { MOSAIC_ART_BOX, "box" }, { MOSAIC_ART_THUMBNAIL, "thumbnail" } };
+	const MosaicSurface* image = NULL;
+	const char* which = "none";
+	int state = MOSAIC_ART_MISSING;
+	const MosaicEntry* entry = entryOf(index);
+	for (size_t k = 0; entry && k < sizeof(kinds) / sizeof(kinds[0]) && state == MOSAIC_ART_MISSING; k++) {
+		state = host->art_get(entry, kinds[k].kind, &image);
+		which = kinds[k].name;
+	}
+	const MosaicRecent* r = info(index);
+	if (state == MOSAIC_ART_MISSING && r && r->preview[0]) {
+		state = host->art_load(r->preview, &image);
+		which = "preview";
+	}
+	art_shown = state == MOSAIC_ART_LOADING ? "loading" : "none";
+	if (state == MOSAIC_ART_LOADING) return 0;
+	int iw = 0, ih = 0;
+	if (state != MOSAIC_ART_READY || !image || host->surface_size(image, &iw, &ih) != 0 || iw <= 0 || ih <= 0) return -1;
+	art_shown = which;
+	char key[sizeof(backdrop_key)];
+	snprintf(key, sizeof(key), "%s\n%s\n%ix%i", recents.path[index], which, area->w, area->h);
+	if (strcmp(key, backdrop_key) != 0) {
+		backdropFree();
+		snprintf(backdrop_key, sizeof(backdrop_key), "%s", key);
+		backdrop = makeBackdrop(image, iw, ih, area->w, area->h);
+	}
+	MosaicRect to = *area;
+	const MosaicSurface* src = backdrop;
+	int sw = area->w, sh = area->h;
+	if (!src) {
+		// no memory for the copy: the art alone, fitted, on black
+		fillAround(screen, area, hole, mosaic_color(0x000000, 255));
+		to = SP_fit(iw, ih, area);
+		src = image;
+		sw = iw;
+		sh = ih;
+	}
+	MosaicRect parts[4];
+	int n = SP_avoid(&to, hole, parts);
+	for (int i = 0; i < n; i++) {
+		MosaicRect from = SP_source(&to, &parts[i], sw, sh);
+		host->blit(screen, src, &from, &parts[i]);
+	}
+	return 1;
+}
+
+static int renderBoxart(MosaicSurface* screen, const MosaicScreenView* view, const MosaicRect* hole) {
+	const MosaicRect* area = &view->area;
+	int got = drawArt(screen, selected, area, hole);
+	if (got == 0) fillAround(screen, area, hole, mosaic_color(0x000000, 255));
+	if (got < 0) {
+		fillAround(screen, area, hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
+		centred(screen, MOSAIC_FONT_LARGE, tr("No Preview"), area, mosaic_color(0xFFFFFF, 255));
+	}
+	int scale = host->screen_scale();
+	int line_h = host->text_height(MOSAIC_FONT_LARGE);
+	MosaicRect room = SP_room(area, hole, scale);
+	const Lines* l = nameLines(selected, room.w - 2 * 12 * scale, 2);
+	if (l->n <= 0) return got;
+	// the caption under the name, left out when there's no room for both
+	int text_h = captions_on ? host->text_height(MOSAIC_FONT_SMALL) : 0;
+	SPBoxart b;
+	int name_h = SP_pillHeight(scale, l->n, line_h);
+	if (SP_boxart(&room, scale, widest(l), name_h, text_h > 0 ? text_h : 0, &b) != 0 &&
+		(text_h <= 0 || SP_boxart(&room, scale, widest(l), name_h, 0, &b) != 0)) {
+		return got;
+	}
+	pill(screen, &b.name, l, 1, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257), themeColor(MOSAIC_COLOR_HINT, 0xFFFFFF));
+	char text[160];
+	int cw = b.caption.w > 0 ? captionOf(selected, b.caption.w, text, sizeof(text)) : 0;
+	if (cw > 0) {
+		host->draw_text(screen, MOSAIC_FONT_SMALL, text, b.caption.x + (b.caption.w - cw) / 2, b.caption.y,
 			captionInk(MOSAIC_COLOR_BACKGROUND, 0x000000), cw);
 	}
 	return got;
@@ -423,9 +663,12 @@ static void logShown(int got, int fell_back) {
 			if (caption_drawn) snprintf(caption, sizeof(caption), ", caption %s", shown_caption);
 			else snprintf(caption, sizeof(caption), ", no caption");
 		}
-		snprintf(line, sizeof(line), "showing %i of %i: %s, preview %s, %s, style %s%s%s", selected, recents.count,
-			nameOf(selected), got > 0 ? "drawn" : got == 0 ? "loading" : "none", r && r->can_resume ? "resume" : "open",
-			styleName(style), fell_back ? " (too small, drawn full)" : "", caption);
+		char art[32];
+		if (style == SP_STYLE_BOXART) snprintf(art, sizeof(art), "art %s", art_shown);
+		else snprintf(art, sizeof(art), "preview %s", got > 0 ? "drawn" : got == 0 ? "loading" : "none");
+		snprintf(line, sizeof(line), "showing %i of %i: %s, %s, %s, style %s%s%s", selected, recents.count,
+			nameOf(selected), art, r && r->can_resume ? "resume" : "open", styleName(style),
+			fell_back ? " (too small, drawn full)" : "", caption);
 	}
 	if (strcmp(line, shown) == 0) return;
 	snprintf(shown, sizeof(shown), "%s", line);
@@ -444,6 +687,7 @@ static int enter(void* data) {
 	first = 0;
 	pressed_here = 0;
 	shown[0] = '\0';
+	linesForget();
 	if (captions_on && !(MOSAIC_HOST_HAS(host, has_capability) && host->has_capability("captions.text"))) {
 		say("captions on, but nobody provides captions.text, so there are none");
 	}
@@ -454,6 +698,8 @@ static void leave(void* data) {
 	(void)data;
 	pressed_here = 0;
 	copiesClear();
+	backdropFree();
+	entriesFree();
 }
 
 static void openSelected(void) {
@@ -502,19 +748,19 @@ static int input(const MosaicInput* in, void* data) {
 	enum { PAGE = 1000 };
 	static const struct {
 		int button;
-		int by[3]; // for each enum SPStyle
+		int by[4]; // for each enum SPStyle
 	} steps[] = {
-		{ MOSAIC_BUTTON_LEFT, { -1, -1, -PAGE } },
-		{ MOSAIC_BUTTON_RIGHT, { 1, 1, PAGE } },
-		{ MOSAIC_BUTTON_UP, { 0, 0, -1 } },
-		{ MOSAIC_BUTTON_DOWN, { 0, 0, 1 } },
+		{ MOSAIC_BUTTON_LEFT, { -1, -1, -PAGE, -1 } },
+		{ MOSAIC_BUTTON_RIGHT, { 1, 1, PAGE, 1 } },
+		{ MOSAIC_BUTTON_UP, { 0, 0, -1, 0 } },
+		{ MOSAIC_BUTTON_DOWN, { 0, 0, 1, 0 } },
 	};
 	for (size_t i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
 		unsigned int bit = MOSAIC_BUTTON_BIT(steps[i].button);
 		int by = steps[i].by[style];
 		if (by == PAGE || by == -PAGE) by = by / PAGE * page_rows;
-		// stock's moves only on a press; the others repeat while held
-		unsigned int when = style == SP_STYLE_FULL ? in->pressed : in->repeated;
+		// stock's, and boxart, move only on a press; the others repeat while held
+		unsigned int when = style == SP_STYLE_FULL || style == SP_STYLE_BOXART ? in->pressed : in->repeated;
 		if (!by || !(when & bit)) continue;
 		selected = SP_move(selected, count, by, (in->pressed & bit) != 0);
 		break; // one direction a frame
@@ -537,6 +783,8 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 		centred(screen, MOSAIC_FONT_LARGE, "No Recents", &view->area, mosaic_color(0xFFFFFF, 255));
 	} else if (style == SP_STYLE_FULL) {
 		got = renderFull(screen, view, &hole);
+	} else if (style == SP_STYLE_BOXART) {
+		got = renderBoxart(screen, view, &hole);
 	} else {
 		fillAround(screen, &view->area, &hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
 		got = style == SP_STYLE_STRIP ? renderStrip(screen, view, &hole, &fell_back)
@@ -581,6 +829,8 @@ static int init(const MosaicHost* h) {
 
 static void quit(void) {
 	copiesClear();
+	backdropFree();
+	entriesFree();
 }
 
 static const MosaicPlugin plugin = {

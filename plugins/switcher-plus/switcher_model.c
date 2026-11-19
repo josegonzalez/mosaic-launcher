@@ -10,6 +10,7 @@
 int SP_style(const char* value) {
 	if (value && strcmp(value, "strip") == 0) return SP_STYLE_STRIP;
 	if (value && strcmp(value, "list") == 0) return SP_STYLE_LIST;
+	if (value && strcmp(value, "boxart") == 0) return SP_STYLE_BOXART;
 	return SP_STYLE_FULL;
 }
 
@@ -95,6 +96,77 @@ const MosaicRecent* SP_info(SPRecents* recents, int index, SPInfoFn info, void* 
 		recents->known[index] = info(recents->index[index], r, data) == 0 ? 1 : -1;
 	}
 	return recents->known[index] > 0 ? &recents->info[index] : NULL;
+}
+
+///////////////////////////////////////
+// names on two lines
+
+// the start of the UTF-8 character at or before at in text
+static size_t charStart(const char* text, size_t at) {
+	while (at > 0 && ((unsigned char)text[at] & 0xC0) == 0x80) at--;
+	return at;
+}
+
+// text's first n bytes, less spaces at the end, and then tail, into out
+static void prefix(const char* text, size_t n, const char* tail, char* out) {
+	while (n > 0 && text[n - 1] == ' ') n--;
+	if (n > SP_NAME_MAX - 4) n = charStart(text, SP_NAME_MAX - 4);
+	memcpy(out, text, n);
+	snprintf(out + n, SP_NAME_MAX - n, "%s", tail);
+}
+
+int SP_wrap(const char* text, int max_w, SPMeasureFn measure, void* ctx, char lines[2][SP_NAME_MAX]) {
+	lines[0][0] = lines[1][0] = '\0';
+	if (!text) return 0;
+	while (*text == ' ') text++;
+	size_t len = strlen(text);
+	if (len >= SP_NAME_MAX) len = charStart(text, SP_NAME_MAX - 1);
+	if (len == 0) return 0;
+	prefix(text, len, "", lines[0]);
+	if (measure(lines[0], ctx) <= max_w) return 1;
+
+	// the first line: up to the last space it fits to, or as many
+	// characters as fit, at least one
+	size_t cut = 0;
+	for (size_t i = len; i > 0; i--) {
+		if (text[i] != ' ' || text[i - 1] == ' ') continue;
+		prefix(text, i, "", lines[0]);
+		if (measure(lines[0], ctx) <= max_w) {
+			cut = i;
+			break;
+		}
+	}
+	if (!cut) {
+		for (size_t i = charStart(text, len - 1); i > 0; i = charStart(text, i - 1)) {
+			prefix(text, i, "", lines[0]);
+			if (measure(lines[0], ctx) <= max_w) {
+				cut = i;
+				break;
+			}
+		}
+		if (!cut) cut = 1;
+		while (cut < len && ((unsigned char)text[cut] & 0xC0) == 0x80) cut++;
+		prefix(text, cut, "", lines[0]);
+	}
+
+	// the second: the rest, or as much of it as fits before "..."
+	const char* rest = text + cut;
+	while (*rest == ' ') rest++;
+	size_t rest_len = len - (size_t)(rest - text);
+	if (rest_len == 0) return 1;
+	prefix(rest, rest_len, "", lines[1]);
+	if (measure(lines[1], ctx) <= max_w) return 2;
+	for (size_t i = charStart(rest, rest_len - 1); i > 0; i = charStart(rest, i - 1)) {
+		prefix(rest, i, "...", lines[1]);
+		if (measure(lines[1], ctx) <= max_w) return 2;
+	}
+	snprintf(lines[1], SP_NAME_MAX, "...");
+	return 2;
+}
+
+int SP_pillHeight(int scale, int lines, int line_h) {
+	if (scale < 1) scale = 1;
+	return PILL_SIZE * scale + (lines > 1 && line_h > 0 ? line_h : 0);
 }
 
 ///////////////////////////////////////
@@ -248,7 +320,7 @@ int SP_list(const MosaicRect* area, const MosaicRect* hole, int scale, SPList* o
 	int end = bottom(area) - pad - pill - pad;
 	int rows = w > 0 ? (end - top) / pill : 0;
 	if (rows < 1) return -1;
-	out->rows = (MosaicRect){ x, top, w, rows * pill };
+	out->rows = (MosaicRect){ x, top, w, end - top };
 	out->row_h = pill;
 	out->count = rows;
 	MosaicRect room = SP_room(area, hole, scale);
@@ -258,11 +330,49 @@ int SP_list(const MosaicRect* area, const MosaicRect* hole, int scale, SPList* o
 	return 0;
 }
 
+int SP_windowRows(int first, int selected, int count, int h, int (*height)(int index, void* data), void* data,
+	int* shown) {
+	*shown = 0;
+	if (count <= 0) return 0;
+	if (selected < 0) selected = 0;
+	if (selected >= count) selected = count - 1;
+	if (first < 0) first = 0;
+	if (selected < first) first = selected;
+	int used = 0;
+	for (int i = first; i <= selected; i++) used += height(i, data);
+	while (first < selected && used > h) used -= height(first++, data);
+	// down at the end, rows from before fill what's left
+	int tail = 0;
+	for (int i = first; i < count; i++) tail += height(i, data);
+	while (first > 0 && tail + height(first - 1, data) <= h) tail += height(--first, data);
+	used = 0;
+	for (int i = first; i < count; i++) {
+		used += height(i, data);
+		if (used > h && i > first) break;
+		(*shown)++;
+	}
+	return first;
+}
+
 ///////////////////////////////////////
 // where play time captions go
 
 #define BUTTON_SIZE 20
 #define BUTTON_MARGIN 5
+
+int SP_boxart(const MosaicRect* room, int scale, int text_w, int name_h, int caption_h, SPBoxart* out) {
+	memset(out, 0, sizeof(*out));
+	if (scale < 1) scale = 1;
+	int inner = BUTTON_PADDING * scale;
+	if (caption_h < 0) caption_h = 0;
+	int below = caption_h > 0 ? BUTTON_MARGIN * scale + caption_h : 0;
+	if (empty(room) || name_h <= 0 || name_h + below > room->h || room->w <= 2 * inner) return -1;
+	if (text_w < 0) text_w = 0;
+	int w = text_w + 2 * inner < room->w ? text_w + 2 * inner : room->w;
+	out->name = (MosaicRect){ room->x + (room->w - w) / 2, bottom(room) - below - name_h, w, name_h };
+	if (caption_h > 0) out->caption = (MosaicRect){ room->x, bottom(room) - caption_h, room->w, caption_h };
+	return 0;
+}
 
 int SP_mute(int fg, int bg, int percent) {
 	if (percent < 0) percent = 0;

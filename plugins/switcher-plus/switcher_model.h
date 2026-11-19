@@ -1,8 +1,9 @@
 // Game switcher plus, without the host: its style setting, where the
 // d-pad and a removal leave the selection, the button hints, the recents
-// it keeps until they change, where each style puts the title, the
-// previews and the rows, and where the play time captions go. No SDL and
-// no file access, so it's tested on the host.
+// it keeps until they change, names wrapped onto two lines, where each
+// style puts the title, the previews, the art and the rows, and where the
+// play time captions go. No SDL and no file access, so it's tested on the
+// host.
 
 #ifndef SWITCHER_MODEL_H
 #define SWITCHER_MODEL_H
@@ -15,15 +16,18 @@
 #define SP_PATH_MAX 512
 // previews either side of the selected one in the strip, at most
 #define SP_MAX_SIDES 3
+// a name's bytes, as MosaicRecent's
+#define SP_NAME_MAX 256
 
 // The style setting.
 enum SPStyle {
 	SP_STYLE_FULL,  // stock's: the selected recent's preview across the screen, its name on a pill
 	SP_STYLE_STRIP, // the selected preview large in the middle, its neighbours smaller either side
 	SP_STYLE_LIST,  // the recents' names in rows, the selected one's preview in a panel beside them
+	SP_STYLE_BOXART, // the selected recent's box art across the screen on a dimmed copy, its name at the bottom
 };
 
-// full, strip or list; full for anything else.
+// full, strip, list or boxart; full for anything else.
 int SP_style(const char* value);
 
 // Where a step of by entries moves the selection in count entries. A step
@@ -76,6 +80,24 @@ int SP_sync(SPRecents* recents, int count, SPPathFn path, SPSkipFn skip, void* d
 // host's recents, only the first time since it changed. NULL past the end,
 // or when info failed.
 const MosaicRecent* SP_info(SPRecents* recents, int index, SPInfoFn info, void* data);
+
+///////////////////////////////////////
+// names on two lines
+
+// how wide text is, in pixels
+typedef int (*SPMeasureFn)(const char* text, void* ctx);
+
+// text in at most two lines, each at most max_w wide as measure measures
+// it, written to lines. The first line breaks at the last space that
+// lets it fit, or between characters when even the first word doesn't.
+// The second line is the rest, and ends with "..." when it doesn't fit,
+// cut between characters. Returns how many lines: 1 when text fits on
+// one, 2, or 0 for empty text.
+int SP_wrap(const char* text, int max_w, SPMeasureFn measure, void* ctx, char lines[2][SP_NAME_MAX]);
+
+// The height of a pill for lines lines of text line_h tall: PILL_SIZE,
+// and line_h more for a second line.
+int SP_pillHeight(int scale, int lines, int line_h);
 
 ///////////////////////////////////////
 // layout
@@ -136,7 +158,7 @@ int SP_strip(const MosaicRect* room, int aspect_w, int aspect_h, int scale, int 
 MosaicRect SP_stripCard(const SPStrip* strip, int offset);
 
 typedef struct SPList {
-	MosaicRect rows;  // the column of rows, on the left
+	MosaicRect rows;  // the column of rows, on the left, down to the hint pills
 	int row_h;
 	int count;        // rows that fit
 	MosaicRect panel; // the selected recent's preview, on the right
@@ -148,6 +170,27 @@ typedef struct SPList {
 // the panel in the rest of room (see SP_room) right of it, a PADDING
 // between them. Returns 0, or -1 when not even a row fits.
 int SP_list(const MosaicRect* area, const MosaicRect* hole, int scale, SPList* out);
+
+// The list's first row in view, given the one in view before, when each
+// row is height(index) tall (two lines' rows are taller): it moves only
+// as far as it takes to show the whole selected row, and no further down
+// than the rows from it to the last fill h. Writes how many rows from it
+// fit whole in h to shown, at least the selected one. 0 for an empty list.
+int SP_windowRows(int first, int selected, int count, int h, int (*height)(int index, void* data), void* data,
+	int* shown);
+
+typedef struct SPBoxart {
+	MosaicRect name;    // the name pill
+	MosaicRect caption; // the caption line under it, w 0 for none
+} SPBoxart;
+
+// Lays the boxart style's name out at the bottom of room (see SP_room):
+// a pill name_h tall for a name text_w wide with BUTTON_PADDING either
+// side, at most room's width, centred across it; with caption_h above 0,
+// a caption line caption_h tall across room under it, BUTTON_MARGIN
+// between them, along room's bottom. Returns 0, or -1 when room is too
+// short or narrow for the pill.
+int SP_boxart(const MosaicRect* room, int scale, int text_w, int name_h, int caption_h, SPBoxart* out);
 
 
 ///////////////////////////////////////

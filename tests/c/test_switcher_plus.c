@@ -23,6 +23,7 @@ static void testSettings(void) {
 	CHECK(SP_style("full") == SP_STYLE_FULL);
 	CHECK(SP_style("strip") == SP_STYLE_STRIP);
 	CHECK(SP_style("list") == SP_STYLE_LIST);
+	CHECK(SP_style("boxart") == SP_STYLE_BOXART);
 	CHECK(SP_style("grid") == SP_STYLE_FULL);
 	CHECK(SP_style("") == SP_STYLE_FULL);
 	CHECK(SP_style(NULL) == SP_STYLE_FULL);
@@ -273,7 +274,7 @@ static void testStrip(void) {
 static void testList(void) {
 	SPList l;
 	CHECK(SP_list(&AREA, &STATUS, 3, &l) == 0);
-	CHECK(rectIs(l.rows, 30, 30, 379, 540));
+	CHECK(rectIs(l.rows, 30, 30, 379, 588));
 	CHECK(l.row_h == 90 && l.count == 6);
 	CHECK(rectIs(l.panel, 439, 150, 555, 468));
 	// header widgets reaching over the column push the rows down
@@ -325,6 +326,99 @@ static void testCaptionPlaces(void) {
 	CHECK(SP_panelCaption(&NONE, 3, 40, &preview).w == 0);
 }
 
+// ten pixels a byte
+static int measureTen(const char* text, void* ctx) {
+	(void)ctx;
+	return 10 * (int)strlen(text);
+}
+
+static void testWrap(void) {
+	char l[2][SP_NAME_MAX];
+	CHECK(SP_wrap("Apple", 100, measureTen, NULL, l) == 1);
+	CHECK_STR(l[0], "Apple");
+	CHECK_STR(l[1], "");
+	// at the last space that fits
+	CHECK(SP_wrap("The Legend of Zelda", 100, measureTen, NULL, l) == 2);
+	CHECK_STR(l[0], "The Legend");
+	CHECK_STR(l[1], "of Zelda");
+	// then cut with "..."
+	CHECK(SP_wrap("The Legend of Zelda Links Awakening", 100, measureTen, NULL, l) == 2);
+	CHECK_STR(l[0], "The Legend");
+	CHECK_STR(l[1], "of Zeld...");
+	// spaces before the cut aren't kept, nor doubled ones at the break
+	CHECK(SP_wrap("  The  Legend  of Zelda Links", 100, measureTen, NULL, l) == 2);
+	CHECK_STR(l[0], "The");
+	CHECK_STR(l[1], "Legend...");
+	// a first word too long for a line breaks between characters
+	CHECK(SP_wrap("Supercalifragilistic", 100, measureTen, NULL, l) == 2);
+	CHECK_STR(l[0], "Supercalif");
+	CHECK_STR(l[1], "ragilistic");
+	// never inside a UTF-8 character
+	CHECK(SP_wrap("Pok\xC3\xA9mon Pinball", 50, measureTen, NULL, l) == 2);
+	CHECK_STR(l[0], "Pok\xC3\xA9");
+	CHECK_STR(l[1], "mo...");
+	CHECK(SP_wrap("Pok\xC3\xA9mon Pinball", 40, measureTen, NULL, l) == 2);
+	CHECK_STR(l[0], "Pok");
+	CHECK_STR(l[1], "...");
+	// nothing fits: a character, then "..."
+	CHECK(SP_wrap("Abc def", 5, measureTen, NULL, l) == 2);
+	CHECK_STR(l[0], "A");
+	CHECK_STR(l[1], "...");
+	CHECK(SP_wrap("A", 5, measureTen, NULL, l) == 1);
+	CHECK(SP_wrap("", 100, measureTen, NULL, l) == 0);
+	CHECK(SP_wrap("   ", 100, measureTen, NULL, l) == 0);
+	CHECK(SP_wrap(NULL, 100, measureTen, NULL, l) == 0);
+
+	CHECK(SP_pillHeight(3, 1, 40) == 90);
+	CHECK(SP_pillHeight(3, 2, 40) == 130);
+	CHECK(SP_pillHeight(3, 0, 40) == 90);
+	CHECK(SP_pillHeight(0, 2, 40) == 70);
+}
+
+static const int* row_heights;
+static int rowOf(int index, void* data) {
+	(void)data;
+	return row_heights[index];
+}
+
+static void testWindowRows(void) {
+	static const int even[10] = { 90, 90, 90, 90, 90, 90, 90, 90, 90, 90 };
+	int shown = -1;
+	row_heights = even;
+	// as SP_window when the rows are the same height
+	CHECK(SP_windowRows(0, 7, 10, 540, rowOf, NULL, &shown) == 2 && shown == 6);
+	CHECK(SP_windowRows(5, 3, 10, 540, rowOf, NULL, &shown) == 3 && shown == 6);
+	CHECK(SP_windowRows(2, 4, 10, 540, rowOf, NULL, &shown) == 2 && shown == 6);
+	CHECK(SP_windowRows(8, 9, 10, 540, rowOf, NULL, &shown) == 4 && shown == 6);
+	CHECK(SP_windowRows(3, 1, 4, 540, rowOf, NULL, &shown) == 0 && shown == 4);
+	CHECK(SP_windowRows(3, 0, 0, 540, rowOf, NULL, &shown) == 0 && shown == 0);
+	// taller rows: fewer fit
+	static const int mixed[6] = { 90, 130, 90, 130, 90, 130 };
+	row_heights = mixed;
+	CHECK(SP_windowRows(0, 3, 6, 540, rowOf, NULL, &shown) == 0 && shown == 5);
+	CHECK(SP_windowRows(0, 5, 6, 540, rowOf, NULL, &shown) == 2 && shown == 4);
+	// a selected row taller than the room still shows
+	CHECK(SP_windowRows(0, 1, 6, 100, rowOf, NULL, &shown) == 1 && shown == 1);
+}
+
+static void testBoxartPlaces(void) {
+	MosaicRect room = SP_room(&AREA, &STATUS, 3);
+	SPBoxart b;
+	// centred along the room's bottom
+	CHECK(SP_boxart(&room, 3, 200, 90, 0, &b) == 0);
+	CHECK(rectIs(b.name, 376, 528, 272, 90));
+	CHECK(b.caption.w == 0);
+	// a caption under it
+	CHECK(SP_boxart(&room, 3, 200, 130, 40, &b) == 0);
+	CHECK(rectIs(b.name, 376, 433, 272, 130));
+	CHECK(rectIs(b.caption, 30, 578, 964, 40));
+	// at most the room's width
+	CHECK(SP_boxart(&room, 3, 5000, 90, 0, &b) == 0);
+	CHECK(rectIs(b.name, 30, 528, 964, 90));
+	CHECK(SP_boxart(&room, 3, 200, 500, 0, &b) == -1);
+	CHECK(SP_boxart(&NONE, 3, 200, 90, 0, &b) == -1);
+}
+
 ///////////////////////////////////////
 // the fake host
 
@@ -337,6 +431,12 @@ struct MosaicSurface {
 static MosaicSurface screen_surface = { 1024, 768, 0, NULL };
 static MosaicSurface preview_apple = { 640, 480, 0, NULL };
 static MosaicSurface preview_cherry = { 1024, 768, 0, NULL };
+static MosaicSurface box_apple = { 300, 400, 0, NULL };
+static MosaicSurface thumb_banana = { 200, 200, 0, NULL };
+
+struct MosaicEntry {
+	char path[512];
+};
 
 static MosaicHost fake_host;
 static MosaicScreenHooks registered;
@@ -349,7 +449,11 @@ static int removed = -1;
 static int redraws = 0;
 static int scales = 0, frees = 0, live = 0;
 static int blits = 0, blits_into_hole = 0, fills_into_hole = 0;
+static int own_fills = 0, own_blits = 0; // onto the plugin's own surfaces
+static int scale_fails = 0;
 static int art_state = MOSAIC_ART_READY;
+static int art_get_state = MOSAIC_ART_READY; // for the box and thumbnail art there is
+static int entries_made = 0, entries_freed = 0;
 static char loaded[512];
 static MosaicRect hole_now; // what the view leaves clear, checked against every draw
 static MosaicHint hints_left[2], hints_right[2];
@@ -530,6 +634,7 @@ static int fakeScale(void) {
 
 static MosaicSurface* fakeScaleSurface(const char* id, const MosaicSurface* src, int w, int h, int fit) {
 	(void)fit;
+	if (scale_fails) return NULL;
 	scales++;
 	live++;
 	MosaicSurface* s = calloc(1, sizeof(*s));
@@ -560,9 +665,9 @@ static int meetsHole(const MosaicRect* r) {
 }
 
 static int fakeFill(MosaicSurface* target, const MosaicRect* rect, MosaicColor color) {
-	(void)target;
 	(void)color;
-	if (!rect || meetsHole(rect)) fills_into_hole++;
+	if (target != &screen_surface) own_fills++;
+	else if (!rect || meetsHole(rect)) fills_into_hole++;
 	return 0;
 }
 
@@ -572,9 +677,12 @@ static int fakeFillRound(MosaicSurface* target, const MosaicRect* rect, int radi
 }
 
 static int fakeBlit(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect, const MosaicRect* dst) {
-	(void)target;
 	(void)src;
 	(void)src_rect;
+	if (target != &screen_surface) {
+		own_blits++;
+		return 0;
+	}
 	blits++;
 	if (!dst || meetsHole(dst)) blits_into_hole++;
 	return 0;
@@ -616,11 +724,31 @@ static int fakeArtLoad(const char* path, const MosaicSurface** out) {
 	return MOSAIC_ART_READY;
 }
 
+// Apple has a box, Banana a thumbnail, Cherry neither
 static int fakeArtGet(const MosaicEntry* entry, int kind, const MosaicSurface** out) {
-	(void)entry;
-	(void)kind;
-	(void)out;
-	return MOSAIC_ART_MISSING;
+	if (!entry) return MOSAIC_ART_MISSING;
+	const MosaicSurface* art = NULL;
+	if (kind == MOSAIC_ART_BOX && strstr(entry->path, "Apple")) art = &box_apple;
+	if (kind == MOSAIC_ART_THUMBNAIL && strstr(entry->path, "Banana")) art = &thumb_banana;
+	if (!art) return MOSAIC_ART_MISSING;
+	if (art_get_state != MOSAIC_ART_READY) return art_get_state;
+	*out = art;
+	return MOSAIC_ART_READY;
+}
+
+static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
+	(void)type;
+	(void)name;
+	MosaicEntry* e = calloc(1, sizeof(*e));
+	snprintf(e->path, sizeof(e->path), "%s", path);
+	entries_made++;
+	return e;
+}
+
+static void fakeEntryFree(MosaicEntry* e) {
+	if (!e) return;
+	entries_freed++;
+	free(e);
 }
 
 static int fakeDrawHints(MosaicSurface* screen, int group, const MosaicHint* hints, int count, MosaicRect* drawn) {
@@ -676,6 +804,8 @@ static void setupHost(void) {
 	fake_host.text_truncate = fakeTruncate;
 	fake_host.draw_text = fakeDrawText;
 	fake_host.art_get = fakeArtGet;
+	fake_host.entry_new = fakeEntryNew;
+	fake_host.entry_free = fakeEntryFree;
 	fake_host.art_load = fakeArtLoad;
 	fake_host.draw_hints = fakeDrawHints;
 	fake_host.play_time = fakePlayTime;
@@ -1133,6 +1263,158 @@ static void testCaptions(void) {
 	tzset();
 }
 
+static void testBoxart(void) {
+	start("boxart");
+	CHECK_STR(last_log, "style boxart");
+	threeRecents();
+	registered.enter(registered.data);
+	scales = frees = live = 0;
+	blits = blits_into_hole = fills_into_hole = own_fills = own_blits = 0;
+	entries_made = entries_freed = 0;
+
+	// Apple's box: cropped across the screen, dimmed, with the box fitted
+	// on top, made once into one copy and drawn around the status pill
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, art box, resume, style boxart");
+	CHECK(scales == 1 && live == 1 && own_fills == 1 && own_blits == 1);
+	CHECK(blits == 4 && blits_into_hole == 0 && fills_into_hole == 0);
+	CHECK(entries_made == 1);
+	// the name on a pill centred along the bottom, above the hints
+	CHECK(text_count == 1);
+	CHECK_STR(texts[0], "Apple");
+	CHECK(text_x[0] == 462 && text_y[0] == 553);
+	CHECK(hints_right_count == 2 && hints_right[1].button == MOSAIC_BUTTON_A);
+	// drawn again: no new copy
+	CHECK(draw() == 0);
+	CHECK(scales == 1 && own_fills == 1 && blits == 8);
+
+	// held, it doesn't move, as stock's; pressed, Banana's thumbnail in
+	// place of a box, the copy before it freed
+	hold(MOSAIC_BUTTON_RIGHT);
+	CHECK(selected == 0);
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 1 of 3: Banana, art thumbnail, open, style boxart");
+	CHECK(scales == 2 && live == 1);
+	// Cherry's save state preview with neither
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 2 of 3: Cherry, art preview, resume, style boxart");
+	CHECK(scales == 3 && live == 1);
+	CHECK_STR(loaded, "/sd/.minui/GB/Cherry.gb.1.bmp");
+	// and nothing at all
+	art_state = MOSAIC_ART_MISSING;
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 2 of 3: Cherry, art none, resume, style boxart");
+	CHECK_STR(texts[0], "No Preview");
+	CHECK_STR(texts[1], "Cherry");
+	art_state = MOSAIC_ART_READY;
+	// a box still loading is waited for, not passed over
+	art_get_state = MOSAIC_ART_LOADING;
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, art loading, resume, style boxart");
+	art_get_state = MOSAIC_ART_READY;
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 0 of 3: Apple, art box, resume, style boxart");
+
+	// no room for a copy: the art alone, fitted on black
+	scale_fails = 1;
+	press(MOSAIC_BUTTON_RIGHT);
+	blits = blits_into_hole = fills_into_hole = 0;
+	CHECK(draw() == 0);
+	CHECK_STR(last_log, "showing 1 of 3: Banana, art thumbnail, open, style boxart");
+	CHECK(live == 0 && blits > 0 && blits_into_hole == 0 && fills_into_hole == 0);
+	scale_fails = 0;
+
+	// closing frees the copy and the entries
+	press(MOSAIC_BUTTON_LEFT);
+	CHECK(draw() == 0);
+	CHECK(live == 1);
+	registered.exit(registered.data);
+	CHECK(live == 0);
+	CHECK(entries_made == 3 && entries_freed == 3);
+	fake_count = 0;
+}
+
+// a name too long for one line
+#define LONG_NAME "Alpha Bravo Charlie Delta Echo Foxtrot Golf Hotel"
+
+static void testTwoLines(void) {
+	// full: the title pill a line taller
+	start("full");
+	threeRecents();
+	snprintf(fake_infos[1].name, sizeof(fake_infos[1].name), LONG_NAME);
+	registered.enter(registered.data);
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK(text_count == 3);
+	CHECK_STR(texts[1], "Alpha Bravo Charlie Delta Echo");
+	CHECK_STR(texts[2], "Foxtrot Golf Hotel");
+	CHECK(text_x[1] == 66 && text_y[1] == 55 && text_x[2] == 66 && text_y[2] == 95);
+	// then "..."
+	snprintf(fake_infos[1].name, sizeof(fake_infos[1].name), LONG_NAME " India Juliett Kilo Lima");
+	registered.exit(registered.data);
+	registered.enter(registered.data);
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(texts[2], "Foxtrot Golf Hotel India Juliet...");
+	registered.exit(registered.data);
+
+	// strip: room for a second line under every preview once any name
+	// needs one, so a short name sits higher
+	start("strip");
+	threeRecents();
+	registered.enter(registered.data);
+	CHECK(draw() == 0);
+	CHECK_STR(texts[text_count - 1], "Apple");
+	CHECK(text_y[text_count - 1] == 523);
+	registered.exit(registered.data);
+	snprintf(fake_infos[1].name, sizeof(fake_infos[1].name), LONG_NAME);
+	registered.enter(registered.data);
+	CHECK(draw() == 0);
+	CHECK_STR(texts[text_count - 1], "Apple");
+	CHECK(text_y[text_count - 1] == 503);
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(texts[text_count - 2], "Alpha Bravo Charlie Delta Echo Foxtrot Golf");
+	CHECK_STR(texts[text_count - 1], "Hotel");
+	CHECK(text_y[text_count - 1] == text_y[text_count - 2] + 40);
+	registered.exit(registered.data);
+
+	// list: the row a line taller, pushing the next one down
+	start("list");
+	threeRecents();
+	snprintf(fake_infos[1].name, sizeof(fake_infos[1].name), LONG_NAME);
+	registered.enter(registered.data);
+	CHECK(draw() == 0);
+	CHECK(text_count == 4);
+	CHECK_STR(texts[0], "Apple");
+	CHECK_STR(texts[1], "Alpha Bravo");
+	CHECK_STR(texts[2], "Charlie Delt...");
+	CHECK_STR(texts[3], "Cherry");
+	CHECK(text_y[0] == 55 && text_y[1] == 145 && text_y[2] == 185 && text_y[3] == 275);
+	// selected, on a pill as tall
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(draw() == 0);
+	CHECK_STR(texts[1], "Alpha Bravo");
+	CHECK(text_y[1] == 145 && text_y[2] == 185 && text_y[3] == 275);
+	registered.exit(registered.data);
+
+	// boxart: the pill grows upwards
+	start("boxart");
+	threeRecents();
+	snprintf(fake_infos[1].name, sizeof(fake_infos[1].name), LONG_NAME);
+	registered.enter(registered.data);
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(draw() == 0);
+	CHECK_STR(texts[0], "Alpha Bravo Charlie Delta Echo Foxtrot Golf");
+	CHECK_STR(texts[1], "Hotel");
+	CHECK(text_y[0] == 513 && text_y[1] == 553);
+	registered.exit(registered.data);
+	fake_count = 0;
+}
+
 int main(void) {
 	testSettings();
 	testMoves();
@@ -1142,11 +1424,16 @@ int main(void) {
 	testStrip();
 	testList();
 	testCaptionPlaces();
+	testWrap();
+	testWindowRows();
+	testBoxartPlaces();
 	testInit();
 	testButtons();
 	testFiltered();
 	testStyleMoves();
 	testRender();
 	testCaptions();
+	testBoxart();
+	testTwoLines();
 	CHECK_DONE();
 }
