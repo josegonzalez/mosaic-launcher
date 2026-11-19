@@ -83,6 +83,12 @@ enum MosaicButton {
 	MOSAIC_BUTTON_FN3,
 };
 
+// The analog sticks, for host->stick.
+enum MosaicStick {
+	MOSAIC_STICK_LEFT,
+	MOSAIC_STICK_RIGHT,
+};
+
 // A button's bit in a MosaicInput mask.
 #define MOSAIC_BUTTON_BIT(button) (1u << (button))
 
@@ -1876,6 +1882,14 @@ typedef struct MosaicHost {
 	// actions have none. Check for it, and for action_gate in MosaicPlugin,
 	// with MOSAIC_HOST_HAS(host, action_flags).
 	int (*action_flags)(const char* action_id);
+
+	// A stick's raw position (which an enum MosaicStick), as stock's pad
+	// reads it: x from about -32768 (left) to 32767 (right) and y from
+	// about -32768 (up) to 32767 (down), 0 at rest, with no dead zone.
+	// Writes them into x and y (either may be NULL) and returns 0, or -1
+	// when the device has no such stick, such as the Brick and desktop.
+	// Main thread only. Check for it with MOSAIC_HOST_HAS(host, stick).
+	int (*stick)(int which, int* x, int* y);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

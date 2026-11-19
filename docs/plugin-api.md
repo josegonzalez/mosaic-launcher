@@ -1071,6 +1071,7 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   // in MosaicPlugin, with MOSAIC_HOST_HAS(host, action_flags) checked in init
   .action_gate = actionGate,
   ```
+- `stick(which, &x, &y)` reads a stick's raw position as stock's pad has it, `which` `MOSAIC_STICK_LEFT` or `MOSAIC_STICK_RIGHT`: `x` from about -32768 (left) to 32767 (right) and `y` from about -32768 (up) to 32767 (down), 0 at rest, with no dead zone, written into `x` and `y` (either may be `NULL`). It returns 0, or -1 when the device has no such stick: the Brick and Brick Pro, an h700 without it, and desktop. It's for the main thread only, so read it from `tick` while it matters, and redraw when it moves. The bundled `system-info`'s input tester shows them. Check for it with `MOSAIC_HOST_HAS(host, stick)`.
 
 ## Without writing C
 

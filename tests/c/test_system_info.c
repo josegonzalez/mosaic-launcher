@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 #include "check.h"
 #include "words.h"
 #include "../../plugins/system-info/system_info.c"
@@ -394,9 +395,16 @@ static void fakeRedraw(void) {
 	redraws++;
 }
 
+static MosaicScreenHooks storage_screen, tester_screen;
+static char current[64] = "gamelist";
+
 static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
-	snprintf(registered_id, sizeof(registered_id), "%s", id);
-	registered = *hooks;
+	if (!strcmp(id, STORAGE_ID)) storage_screen = *hooks;
+	else if (!strcmp(id, INPUT_ID)) tester_screen = *hooks;
+	else {
+		snprintf(registered_id, sizeof(registered_id), "%s", id);
+		registered = *hooks;
+	}
 	return 0;
 }
 
@@ -428,7 +436,46 @@ static int fakeBind(int screen, int button, int trigger, const char* id) {
 
 static int fakeOpenScreen(const char* id) {
 	snprintf(opened_screen, sizeof(opened_screen), "%s", id);
-	return registered.enter ? registered.enter(registered.data) : 0;
+	snprintf(current, sizeof(current), "%s", id);
+	const MosaicScreenHooks* h = !strcmp(id, STORAGE_ID) ? &storage_screen : !strcmp(id, INPUT_ID) ? &tester_screen : &registered;
+	return h->enter ? h->enter(h->data) : 0;
+}
+
+static const char* fakeCurrent(void) {
+	return current;
+}
+
+static int fakeHoldSwitch(void) {
+	return 0;
+}
+
+static const char* fakeFnName(int button) {
+	return button == MOSAIC_BUTTON_FN3 ? "HOME" : "";
+}
+
+static int stick_left = 1; // a left stick, at stick_x and stick_y
+static int stick_x = 12000, stick_y = -3000;
+static int fakeStick(int which, int* x, int* y) {
+	if (which != MOSAIC_STICK_LEFT || !stick_left) return -1;
+	*x = stick_x;
+	*y = stick_y;
+	return 0;
+}
+
+static int fakeSetNames(void (*each)(const char*, void*), void* data) {
+	(void)each;
+	(void)data;
+	return 0;
+}
+
+static int subscribed = 0;
+static void (*card_changed)(const char*, const char*, void*);
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)name;
+	(void)data;
+	subscribed++;
+	card_changed = on_event;
+	return 0;
 }
 
 static int fakeThemeColor(int index) {
@@ -505,7 +552,7 @@ static int fakeDrawHints(MosaicSurface* screen, int group, const MosaicHint* h, 
 		snprintf(hint_text + used, sizeof(hint_text) - used, "%s%i %s", group == MOSAIC_HINTS_LEFT ? "L:" : "R:", h[i].button,
 			h[i].label);
 	}
-	if (group == MOSAIC_HINTS_RIGHT && count == 1 && h[0].button == MOSAIC_BUTTON_B && !strcmp(h[0].label, "BACK"))
+	if (group == MOSAIC_HINTS_LEFT && count == 1 && h[0].button == MOSAIC_BUTTON_B && !strcmp(h[0].label, "BACK"))
 		hints++;
 	return 0;
 }
@@ -539,6 +586,12 @@ static void setupHost(void) {
 	fake_host.text_truncate = fakeTruncate;
 	fake_host.draw_text = fakeDrawText;
 	fake_host.draw_hints = fakeDrawHints;
+	fake_host.current_screen = fakeCurrent;
+	fake_host.hold_switch = fakeHoldSwitch;
+	fake_host.fn_name = fakeFnName;
+	fake_host.subscribe = fakeSubscribe;
+	fake_host.set_names = fakeSetNames;
+	fake_host.stick = fakeStick;
 }
 
 static void writeFile(const char* path, const char* text) {
@@ -707,16 +760,19 @@ static void testPlugin(void) {
 }
 
 static void testHints(void) {
-	MosaicHint left[1], right[1];
+	MosaicHint left[2], right[2];
 	int lc = -1, rc = -1;
 	Si_hints(0, 0, left, &lc, right, &rc);
-	CHECK(lc == 0 && rc == 1);
-	CHECK(right[0].button == MOSAIC_BUTTON_B && !strcmp(right[0].label, "BACK"));
-	Si_hints(1, 0, left, &lc, right, &rc);
-	CHECK(lc == 1 && rc == 1);
+	CHECK(lc == 1 && rc == 2);
 	CHECK(left[0].button == MOSAIC_BUTTON_B && !strcmp(left[0].label, "BACK"));
-	CHECK(right[0].button == MOSAIC_BUTTON_A && !strcmp(right[0].label, "GRAPH"));
+	CHECK(right[0].button == MOSAIC_BUTTON_X && !strcmp(right[0].label, "INPUT"));
+	CHECK(right[1].button == MOSAIC_BUTTON_Y && !strcmp(right[1].label, "CARD"));
+	Si_hints(1, 0, left, &lc, right, &rc);
+	CHECK(lc == 2 && rc == 2);
+	CHECK(left[0].button == MOSAIC_BUTTON_B && !strcmp(left[0].label, "BACK"));
+	CHECK(left[1].button == MOSAIC_BUTTON_A && !strcmp(left[1].label, "GRAPH"));
 	Si_hints(1, 1, left, &lc, right, &rc);
+	CHECK(lc == 1 && rc == 1);
 	CHECK(right[0].button == MOSAIC_BUTTON_A && !strcmp(right[0].label, "INFO"));
 
 	// the graph's own page: the graph takes what's under the title
@@ -746,6 +802,507 @@ static void testSettings(void) {
 	CHECK(mosaic_plugin_get(&fake_host)->init(&fake_host) == 1);
 }
 
+///////////////////////////////////////
+// the Storage page's model
+
+static void testStorageNames(void) {
+	char out[ST_NAME_MAX];
+	St_tag("Game Boy (GB)", out, sizeof(out));
+	CHECK_STR(out, "GB");
+	St_tag("01) Super Nintendo (SFC)", out, sizeof(out));
+	CHECK_STR(out, "SFC");
+	St_tag("Ports", out, sizeof(out));
+	CHECK_STR(out, "Ports");
+	St_tag("Odd (name) here", out, sizeof(out));
+	CHECK_STR(out, "Odd (name) here");
+	St_tag("Empty ()", out, sizeof(out));
+	CHECK_STR(out, "Empty ()");
+
+	St_name("01) Game Boy (GB)", out, sizeof(out));
+	CHECK_STR(out, "Game Boy");
+	St_name("Game Boy (GB)", out, sizeof(out));
+	CHECK_STR(out, "Game Boy");
+	St_name("Ports", out, sizeof(out));
+	CHECK_STR(out, "Ports");
+	St_name("(GB)", out, sizeof(out));
+	CHECK_STR(out, "(GB)");
+	St_name("2048 (P8)", out, sizeof(out));
+	CHECK_STR(out, "2048");
+
+	CHECK(St_stateTag("GB-gambatte", out, sizeof(out)) == 0);
+	CHECK_STR(out, "GB");
+	CHECK(St_stateTag("PS-pcsx_rearmed", out, sizeof(out)) == 0);
+	CHECK_STR(out, "PS");
+	CHECK(St_stateTag(".minui", out, sizeof(out)) == -1);
+	CHECK(St_stateTag("-core", out, sizeof(out)) == -1);
+	CHECK(St_stateTag("GB-", out, sizeof(out)) == -1);
+}
+
+static void testStorageRows(void) {
+	static StTotals t;
+	St_init(&t);
+	CHECK(St_row(&t, "", "Nothing") == -1);
+	CHECK(St_row(&t, "MD", NULL) == 0);
+	CHECK(St_row(&t, "GB", "Game Boy") == 1);
+	CHECK(St_row(&t, "MD", "Mega Drive") == 0);
+	CHECK_STR(t.rows[0].name, "Mega Drive");
+	CHECK(St_row(&t, "GB", "Game Boy Hacks") == 1);
+	CHECK_STR(t.rows[1].name, "Game Boy");
+	CHECK(St_row(&t, "GBA", NULL) == 2);
+	t.rows[0].bytes[ST_GAMES] = 100;
+	t.rows[1].bytes[ST_GAMES] = 50;
+	t.rows[1].bytes[ST_SAVES] = 40;
+	t.rows[1].bytes[ST_ART] = 20;
+	t.rows[2].bytes[ST_ART] = 100;
+	t.bios = 5;
+	t.screenshots = 7;
+	CHECK(St_rowTotal(&t.rows[1]) == 110);
+	CHECK(St_total(&t) == 322);
+	St_sort(&t);
+	// largest first, then by name: Game Boy, then the tied GBA (named by
+	// its tag) and Mega Drive
+	CHECK_STR(t.rows[0].tag, "GB");
+	CHECK_STR(t.rows[1].tag, "GBA");
+	CHECK_STR(t.rows[2].tag, "MD");
+	CHECK(St_find(&t, "MD") == 2 && St_find(&t, "PS") == -1);
+	for (int i = t.count; i < ST_ROWS_MAX; i++) {
+		char tag[16];
+		snprintf(tag, sizeof(tag), "T%i", i);
+		CHECK(St_row(&t, tag, NULL) == i);
+	}
+	CHECK(St_row(&t, "ONE MORE", NULL) == -1);
+
+	StSeen seen;
+	St_seenInit(&seen);
+	CHECK(St_seenAdd(&seen, 1, 2) == 1);
+	CHECK(St_seenAdd(&seen, 1, 3) == 1);
+	CHECK(St_seenAdd(&seen, 1, 2) == 0);
+	for (unsigned long long i = 0; i < 200; i++) CHECK(St_seenAdd(&seen, 2, i) == 1);
+	CHECK(St_seenAdd(&seen, 2, 150) == 0);
+	St_seenFree(&seen);
+
+	char out[192];
+	St_formatCount(0, out, sizeof(out));
+	CHECK_STR(out, "0");
+	St_formatCount(999, out, sizeof(out));
+	CHECK_STR(out, "999");
+	St_formatCount(1234, out, sizeof(out));
+	CHECK_STR(out, "1,234");
+	St_formatCount(1234567, out, sizeof(out));
+	CHECK_STR(out, "1,234,567");
+	St_formatProgress("Game Boy", 3, 12, 1234, out, sizeof(out));
+	CHECK_STR(out, "Counting Game Boy, 3 of 12 systems, 1,234 files");
+	St_formatProgress("Game Boy", 1, 1, 1, out, sizeof(out));
+	CHECK_STR(out, "Counting Game Boy, 1 of 1 system, 1 file");
+	St_formatProgress(NULL, 13, 12, 20, out, sizeof(out));
+	CHECK_STR(out, "Counting BIOS, 12 of 12 systems, 20 files");
+	St_formatProgress(NULL, 14, 12, 20, out, sizeof(out));
+	CHECK_STR(out, "Counting Screenshots, 12 of 12 systems, 20 files");
+}
+
+static void testStorageCache(void) {
+	StCache c;
+	St_cacheInit(&c);
+	CHECK(St_cacheStale(&c));
+	// the first opening counts, and a second while it runs doesn't
+	CHECK(St_cacheStart(&c) == 1);
+	CHECK(St_cacheStart(&c) == 0);
+	St_cacheDone(&c, 1);
+	CHECK(!St_cacheStale(&c));
+	CHECK(St_cacheStart(&c) == 0);
+	// a game changes the card: counted again
+	St_cacheChanged(&c);
+	CHECK(St_cacheStale(&c));
+	CHECK(St_cacheStart(&c) == 1);
+	// and changes again while it counts: still stale once it's done
+	St_cacheChanged(&c);
+	St_cacheDone(&c, 1);
+	CHECK(St_cacheStale(&c));
+	CHECK(St_cacheStart(&c) == 1);
+	// a cancelled count keeps what was there
+	St_cacheDone(&c, 0);
+	CHECK(St_cacheStale(&c) && c.have);
+	CHECK(St_cacheStart(&c) == 1);
+	St_cacheDone(&c, 1);
+	CHECK(!St_cacheStale(&c));
+}
+
+static void writeBytes(const char* path, size_t n) {
+	FILE* f = fopen(path, "w");
+	CHECK(f != NULL);
+	if (!f) return;
+	for (size_t i = 0; i < n; i++) fputc('x', f);
+	fclose(f);
+}
+
+static int progress_calls = 0;
+static char progress_last[64];
+static void testProgress(void* ctx, const char* name, int done, int total, unsigned long long files) {
+	(void)ctx;
+	(void)files;
+	progress_calls++;
+	snprintf(progress_last, sizeof(progress_last), "%s %i/%i", name ? name : "-", done, total);
+}
+
+#define SCARD CARD "/storage"
+
+static void makeStorageCard(void) {
+	CHECK(system("rm -rf '" SCARD "' && mkdir -p '" SCARD "/Roms/01) Game Boy (GB)/.media' '" SCARD
+		"/Roms/01) Game Boy (GB)/Sub/.media' '" SCARD "/Roms/Game Boy Hacks (GB)' '" SCARD "/Roms/.hidden (HID)' '" SCARD
+		"/Roms/Mega Drive (MD)' '" SCARD "/Saves/GB' '" SCARD "/Saves/PS' '" SCARD "/.userdata/shared/GB-gambatte' '" SCARD
+		"/.userdata/shared/GBA-mgba' '" SCARD "/.userdata/shared/.minui' '" SCARD "/Bios/GBA' '" SCARD "/Screenshots' '" CARD
+		"/outside'") == 0);
+	writeBytes(SCARD "/Roms/01) Game Boy (GB)/Tetris.gb", 100);
+	writeBytes(SCARD "/Roms/01) Game Boy (GB)/.media/Tetris.png", 50);
+	writeBytes(SCARD "/Roms/01) Game Boy (GB)/Sub/Zelda.gb", 60);
+	writeBytes(SCARD "/Roms/01) Game Boy (GB)/Sub/.media/Zelda.png", 10);
+	writeBytes(SCARD "/Roms/Game Boy Hacks (GB)/Hack.gb", 30);
+	writeBytes(SCARD "/Roms/.hidden (HID)/Secret.bin", 1000);
+	writeBytes(SCARD "/Roms/Mega Drive (MD)/Sonic.md", 500);
+	writeBytes(SCARD "/Saves/GB/Tetris.sav", 8);
+	writeBytes(SCARD "/Saves/PS/Card.mcd", 4);
+	writeBytes(SCARD "/.userdata/shared/GB-gambatte/Tetris.st0", 16);
+	writeBytes(SCARD "/.userdata/shared/GBA-mgba/Nothing.st0", 2000);
+	writeBytes(SCARD "/Bios/GBA/gba_bios.bin", 20);
+	writeBytes(SCARD "/Screenshots/Tetris.png", 5);
+	writeBytes(CARD "/outside/Big.bin", 5000);
+	// a link to a big file outside counts as the link, and its folder isn't
+	// followed; a hard link is counted once
+	CHECK(symlink(CARD "/outside/Big.bin", SCARD "/Roms/Mega Drive (MD)/Big.md") == 0);
+	CHECK(symlink(CARD "/outside", SCARD "/Roms/Mega Drive (MD)/Outside") == 0);
+	CHECK(link(SCARD "/Roms/Mega Drive (MD)/Sonic.md", SCARD "/Roms/Mega Drive (MD)/Sonic Copy.md") == 0);
+}
+
+static void testStorageCount(void) {
+	makeStorageCard();
+	static StTotals t;
+	StWalk w;
+	St_walkInit(&w);
+	w.progress = testProgress;
+	progress_calls = 0;
+	CHECK(St_count(SCARD, &t, &w) == 0);
+	St_walkFree(&w);
+	struct stat link_st;
+	CHECK(lstat(SCARD "/Roms/Mega Drive (MD)/Big.md", &link_st) == 0);
+	unsigned long long links = (unsigned long long)link_st.st_size;
+	CHECK(lstat(SCARD "/Roms/Mega Drive (MD)/Outside", &link_st) == 0);
+	links += (unsigned long long)link_st.st_size;
+	// MD, GB, PS from Saves: largest first
+	CHECK(t.count == 3);
+	CHECK_STR(t.rows[0].tag, "MD");
+	CHECK_STR(t.rows[0].name, "Mega Drive");
+	CHECK(t.rows[0].bytes[ST_GAMES] == 500 + links);
+	CHECK_STR(t.rows[1].tag, "GB");
+	CHECK_STR(t.rows[1].name, "Game Boy");
+	CHECK(t.rows[1].bytes[ST_GAMES] == 100 + 60 + 30);
+	CHECK(t.rows[1].bytes[ST_ART] == 60);
+	CHECK(t.rows[1].bytes[ST_SAVES] == 8 + 16);
+	CHECK_STR(t.rows[2].tag, "PS");
+	CHECK_STR(t.rows[2].name, "");
+	CHECK(t.rows[2].bytes[ST_SAVES] == 4);
+	CHECK(t.bios == 20);
+	CHECK(t.screenshots == 5);
+	CHECK(t.files == 13);
+	// each system, then BIOS and Screenshots
+	CHECK(progress_calls == 5);
+	CHECK_STR(progress_last, "- 5/3");
+
+	// cancelled: stops at once
+	volatile int stop = 1;
+	St_walkInit(&w);
+	w.cancel = &stop;
+	CHECK(St_count(SCARD, &t, &w) == -1);
+	St_walkFree(&w);
+
+	// an empty card
+	CHECK(system("mkdir -p '" CARD "/empty'") == 0);
+	St_walkInit(&w);
+	CHECK(St_count(CARD "/empty", &t, &w) == 0);
+	St_walkFree(&w);
+	CHECK(t.count == 0 && St_total(&t) == 0);
+}
+
+///////////////////////////////////////
+// the input tester's model
+
+static void testInputModel(void) {
+	CHECK_STR(It_name(MOSAIC_BUTTON_A), "A");
+	CHECK_STR(It_name(MOSAIC_BUTTON_POWER), "POWER");
+	CHECK_STR(It_name(MOSAIC_BUTTON_FN1), "");
+	CHECK_STR(It_name(-1), "");
+	CHECK(It_shown(MOSAIC_BUTTON_MENU, 0));
+	CHECK(!It_shown(MOSAIC_BUTTON_FN1, 0));
+	CHECK(It_shown(MOSAIC_BUTTON_FN3, 4) && !It_shown(MOSAIC_BUTTON_FN2, 4));
+	CHECK(!It_shown(IT_BUTTONS, 7));
+
+	ItHistory h;
+	It_historyInit(&h);
+	CHECK(It_historyPress(&h, 0) == 0);
+	CHECK(It_historyPress(&h, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_A)) == 1);
+	CHECK(It_historyPress(&h, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B) | MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_UP)) == 2);
+	CHECK(h.count == 3);
+	CHECK(h.buttons[0] == MOSAIC_BUTTON_UP && h.buttons[1] == MOSAIC_BUTTON_B && h.buttons[2] == MOSAIC_BUTTON_A);
+	for (int i = 0; i < 10; i++) It_historyPress(&h, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_X));
+	It_historyPress(&h, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER));
+	CHECK(h.count == IT_HISTORY);
+	CHECK(h.buttons[0] == MOSAIC_BUTTON_POWER && h.buttons[IT_HISTORY - 1] == MOSAIC_BUTTON_X);
+
+	unsigned int both = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B) | MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_START);
+	ItHold hold;
+	It_holdInit(&hold);
+	CHECK(It_holdStep(&hold, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B), 100) == 0);
+	CHECK(It_holdPercent(&hold, 100) == 0);
+	CHECK(It_holdStep(&hold, both, 1000) == 0);
+	CHECK(It_holdPercent(&hold, 1500) == 50);
+	CHECK(It_holdStep(&hold, both | MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_A), 1999) == 0);
+	// letting go starts over
+	CHECK(It_holdStep(&hold, MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_START), 2000) == 0);
+	CHECK(It_holdStep(&hold, both, 2100) == 0);
+	CHECK(It_holdStep(&hold, both, 3099) == 0);
+	CHECK(It_holdStep(&hold, both, 3100) == 1);
+	CHECK(It_holdPercent(&hold, 3500) == 100);
+
+	CHECK(It_stickOffset(0, 20) == 0);
+	CHECK(It_stickOffset(IT_STICK_MAX, 20) == 20);
+	CHECK(It_stickOffset(-32768, 20) == -20);
+	CHECK(It_stickOffset(IT_STICK_MAX / 2, 20) == 9);
+	CHECK(It_stickOffset(100, 0) == 0);
+	char out[48];
+	It_formatStick(12000, -3000, out, sizeof(out));
+	CHECK_STR(out, "12000, -3000");
+
+	// every button shown inside the area and apart from the others
+	MosaicRect area = { 10, 20, 640, 330 };
+	ItLayout l;
+	CHECK(It_layout(&area, 7, 3, &l) == 0);
+	CHECK(l.unit == 20);
+	for (int a = 0; a < IT_BUTTONS; a++) {
+		CHECK(l.buttons[a].w > 0);
+		CHECK(l.buttons[a].x >= area.x && l.buttons[a].x + l.buttons[a].w <= area.x + area.w);
+		CHECK(l.buttons[a].y >= area.y && l.buttons[a].y + l.buttons[a].h <= area.y + area.h);
+		for (int b = a + 1; b < IT_BUTTONS; b++) CHECK(!meet(&l.buttons[a], &l.buttons[b]));
+		for (int s = 0; s < 2; s++) CHECK(!meet(&l.buttons[a], &l.sticks[s]) && !meet(&l.buttons[a], &l.stick_text[s]));
+	}
+	CHECK(!meet(&l.sticks[0], &l.sticks[1]));
+	CHECK(It_layout(&area, 0, 0, &l) == 0);
+	CHECK(l.buttons[MOSAIC_BUTTON_FN1].w == 0 && l.sticks[0].w == 0 && l.sticks[1].w == 0);
+	// one FN button, centred
+	CHECK(It_layout(&area, 4, 1, &l) == 0);
+	CHECK(l.buttons[MOSAIC_BUTTON_FN3].w > 0 && l.buttons[MOSAIC_BUTTON_FN1].w == 0);
+	CHECK(l.sticks[0].w > 0 && l.sticks[1].w == 0);
+	MosaicRect tiny = { 0, 0, 40, 20 };
+	CHECK(It_layout(&tiny, 0, 0, &l) == -1);
+}
+
+///////////////////////////////////////
+// the Storage page and the input tester in the plugin
+
+static void renderOn(const MosaicScreenHooks* h, const char* id) {
+	MosaicScreenView view = { sizeof(view), { 0, 0, 1024, 768 }, { 800, 30, 194, 90 }, { 0, 0, 0, 0 }, id };
+	hole_now = view.status;
+	CHECK(h->render(&screen_surface, &view, h->data) == 0);
+}
+
+// Ticks until the count is done, for up to five seconds.
+static void waitCount(void) {
+	for (int i = 0; i < 500 && worker_running; i++) {
+		struct timespec ms = { 0, 10 * 1000 * 1000 };
+		nanosleep(&ms, NULL);
+		tick(100000 + (unsigned long)i);
+	}
+	CHECK(!worker_running);
+}
+
+static void testPluginStorage(void) {
+	makeCard();
+	makeStorageCard();
+	setupHost();
+	fake_host.sdcard_path = SCARD;
+	subscribed = 0;
+	CHECK(mosaic_plugin_get(&fake_host)->init(&fake_host) == 0);
+	CHECK(storage_screen.render != NULL);
+	CHECK(subscribed == 1);
+	all_log[0] = '\0';
+	CHECK(fakeOpenScreen(STORAGE_ID) == 0);
+	CHECK(logged("storage: counting"));
+	fills_into_hole = 0;
+	renderOn(&storage_screen, STORAGE_ID);
+	waitCount();
+	CHECK(logged("storage: 3 systems, 13 files, "));
+	CHECK(logged("storage: Mega Drive (MD): games "));
+	CHECK(logged("storage: Game Boy (GB): games 0.2 KB, saves 0.0 KB, art 0.1 KB, total 0.3 KB"));
+	CHECK(logged("storage: PS (PS): games 0.0 KB, saves 0.0 KB, art 0.0 KB, total 0.0 KB"));
+	CHECK(logged("storage: BIOS 0.0 KB, Screenshots 0.0 KB"));
+	hint_text[0] = '\0';
+	hints = 0;
+	renderOn(&storage_screen, STORAGE_ID);
+	CHECK(fills_into_hole == 0);
+	CHECK(hints == 1);
+	// the rows: three systems, BIOS, Screenshots and everything
+	CHECK(storageRows() == 6);
+	MosaicInput down;
+	memset(&down, 0, sizeof(down));
+	down.repeated = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN);
+	CHECK(storage_screen.input(&down, storage_screen.data) == MOSAIC_SCREEN_STAY);
+	CHECK(storage_first == 0); // they all fit
+	MosaicInput press_b;
+	memset(&press_b, 0, sizeof(press_b));
+	press_b.pressed = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B);
+	CHECK(storage_screen.input(&press_b, storage_screen.data) == MOSAIC_SCREEN_CLOSE);
+	storage_screen.exit(storage_screen.data);
+
+	// opened again: what was counted
+	all_log[0] = '\0';
+	CHECK(fakeOpenScreen(STORAGE_ID) == 0);
+	CHECK(logged("storage: opened with the sizes counted before"));
+	CHECK(!worker_running);
+	storage_screen.exit(storage_screen.data);
+
+	// a game ran: counted again on the next opening, not before
+	writeBytes(SCARD "/Saves/GB/Zelda.sav", 2000);
+	card_changed("launcher.return", "path=x\ntype=rom", NULL);
+	CHECK(logged("storage: launcher.return, counting again next time"));
+	tick(200000);
+	CHECK(!worker_running);
+	all_log[0] = '\0';
+	CHECK(fakeOpenScreen(STORAGE_ID) == 0);
+	CHECK(logged("storage: counting"));
+	// the old sizes show meanwhile
+	CHECK(storageRows() == 6);
+	waitCount();
+	CHECK(logged("storage: Game Boy (GB): games 0.2 KB, saves 2.0 KB, art 0.1 KB, total 2.2 KB"));
+	storage_screen.exit(storage_screen.data);
+
+	// quitting stops a count
+	card_changed("launcher.return", "path=y\ntype=pak", NULL);
+	CHECK(fakeOpenScreen(STORAGE_ID) == 0);
+	mosaic_plugin_get(&fake_host)->quit();
+	CHECK(!worker_running);
+	storage_screen.exit(storage_screen.data);
+
+	// from the info page, Y opens it and X the input tester
+	all_log[0] = '\0';
+	action_run(NULL, NULL);
+	MosaicInput press_y, press_x;
+	memset(&press_y, 0, sizeof(press_y));
+	memset(&press_x, 0, sizeof(press_x));
+	press_y.pressed = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_Y);
+	press_x.pressed = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_X);
+	CHECK(registered.input(&press_y, registered.data) == MOSAIC_SCREEN_STAY);
+	CHECK_STR(opened_screen, STORAGE_ID);
+	waitCount();
+	storage_screen.exit(storage_screen.data);
+	CHECK(registered.input(&press_x, registered.data) == MOSAIC_SCREEN_STAY);
+	CHECK_STR(opened_screen, INPUT_ID);
+	tester_screen.exit(tester_screen.data);
+	registered.exit(registered.data);
+	snprintf(current, sizeof(current), "gamelist");
+}
+
+static unsigned int filterFrame(unsigned int pressed, unsigned int released, unsigned int held) {
+	MosaicInput in;
+	memset(&in, 0, sizeof(in));
+	in.size = sizeof(in);
+	in.pressed = pressed;
+	in.repeated = pressed;
+	in.released = released;
+	in.held = held;
+	unsigned int consumed = 0;
+	CHECK(inputFilter(&in, &consumed) == 0);
+	return consumed;
+}
+
+static void testPluginTester(void) {
+	makeCard();
+	setupHost();
+	CHECK(mosaic_plugin_get(&fake_host)->init(&fake_host) == 0);
+	CHECK(tester_screen.render != NULL);
+	unsigned int a = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_A), b = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B);
+	unsigned int start = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_START), power = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER);
+	unsigned int menu = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_MENU), fn3 = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_FN3);
+	// closed, it takes nothing
+	CHECK(filterFrame(a | menu, 0, a | menu) == 0);
+
+	all_log[0] = '\0';
+	tick(1000);
+	CHECK(fakeOpenScreen(INPUT_ID) == 0);
+	CHECK(logged("input tester: opened"));
+	CHECK(logged("input tester: left stick 12000, -3000; right stick none"));
+	CHECK(fn_mask == 4 && stick_mask == 1);
+	// every button but power is taken
+	CHECK(filterFrame(a | menu | fn3 | power, 0, a | menu | fn3 | power) == (a | menu | fn3));
+	CHECK(logged("input tester: pressed A"));
+	CHECK(logged("input tester: pressed MENU"));
+	CHECK(logged("input tester: pressed POWER"));
+	CHECK(logged("input tester: pressed HOME"));
+	CHECK(held_now == (a | menu | fn3 | power));
+	CHECK(filterFrame(0, a | menu | fn3 | power, 0) == (a | menu | fn3));
+	CHECK(presses.count == 4 && presses.buttons[0] == MOSAIC_BUTTON_FN3);
+	// a dialog over it gets its buttons
+	snprintf(current, sizeof(current), "dialog");
+	CHECK(filterFrame(a, 0, a) == 0);
+	snprintf(current, sizeof(current), INPUT_ID);
+	CHECK(filterFrame(0, a, 0) == a);
+
+	// the sticks move: a redraw
+	redraws = 0;
+	stick_x = -32768;
+	tick(1100);
+	CHECK(redraws == 1 && sticks[0][0] == -32768);
+	tick(1200);
+	CHECK(redraws == 1);
+	fills_into_hole = 0;
+	renderOn(&tester_screen, INPUT_ID);
+	CHECK(fills_into_hole == 0);
+
+	// B and START, held for a second, leave
+	MosaicInput none;
+	memset(&none, 0, sizeof(none));
+	tick(2000);
+	CHECK(filterFrame(b, 0, b) == b);
+	CHECK(filterFrame(start, 0, b | start) == start);
+	CHECK(tester_screen.animating(tester_screen.data) == 1);
+	CHECK(tester_screen.input(&none, tester_screen.data) == MOSAIC_SCREEN_STAY);
+	tick(2999);
+	CHECK(filterFrame(0, 0, b | start) == 0);
+	CHECK(tester_screen.input(&none, tester_screen.data) == MOSAIC_SCREEN_STAY);
+	tick(3000);
+	CHECK(filterFrame(0, 0, b | start) == 0);
+	CHECK(logged("input tester: B and START held, leaving"));
+	CHECK(tester_screen.input(&none, tester_screen.data) == MOSAIC_SCREEN_CLOSE);
+	tester_screen.exit(tester_screen.data);
+	snprintf(current, sizeof(current), SCREEN_ID);
+	CHECK(logged("input tester: closed"));
+	// their releases are still taken, and then nothing; a new press in the
+	// same frame as a release gets through
+	CHECK(filterFrame(0, b, start) == b);
+	CHECK(filterFrame(b, start, b) == start);
+	CHECK(filterFrame(a, 0, a) == 0);
+	CHECK(filterFrame(b, 0, b) == 0);
+
+	// without sticks or FN buttons
+	stick_left = 0;
+	fake_host.fn_name = NULL;
+	fake_host.size = offsetof(MosaicHost, stick);
+	CHECK(fakeOpenScreen(INPUT_ID) == 0);
+	CHECK(logged("input tester: left stick none; right stick none"));
+	CHECK(fn_mask == 0 && stick_mask == 0);
+	renderOn(&tester_screen, INPUT_ID);
+	tester_screen.exit(tester_screen.data);
+	stick_left = 1;
+	stick_x = 12000;
+	snprintf(current, sizeof(current), "gamelist");
+
+	// an older launcher without input filters: no tester
+	setupHost();
+	memset(&tester_screen, 0, sizeof(tester_screen));
+	fake_host.hold_switch = NULL;
+	all_log[0] = '\0';
+	mosaic_plugin_get(&fake_host)->init(&fake_host);
+	CHECK(tester_screen.render == NULL);
+	CHECK(logged("this launcher has no input filters, so no input tester"));
+}
+
 int main(void) {
 	testFormats();
 	testWords();
@@ -758,6 +1315,13 @@ int main(void) {
 	testDue();
 	testPlugin();
 	testSettings();
+	testStorageNames();
+	testStorageRows();
+	testStorageCache();
+	testStorageCount();
+	testInputModel();
+	testPluginStorage();
+	testPluginTester();
 	system("rm -rf '" CARD "'");
 	CHECK_DONE();
 }

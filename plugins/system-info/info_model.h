@@ -25,6 +25,10 @@ typedef struct SiWords {
 } SiWords;
 void Si_setWords(const SiWords* words);
 
+// Fixed text and a count's form in those words, for the other models.
+const char* Si_tr(const char* text);
+const char* Si_trPlural(const char* singular, const char* plural, unsigned long n);
+
 // The rows, in the order they're drawn from the top.
 enum SiRow {
 	SI_BATTERY,
@@ -163,10 +167,10 @@ typedef struct SiLayout {
 int Si_layout(const MosaicRect* area, const MosaicRect* hole, int scale, int title_w, int rows, int label_w,
 	int row_h, int caption_h, SiLayout* out);
 
-// The hints: B BACK alone when the graph fits under the rows, or with
-// the graph on its own page B BACK on the left and A GRAPH, or A INFO on
-// the graph's page, on the right.
-void Si_hints(int own_page, int on_graph, MosaicHint left[1], int* left_count, MosaicHint right[1], int* right_count);
+// The hints: B BACK on the left, with A GRAPH when the graph has a page
+// of its own, and X INPUT and Y CARD on the right, or on the graph's
+// page B BACK and A INFO.
+void Si_hints(int own_page, int on_graph, MosaicHint left[2], int* left_count, MosaicHint right[2], int* right_count);
 
 // The status pill and header widgets as one rect to stay clear of.
 MosaicRect Si_hole(const MosaicRect* status, const MosaicRect* header);

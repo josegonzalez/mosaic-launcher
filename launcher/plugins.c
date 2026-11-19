@@ -1086,6 +1086,36 @@ static const char* hostHomeScreen(void) {
 }
 
 ///////////////////////////////////////
+// sticks
+
+// A stick's raw position from stock's pad. The tg5040's Brick and Brick
+// Pro share the Smart Pro's axes but have no sticks; they're the tg5040s
+// with FN buttons. Desktop has none; its tests can stand them in with
+// MOSAIC_LAUNCHER_STICK_FAKE, "<lx>,<ly>" for a left stick or
+// "<lx>,<ly>,<rx>,<ry>" for both. Device builds never read it.
+static int hostStick(int which, int* x, int* y) {
+	if (which != MOSAIC_STICK_LEFT && which != MOSAIC_STICK_RIGHT) return -1;
+	int v[4] = { 0, 0, 0, 0 };
+	if (IS_DESKTOP) {
+		const char* fake = getenv("MOSAIC_LAUNCHER_STICK_FAKE");
+		int n = fake ? sscanf(fake, "%d,%d,%d,%d", &v[0], &v[1], &v[2], &v[3]) : 0;
+		if (n < (which == MOSAIC_STICK_LEFT ? 2 : 4)) return -1;
+	}
+	else {
+		if ((which == MOSAIC_STICK_LEFT ? AXIS_LX : AXIS_RX) == AXIS_NA) return -1;
+		if (strcmp(PLATFORM, "tg5040") == 0 && BTN_FN1 != BTN_NONE) return -1;
+		v[0] = pad.laxis.x;
+		v[1] = pad.laxis.y;
+		v[2] = pad.raxis.x;
+		v[3] = pad.raxis.y;
+	}
+	int at = which == MOSAIC_STICK_LEFT ? 0 : 2;
+	if (x) *x = v[at];
+	if (y) *y = v[at + 1];
+	return 0;
+}
+
+///////////////////////////////////////
 // FN buttons
 
 static FnBinds fn_binds; // plugins' bindings of FN1 to FN3, never saved
@@ -2317,6 +2347,7 @@ static const MosaicHost host = {
 	.tint_shown = Tint_shown,
 	.entry_free = hostEntryFree,
 	.action_flags = hostActionFlags,
+	.stick = hostStick,
 };
 
 ///////////////////////////////////////

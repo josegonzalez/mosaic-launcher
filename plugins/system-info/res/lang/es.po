@@ -78,8 +78,8 @@ msgstr "R2"
 msgid "SELECT"
 msgstr "SELECT"
 
-msgid "Shows the device's battery, Wi-Fi, storage, memory and uptime on a screen of its own. It never changes a setting."
-msgstr "Muestra la batería, el Wi-Fi, el almacenamiento, la memoria y el tiempo encendido del dispositivo en una pantalla propia. Nunca cambia ningún ajuste."
+msgid "Shows the device's battery, Wi-Fi, storage, memory and uptime on a screen of its own, how much room each system takes on the card, and a button and stick tester. It never changes a setting."
+msgstr "Muestra la batería, el Wi-Fi, el almacenamiento, la memoria y el tiempo encendido del dispositivo en una pantalla propia, cuánto espacio ocupa cada sistema en la tarjeta, y un probador de botones y sticks. Nunca cambia ningún ajuste."
 
 msgid "Storage"
 msgstr "Almacenamiento"
@@ -125,3 +125,58 @@ msgstr "desactivado"
 
 msgid "unavailable"
 msgstr "no disponible"
+
+#, c-format
+msgid "%i of %i system"
+msgid_plural "%i of %i systems"
+msgstr[0] "%i de %i sistema"
+msgstr[1] "%i de %i sistemas"
+
+#, c-format
+msgid "%s file"
+msgid_plural "%s files"
+msgstr[0] "%s archivo"
+msgstr[1] "%s archivos"
+
+msgid "Art"
+msgstr "Arte"
+
+msgid "BIOS"
+msgstr "BIOS"
+
+msgid "Counting"
+msgstr "Contando"
+
+#, c-format
+msgid "Counting %s, %s, %s"
+msgstr "Contando %s, %s, %s"
+
+msgid "Everything"
+msgstr "Todo"
+
+msgid "Games"
+msgstr "Juegos"
+
+msgid "Hold B and START together for a second to leave"
+msgstr "Mantén B y START juntos un segundo para salir"
+
+msgid "Input tester"
+msgstr "Probador de controles"
+
+msgid "Last pressed:"
+msgstr "Últimos pulsados:"
+
+msgid "Saves"
+msgstr "Partidas"
+
+msgid "Screenshots"
+msgstr "Capturas"
+
+msgid "System"
+msgstr "Sistema"
+
+msgid "nothing yet"
+msgstr "nada todavía"
+
+msgid "Total"
+msgstr "Total"

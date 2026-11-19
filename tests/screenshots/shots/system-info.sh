@@ -22,3 +22,34 @@ begin
 on system-info
 press "menu wait left"
 shot tile
+
+# the Storage page, with the sample games at sizes like real ones' (sparse
+# files, as their roms are empty) and some saves, states and a BIOS
+begin
+on system-info
+si_size() { mkdir -p "$(dirname "$1")" && dd if=/dev/zero of="$1" bs=1 count=0 seek="$2" 2>/dev/null; }
+si_size "$CARD/Roms/Game Boy (GB)/Libbet and the Magic Floor.gb" 262144
+si_size "$CARD/Roms/Game Boy (GB)/Tobu Tobu Girl.gb" 524288
+si_size "$CARD/Roms/Game Boy Color (GBC)/Tobu Tobu Girl Deluxe.gbc" 1048576
+si_size "$CARD/Roms/Game Boy Color (GBC)/µCity.gbc" 1048576
+si_size "$CARD/Roms/Nintendo Entertainment System (FC)/Concentration Room.nes" 40976
+si_size "$CARD/Roms/Nintendo Entertainment System (FC)/Thwaite.nes" 40976
+si_size "$CARD/Saves/GB/Tobu Tobu Girl.sav" 8192
+si_size "$CARD/Saves/GBC/µCity.sav" 32768
+si_size "$CARD/.userdata/shared/GBC-gambatte/µCity.st0" 98304
+si_size "$CARD/.userdata/shared/GB-gambatte/Tobu Tobu Girl.st0" 98304
+si_size "$CARD/Bios/GBA/gba_bios.bin" 16384
+press "menu wait left a y"
+after 1500
+shot storage
+
+# the input tester, with A held and a stand-in left stick pushed up and to
+# the right, after RIGHT, B and Y
+begin
+on system-info
+MOSAIC_LAUNCHER_STICK_FAKE="21000,-14000"
+export MOSAIC_LAUNCHER_STICK_FAKE
+press "menu wait left a x right b y a/3000"
+after 900
+shot input
+unset MOSAIC_LAUNCHER_STICK_FAKE

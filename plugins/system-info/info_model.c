@@ -34,6 +34,14 @@ static const char* trPlural(const char* singular, const char* plural, unsigned l
 	return n == 1 ? singular : plural;
 }
 
+const char* Si_tr(const char* text) {
+	return tr(text);
+}
+
+const char* Si_trPlural(const char* singular, const char* plural, unsigned long n) {
+	return trPlural(singular, plural, n);
+}
+
 const char* Si_label(int row) {
 	static const char* labels[SI_ROWS] = {
 		TR_MARK("Battery"), TR_MARK("Wi-Fi"), TR_MARK("IP address"), TR_MARK("Storage"), TR_MARK("Memory"), TR_MARK("Uptime"),
@@ -399,15 +407,17 @@ int Si_layout(const MosaicRect* area, const MosaicRect* hole, int scale, int tit
 	return 0;
 }
 
-void Si_hints(int own_page, int on_graph, MosaicHint left[1], int* left_count, MosaicHint right[1], int* right_count) {
+void Si_hints(int own_page, int on_graph, MosaicHint left[2], int* left_count, MosaicHint right[2], int* right_count) {
 	*left_count = 0;
 	*right_count = 0;
-	if (!own_page) {
-		right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_B, "BACK" };
+	left[(*left_count)++] = (MosaicHint){ MOSAIC_BUTTON_B, "BACK" };
+	if (on_graph) {
+		right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_A, "INFO" };
 		return;
 	}
-	left[(*left_count)++] = (MosaicHint){ MOSAIC_BUTTON_B, "BACK" };
-	right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_A, on_graph ? "INFO" : "GRAPH" };
+	if (own_page) left[(*left_count)++] = (MosaicHint){ MOSAIC_BUTTON_A, "GRAPH" };
+	right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_X, "INPUT" };
+	right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_Y, "CARD" };
 }
 
 int Si_due(unsigned long* next, unsigned long now, unsigned long period) {

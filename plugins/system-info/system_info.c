@@ -25,8 +25,24 @@
 // sessions when the screen opens: the last games' levels back to back by
 // play time, the time between games left out. Without sessions, as with
 // battery-logger off, it says there's no history.
+//
+// Y opens the Storage page (system-info.storage): each system's size on
+// the card, split into games, saves and states, and art, largest first,
+// then BIOS and Screenshots. It's counted on a thread of the plugin's own
+// as the page opens, with a progress line, and kept until a game or pak
+// has run (launcher.return), when the next opening counts again, showing
+// the old sizes meanwhile. Up and down scroll it.
+//
+// X opens the input tester (system-info.input_test): the device's buttons,
+// lit while they're held, the sticks' dots and raw values where the
+// device has them (host->stick), and the last presses. While it's on top
+// its input_filter takes every button but the power button, MENU and the
+// FN buttons too, so nothing else runs from them; the power button still
+// sleeps and powers off as usual, and shows its press. Holding B and START
+// together for a second leaves it, and their releases are taken too.
 
 #include <arpa/inet.h>
+#include <pthread.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -40,12 +56,21 @@
 #endif
 #include "mosaic_plugin.h"
 #include "info_model.h"
+#include "input_model.h"
+#include "storage_model.h"
+
+// English kept in data and translated where it's drawn, for make pot
+#define TR_MARK(text) (text)
 
 #define ID "system-info"
 #define SCREEN_ID ID ".main"
 #define ACTION_ID ID ".open"
 #define GRAPH_COLUMN 2 // each bar's width, in stock's units
 #define GRAPH_COLUMNS_MAX 1024
+#define HINTS_H 40 // the hints' pill and the padding under it, in stock's units
+#define STORAGE_ID ID ".storage"
+#define INPUT_ID ID ".input"
+#define INPUT_ACTION_ID ID ".input_test"
 #define INFO_TITLE "System info"
 #define GRAPH_TITLE "Battery history"
 
@@ -223,8 +248,13 @@ static void refresh(void) {
 	host->request_redraw();
 }
 
+static void storageTick(void);
+static void inputTick(unsigned long now);
+
 static void tick(unsigned long now) {
 	if (showing && Si_due(&next_read, now, SI_REFRESH_MS)) refresh();
+	storageTick();
+	inputTick(now);
 }
 
 ///////////////////////////////////////
@@ -399,7 +429,7 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	}
 	drawGraph(screen, &layout);
 
-	MosaicHint left[1], right[1];
+	MosaicHint left[2], right[2];
 	int left_count = 0, right_count = 0;
 	Si_hints(own_page, on_graph, left, &left_count, right, &right_count);
 	if (left_count) host->draw_hints(screen, MOSAIC_HINTS_LEFT, left, left_count, NULL);
@@ -407,8 +437,17 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	return 0;
 }
 
+static void openScreen(const char* id) {
+	if (host->open_screen(id) != 0) {
+		char message[96];
+		snprintf(message, sizeof(message), "couldn't open %s", id);
+		say(message);
+	}
+}
+
 // B closes, or from the graph's own page goes back to the info; A moves
-// between the two pages when the graph has its own.
+// between the two pages when the graph has its own; X opens the input
+// tester and Y the Storage page.
 static int input(const MosaicInput* in, void* data) {
 	(void)data;
 	if (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B)) {
@@ -418,6 +457,10 @@ static int input(const MosaicInput* in, void* data) {
 	} else if (own_page && (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_A))) {
 		on_graph = !on_graph;
 		host->request_redraw();
+	} else if (!on_graph && (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_X))) {
+		openScreen(INPUT_ID);
+	} else if (!on_graph && (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_Y))) {
+		openScreen(STORAGE_ID);
 	}
 	return MOSAIC_SCREEN_STAY;
 }
@@ -448,12 +491,481 @@ static void leave(void* data) {
 }
 
 ///////////////////////////////////////
+// the Storage page
+
+static StCache cache;
+static StTotals totals;       // what shows, the main thread's
+static StTotals work;         // the running count's, its thread's until it's done
+static pthread_t worker;
+static int worker_running = 0; // the main thread's
+static volatile int cancel_count = 0;
+static pthread_mutex_t progress_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct {
+	char name[ST_NAME_MAX];
+	int done, total;
+	unsigned long long files;
+	int finished, ok;
+} progress; // under progress_lock
+static char progress_line[192];
+static char card_path[1024];
+static int storage_showing = 0;
+static int storage_first = 0; // the first row shown
+static int storage_rows_shown = 1;
+
+// On the counting thread: what it's on.
+static void onProgress(void* ctx, const char* name, int done, int total, unsigned long long files) {
+	(void)ctx;
+	pthread_mutex_lock(&progress_lock);
+	snprintf(progress.name, sizeof(progress.name), "%s", name ? name : "");
+	progress.done = done;
+	progress.total = total;
+	progress.files = files;
+	pthread_mutex_unlock(&progress_lock);
+}
+
+static void* countThread(void* arg) {
+	(void)arg;
+	StWalk w;
+	St_walkInit(&w);
+	w.cancel = &cancel_count;
+	w.progress = onProgress;
+	int rc = St_count(card_path, &work, &w);
+	St_walkFree(&w);
+	pthread_mutex_lock(&progress_lock);
+	progress.finished = 1;
+	progress.ok = rc == 0;
+	pthread_mutex_unlock(&progress_lock);
+	return NULL;
+}
+
+static void startCount(void) {
+	memset(&progress, 0, sizeof(progress));
+	progress_line[0] = '\0';
+	cancel_count = 0;
+	snprintf(card_path, sizeof(card_path), "%s", host->sdcard_path);
+	if (pthread_create(&worker, NULL, countThread, NULL) != 0) {
+		St_cacheDone(&cache, 0);
+		say("storage: couldn't start counting");
+		return;
+	}
+	worker_running = 1;
+	say("storage: counting");
+}
+
+static void logTotals(void) {
+	char line[320], a[32], b[32], c[32], d[32];
+	St_formatCount(totals.files, a, sizeof(a));
+	Si_formatSize(St_total(&totals), b, sizeof(b));
+	snprintf(line, sizeof(line), "storage: %i systems, %s files, %s", totals.count, a, b);
+	say(line);
+	for (int i = 0; i < totals.count; i++) {
+		const StRow* r = &totals.rows[i];
+		Si_formatSize(r->bytes[ST_GAMES], a, sizeof(a));
+		Si_formatSize(r->bytes[ST_SAVES], b, sizeof(b));
+		Si_formatSize(r->bytes[ST_ART], c, sizeof(c));
+		Si_formatSize(St_rowTotal(r), d, sizeof(d));
+		snprintf(line, sizeof(line), "storage: %s (%s): games %s, saves %s, art %s, total %s", r->name[0] ? r->name : r->tag,
+			r->tag, a, b, c, d);
+		say(line);
+	}
+	Si_formatSize(totals.bios, a, sizeof(a));
+	Si_formatSize(totals.screenshots, b, sizeof(b));
+	snprintf(line, sizeof(line), "storage: BIOS %s, Screenshots %s", a, b);
+	say(line);
+}
+
+// From tick: the count's progress, and its sizes once it's done.
+static void storageTick(void) {
+	if (!worker_running) return;
+	pthread_mutex_lock(&progress_lock);
+	char name[ST_NAME_MAX];
+	snprintf(name, sizeof(name), "%s", progress.name);
+	int done = progress.done, total = progress.total, finished = progress.finished, ok = progress.ok;
+	unsigned long long files = progress.files;
+	pthread_mutex_unlock(&progress_lock);
+	if (!finished) {
+		char line[sizeof(progress_line)];
+		St_formatProgress(name, done, total, files, line, sizeof(line));
+		if (strcmp(line, progress_line) != 0) {
+			snprintf(progress_line, sizeof(progress_line), "%s", line);
+			if (storage_showing) host->request_redraw();
+		}
+		return;
+	}
+	pthread_join(worker, NULL);
+	worker_running = 0;
+	St_cacheDone(&cache, ok);
+	if (ok) {
+		totals = work;
+		logTotals();
+	}
+	else say("storage: counting stopped");
+	progress_line[0] = '\0';
+	if (storage_showing) {
+		host->request_redraw();
+		// the card changed while it counted
+		if (St_cacheStart(&cache)) startCount();
+	}
+}
+
+static void stopCount(void) {
+	if (!worker_running) return;
+	cancel_count = 1;
+	pthread_join(worker, NULL);
+	worker_running = 0;
+	St_cacheDone(&cache, 0);
+}
+
+static void onCardChanged(const char* name, const char* payload, void* data) {
+	(void)payload;
+	(void)data;
+	St_cacheChanged(&cache);
+	char message[96];
+	snprintf(message, sizeof(message), "storage: %s, counting again next time", name);
+	say(message);
+}
+
+// The rows the page lists: the systems, BIOS, Screenshots and the total.
+static int storageRows(void) {
+	return cache.have ? totals.count + 3 : 0;
+}
+
+static void storageRow(int i, const char** name, unsigned long long* parts, int* has_parts, unsigned long long* total) {
+	*has_parts = 0;
+	memset(parts, 0, sizeof(unsigned long long) * ST_PARTS);
+	if (i < totals.count) {
+		const StRow* r = &totals.rows[i];
+		*name = r->name[0] ? r->name : r->tag;
+		memcpy(parts, r->bytes, sizeof(r->bytes));
+		*has_parts = 1;
+		*total = St_rowTotal(r);
+	} else if (i == totals.count) {
+		*name = tr("BIOS");
+		*total = totals.bios;
+	} else if (i == totals.count + 1) {
+		*name = tr("Screenshots");
+		*total = totals.screenshots;
+	} else {
+		*name = tr("Everything");
+		*total = St_total(&totals);
+	}
+}
+
+static int storageRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
+	(void)data;
+	MosaicRect hole = Si_hole(&view->status, &view->header);
+	fillAround(screen, &view->area, &hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
+	int font = MOSAIC_FONT_TINY;
+	int scale = host->screen_scale();
+	if (scale < 1) scale = 1;
+	int line_h = host->text_height(font) + 2 * scale;
+	SiLayout layout;
+	if (Si_layout(&view->area, &hole, scale, host->text_width(MOSAIC_FONT_LARGE, tr("Storage")), 0, 0, 0, line_h,
+			&layout) != 0) return 0;
+	drawTitle(screen, &layout.title, tr("Storage"));
+
+	MosaicColor label = themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF);
+	MosaicColor value = themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF);
+	// the columns: games, saves (and states), art and the total
+	static const char* heads[] = { TR_MARK("Games"), TR_MARK("Saves"), TR_MARK("Art"), TR_MARK("Total") };
+	// each column as wide as its heading or a size, and the names the rest
+	int number_w = host->text_width(font, "999.9 MB");
+	int col_x[4], col_w[4], cols_w = 0;
+	for (int h = 0; h < 4; h++) {
+		int w = host->text_width(font, tr(heads[h]));
+		col_w[h] = (w > number_w ? w : number_w) + 6 * scale;
+		cols_w += col_w[h];
+	}
+	MosaicRect list = layout.graph;
+	int name_w = list.w - cols_w;
+	if (name_w < list.w / 4) name_w = list.w / 4;
+	for (int h = 0, x = list.x + name_w; h < 4; h++) {
+		col_x[h] = x;
+		x += col_w[h];
+		if (col_x[h] + col_w[h] > list.x + list.w) col_w[h] = list.x + list.w - col_x[h];
+	}
+	MosaicRect head = layout.caption;
+	text(screen, font, tr("System"), head.x, head.y, name_w - 4 * scale, label);
+	for (int h = 0; h < 4; h++) text(screen, font, tr(heads[h]), col_x[h], head.y, col_w[h], label);
+
+	int rows = storageRows();
+	int room = list.h / line_h;
+	if (worker_running && room > 0) room--; // the progress line
+	storage_rows_shown = room > 0 ? room : 1;
+	if (storage_first > rows - storage_rows_shown) storage_first = rows - storage_rows_shown;
+	if (storage_first < 0) storage_first = 0;
+	int y = list.y;
+	for (int i = storage_first; i < rows && i < storage_first + room; i++, y += line_h) {
+		const char* name;
+		unsigned long long parts[ST_PARTS], total;
+		int has_parts;
+		storageRow(i, &name, parts, &has_parts, &total);
+		text(screen, font, name, list.x, y, name_w - 4 * scale, i == rows - 1 ? label : value);
+		char size[32];
+		for (int p = 0; p < ST_PARTS && has_parts; p++) {
+			Si_formatSize(parts[p], size, sizeof(size));
+			text(screen, font, size, col_x[p], y, col_w[p], value);
+		}
+		Si_formatSize(total, size, sizeof(size));
+		text(screen, font, size, col_x[3], y, col_w[3], i == rows - 1 ? label : value);
+	}
+	if (worker_running) {
+		const char* line = progress_line[0] ? progress_line : tr("Counting");
+		text(screen, font, line, list.x, list.y + room * line_h, list.w, label);
+	}
+
+	MosaicHint left[1] = { { MOSAIC_BUTTON_B, "BACK" } };
+	host->draw_hints(screen, MOSAIC_HINTS_LEFT, left, 1, NULL);
+	return 0;
+}
+
+// B goes back; up and down scroll.
+static int storageInput(const MosaicInput* in, void* data) {
+	(void)data;
+	if (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B)) return MOSAIC_SCREEN_CLOSE;
+	int move = 0;
+	if (in->repeated & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_UP)) move = -1;
+	if (in->repeated & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN)) move = 1;
+	int last = storageRows() - storage_rows_shown;
+	int to = storage_first + move;
+	if (to > last) to = last;
+	if (to < 0) to = 0;
+	if (to != storage_first) {
+		storage_first = to;
+		host->request_redraw();
+	}
+	return MOSAIC_SCREEN_STAY;
+}
+
+static int storageEnter(void* data) {
+	(void)data;
+	storage_showing = 1;
+	storage_first = 0;
+	if (St_cacheStart(&cache)) startCount();
+	else say(worker_running ? "storage: still counting" : "storage: opened with the sizes counted before");
+	return 0;
+}
+
+static void storageLeave(void* data) {
+	(void)data;
+	storage_showing = 0;
+	say("storage: closed");
+}
+
+///////////////////////////////////////
+// the input tester
+
+static int testing = 0;
+static ItHistory presses;
+static ItHold hold;
+static unsigned int held_now = 0;
+static unsigned int draining = 0; // the buttons held as it closed, whose releases it still takes
+static int leaving = 0;
+static unsigned long tick_now = 0;
+static unsigned int fn_mask = 0, stick_mask = 0;
+static int sticks[2][2];
+
+static const char* buttonName(int button) {
+	if (button >= MOSAIC_BUTTON_FN1 && MOSAIC_HOST_HAS(host, fn_name)) return host->fn_name(button);
+	return It_name(button);
+}
+
+static int onTop(void) {
+	return testing && strcmp(host->current_screen(), INPUT_ID) == 0;
+}
+
+// Redraws when a stick moved.
+static void readSticks(void) {
+	if (!MOSAIC_HOST_HAS(host, stick)) return;
+	for (int s = 0; s < 2; s++) {
+		if (!((stick_mask >> s) & 1)) continue;
+		int x = 0, y = 0;
+		if (host->stick(s, &x, &y) != 0 || (x == sticks[s][0] && y == sticks[s][1])) continue;
+		sticks[s][0] = x;
+		sticks[s][1] = y;
+		host->request_redraw();
+	}
+}
+
+static void logSticks(void) {
+	char line[160], l[48] = "none", r[48] = "none";
+	if (stick_mask & 1) It_formatStick(sticks[0][0], sticks[0][1], l, sizeof(l));
+	if (stick_mask & 2) It_formatStick(sticks[1][0], sticks[1][1], r, sizeof(r));
+	snprintf(line, sizeof(line), "input tester: left stick %s; right stick %s", l, r);
+	say(line);
+}
+
+// Every button but power, while the tester is on top, and after it closes
+// the releases of what was held.
+static int inputFilter(const MosaicInput* in, unsigned int* consumed) {
+	unsigned int frame = in->pressed | in->repeated | in->released;
+	// a press of one is a new one, which gets through
+	if (draining) {
+		*consumed |= (in->repeated | in->released) & draining & ~in->pressed;
+		draining &= in->held;
+	}
+	if (!onTop()) return 0;
+	unsigned int power = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_POWER);
+	*consumed |= frame & ~power;
+	if (It_historyPress(&presses, in->pressed)) {
+		for (int b = 0; b < IT_BUTTONS; b++) {
+			if (!(in->pressed & MOSAIC_BUTTON_BIT(b))) continue;
+			char message[64];
+			snprintf(message, sizeof(message), "input tester: pressed %s", buttonName(b));
+			say(message);
+		}
+		host->request_redraw();
+	}
+	if (in->held != held_now) {
+		held_now = in->held;
+		host->request_redraw();
+	}
+	if (!leaving && It_holdStep(&hold, in->held, tick_now)) {
+		leaving = 1;
+		draining = in->held & ~power;
+		say("input tester: B and START held, leaving");
+	}
+	return 0;
+}
+
+static void inputTick(unsigned long now) {
+	tick_now = now;
+	if (onTop()) readSticks();
+}
+
+static int inputAnimating(void* data) {
+	(void)data;
+	return hold.holding;
+}
+
+static int testerInput(const MosaicInput* in, void* data) {
+	(void)in;
+	(void)data;
+	return leaving ? MOSAIC_SCREEN_CLOSE : MOSAIC_SCREEN_STAY;
+}
+
+static void drawButton(MosaicSurface* screen, const MosaicRect* r, const char* name, int lit, int round) {
+	if (r->w <= 0) return;
+	MosaicColor fill = lit ? themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257) : themeColor(MOSAIC_COLOR_ACCENT2, 0x333333);
+	host->fill_round_rect(screen, r, round ? r->h / 2 : r->h / 4, fill);
+	int tw = host->text_width(MOSAIC_FONT_TINY, name), th = host->text_height(MOSAIC_FONT_TINY);
+	if (tw > r->w) tw = r->w;
+	text(screen, MOSAIC_FONT_TINY, name, r->x + (r->w - tw) / 2, r->y + (r->h - th) / 2, r->w,
+		themeColor(lit ? MOSAIC_COLOR_HINT : MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF));
+}
+
+static int testerRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
+	(void)data;
+	MosaicRect hole = Si_hole(&view->status, &view->header);
+	fillAround(screen, &view->area, &hole, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000));
+	int scale = host->screen_scale();
+	if (scale < 1) scale = 1;
+	int line_h = host->text_height(MOSAIC_FONT_TINY) + 2 * scale;
+	SiLayout layout;
+	if (Si_layout(&view->area, &hole, scale, host->text_width(MOSAIC_FONT_LARGE, tr("Input tester")), 0, 0, 0, line_h,
+			&layout) != 0) return 0;
+	drawTitle(screen, &layout.title, tr("Input tester"));
+	MosaicColor label = themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF);
+
+	// how to leave, filling up while B and START are held
+	MosaicRect cap = layout.caption;
+	int percent = It_holdPercent(&hold, tick_now);
+	if (percent > 0) {
+		MosaicRect bar = { cap.x, cap.y, cap.w * percent / 100, cap.h };
+		host->fill_rect(screen, &bar, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257));
+	}
+	text(screen, MOSAIC_FONT_TINY, tr("Hold B and START together for a second to leave"), cap.x, cap.y, cap.w, label);
+
+	// the drawing, with the last presses under it, down into the hints'
+	// room, as the tester has none
+	MosaicRect area = layout.graph;
+	area.h += HINTS_H * scale - line_h;
+	ItLayout it;
+	if (It_layout(&area, fn_mask, stick_mask, &it) == 0) {
+		for (int b = 0; b < IT_BUTTONS; b++) {
+			int round = b == MOSAIC_BUTTON_A || b == MOSAIC_BUTTON_B || b == MOSAIC_BUTTON_X || b == MOSAIC_BUTTON_Y;
+			const char* name = b >= MOSAIC_BUTTON_FN1 ? buttonName(b) : It_label(b);
+			drawButton(screen, &it.buttons[b], name, (held_now >> b) & 1, round);
+		}
+		for (int s = 0; s < 2; s++) {
+			const MosaicRect* box = &it.sticks[s];
+			if (box->w <= 0) continue;
+			host->fill_round_rect(screen, box, box->w / 2, themeColor(MOSAIC_COLOR_ACCENT2, 0x333333));
+			int dot = it.unit * 3 / 2;
+			int radius = (box->w - dot) / 2;
+			MosaicRect d = { box->x + radius + It_stickOffset(sticks[s][0], radius),
+				box->y + radius + It_stickOffset(sticks[s][1], radius), dot, dot };
+			host->fill_round_rect(screen, &d, dot / 2, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257));
+			char raw[48];
+			It_formatStick(sticks[s][0], sticks[s][1], raw, sizeof(raw));
+			const MosaicRect* t = &it.stick_text[s];
+			int tw = host->text_width(MOSAIC_FONT_TINY, raw);
+			if (tw > t->w) tw = t->w;
+			text(screen, MOSAIC_FONT_TINY, raw, t->x + (t->w - tw) / 2, t->y, t->w, label);
+		}
+	}
+	char last[256];
+	size_t used = (size_t)snprintf(last, sizeof(last), "%s", tr("Last pressed:"));
+	if (!presses.count) snprintf(last + used, sizeof(last) - used, " %s", tr("nothing yet"));
+	for (int i = 0; i < presses.count && used < sizeof(last); i++) {
+		int n = snprintf(last + used, sizeof(last) - used, "%s %s", i ? "," : "", buttonName(presses.buttons[i]));
+		if (n < 0) break;
+		used += (size_t)n;
+	}
+	text(screen, MOSAIC_FONT_TINY, last, area.x, area.y + area.h + scale, area.w, label);
+	return 0;
+}
+
+static int testerEnter(void* data) {
+	(void)data;
+	testing = 1;
+	leaving = 0;
+	held_now = 0;
+	It_historyInit(&presses);
+	It_holdInit(&hold);
+	fn_mask = 0;
+	for (int b = MOSAIC_BUTTON_FN1; b <= MOSAIC_BUTTON_FN3 && MOSAIC_HOST_HAS(host, fn_name); b++) {
+		if (host->fn_name(b)[0]) fn_mask |= 1u << (b - MOSAIC_BUTTON_FN1);
+	}
+	stick_mask = 0;
+	memset(sticks, 0, sizeof(sticks));
+	for (int s = 0; s < 2 && MOSAIC_HOST_HAS(host, stick); s++) {
+		if (host->stick(s, &sticks[s][0], &sticks[s][1]) == 0) stick_mask |= 1u << s;
+	}
+	say("input tester: opened");
+	logSticks();
+	return 0;
+}
+
+static void testerLeave(void* data) {
+	(void)data;
+	testing = 0;
+	say("input tester: closed");
+}
+
+///////////////////////////////////////
 // the action
 
 static void openInfo(const char* path, void* data) {
 	(void)path;
 	(void)data;
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the system info screen");
+}
+
+static void openStorage(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	openScreen(STORAGE_ID);
+}
+
+static void openTester(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	openScreen(INPUT_ID);
+}
+
+static void quit(void) {
+	stopCount();
 }
 
 static int init(const MosaicHost* h) {
@@ -464,6 +976,36 @@ static int init(const MosaicHost* h) {
 	if (!MOSAIC_HOST_HAS(host, draw_hints) || !MOSAIC_HOST_HAS(host, open_screen)) {
 		say("this launcher has no plugin screens or button hints");
 		return 1;
+	}
+	static const MosaicScreenHooks storage_hooks = {
+		.size = sizeof(MosaicScreenHooks),
+		.enter = storageEnter,
+		.exit = storageLeave,
+		.input = storageInput,
+		.render = storageRender,
+	};
+	static const MosaicScreenHooks tester_hooks = {
+		.size = sizeof(MosaicScreenHooks),
+		.enter = testerEnter,
+		.exit = testerLeave,
+		.input = testerInput,
+		.render = testerRender,
+		.animating = inputAnimating,
+	};
+	St_cacheInit(&cache);
+	St_init(&totals);
+	testing = 0;
+	draining = 0;
+	if (host->register_screen(STORAGE_ID, &storage_hooks) != 0) say("can't register the storage screen");
+	else if (host->register_action(STORAGE_ID, "Storage", 0, NULL, openStorage, NULL) != 0) say("couldn't register " STORAGE_ID);
+	// the tester needs the filter to keep its buttons from everything else
+	if (!MOSAIC_HOST_HAS(host, hold_switch)) say("this launcher has no input filters, so no input tester");
+	else if (host->register_screen(INPUT_ID, &tester_hooks) != 0) say("can't register the input tester");
+	else if (host->register_action(INPUT_ACTION_ID, "Input tester", 0, NULL, openTester, NULL) != 0) {
+		say("couldn't register " INPUT_ACTION_ID);
+	}
+	if (MOSAIC_HOST_HAS(host, set_names) && MOSAIC_HOST_HAS(host, subscribe)) {
+		host->subscribe("launcher.return", onCardChanged, NULL);
 	}
 	static const MosaicScreenHooks hooks = {
 		.size = sizeof(MosaicScreenHooks),
@@ -509,6 +1051,8 @@ static const MosaicPlugin plugin = {
 	.id = ID,
 	.init = init,
 	.tick = tick,
+	.quit = quit,
+	.input_filter = inputFilter,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

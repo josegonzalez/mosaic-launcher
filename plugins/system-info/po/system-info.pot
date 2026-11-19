@@ -15,6 +15,13 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
+#: storage_model.c
+#, c-format
+msgid "%i of %i system"
+msgid_plural "%i of %i systems"
+msgstr[0] ""
+msgstr[1] ""
+
 #: info_model.c
 #, c-format
 msgid "%i of 3 bars"
@@ -40,9 +47,24 @@ msgstr ""
 msgid "%lldm"
 msgstr ""
 
+#: storage_model.c
+#, c-format
+msgid "%s file"
+msgid_plural "%s files"
+msgstr[0] ""
+msgstr[1] ""
+
 #: info_model.c
 #, c-format
 msgid "%s free of %s"
+msgstr ""
+
+#: system_info.c
+msgid "Art"
+msgstr ""
+
+#: storage_model.c system_info.c
+msgid "BIOS"
 msgstr ""
 
 #: info_model.c
@@ -56,12 +78,37 @@ msgid_plural "Battery over the last %i games, %s of play"
 msgstr[0] ""
 msgstr[1] ""
 
+#: system_info.c
+msgid "Counting"
+msgstr ""
+
+#: storage_model.c
+#, c-format
+msgid "Counting %s, %s, %s"
+msgstr ""
+
+#: system_info.c
+msgid "Everything"
+msgstr ""
+
 #: info_model.c
 msgid "GB"
 msgstr ""
 
+#: system_info.c
+msgid "Games"
+msgstr ""
+
+#: system_info.c
+msgid "Hold B and START together for a second to leave"
+msgstr ""
+
 #: info_model.c
 msgid "IP address"
+msgstr ""
+
+#: system_info.c
+msgid "Input tester"
 msgstr ""
 
 #: info_model.c
@@ -70,6 +117,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "L2"
+msgstr ""
+
+#: system_info.c
+msgid "Last pressed:"
 msgstr ""
 
 #: info_model.c
@@ -104,12 +155,24 @@ msgstr ""
 msgid "SELECT"
 msgstr ""
 
-#: plugin.txt
-msgid "Shows the device's battery, Wi-Fi, storage, memory and uptime on a screen of its own. It never changes a setting."
+#: system_info.c
+msgid "Saves"
 msgstr ""
 
-#: info_model.c
+#: storage_model.c system_info.c
+msgid "Screenshots"
+msgstr ""
+
+#: plugin.txt
+msgid "Shows the device's battery, Wi-Fi, storage, memory and uptime on a screen of its own, how much room each system takes on the card, and a button and stick tester. It never changes a setting."
+msgstr ""
+
+#: info_model.c system_info.c
 msgid "Storage"
+msgstr ""
+
+#: system_info.c
+msgid "System"
 msgstr ""
 
 #: plugin.txt system_info.c
@@ -122,6 +185,10 @@ msgstr ""
 
 #: info_model.c
 msgid "TB"
+msgstr ""
+
+#: system_info.c
+msgid "Total"
 msgstr ""
 
 #: info_model.c
@@ -158,6 +225,10 @@ msgstr ""
 
 #: info_model.c
 msgid "not connected"
+msgstr ""
+
+#: system_info.c
+msgid "nothing yet"
 msgstr ""
 
 #: info_model.c
