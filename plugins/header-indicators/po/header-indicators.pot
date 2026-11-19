@@ -15,7 +15,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: plugin.txt
-msgid "Adds a small pill beside the status pill with free storage, an SSH dot, a profile badge and the FPS."
+msgid "Adds a small pill beside the status pill with free storage, an SSH dot, a profile badge, the FPS and a headset while the sound goes to Bluetooth."
+msgstr ""
+
+#: plugin.txt
+msgid "Bluetooth audio"
 msgstr ""
 
 #: plugin.txt

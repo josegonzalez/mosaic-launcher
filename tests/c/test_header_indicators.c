@@ -99,7 +99,7 @@ static void testListening(void) {
 }
 
 static void testFit(void) {
-	int widths[HI_COUNT] = { 40, 30, 50, 6 };
+	int widths[HI_COUNT] = { 40, 30, 50, 6, 0 };
 	int shown[HI_COUNT];
 	// all of them: 126 wide, 3 gaps of 4, 10 at each end
 	CHECK(Hi_fit(widths, 10, 4, 500, shown) == 126 + 12 + 20);
@@ -115,11 +115,30 @@ static void testFit(void) {
 	CHECK(Hi_fit(widths, 10, 4, 25, shown) == 0);
 	CHECK(!shown[HI_SSH]);
 	// ones that are off take no room and no gap
-	int some[HI_COUNT] = { 0, 30, 0, 0 };
+	int some[HI_COUNT] = { 0, 30, 0, 0, 0 };
 	CHECK(Hi_fit(some, 10, 4, 500, shown) == 50);
 	CHECK(!shown[HI_PROFILE] && shown[HI_STORAGE] && !shown[HI_FPS] && !shown[HI_SSH]);
-	int none[HI_COUNT] = { 0, 0, 0, 0 };
+	int none[HI_COUNT] = { 0, 0, 0, 0, 0 };
 	CHECK(Hi_fit(none, 10, 4, 500, shown) == 0);
+	// the headset sits last, and goes after the SSH dot
+	int audio[HI_COUNT] = { 0, 30, 0, 6, 8 };
+	CHECK(Hi_fit(audio, 10, 4, 500, shown) == 44 + 8 + 20);
+	CHECK(shown[HI_STORAGE] && shown[HI_SSH] && shown[HI_AUDIO]);
+	CHECK(Hi_fit(audio, 10, 4, 71, shown) == 14 + 4 + 20);
+	CHECK(!shown[HI_STORAGE] && shown[HI_SSH] && shown[HI_AUDIO]);
+	CHECK(Hi_fit(audio, 10, 4, 37, shown) == 28);
+	CHECK(!shown[HI_SSH] && shown[HI_AUDIO]);
+	CHECK(Hi_fit(audio, 10, 4, 27, shown) == 0);
+	CHECK(!shown[HI_AUDIO]);
+	CHECK(HI_SSH < HI_AUDIO && HI_AUDIO == HI_COUNT - 1);
+}
+
+static void testAudioShown(void) {
+	CHECK(Hi_audioShown(1, MOSAIC_AUDIO_SINK_BLUETOOTH));
+	CHECK(!Hi_audioShown(0, MOSAIC_AUDIO_SINK_BLUETOOTH));
+	CHECK(!Hi_audioShown(1, MOSAIC_AUDIO_SINK_NONE));
+	CHECK(!Hi_audioShown(1, MOSAIC_AUDIO_SINK_USB));
+	CHECK(!Hi_audioShown(1, -1));
 }
 
 static void testSettings(void) {
@@ -149,6 +168,10 @@ static char drawn[4][64];
 static MosaicRect drawn_at[4];
 static unsigned int drawn_rgb[4];
 static MosaicRect dot;
+static int rings = 0;
+static MosaicRect ring;
+static int sink = MOSAIC_AUDIO_SINK_NONE;
+static int sink_asks = 0;
 
 static void fakeLog(const char* id, const char* m) {
 	snprintf(last_log, sizeof(last_log), "%s", m);
@@ -193,6 +216,16 @@ static int fakeDrawText(MosaicSurface* s, int font, const char* text, int x, int
 	texts++;
 	return 5 * (int)strlen(text);
 }
+static int fakeRing(MosaicSurface* s, const MosaicRect* r, int radius, int thickness, MosaicColor c) {
+	(void)s; (void)radius; (void)thickness; (void)c;
+	rings++;
+	ring = *r;
+	return 0;
+}
+static int fakeAudioSink(void) {
+	sink_asks++;
+	return sink;
+}
 static int fakeDecorateCell(MosaicSurface* s, int i, const MosaicRect* r, const MosaicRect* n) { (void)s; (void)i; (void)r; (void)n; return -1; }
 
 static MosaicHost fake = {
@@ -211,6 +244,8 @@ static MosaicHost fake = {
 	.text_truncate = fakeTruncate,
 	.draw_text = fakeDrawText,
 	.decorate_cell = fakeDecorateCell,
+	.draw_ring = fakeRing,
+	.audio_sink = fakeAudioSink,
 };
 
 static void setting(const char* key, const char* value) {
@@ -230,7 +265,7 @@ static void start(void) {
 }
 
 static void draw(const MosaicRect* rect) {
-	fills = round_fills = texts = 0;
+	fills = round_fills = texts = rings = 0;
 	memset(drawn, 0, sizeof(drawn));
 	memset(&dot, 0, sizeof(dot));
 	CHECK(headerWidget(NULL, rect) == 0);
@@ -328,6 +363,70 @@ static void testSsh(void) {
 	CHECK(dot.x == 34 && dot.w == 4 && dot.y == 28);
 }
 
+static void testAudio(void) {
+	memset(settings, 0, sizeof(settings));
+	setting("storage", "off");
+	sink = MOSAIC_AUDIO_SINK_NONE;
+	start();
+	CHECK(logs == 0);
+	tick(0);
+	CHECK(redraws == 0);
+	CHECK(headerWidth(300, 60) == 0);
+	// a Bluetooth sink shows the headset: two thirds of a 12 line is 8
+	sink = MOSAIC_AUDIO_SINK_BLUETOOTH;
+	tick(20);
+	CHECK(redraws == 1);
+	tick(40);
+	CHECK(redraws == 1);
+	int w = headerWidth(300, 60);
+	CHECK(w == 8 + 48);
+	MosaicRect rect = { 10, 0, w, 60 };
+	sink_asks = 0;
+	draw(&rect);
+	// the draw only uses what tick kept
+	CHECK(sink_asks == 0);
+	CHECK(rings == 1);
+	CHECK(ring.x == 34 && ring.y == 26 && ring.w == 8 && ring.h == 8);
+	// the pill, two cups, and the ring's bottom half covered
+	CHECK(round_fills == 3 && fills == 1);
+	CHECK(strstr(last_log, ": audio") != NULL);
+	// beside free storage and the SSH dot, last
+	setting("storage", "on");
+	setting("ssh", "on");
+	start();
+	tick(0);
+	ssh_on = 1;
+	w = headerWidth(300, 60);
+	CHECK(w == 5 * (int)strlen(storage) + 12 + 4 + 12 + 8 + 48);
+	rect = (MosaicRect){ 0, 0, w, 60 };
+	draw(&rect);
+	CHECK(ring.x == w - 24 - 8);
+	CHECK(strstr(last_log, ": storage ssh audio") != NULL);
+	// a USB DAC or none hides it again
+	sink = MOSAIC_AUDIO_SINK_USB;
+	redraws = 0;
+	tick(100);
+	CHECK(redraws == 1);
+	CHECK(!audio_on);
+	// with it off, the sink isn't asked
+	setting("bt_audio", "off");
+	sink = MOSAIC_AUDIO_SINK_BLUETOOTH;
+	start();
+	sink_asks = 0;
+	tick(0);
+	CHECK(sink_asks == 0);
+	CHECK(!audio_on);
+	// a launcher without audio_sink: off, said once
+	setting("bt_audio", "on");
+	fake.audio_sink = NULL;
+	start();
+	CHECK(logs == 1 && strstr(last_log, "no audio sink") != NULL);
+	tick(0);
+	CHECK(!audio_on);
+	fake.audio_sink = fakeAudioSink;
+	sink = MOSAIC_AUDIO_SINK_NONE;
+}
+
 int main(void) {
 	testFormatSize();
 	testFps();
@@ -337,5 +436,7 @@ int main(void) {
 	testStorage();
 	testProfileAndFps();
 	testSsh();
+	testAudioShown();
+	testAudio();
 	CHECK_DONE();
 }

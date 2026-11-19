@@ -11,12 +11,15 @@
 #define HI_FPS_GAP_MS 2000 // a frame this long after the last starts counting again, such as after sleep
 #define HI_SSH_PORT 22
 
-// The indicators, in the order they're drawn from the left.
+// The indicators, in the order they're drawn from the left: the marks
+// that show a state, the SSH dot and the Bluetooth audio headset, last,
+// nearest stock's status pill.
 enum HiItem {
 	HI_PROFILE,
 	HI_STORAGE,
 	HI_FPS,
 	HI_SSH,
+	HI_AUDIO,
 	HI_COUNT,
 };
 
@@ -50,9 +53,15 @@ int Hi_listening(const char* text, int port);
 // Which indicators fit in max_width. widths[i] is how wide each one is, 0
 // for one that's off or has nothing to show yet; they sit pad in from the
 // pill's ends and gap apart. Drops the FPS, then the profile, then free
-// storage, then the SSH dot, until the rest fit, and writes 1 into shown[i]
-// for each one kept. Returns the width they take, or 0 for none.
+// storage, then the SSH dot, then the headset, until the rest fit, and
+// writes 1 into shown[i] for each one kept. Returns the width they take,
+// or 0 for none.
 int Hi_fit(const int widths[HI_COUNT], int pad, int gap, int max_width, int shown[HI_COUNT]);
+
+// 1 when the headset mark shows: while it's wanted and sink, an enum
+// MosaicAudioSink from host->audio_sink, is Bluetooth, whether or not
+// anything is playing.
+int Hi_audioShown(int wanted, int sink);
 
 // When it's time to look again: 1 at now >= *next, which moves on by
 // period.

@@ -1,14 +1,17 @@
-// Header indicators: free storage, an SSH dot, a profile badge and the
-// launcher's frames a second, in one pill beside stock's status pill.
+// Header indicators: free storage, an SSH dot, a profile badge, the
+// launcher's frames a second and a headset while the sound goes to a
+// Bluetooth device, in one pill beside stock's status pill.
 //
 // Free storage comes from statvfs on the card and the SSH dot from a
 // socket listening on port 22 in /proc/net/tcp and tcp6, each looked at
 // every 5 seconds from tick rather than each frame. The FPS is counted
-// from the times tick is called. The widget asks for a redraw only when
-// what it shows changes. Stock has no SSH server or profiles: the dot
-// shows for any SSH pak listening on port 22, and the profile badge is the
-// text of the profile setting. Stock already shows the clock and battery,
-// so this doesn't.
+// from the times tick is called, and the headset from host->audio_sink,
+// asked each tick (the launcher keeps stock's answer, so it's cheap); it
+// shows while the sink is Bluetooth, whether or not anything is playing.
+// The widget asks for a redraw only when what it shows changes. Stock has
+// no SSH server or profiles: the dot shows for any SSH pak listening on
+// port 22, and the profile badge is the text of the profile setting. Stock
+// already shows the clock and battery, so this doesn't.
 //
 // The SSH dot is a device check: on desktop it stays off, and the plugin
 // logs that once.
@@ -29,6 +32,7 @@ static int want[HI_COUNT];
 static char profile[128];
 static char storage[16];
 static int ssh_on = 0;
+static int audio_on = 0;
 static HiFps fps;
 static unsigned long next_storage = 0, next_ssh = 0;
 static int ssh_supported = 0;
@@ -64,6 +68,27 @@ static int gap(void) {
 static int dotSize(void) {
 	int d = host->text_height(FONT) / 3;
 	return d > 4 ? d : 4;
+}
+
+// as tall as two thirds of a line, and as wide
+static int headsetSize(void) {
+	int s = host->text_height(FONT) * 2 / 3;
+	return s > 8 ? s : 8;
+}
+
+// A band over the top and a cup at each side, in ink, on the pill's
+// colour: the top half of a ring, its bottom half covered again.
+static void drawHeadset(MosaicSurface* screen, int x, int y, int s, MosaicColor ink, MosaicColor pill) {
+	int t = s / 8 > 1 ? s / 8 : 1;
+	MosaicRect band = { x, y, s, s };
+	host->draw_ring(screen, &band, s / 2, t, ink);
+	MosaicRect under = { x, y + s / 2, s, s - s / 2 };
+	host->fill_rect(screen, &under, pill);
+	int cup_w = s / 4 > t + 1 ? s / 4 : t + 1;
+	MosaicRect left = { x, y + s / 2 - t, cup_w, s - s / 2 + t };
+	MosaicRect right = { x + s - cup_w, left.y, cup_w, left.h };
+	host->fill_round_rect(screen, &left, cup_w / 3, ink);
+	host->fill_round_rect(screen, &right, cup_w / 3, ink);
 }
 
 static void readStorage(void) {
@@ -102,6 +127,13 @@ static void readSsh(void) {
 static void tick(unsigned long now) {
 	if (want[HI_STORAGE] && Hi_due(&next_storage, now, HI_REFRESH_MS)) readStorage();
 	if (want[HI_SSH] && ssh_supported && Hi_due(&next_ssh, now, HI_REFRESH_MS)) readSsh();
+	if (want[HI_AUDIO]) {
+		int on = Hi_audioShown(1, host->audio_sink());
+		if (on != audio_on) {
+			audio_on = on;
+			host->request_redraw();
+		}
+	}
 	if (want[HI_FPS] && HiFps_frame(&fps, now)) {
 		if (!fps_logged) {
 			char message[64];
@@ -134,6 +166,7 @@ static int headerWidth(int max_width, int height) {
 		widths[HI_FPS] = w > least ? w : least;
 	}
 	if (want[HI_SSH] && ssh_on) widths[HI_SSH] = dotSize();
+	if (want[HI_AUDIO] && audio_on) widths[HI_AUDIO] = headsetSize();
 	for (int i = 0; i < HI_COUNT; i++) {
 		if (widths[i] < 0) widths[i] = 0;
 	}
@@ -142,7 +175,7 @@ static int headerWidth(int max_width, int height) {
 
 static void logLayout(const MosaicRect* rect) {
 	if (!memcmp(rect, &logged_rect, sizeof(*rect)) && !memcmp(shown, logged_shown, sizeof(shown))) return;
-	static const char* names[HI_COUNT] = { "profile", "storage", "fps", "ssh" };
+	static const char* names[HI_COUNT] = { "profile", "storage", "fps", "ssh", "audio" };
 	char message[160];
 	int n = snprintf(message, sizeof(message), "widget at %i,%i %ix%i:", rect->x, rect->y, rect->w, rect->h);
 	for (int i = 0; i < HI_COUNT && n > 0 && (size_t)n < sizeof(message); i++) {
@@ -158,7 +191,8 @@ static int headerWidget(MosaicSurface* screen, const MosaicRect* rect) {
 	int ink = host->theme_color(MOSAIC_COLOR_HINT);
 	if (pill < 0 || ink < 0) return -1;
 	MosaicColor ink_color = mosaic_color((unsigned int)ink, 255);
-	host->fill_round_rect(screen, rect, rect->h / 2, mosaic_color((unsigned int)pill, 255));
+	MosaicColor pill_color = mosaic_color((unsigned int)pill, 255);
+	host->fill_round_rect(screen, rect, rect->h / 2, pill_color);
 
 	int x = rect->x + pad();
 	int text_y = rect->y + (rect->h - host->text_height(FONT)) / 2;
@@ -175,6 +209,11 @@ static int headerWidget(MosaicSurface* screen, const MosaicRect* rect) {
 			int d = widths[HI_SSH];
 			MosaicRect dot = { x, rect->y + (rect->h - d) / 2, d, d };
 			host->fill_round_rect(screen, &dot, d / 2, ink_color);
+			break;
+		}
+		case HI_AUDIO: {
+			int s = widths[HI_AUDIO];
+			drawHeadset(screen, x, rect->y + (rect->h - s) / 2, s, ink_color, pill_color);
 			break;
 		}
 		}
@@ -195,9 +234,15 @@ static int init(const MosaicHost* h) {
 	want[HI_STORAGE] = Hi_parseToggle(host->cfg_get("storage", "on"), 1);
 	want[HI_FPS] = Hi_parseToggle(host->cfg_get("fps", "off"), 0);
 	want[HI_SSH] = Hi_parseToggle(host->cfg_get("ssh", "off"), 0);
+	want[HI_AUDIO] = Hi_parseToggle(host->cfg_get("bt_audio", "on"), 1);
+	if (want[HI_AUDIO] && !MOSAIC_HOST_HAS(host, audio_sink)) {
+		say("unsupported: this launcher has no audio sink, so the headset stays off");
+		want[HI_AUDIO] = 0;
+	}
 
 	storage[0] = '\0';
 	ssh_on = 0;
+	audio_on = 0;
 	next_storage = next_ssh = 0;
 	HiFps_init(&fps);
 	fps_logged = 0;

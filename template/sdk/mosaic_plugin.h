@@ -129,6 +129,13 @@ enum MosaicQuickRow {
 	MOSAIC_QUICK_BOTTOM, // the small icons: Settings, Wifi, Sleep, Power off
 };
 
+// Where the device's sound goes, from host->audio_sink.
+enum MosaicAudioSink {
+	MOSAIC_AUDIO_SINK_NONE,      // its own speaker, or headphones in its jack
+	MOSAIC_AUDIO_SINK_BLUETOOTH, // a connected Bluetooth device
+	MOSAIC_AUDIO_SINK_USB,       // a USB audio device, such as a USB-C DAC
+};
+
 // What pre_launch decides. MOSAIC_LAUNCH_REPLACE runs the command set with
 // host->replace_launch in place of the launch; a launcher older than that
 // field launches as usual.
@@ -2022,6 +2029,15 @@ typedef struct MosaicHost {
 	// Check for them with MOSAIC_HOST_HAS(host, restart).
 	void (*restart)(void);
 	void (*reset_settings)(void);
+
+	// Where the device's sound goes now, an enum MosaicAudioSink: Bluetooth
+	// while a Bluetooth audio device is connected and is the output, as
+	// stock switches to it, whether or not anything is playing. The
+	// launcher reads stock's answer once a frame before plugins' ticks and
+	// keeps it, so the call only copies it and is cheap enough for drawing.
+	// Desktop has no external audio and answers MOSAIC_AUDIO_SINK_NONE.
+	// Check for it with MOSAIC_HOST_HAS(host, audio_sink).
+	int (*audio_sink)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

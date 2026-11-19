@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mosaic_plugin.h"
 
 void Hi_formatSize(unsigned long long bytes, char* out, size_t size) {
 	static const char units[] = "KMGTP";
@@ -98,7 +99,7 @@ static int fitWidth(const int widths[HI_COUNT], const int shown[HI_COUNT], int p
 }
 
 int Hi_fit(const int widths[HI_COUNT], int pad, int gap, int max_width, int shown[HI_COUNT]) {
-	static const int drop[HI_COUNT] = { HI_FPS, HI_PROFILE, HI_STORAGE, HI_SSH };
+	static const int drop[HI_COUNT] = { HI_FPS, HI_PROFILE, HI_STORAGE, HI_SSH, HI_AUDIO };
 	for (int i = 0; i < HI_COUNT; i++) shown[i] = widths[i] > 0;
 	int total = fitWidth(widths, shown, pad, gap);
 	for (int i = 0; i < HI_COUNT && total > max_width; i++) {
@@ -106,6 +107,10 @@ int Hi_fit(const int widths[HI_COUNT], int pad, int gap, int max_width, int show
 		total = fitWidth(widths, shown, pad, gap);
 	}
 	return total <= max_width ? total : 0;
+}
+
+int Hi_audioShown(int wanted, int sink) {
+	return wanted && sink == MOSAIC_AUDIO_SINK_BLUETOOTH;
 }
 
 int Hi_due(unsigned long* next, unsigned long now, unsigned long period) {

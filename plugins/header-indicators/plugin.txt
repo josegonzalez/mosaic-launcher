@@ -2,12 +2,14 @@ id=header-indicators
 name=Header indicators
 api=1
 category=Looks
-summary=Shows free storage, an SSH dot, a profile badge and the FPS in the header.
-description=Adds a small pill beside the status pill with free storage, an SSH dot, a profile badge and the FPS.
+summary=Shows free storage, an SSH dot, a profile badge, the FPS and a Bluetooth headset in the header.
+description=Adds a small pill beside the status pill with free storage, an SSH dot, a profile badge, the FPS and a headset while the sound goes to Bluetooth.
 # free space on the card, such as 12.3G, looked at every 5 seconds
 setting.storage=toggle|Free storage|on
 # a dot while an SSH server listens on port 22; never on desktop
 setting.ssh=toggle|SSH dot|off
+# a headset while the sound goes to a Bluetooth device, playing or not
+setting.bt_audio=toggle|Bluetooth audio|on
 # the launcher's frames a second
 setting.fps=toggle|FPS|off
 # a short name to show, such as whose device it is; empty for none

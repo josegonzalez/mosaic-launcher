@@ -21,6 +21,7 @@
 #include "inputmodel.h"
 #include "pin.h"
 #include "resetmodel.h"
+#include "sinkmodel.h"
 #include "audiomodel.h"
 #include "screenmodel.h"
 #include "caller.h"
@@ -1142,6 +1143,34 @@ static int hostWifiConnection(MosaicWifi* out) {
 }
 static void wifiLog(const char* message) {
 	LOG_info("plugins: %s", message);
+}
+
+// The audio sink, read once a frame by sinkRefresh before plugins' ticks
+// and kept, so audio_sink is cheap enough for drawing. On a device it's
+// stock's shared settings, which audiomon sets. Desktop has none: its
+// tests can stand an .asoundrc in for a device with
+// MOSAIC_LAUNCHER_AUDIO_SINK_FAKE, read at most once a second; device
+// builds never read it.
+#define SINK_FAKE_MS 1000
+static int audio_sink = MOSAIC_AUDIO_SINK_NONE;
+static unsigned long sink_fake_next = 0;
+
+static void sinkRefresh(unsigned long now) {
+	int sink = audio_sink;
+	if (!IS_DESKTOP) sink = Sink_fromStock(GetAudioSink());
+	else if (now >= sink_fake_next) {
+		sink_fake_next = now + SINK_FAKE_MS;
+		const char* path = getenv("MOSAIC_LAUNCHER_AUDIO_SINK_FAKE");
+		char* text = path && path[0] ? readText(path) : NULL;
+		sink = Sink_parse(text);
+		free(text);
+	}
+	if (sink == audio_sink) return;
+	LOG_info("plugins: audio sink is %s\n", Sink_name(sink));
+	audio_sink = sink;
+}
+static int hostAudioSink(void) {
+	return audio_sink;
 }
 
 // home is claimed once every plugin has loaded, so it's NULL from init
@@ -2431,6 +2460,7 @@ static const MosaicHost host = {
 	.hide_quick_labels = hostHideQuickLabels,
 	.restart = hostRestart,
 	.reset_settings = hostResetSettings,
+	.audio_sink = hostAudioSink,
 };
 
 ///////////////////////////////////////
@@ -3917,6 +3947,7 @@ void Plugins_tick(unsigned long now) {
 		profile_relist = 0;
 		state.reload = 1;
 	}
+	if (loaded_count) sinkRefresh(now);
 	EACH_PLUGIN_WITH(tick) p->tick(now);
 	Audio_soundTick(now);
 }
