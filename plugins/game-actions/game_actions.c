@@ -9,6 +9,15 @@
 // .userdata/<platform>/launcher/game-actions-names.txt, one card-relative
 // path, a tab and the name per line.
 //
+// Rename file renames a game under Roms/ on the card, typed on the
+// keyboard, after a confirm, and takes everything stock and plugins know
+// it by along: its art and .info, saves, states, resume slot and previews
+// and emulator settings, which actions_model.c lists and checks first, so
+// nothing moves when any target is there already, and puts back what it
+// moved when a step fails. Its play time moves in the tracker's database
+// in one transaction, and recents, favorites, tags and statuses and
+// collections follow.
+//
 // Delete removes a game under Roms/ with its sidecar files (saves, states,
 // art, its own emulator settings, and for a multi-disc or cue-sheet game
 // its whole folder), after a confirm that names what goes. What it deletes
@@ -348,6 +357,186 @@ static void collect(const char* action_path, void* data) {
 }
 
 ///////////////////////////////////////
+// rename file
+
+static GARename moving;            // what the confirm dialog is asking about
+static char moving_game[GA_PATH_LEN]; // the game waiting on the keyboard
+
+static void sayf(const char* format, const char* a, const char* b) {
+	char message[GA_PATH_LEN * 2 + 64];
+	snprintf(message, sizeof(message), format, a ? a : "", b ? b : "");
+	say(message);
+}
+
+// The card-relative form, or the path as it is, for the log.
+static const char* shownPath(const char* path) {
+	const char* rel = relative(path);
+	return rel ? rel : path;
+}
+
+static int canRenameFile(const char* action_path, void* data) {
+	return canDelete(action_path, data);
+}
+
+// Asks a plugin's move service to move a path, when one is on.
+static void moveIn(const char* service, const char* from, const char* to) {
+	if (!MOSAIC_HOST_HAS(host, call) || !MOSAIC_HOST_HAS(host, has_capability) || !host->has_capability(service)) return;
+	char args[GA_PATH_LEN * 2 + 16], reply[MOSAIC_CALL_MAX];
+	snprintf(args, sizeof(args), "from=%s\nto=%s", from, to);
+	if (host->call(service, args, reply, sizeof(reply)) < 0 || strstr(reply, "error=")) sayf("%s couldn't move %s", service, shownPath(from));
+}
+
+// Recents, favorites, tags and statuses, collections and the name override
+// at the game's new paths, once its files and play time moved.
+static void carryOver(const GARename* r) {
+	if (MOSAIC_HOST_HAS(host, recent_set)) {
+		for (int i = host->recents_count() - 1; i >= 0; i--) {
+			const char* recent = host->recent_path(i);
+			char to[GA_PATH_LEN];
+			if (!recent || !GA_renamedPath(r, recent, to, sizeof(to))) continue;
+			char from[GA_PATH_LEN];
+			snprintf(from, sizeof(from), "%s", recent);
+			if (host->recent_set(i, to) == 0) sayf("recent %s is now %s", shownPath(from), shownPath(to));
+			else if (host->recent_remove(i) == 0) sayf("recent %s was there twice as %s", shownPath(from), shownPath(to));
+		}
+	}
+	for (int i = 0; i < r->carry_count; i++) {
+		moveIn("favorites.move", r->carries[i].from, r->carries[i].to);
+		moveIn("tags.move", r->carries[i].from, r->carries[i].to);
+	}
+	char* collections[MAX_CLEANUP];
+	int count = GA_collections(host->sdcard_path, collections, MAX_CLEANUP);
+	for (int i = 0; i < count; i++) {
+		char file[GA_PATH_LEN * 2];
+		snprintf(file, sizeof(file), "%s/%s.txt", collections_dir, collections[i]);
+		int changed = GA_collectionRename(file, host->sdcard_path, r);
+		if (changed > 0) sayf("moved it in the %s collection", collections[i], NULL);
+		else if (changed < 0) sayf("couldn't update the %s collection", collections[i], NULL);
+		free(collections[i]);
+	}
+	// the new file name is the name shown now
+	const char* rel = relative(r->from);
+	refreshNames();
+	if (rel && GA_namesRemove(&names, rel, r->is_dir) > 0) saveNames();
+}
+
+// Play time in the tracker's database, all paths in one go. Returns 0, or
+// -1 when it couldn't be moved.
+static int movePlayTime(const GARename* r) {
+	if (!r->carry_count) return 0;
+	const char* from[GA_CARRY_MAX];
+	const char* to[GA_CARRY_MAX];
+	for (int i = 0; i < r->carry_count; i++) {
+		from[i] = r->carries[i].from;
+		to[i] = r->carries[i].to;
+	}
+	int moved = host->play_move_paths(from, to, r->carry_count);
+	if (moved < 0) return -1;
+	char count[16];
+	snprintf(count, sizeof(count), "%i", moved);
+	sayf("moved the play time of %s (%s paths with sessions)", shownPath(r->from), count);
+	return 0;
+}
+
+static void renameFailed(const GARenameResult* result, const char* why) {
+	char message[GA_PATH_LEN + 128];
+	if (result->stuck) {
+		sayf("couldn't put back %s%s", shownPath(result->stuck_path), result->stuck > 1 ? " and others" : "");
+		const char* name = strrchr(result->stuck_path, '/');
+		snprintf(message, sizeof(message), trPlural("Couldn't rename, and %i file couldn't be put back: %.60s",
+			"Couldn't rename, and %i files couldn't be put back, such as %.60s", (unsigned long)result->stuck),
+			result->stuck, name ? name + 1 : result->stuck_path);
+	}
+	else snprintf(message, sizeof(message), "%s", why);
+	toast(message);
+}
+
+static void renameConfirmed(void* data) {
+	(void)data;
+	if (!moving.count) return;
+	for (int i = 0; i < moving.count; i++) {
+		sayf(moving.moves[i].copy ? "copying %s to %s" : "moving %s to %s", shownPath(moving.moves[i].from), shownPath(moving.moves[i].to));
+	}
+	GARenameResult result;
+	char why[GA_PATH_LEN + 64];
+	if (GA_runRename(&moving, &result) != 0) {
+		sayf("couldn't move %s, so put the rest back", shownPath(result.failed), NULL);
+		const char* name = strrchr(result.failed, '/');
+		snprintf(why, sizeof(why), tr("Couldn't move %.80s, so nothing was renamed"), name ? name + 1 : result.failed);
+		renameFailed(&result, why);
+		GA_renameFree(&moving);
+		return;
+	}
+	if (movePlayTime(&moving) != 0) {
+		say("couldn't move its play time, so put its files back");
+		memset(&result, 0, sizeof(result));
+		GA_undoRename(&moving, moving.count, &result);
+		renameFailed(&result, tr("Couldn't move its play time, so nothing was renamed"));
+		GA_renameFree(&moving);
+		return;
+	}
+	carryOver(&moving);
+	sayf("renamed %s to %s", shownPath(moving.from), shownPath(moving.to));
+	char message[GA_PATH_LEN];
+	const char* name = strrchr(moving.to, '/');
+	snprintf(message, sizeof(message), tr("Renamed to %.80s"), name ? name + 1 : moving.to);
+	toast(message);
+	GA_renameFree(&moving);
+	checked[0] = '\0';
+	if (MOSAIC_HOST_HAS(host, index_refresh)) host->index_refresh();
+	reload();
+}
+
+static void fileNamed(const char* text, void* data) {
+	(void)data;
+	if (!text || !moving_game[0]) return; // cancelled
+	GACard c = card();
+	c.with_saves = 1;
+	char message[GA_PATH_LEN + 128];
+	if (GA_planRename(&c, moving_game, text, &moving) != 0) {
+		const char* clash = strrchr(moving.clash, '/');
+		clash = clash ? clash + 1 : moving.clash;
+		switch (moving.error) {
+		case GA_RENAME_SAME: return;
+		case GA_RENAME_NAME: snprintf(message, sizeof(message), "%s", tr("That can't be a file name")); break;
+		case GA_RENAME_EXISTS:
+			sayf("not renaming %s: %s is there already", shownPath(moving_game), shownPath(moving.clash));
+			snprintf(message, sizeof(message), tr("%.80s is there already"), clash);
+			break;
+		case GA_RENAME_TAKEN:
+			sayf("not renaming %s: another game in the system is named %s", shownPath(moving_game), moving.clash);
+			snprintf(message, sizeof(message), tr("Another game in this system is named %.80s"), clash);
+			break;
+		default: snprintf(message, sizeof(message), "%s", tr("Can't rename that")); break;
+		}
+		toast(message);
+		return;
+	}
+	char shown[GA_PATH_LEN];
+	GA_editableName(moving.from, moving.is_dir, shown, sizeof(shown));
+	char summary[320];
+	GA_renameSummary(&moving, summary, sizeof(summary));
+	char also[400];
+	if (summary[0]) snprintf(also, sizeof(also), tr("\nAlso moves %s."), summary);
+	else also[0] = '\0';
+	char question[1024]; // the dialog keeps 255 characters per line
+	snprintf(question, sizeof(question), tr("Rename %.40s%s to %.40s%s?%s"), shown, strlen(shown) > 40 ? "..." : "", text,
+		strlen(text) > 40 ? "..." : "", also);
+	host->confirm(question, tr("RENAME"), renameConfirmed, NULL);
+}
+
+static void renameFile(const char* action_path, void* data) {
+	(void)action_path;
+	(void)data;
+	const char* path = selectedPath();
+	int is_dir;
+	if (!path || !GA_gameFor(host->sdcard_path, path, moving_game, sizeof(moving_game), &is_dir)) return;
+	char name[GA_PATH_LEN];
+	GA_editableName(moving_game, is_dir, name, sizeof(name));
+	host->keyboard(tr("Rename file"), name, fileNamed, NULL);
+}
+
+///////////////////////////////////////
 // hooks
 
 static void postReturn(void) {
@@ -358,6 +547,7 @@ static void postReturn(void) {
 static void quit(void) {
 	GA_namesFree(&names);
 	GA_planFree(&plan);
+	GA_renameFree(&moving);
 	freeChoices();
 }
 
@@ -392,6 +582,8 @@ static int init(const MosaicHost* h) {
 	snprintf(collections_dir, sizeof(collections_dir), "%s/Collections", host->sdcard_path);
 	GA_namesInit(&names);
 	GA_planInit(&plan);
+	GA_renameInit(&moving);
+	moving_game[0] = '\0';
 	memset(&names_seen, 0, sizeof(names_seen));
 	names_seen.st_size = -1; // so the first refresh reads the file
 	refreshNames();
@@ -407,6 +599,12 @@ static int init(const MosaicHost* h) {
 	if (settingOn("rename")) {
 		if (MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.rename", TR_MARK("RENAME"), canRename, rename_, button);
 		else say("this launcher has no keyboard; rename is off");
+	}
+	if (settingOn("rename_file")) {
+		if (MOSAIC_HOST_HAS(host, play_move_paths) && MOSAIC_HOST_HAS(host, confirm) && MOSAIC_HOST_HAS(host, keyboard)) {
+			add("game-actions.rename-file", TR_MARK("RENAME FILE"), canRenameFile, renameFile, button);
+		}
+		else say("this launcher can't move play history; rename file is off");
 	}
 	if (settingOn("collections")) {
 		if (MOSAIC_HOST_HAS(host, choose) && MOSAIC_HOST_HAS(host, keyboard)) add("game-actions.collect", TR_MARK("ADD TO COLLECTION"), canCollect, collect, button);

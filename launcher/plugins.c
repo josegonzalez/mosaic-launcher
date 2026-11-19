@@ -906,6 +906,14 @@ static int hostPlayForget(const char* path) {
 	return deleted;
 }
 
+static int hostPlayMovePaths(const char* const* from, const char* const* to, int count) {
+	LoadedPlugin* caller = callingPlugin("play_move_paths");
+	if (!caller) return -1;
+	int moved = PlayHistory_movePaths(from, to, count);
+	LOG_info("plugins: %s moved the play history of %i path%s: %i\n", caller->id, count, count == 1 ? "" : "s", moved);
+	return moved;
+}
+
 static int hostAchievements(const char* path, MosaicAchievements* out) {
 	RASummary summary;
 	int rc = RAProgress_get(path, &summary);
@@ -2391,6 +2399,7 @@ static const MosaicHost host = {
 	.surface_blur = hostSurfaceBlur,
 	.draw_ring = PluginDraw_drawRing,
 	.quick_tile_icon = hostQuickTileIcon,
+	.play_move_paths = hostPlayMovePaths,
 };
 
 ///////////////////////////////////////

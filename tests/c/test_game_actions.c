@@ -62,6 +62,7 @@ static void makeCard(void) {
 	// a plain game, with every kind of sidecar
 	touch(GB "/Tetris.gb");
 	touch(GB "/.media/Tetris.png");
+	touch(GB "/.media/Tetris.info");
 	touch(CARD "/Saves/GB/Tetris.gb.sav");
 	touch(CARD "/Saves/GB/Tetris.gb.rtc");
 	touch(CARD "/Saves/GB/Tetris.srm");
@@ -145,6 +146,8 @@ static void makeCard(void) {
 	(void)symlink(OUTSIDE "/Linked (LN)", CARD "/Roms/Linked (LN)");
 	touch(GB "/Linked.gb");
 	(void)symlink(OUTSIDE "/precious.bin", GB "/Linked.gb.link");
+	touch(GB "/Linker.gb");
+	(void)symlink(OUTSIDE "/precious.bin", CARD "/Saves/GB/Linker.gb.sav");
 	// a save folder that's a link out of the card
 	touch(CARD "/Roms/NES (FC)/Mario.nes");
 	touch(OUTSIDE "/saves/Mario.nes.sav");
@@ -436,6 +439,276 @@ static void testDelete(void) {
 	GA_planFree(&plan);
 }
 
+// A rename plan as "kind from -> to" lines in order, card-relative, with
+// "copy" for a step that copies.
+static char* renameText(const GARename* r) {
+	static char text[16384];
+	text[0] = '\0';
+	size_t len = strlen(CARD);
+	for (int i = 0; i < r->count; i++) {
+		const GAMove* m = &r->moves[i];
+		const char* from = strncmp(m->from, CARD, len) ? m->from : m->from + len;
+		const char* to = strncmp(m->to, CARD, len) ? m->to : m->to + len;
+		size_t at = strlen(text);
+		snprintf(text + at, sizeof(text) - at, "%s%s %s -> %s\n", kinds[m->kind], m->copy ? " copy" : "", from, to);
+	}
+	return text;
+}
+
+static char* carryText(const GARename* r) {
+	static char text[8192];
+	text[0] = '\0';
+	size_t len = strlen(CARD);
+	for (int i = 0; i < r->carry_count; i++) {
+		const GAMove* m = &r->carries[i];
+		size_t at = strlen(text);
+		snprintf(text + at, sizeof(text) - at, "%s -> %s\n", m->from + len, m->to + len);
+	}
+	return text;
+}
+
+// Renaming: every old to new path pair, the checks before anything
+// changes, and the names it refuses.
+static void testRenamePlans(void) {
+	GACard c = testCard(1);
+	GARename r;
+	GA_renameInit(&r);
+	char name[256];
+
+	GA_editableName(GB "/Tetris.gb", 0, name, sizeof(name));
+	CHECK_STR(name, "Tetris");
+	GA_editableName(GB "/Dr. Mario.gb", 0, name, sizeof(name));
+	CHECK_STR(name, "Dr. Mario");
+	GA_editableName(PS "/FF7 v1.1", 1, name, sizeof(name));
+	CHECK_STR(name, "FF7 v1.1");
+	CHECK(GA_validFileName("Tetris DX"));
+	CHECK(!GA_validFileName(""));
+	CHECK(!GA_validFileName(".hidden"));
+	CHECK(!GA_validFileName(" lead"));
+	CHECK(!GA_validFileName("a/b"));
+	CHECK(!GA_validFileName("a\\b"));
+	CHECK(!GA_validFileName("a\tb"));
+	CHECK(!GA_validFileName(NULL));
+
+	// a plain game: the rom, its art, and every save, state, slot and setting
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Tetris DX", &r) == 0);
+	CHECK(r.error == GA_RENAME_OK);
+	CHECK_STR(renameText(&r),
+		"game /Roms/Game Boy (GB)/Tetris.gb -> /Roms/Game Boy (GB)/Tetris DX.gb\n"
+		"art /Roms/Game Boy (GB)/.media/Tetris.png -> /Roms/Game Boy (GB)/.media/Tetris DX.png\n"
+		"art /Roms/Game Boy (GB)/.media/Tetris.info -> /Roms/Game Boy (GB)/.media/Tetris DX.info\n"
+		"save /Saves/GB/Tetris.gb.sav -> /Saves/GB/Tetris DX.gb.sav\n"
+		"save /Saves/GB/Tetris.gb.rtc -> /Saves/GB/Tetris DX.gb.rtc\n"
+		"state /.userdata/shared/GB-gambatte/Tetris.gb.st0 -> /.userdata/shared/GB-gambatte/Tetris DX.gb.st0\n"
+		"state /.userdata/shared/GB-gambatte/Tetris.gb.st9 -> /.userdata/shared/GB-gambatte/Tetris DX.gb.st9\n"
+		"slot /.userdata/shared/.minui/GB/Tetris.gb.txt -> /.userdata/shared/.minui/GB/Tetris DX.gb.txt\n"
+		"slot /.userdata/shared/.minui/GB/Tetris.gb.0.bmp -> /.userdata/shared/.minui/GB/Tetris DX.gb.0.bmp\n"
+		"slot /.userdata/shared/.minui/GB/Tetris.gb.0.txt -> /.userdata/shared/.minui/GB/Tetris DX.gb.0.txt\n"
+		"config /.userdata/desktop/GB-gambatte/Tetris.gb.cfg -> /.userdata/desktop/GB-gambatte/Tetris DX.gb.cfg\n"
+		"save /Saves/GB/Tetris.srm -> /Saves/GB/Tetris DX.srm\n"
+		"state /.userdata/shared/GB-mgba/Tetris.state -> /.userdata/shared/GB-mgba/Tetris DX.state\n"
+		"state /.userdata/shared/GB-mgba/Tetris.state.auto -> /.userdata/shared/GB-mgba/Tetris DX.state.auto\n"
+		"state /.userdata/shared/GB-mgba/Tetris.state3 -> /.userdata/shared/GB-mgba/Tetris DX.state3\n");
+	CHECK_STR(carryText(&r), "/Roms/Game Boy (GB)/Tetris.gb -> /Roms/Game Boy (GB)/Tetris DX.gb\n");
+	char summary[256];
+	GA_renameSummary(&r, summary, sizeof(summary));
+	CHECK_STR(summary, "3 saves, 5 states, its art and its settings");
+	char out[1024];
+	CHECK(GA_renamedPath(&r, GB "/Tetris.gb", out, sizeof(out)) == 1);
+	CHECK_STR(out, GB "/Tetris DX.gb");
+	CHECK(GA_renamedPath(&r, GB "/Tetris 2.gb", out, sizeof(out)) == 0);
+	CHECK(GA_renamedPath(&r, GB "/Tetris.gb/x", out, sizeof(out)) == 0);
+
+	// a game folder: its .m3u inside first, then the folder, its art beside
+	// it, and the saves under the .m3u's name; the links in it move with it
+	CHECK(GA_planRename(&c, PS "/FF7", "Final Fantasy VII", &r) == 0);
+	CHECK_STR(renameText(&r),
+		"game /Roms/Sony PlayStation (PS)/FF7/FF7.m3u -> /Roms/Sony PlayStation (PS)/FF7/Final Fantasy VII.m3u\n"
+		"game /Roms/Sony PlayStation (PS)/FF7 -> /Roms/Sony PlayStation (PS)/Final Fantasy VII\n"
+		"art /Roms/Sony PlayStation (PS)/.media/FF7.png -> /Roms/Sony PlayStation (PS)/.media/Final Fantasy VII.png\n"
+		"save /Saves/PS/FF7.m3u.sav -> /Saves/PS/Final Fantasy VII.m3u.sav\n"
+		"state /.userdata/shared/PS-pcsx/FF7.m3u.st0 -> /.userdata/shared/PS-pcsx/Final Fantasy VII.m3u.st0\n"
+		"save /Saves/PS/FF7.srm -> /Saves/PS/Final Fantasy VII.srm\n");
+	CHECK(GA_renamedPath(&r, PS "/FF7/FF7.m3u", out, sizeof(out)) == 1);
+	CHECK_STR(out, PS "/Final Fantasy VII/Final Fantasy VII.m3u");
+	CHECK(GA_renamedPath(&r, PS "/FF7/FF7 (Disc 1).cue", out, sizeof(out)) == 1);
+	CHECK_STR(out, PS "/Final Fantasy VII/FF7 (Disc 1).cue");
+	CHECK(GA_renamedPath(&r, PS "/FF7 Remake.m3u", out, sizeof(out)) == 0);
+	CHECK(strstr(carryText(&r), "/Roms/Sony PlayStation (PS)/FF7 -> /Roms/Sony PlayStation (PS)/Final Fantasy VII\n"
+		"/Roms/Sony PlayStation (PS)/FF7/FF7.m3u -> /Roms/Sony PlayStation (PS)/Final Fantasy VII/Final Fantasy VII.m3u\n") != NULL);
+	CHECK(strstr(carryText(&r), "/FF7/FF7 (Disc 2).cue -> /Roms/Sony PlayStation (PS)/Final Fantasy VII/FF7 (Disc 2).cue\n") != NULL);
+	CHECK(strstr(carryText(&r), "/FF7/.media") == NULL);
+
+	// a cue sheet folder: its .cue named after it, the tracks stay as they are
+	CHECK(GA_planRename(&c, PS "/Spyro/Spyro.bin", "Spyro the Dragon", &r) == 0);
+	CHECK_STR(renameText(&r),
+		"game /Roms/Sony PlayStation (PS)/Spyro/Spyro.cue -> /Roms/Sony PlayStation (PS)/Spyro/Spyro the Dragon.cue\n"
+		"game /Roms/Sony PlayStation (PS)/Spyro -> /Roms/Sony PlayStation (PS)/Spyro the Dragon\n"
+		"save /Saves/PS/Spyro.cue.sav -> /Saves/PS/Spyro the Dragon.cue.sav\n");
+
+	// a loose cue sheet: only the sheet, as it names its tracks
+	CHECK(GA_planRename(&c, PS "/Crash.cue", "Crash Bandicoot", &r) == 0);
+	CHECK_STR(renameText(&r),
+		"game /Roms/Sony PlayStation (PS)/Crash.cue -> /Roms/Sony PlayStation (PS)/Crash Bandicoot.cue\n"
+		"art /Roms/Sony PlayStation (PS)/.media/Crash.png -> /Roms/Sony PlayStation (PS)/.media/Crash Bandicoot.png\n"
+		"save /Saves/PS/Crash.cue.sav -> /Saves/PS/Crash Bandicoot.cue.sav\n"
+		"save /Saves/PS/Crash.srm -> /Saves/PS/Crash Bandicoot.srm\n");
+
+	// shared names are copied: Zelda.zip's art and its cut save name, and
+	// the other Dr. Mario's whole name
+	CHECK(GA_planRename(&c, GB "/Zelda.gb", "Link", &r) == 0);
+	CHECK_STR(renameText(&r),
+		"game /Roms/Game Boy (GB)/Zelda.gb -> /Roms/Game Boy (GB)/Link.gb\n"
+		"art copy /Roms/Game Boy (GB)/.media/Zelda.png -> /Roms/Game Boy (GB)/.media/Link.png\n"
+		"save /Saves/GB/Zelda.gb.sav -> /Saves/GB/Link.gb.sav\n"
+		"save copy /Saves/GB/Zelda.srm -> /Saves/GB/Link.srm\n");
+	CHECK(GA_planRename(&c, GB "/Hacks/Dr. Mario.gb", "Dr. Luigi", &r) == 0);
+	CHECK_STR(renameText(&r),
+		"game /Roms/Game Boy (GB)/Hacks/Dr. Mario.gb -> /Roms/Game Boy (GB)/Hacks/Dr. Luigi.gb\n"
+		"save copy /Saves/GB/Dr. Mario.gb.sav -> /Saves/GB/Dr. Luigi.gb.sav\n"
+		"save copy /Saves/GB/Dr. Mario.srm -> /Saves/GB/Dr. Luigi.srm\n");
+
+	// a sidecar that's a link moves as a link; a save folder that's a link
+	// out of the card is left
+	CHECK(GA_planRename(&c, GB "/Linker.gb", "Linked Up", &r) == 0);
+	CHECK_STR(renameText(&r),
+		"game /Roms/Game Boy (GB)/Linker.gb -> /Roms/Game Boy (GB)/Linked Up.gb\n"
+		"save /Saves/GB/Linker.gb.sav -> /Saves/GB/Linked Up.gb.sav\n");
+	CHECK(GA_planRename(&c, CARD "/Roms/NES (FC)/Mario.nes", "Luigi", &r) == 0);
+	CHECK_STR(renameText(&r), "game /Roms/NES (FC)/Mario.nes -> /Roms/NES (FC)/Luigi.nes\n");
+
+	// only the case changes: the same file isn't a clash
+	CHECK(GA_planRename(&c, GB "/Tetris 2.gb", "TETRIS 2", &r) == 0);
+	CHECK(r.count == 3);
+
+	// refused, naming the target that's there
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Tetris 2", &r) == -1);
+	CHECK(r.error == GA_RENAME_EXISTS);
+	CHECK_STR(r.clash, GB "/Tetris 2.gb");
+	CHECK(r.count == 0);
+	touch(CARD "/.userdata/shared/GB-mgba/Tetris Clash.state3");
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Tetris Clash", &r) == -1);
+	CHECK(r.error == GA_RENAME_EXISTS);
+	CHECK_STR(r.clash, CARD "/.userdata/shared/GB-mgba/Tetris Clash.state3");
+	unlink(CARD "/.userdata/shared/GB-mgba/Tetris Clash.state3");
+	touch(PS "/FF7/Final.m3u");
+	CHECK(GA_planRename(&c, PS "/FF7", "Final", &r) == -1);
+	CHECK(r.error == GA_RENAME_EXISTS);
+	CHECK_STR(r.clash, PS "/FF7/Final.m3u");
+	unlink(PS "/FF7/Final.m3u");
+	// another game in the system has the name, so they'd share saves
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Pokemon", &r) == -1);
+	CHECK(r.error == GA_RENAME_EXISTS);
+	touch(CARD "/Roms/Game Boy Hacks (GB)/Kirby.gb");
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Kirby", &r) == -1);
+	CHECK(r.error == GA_RENAME_TAKEN);
+	CHECK_STR(r.clash, "Kirby.gb");
+	// or cuts to it, for the saves that are under the cut name
+	touch(CARD "/Roms/Game Boy Hacks (GB)/Kirby.zip");
+	unlink(CARD "/Roms/Game Boy Hacks (GB)/Kirby.gb");
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Kirby", &r) == -1);
+	CHECK(r.error == GA_RENAME_TAKEN);
+	CHECK_STR(r.clash, "Kirby");
+	CHECK(GA_planRename(&c, GB "/Linker.gb", "Kirby", &r) == 0); // it has none
+	unlink(CARD "/Roms/Game Boy Hacks (GB)/Kirby.zip");
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Tetris", &r) == -1);
+	CHECK(r.error == GA_RENAME_SAME);
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "a/b", &r) == -1);
+	CHECK(r.error == GA_RENAME_NAME);
+	CHECK(GA_planRename(&c, GB "/Hacks", "Mods", &r) == -1);
+	CHECK(r.error == GA_RENAME_GAME);
+	CHECK(GA_planRename(&c, GB "/Emu.pak", "Other", &r) == -1);
+	CHECK(r.error == GA_RENAME_GAME);
+	CHECK(GA_planRename(&c, CARD "/Roms/Linked (LN)/Game.ln", "Other", &r) == -1);
+	CHECK(r.error == GA_RENAME_GAME);
+	GA_renameFree(&r);
+}
+
+// Running a rename: everything moves, a failure part way puts back what
+// moved, and what can't be put back is named.
+static void testRenameRun(void) {
+	GACard c = testCard(1);
+	GARename r;
+	GA_renameInit(&r);
+	GARenameResult result;
+
+	CHECK(GA_planRename(&c, GB "/Tetris.gb", "Tetris DX", &r) == 0);
+	// a target that turns up after the check: nothing is overwritten, and
+	// the steps before it are put back
+	writeText(CARD "/Saves/GB/Tetris DX.srm", "theirs");
+	CHECK(GA_runRename(&r, &result) == -1);
+	CHECK_STR(result.failed, CARD "/Saves/GB/Tetris.srm");
+	CHECK(result.stuck == 0);
+	CHECK(there(GB "/Tetris.gb"));
+	CHECK(!there(GB "/Tetris DX.gb"));
+	CHECK(there(CARD "/Saves/GB/Tetris.gb.sav"));
+	CHECK(!there(CARD "/Saves/GB/Tetris DX.gb.sav"));
+	CHECK(there(USERDATA "/GB-gambatte/Tetris.gb.cfg"));
+	CHECK_STR(readText(CARD "/Saves/GB/Tetris DX.srm"), "theirs");
+	unlink(CARD "/Saves/GB/Tetris DX.srm");
+
+	CHECK(GA_runRename(&r, &result) == 0);
+	CHECK(!there(GB "/Tetris.gb"));
+	CHECK(there(GB "/Tetris DX.gb"));
+	CHECK(there(GB "/.media/Tetris DX.png"));
+	CHECK(there(CARD "/Saves/GB/Tetris DX.gb.sav"));
+	CHECK(there(CARD "/.userdata/shared/GB-mgba/Tetris DX.state.auto"));
+	CHECK(there(CARD "/.userdata/shared/.minui/GB/Tetris DX.gb.0.bmp"));
+	CHECK(there(USERDATA "/GB-gambatte/Tetris DX.gb.cfg"));
+	CHECK(there(CARD "/Saves/GB/Tetris.gbc.sav"));
+	CHECK(there(CARD "/.userdata/shared/GBC-gambatte/Tetris.gb.st0"));
+	// undone after the fact, as when play history can't be moved; one whose
+	// old name is taken by then stays, and is named
+	touch(CARD "/Saves/GB/Tetris.gb.rtc");
+	memset(&result, 0, sizeof(result));
+	CHECK(GA_undoRename(&r, r.count, &result) == 1);
+	CHECK(result.stuck == 1);
+	CHECK_STR(result.stuck_path, CARD "/Saves/GB/Tetris DX.gb.rtc");
+	CHECK(there(GB "/Tetris.gb"));
+	CHECK(there(CARD "/Saves/GB/Tetris.gb.sav"));
+	CHECK(!there(GB "/Tetris DX.gb"));
+
+	// a folder, its links moved as links
+	CHECK(GA_planRename(&c, PS "/FF7", "Final Fantasy VII", &r) == 0);
+	CHECK(GA_runRename(&r, &result) == 0);
+	CHECK(there(PS "/Final Fantasy VII/Final Fantasy VII.m3u"));
+	CHECK(there(PS "/Final Fantasy VII/FF7 (Disc 1).bin"));
+	CHECK(!there(PS "/FF7"));
+	CHECK(there(PS "/.media/Final Fantasy VII.png"));
+	CHECK(there(OUTSIDE "/precious.bin"));
+	char link[1024];
+	ssize_t got = readlink(PS "/Final Fantasy VII/linked.bin", link, sizeof(link) - 1);
+	CHECK(got > 0);
+	if (got > 0) {
+		link[got] = '\0';
+		CHECK_STR(link, OUTSIDE "/precious.bin");
+	}
+	// a copy is undone by removing it
+	CHECK(GA_planRename(&c, GB "/Zelda.gb", "Link", &r) == 0);
+	CHECK(GA_runRename(&r, &result) == 0);
+	CHECK(there(GB "/.media/Zelda.png") && there(GB "/.media/Link.png"));
+	CHECK(there(CARD "/Saves/GB/Zelda.srm") && there(CARD "/Saves/GB/Link.srm"));
+	CHECK(!there(CARD "/Saves/GB/Zelda.gb.sav") && there(CARD "/Saves/GB/Link.gb.sav"));
+	CHECK(GA_undoRename(&r, r.count, &result) == 0);
+	CHECK(!there(GB "/.media/Link.png") && there(GB "/.media/Zelda.png"));
+	CHECK(there(GB "/Zelda.gb"));
+
+	// collections follow, dropping a line that'd be there twice
+	CHECK(GA_planRename(&c, GB "/Zelda.gb", "Link", &r) == 0);
+	writeText(CARD "/Collections/rename.txt", "/Roms/Game Boy (GB)/Zelda.gb\n/Roms/Game Boy (GB)/Zelda.zip\r\n"
+		"/Roms/Game Boy (GB)/Link.gb\n/Roms/Game Boy (GB)/Zelda.gb");
+	CHECK(GA_collectionRename(CARD "/Collections/rename.txt", CARD, &r) == 2);
+	CHECK_STR(readText(CARD "/Collections/rename.txt"), "/Roms/Game Boy (GB)/Zelda.zip\r\n/Roms/Game Boy (GB)/Link.gb\n");
+	CHECK(GA_planRename(&c, PS "/Final Fantasy VII", "FF", &r) == 0);
+	writeText(CARD "/Collections/rename.txt", "/Roms/Sony PlayStation (PS)/Final Fantasy VII/Final Fantasy VII.m3u\n"
+		"/Roms/Sony PlayStation (PS)/Final Fantasy VII/FF7 (Disc 1).cue\n");
+	CHECK(GA_collectionRename(CARD "/Collections/rename.txt", CARD, &r) == 2);
+	CHECK_STR(readText(CARD "/Collections/rename.txt"), "/Roms/Sony PlayStation (PS)/FF/FF.m3u\n/Roms/Sony PlayStation (PS)/FF/FF7 (Disc 1).cue\n");
+	CHECK(GA_collectionRename(CARD "/Collections/missing.txt", CARD, &r) == 0);
+	CHECK(!there(CARD "/Collections/missing.txt"));
+	GA_renameFree(&r);
+}
+
 static void testCollections(void) {
 	char rel[1024];
 	CHECK(GA_collectionPath(CARD, GB "/Zelda.gb", rel, sizeof(rel)) == 1);
@@ -623,6 +896,38 @@ static int fakeRecentRemove(int i) {
 	return 0;
 }
 static void fakeReload(void) { reloads++; }
+static int fakeRecentSet(int i, const char* path) {
+	if (i < 0 || i >= recent_count) return -1;
+	for (int j = 0; j < recent_count; j++) {
+		if (j != i && !strcmp(recents[j], path)) return -1; // there twice
+	}
+	snprintf(recents[i], sizeof(recents[0]), "%s", path);
+	return 0;
+}
+static char play_moved[4096]; // "from>to" lines, card-relative
+static int play_answer = 0;
+static int fakePlayMovePaths(const char* const* from, const char* const* to, int count) {
+	play_moved[0] = '\0';
+	for (int i = 0; i < count; i++) {
+		size_t at = strlen(play_moved);
+		snprintf(play_moved + at, sizeof(play_moved) - at, "%s>%s\n", from[i] + strlen(CARD), to[i] + strlen(CARD));
+	}
+	return play_answer;
+}
+static char services_called[4096];
+static int fakeHasCapability(const char* name) { return !strcmp(name, "favorites.move") || !strcmp(name, "tags.move"); }
+static int fakeCall(const char* name, const char* args, char* out, size_t size) {
+	size_t at = strlen(services_called);
+	if (strstr(args, "/FF7 (Disc 1).bin")) snprintf(services_called + at, sizeof(services_called) - at, "%s disc\n", name);
+	else if (!strstr(args, "/Disc") && !strstr(args, "linked")) {
+		char line[2200];
+		snprintf(line, sizeof(line), "%s %s\n", name, args);
+		for (char* c = line; *c; c++) if (*c == '\n' && c[1]) *c = ' ';
+		snprintf(services_called + at, sizeof(services_called) - at, "%s", line);
+	}
+	snprintf(out, size, "moved=1");
+	return 0;
+}
 
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
@@ -648,6 +953,10 @@ static MosaicHost fake = {
 	.recent_remove = fakeRecentRemove,
 	.reload_lists = fakeReload,
 	.choose = fakeChoose,
+	.recent_set = fakeRecentSet,
+	.has_capability = fakeHasCapability,
+	.call = fakeCall,
+	.play_move_paths = fakePlayMovePaths,
 };
 
 static int find(const char* id) {
@@ -675,7 +984,7 @@ static void testPlugin(void) {
 	makeCard();
 	const MosaicPlugin* p = start();
 	CHECK_STR(p->id, "game-actions");
-	CHECK(action_count == 3);
+	CHECK(action_count == 4);
 	int rename_at = find("game-actions.rename");
 	int collect_at = find("game-actions.collect");
 	int delete_at = find("game-actions.delete");
@@ -835,6 +1144,119 @@ static void testPlugin(void) {
 	fake.size = sizeof(MosaicHost);
 }
 
+// Rename file from the plugin: the keyboard, the confirm, then the files,
+// play time, recents, sets, collections and name override at the new paths.
+static void testRenameFile(void) {
+	makeCard();
+	const MosaicPlugin* p = start();
+	int at = find("game-actions.rename-file");
+	CHECK(at >= 0);
+	if (at < 0) return;
+	CHECK(actions[at].button == MOSAIC_BUTTON_Y);
+	CHECK_STR(actions[at].label, "RENAME FILE");
+	select_(GB "/Hacks", MOSAIC_ENTRY_DIR, "Hacks");
+	CHECK(!actions[at].available(NULL, NULL));
+	select_(CARD "/Tools/desktop/Thing.pak", MOSAIC_ENTRY_PAK, "Thing");
+	CHECK(!actions[at].available(NULL, NULL));
+
+	// a game folder, from a disc in it, with a name override, recents and
+	// collections naming it
+	int rename_at = find("game-actions.rename");
+	select_(PS "/FF7", MOSAIC_ENTRY_DIR, "FF7");
+	actions[rename_at].run(NULL, NULL);
+	kb_done("Final Fantasy", NULL);
+	snprintf(recents[0], sizeof(recents[0]), "%s", PS "/FF7/FF7.m3u");
+	snprintf(recents[1], sizeof(recents[1]), "%s", GB "/Zelda.gb");
+	recent_count = 2;
+	select_(PS "/FF7/FF7 (Disc 1).cue", MOSAIC_ENTRY_ROM, "Disc 1");
+	CHECK(actions[at].available(NULL, NULL));
+	actions[at].run(NULL, NULL);
+	CHECK_STR(kb_title, "Rename file");
+	CHECK_STR(kb_initial, "FF7");
+	answer_yes = NULL;
+	kb_done(NULL, NULL); // cancelled
+	CHECK(answer_yes == NULL);
+	actions[at].run(NULL, NULL);
+	kb_done("FF7", NULL); // the same name: nothing to do
+	CHECK(answer_yes == NULL);
+	actions[at].run(NULL, NULL);
+	kb_done("Final Fantasy VII", NULL);
+	CHECK_STR(asked, "Rename FF7 to Final Fantasy VII?\nAlso moves 2 saves, 1 state and its art.");
+	CHECK(there(PS "/FF7")); // nothing moves before the answer
+	CHECK(answer_yes != NULL);
+	if (!answer_yes) return;
+	services_called[0] = '\0';
+	play_answer = 1;
+	reloads = 0;
+	answer_yes(NULL);
+	CHECK_STR(toasted, "Renamed to Final Fantasy VII");
+	CHECK(reloads == 1);
+	CHECK(there(PS "/Final Fantasy VII/Final Fantasy VII.m3u"));
+	CHECK(there(CARD "/Saves/PS/Final Fantasy VII.m3u.sav"));
+	CHECK(strstr(play_moved, "/Roms/Sony PlayStation (PS)/FF7>/Roms/Sony PlayStation (PS)/Final Fantasy VII\n"
+		"/Roms/Sony PlayStation (PS)/FF7/FF7.m3u>/Roms/Sony PlayStation (PS)/Final Fantasy VII/Final Fantasy VII.m3u\n") == play_moved);
+	CHECK(strstr(play_moved, "/FF7/FF7 (Disc 1).bin>/Roms/Sony PlayStation (PS)/Final Fantasy VII/FF7 (Disc 1).bin\n") != NULL);
+	CHECK(strstr(services_called, "favorites.move from=" PS "/FF7/FF7.m3u to=" PS "/Final Fantasy VII/Final Fantasy VII.m3u\n"
+		"tags.move from=" PS "/FF7/FF7.m3u to=" PS "/Final Fantasy VII/Final Fantasy VII.m3u\n") != NULL);
+	CHECK(strstr(services_called, "favorites.move disc\ntags.move disc\n") != NULL);
+	CHECK_STR(recents[0], PS "/Final Fantasy VII/Final Fantasy VII.m3u");
+	CHECK_STR(recents[1], GB "/Zelda.gb");
+	CHECK_STR(readText(CARD "/Collections/Favorites.txt"),
+		"/Roms/Game Boy (GB)/Tetris.gb\n/Roms/Sony PlayStation (PS)/Final Fantasy VII/Final Fantasy VII.m3u\n");
+	// the new file name is what shows now
+	CHECK_STR(readText(USERDATA "/launcher/game-actions-names.txt"), "");
+
+	// a clash: says which, changes nothing
+	select_(GB "/Tetris.gb", MOSAIC_ENTRY_ROM, "Tetris");
+	actions[at].run(NULL, NULL);
+	CHECK_STR(kb_initial, "Tetris");
+	answer_yes = NULL;
+	play_moved[0] = '\0';
+	kb_done("Tetris 2", NULL);
+	CHECK_STR(toasted, "Tetris 2.gb is there already");
+	CHECK(answer_yes == NULL);
+	CHECK(there(GB "/Tetris.gb"));
+	CHECK_STR(play_moved, "");
+	actions[at].run(NULL, NULL);
+	kb_done("a/b", NULL);
+	CHECK_STR(toasted, "That can't be a file name");
+
+	// play time that can't be moved: its files go back
+	actions[at].run(NULL, NULL);
+	kb_done("Tetris DX", NULL);
+	CHECK_STR(asked, "Rename Tetris to Tetris DX?\nAlso moves 3 saves, 5 states, its art and its settings.");
+	play_answer = -1;
+	answer_yes(NULL);
+	CHECK_STR(toasted, "Couldn't move its play time, so nothing was renamed");
+	CHECK(there(GB "/Tetris.gb"));
+	CHECK(!there(GB "/Tetris DX.gb"));
+	CHECK(there(CARD "/Saves/GB/Tetris.gb.sav"));
+	CHECK(there(GB "/.media/Tetris.png"));
+	CHECK_STR(readText(CARD "/Collections/Favorites.txt"),
+		"/Roms/Game Boy (GB)/Tetris.gb\n/Roms/Sony PlayStation (PS)/Final Fantasy VII/Final Fantasy VII.m3u\n");
+
+	// a step that fails part way: the rest go back
+	actions[at].run(NULL, NULL);
+	kb_done("Tetris DX", NULL);
+	play_answer = 1;
+	touch(CARD "/Saves/GB/Tetris DX.srm");
+	answer_yes(NULL);
+	CHECK_STR(toasted, "Couldn't move Tetris.srm, so nothing was renamed");
+	CHECK(there(GB "/Tetris.gb"));
+	CHECK(!there(GB "/Tetris DX.gb"));
+	unlink(CARD "/Saves/GB/Tetris DX.srm");
+
+	// without the play history call, there's no rename file
+	p->quit();
+	fake.play_move_paths = NULL;
+	p = start();
+	CHECK(find("game-actions.rename-file") < 0);
+	CHECK(find("game-actions.rename") >= 0);
+	fake.play_move_paths = fakePlayMovePaths;
+	p->quit();
+	recent_count = 0;
+}
+
 int main(void) {
 	makeCard();
 	testTag();
@@ -842,9 +1264,13 @@ int main(void) {
 	testPlans();
 	testDelete();
 	makeCard();
+	testRenamePlans();
+	testRenameRun();
+	makeCard();
 	testCollections();
 	testNames();
 	testPlugin();
+	testRenameFile();
 	(void)system("rm -rf '" CARD "' '" OUTSIDE "'");
 	CHECK_DONE();
 }

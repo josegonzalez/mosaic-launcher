@@ -4,9 +4,13 @@ api=1
 category=Library
 summary=Renames, deletes or adds a game to a collection from one button.
 description=Renames, deletes or adds the selected game to a collection, from one button.
+# favorites and tags move a renamed game's paths, when they're on
+optional=favorites,tags
 # the game list button for rename, delete and add to collection, shared with other plugins' actions on it
-setting.button=choice|Game actions button|Y|Y,L2,R2|button:game-actions.rename,button:game-actions.collect,button:game-actions.delete
+setting.button=choice|Game actions button|Y|Y,L2,R2|button:game-actions.rename,button:game-actions.rename-file,button:game-actions.collect,button:game-actions.delete
 setting.rename=toggle|Rename|on
+# renames a game's files, with its saves, states, art and play time
+setting.rename_file=toggle|Rename file|on
 setting.delete=toggle|Delete game|on
 setting.collections=toggle|Add to collection|on
 # off keeps a deleted game's saves, states and emulator settings

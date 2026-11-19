@@ -1983,6 +1983,19 @@ typedef struct MosaicHost {
 	// doesn't fit in size (writing ""). Check for it with
 	// MOSAIC_HOST_HAS(host, quick_tile_icon).
 	int (*quick_tile_icon)(const char* action_id, char* out, size_t size);
+
+	// Moving several paths' play history at once, such as after a plugin
+	// renamed a game folder and the files in it: play_move_paths moves each
+	// from[i] to to[i] as play_move does, all in one transaction, so every
+	// pair moves or none does. It returns how many pairs had sessions to
+	// move, 0 for none or when the tracker has no database yet, and -1,
+	// with nothing changed, for a path outside Roms, a pair with the same
+	// path twice, a count under 1 or over 256, a database gametimectl holds
+	// past a short wait or that can't be written, or a call where cfg_get
+	// is refused; the launcher logs each. play_time and the rest read the
+	// tracker again afterwards. Check for it with
+	// MOSAIC_HOST_HAS(host, play_move_paths).
+	int (*play_move_paths)(const char* const* from, const char* const* to, int count);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

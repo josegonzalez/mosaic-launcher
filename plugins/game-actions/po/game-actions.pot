@@ -15,6 +15,16 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
+#: game_actions.c
+#, c-format
+msgid "\nAlso moves %s."
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "%.80s is there already"
+msgstr ""
+
 #: actions_model.c
 #, c-format
 msgid "%i disc file"
@@ -70,7 +80,16 @@ msgid "Also deletes its folder%s%s.\n"
 msgstr ""
 
 #: game_actions.c
+#, c-format
+msgid "Another game in this system is named %.80s"
+msgstr ""
+
+#: game_actions.c
 msgid "Can't delete that"
+msgstr ""
+
+#: game_actions.c
+msgid "Can't rename that"
 msgstr ""
 
 #: game_actions.c
@@ -87,8 +106,24 @@ msgid "Couldn't list collections"
 msgstr ""
 
 #: game_actions.c
+#, c-format
+msgid "Couldn't move %.80s, so nothing was renamed"
+msgstr ""
+
+#: game_actions.c
+msgid "Couldn't move its play time, so nothing was renamed"
+msgstr ""
+
+#: game_actions.c
 msgid "Couldn't rename that"
 msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Couldn't rename, and %i file couldn't be put back: %.60s"
+msgid_plural "Couldn't rename, and %i files couldn't be put back, such as %.60s"
+msgstr[0] ""
+msgstr[1] ""
 
 #: game_actions.c
 msgid "Couldn't save the name"
@@ -143,16 +178,38 @@ msgstr ""
 msgid "RENAME"
 msgstr ""
 
+#: game_actions.c
+msgid "RENAME FILE"
+msgstr ""
+
 #: game_actions.c plugin.txt
 msgid "Rename"
+msgstr ""
+
+#: game_actions.c
+#, c-format
+msgid "Rename %.40s%s to %.40s%s?%s"
+msgstr ""
+
+#: game_actions.c plugin.txt
+msgid "Rename file"
 msgstr ""
 
 #: game_actions.c
 msgid "Renamed"
 msgstr ""
 
+#: game_actions.c
+#, c-format
+msgid "Renamed to %.80s"
+msgstr ""
+
 #: plugin.txt
 msgid "Renames, deletes or adds the selected game to a collection, from one button."
+msgstr ""
+
+#: game_actions.c
+msgid "That can't be a file name"
 msgstr ""
 
 #: game_actions.c

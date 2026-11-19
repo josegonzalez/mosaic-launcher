@@ -62,6 +62,16 @@ long long PlayHistory_day(int days_ago);
 // that can't be written. Forgets the answers, as PlayHistory_invalidate.
 int PlayHistory_move(const char* from, const char* to);
 
+// Moves several paths' histories the same way, in one transaction: every
+// pair moves or none does. Returns how many pairs had rows to move, 0 for
+// none or when there's no database file yet, or -1, with nothing changed,
+// for a path outside Roms, a pair with the same path twice, a count under
+// 1 or over PLAY_MOVE_MAX, or a database that's locked past the busy
+// timeout or can't be written. Forgets the answers, as
+// PlayHistory_invalidate.
+#define PLAY_MOVE_MAX 256
+int PlayHistory_movePaths(const char* const* from, const char* const* to, int count);
+
 // Every session with its game, oldest first: how many there are, up to
 // the newest PLAY_SESSIONS_MAX, or PLAY_UNKNOWN. Read the first time it's
 // asked, in a read of its own after the rest, and kept until the next

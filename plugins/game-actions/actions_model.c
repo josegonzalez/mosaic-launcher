@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -412,15 +413,17 @@ static int tagFolders(const char* parent, const char* tag, Names* out) {
 	return result;
 }
 
-// Saves, states and settings stored under name, which minarch takes from
-// the file it launched.
-static int addSaves(GAPlan* plan, const GACard* card, const char* sd_real, const char* tag,
-		const char* name, const Names* other_full, const Names* other_cut) {
-	if (strlen(name) > 255) return 0; // longer than a file name can be, so no sidecar has it
-	char file[GA_PATH_LEN];
+// Where stock keeps a game's saves, states and settings: each is in dir,
+// named after the file minarch launched, whole (cut 0) or with its
+// extension cut (cut 1), then suffix. Calls fn for each until one returns
+// nonzero, and returns that, or -1 when memory ran out.
+typedef int (*SidecarFn)(const char* dir, int cut, const char* suffix, int kind, void* ctx);
+
+static int eachSidecar(const GACard* card, const char* tag, SidecarFn fn, void* ctx) {
 	char saves[GA_PATH_LEN];
 	char shared[GA_PATH_LEN];
 	char slots[GA_PATH_LEN];
+	char suffix[32];
 	fmt(saves, sizeof(saves), "%s/Saves/%s", card->sdcard, tag);
 	fmt(shared, sizeof(shared), "%s/.userdata/shared", card->sdcard);
 	fmt(slots, sizeof(slots), "%s/.minui/%s", shared, tag);
@@ -430,60 +433,72 @@ static int addSaves(GAPlan* plan, const GACard* card, const char* sd_real, const
 	int result = tagFolders(shared, tag, &states);
 	if (!result && card->userdata) result = tagFolders(card->userdata, tag, &configs);
 
-	// under the whole file name, unless another game has that file name
-	if (!result && !namesHas(other_full, name)) {
-		fmt(file, sizeof(file), "%s.sav", name);
-		result |= addSidecar(plan, sd_real, saves, file, GA_SAVE);
-		fmt(file, sizeof(file), "%s.rtc", name);
-		result |= addSidecar(plan, sd_real, saves, file, GA_SAVE);
-		for (int s = 0; s < states.count; s++) {
-			for (int slot = 0; slot <= 9; slot++) {
-				fmt(file, sizeof(file), "%s.st%i", name, slot);
-				result |= addSidecar(plan, sd_real, states.items[s], file, GA_STATE);
-			}
-		}
-		fmt(file, sizeof(file), "%s.txt", name);
-		result |= addSidecar(plan, sd_real, slots, file, GA_SLOT);
-		for (int slot = 0; slot <= 9; slot++) {
-			fmt(file, sizeof(file), "%s.%i.bmp", name, slot);
-			result |= addSidecar(plan, sd_real, slots, file, GA_SLOT);
-			fmt(file, sizeof(file), "%s.%i.txt", name, slot);
-			result |= addSidecar(plan, sd_real, slots, file, GA_SLOT);
-		}
-		for (int c = 0; c < configs.count; c++) {
-			fmt(file, sizeof(file), "%s.cfg", name);
-			result |= addSidecar(plan, sd_real, configs.items[c], file, GA_CONFIG);
+	// under the whole file name
+	if (!result) result = fn(saves, 0, ".sav", GA_SAVE, ctx);
+	if (!result) result = fn(saves, 0, ".rtc", GA_SAVE, ctx);
+	for (int s = 0; !result && s < states.count; s++) {
+		for (int slot = 0; !result && slot <= 9; slot++) {
+			fmt(suffix, sizeof(suffix), ".st%i", slot);
+			result = fn(states.items[s], 0, suffix, GA_STATE, ctx);
 		}
 	}
+	if (!result) result = fn(slots, 0, ".txt", GA_SLOT, ctx);
+	for (int slot = 0; !result && slot <= 9; slot++) {
+		fmt(suffix, sizeof(suffix), ".%i.bmp", slot);
+		result = fn(slots, 0, suffix, GA_SLOT, ctx);
+		fmt(suffix, sizeof(suffix), ".%i.txt", slot);
+		if (!result) result = fn(slots, 0, suffix, GA_SLOT, ctx);
+	}
+	for (int c = 0; !result && c < configs.count; c++) result = fn(configs.items[c], 0, ".cfg", GA_CONFIG, ctx);
 
-	// under the name with its extension cut, for the .srm and .state
-	// formats, unless another game cuts to the same name
-	char cut[GA_PATH_LEN];
-	stripped(name, cut, sizeof(cut));
-	if (!result && !namesHas(other_cut, cut)) {
-		fmt(file, sizeof(file), "%s.sav", cut);
-		result |= addSidecar(plan, sd_real, saves, file, GA_SAVE);
-		fmt(file, sizeof(file), "%s.srm", cut);
-		result |= addSidecar(plan, sd_real, saves, file, GA_SAVE);
-		for (int s = 0; s < states.count; s++) {
-			fmt(file, sizeof(file), "%s.state", cut);
-			result |= addSidecar(plan, sd_real, states.items[s], file, GA_STATE);
-			fmt(file, sizeof(file), "%s.state.auto", cut);
-			result |= addSidecar(plan, sd_real, states.items[s], file, GA_STATE);
-			for (int slot = 0; slot <= 8; slot++) {
-				if (slot) {
-					fmt(file, sizeof(file), "%s.state%i", cut, slot);
-					result |= addSidecar(plan, sd_real, states.items[s], file, GA_STATE);
-				}
-				fmt(file, sizeof(file), "%s.state.%i", cut, slot);
-				result |= addSidecar(plan, sd_real, states.items[s], file, GA_STATE);
+	// under the name with its extension cut, for the .srm and .state formats
+	if (!result) result = fn(saves, 1, ".sav", GA_SAVE, ctx);
+	if (!result) result = fn(saves, 1, ".srm", GA_SAVE, ctx);
+	for (int s = 0; !result && s < states.count; s++) {
+		result = fn(states.items[s], 1, ".state", GA_STATE, ctx);
+		if (!result) result = fn(states.items[s], 1, ".state.auto", GA_STATE, ctx);
+		for (int slot = 0; !result && slot <= 8; slot++) {
+			if (slot) {
+				fmt(suffix, sizeof(suffix), ".state%i", slot);
+				result = fn(states.items[s], 1, suffix, GA_STATE, ctx);
 			}
+			fmt(suffix, sizeof(suffix), ".state.%i", slot);
+			if (!result) result = fn(states.items[s], 1, suffix, GA_STATE, ctx);
 		}
 	}
 
 	namesFree(&states);
 	namesFree(&configs);
-	return result ? -1 : 0;
+	return result;
+}
+
+typedef struct DeleteSidecars {
+	GAPlan* plan;
+	const char* sd_real;
+	const char* name;
+	char cut[GA_PATH_LEN];
+	int skip_full; // another game has the whole name
+	int skip_cut;  // or cuts to the same name
+} DeleteSidecars;
+
+static int deleteSidecar(const char* dir, int cut, const char* suffix, int kind, void* ctx) {
+	DeleteSidecars* d = ctx;
+	if (cut ? d->skip_cut : d->skip_full) return 0;
+	char file[GA_PATH_LEN];
+	fmt(file, sizeof(file), "%s%s", cut ? d->cut : d->name, suffix);
+	return addSidecar(d->plan, d->sd_real, dir, file, kind);
+}
+
+// Saves, states and settings stored under name, which minarch takes from
+// the file it launched, unless another game has that name, or cuts to the
+// same name for the formats that cut it.
+static int addSaves(GAPlan* plan, const GACard* card, const char* sd_real, const char* tag,
+		const char* name, const Names* other_full, const Names* other_cut) {
+	if (strlen(name) > 255) return 0; // longer than a file name can be, so no sidecar has it
+	DeleteSidecars d = { plan, sd_real, name, "", namesHas(other_full, name), 0 };
+	stripped(name, d.cut, sizeof(d.cut));
+	d.skip_cut = namesHas(other_cut, d.cut);
+	return eachSidecar(card, tag, deleteSidecar, &d) ? -1 : 0;
 }
 
 // <dir>/.media/<art name>.png, unless another entry in dir (other than
@@ -1012,4 +1027,480 @@ int GA_namesRemove(GANames* names, const char* rel, int is_dir) {
 		}
 	}
 	return removed;
+}
+
+///////////////////////////////////////
+// renaming a game's files
+
+void GA_renameInit(GARename* r) {
+	memset(r, 0, sizeof(*r));
+}
+
+void GA_renameFree(GARename* r) {
+	free(r->moves);
+	free(r->carries);
+	GA_renameInit(r);
+}
+
+void GA_editableName(const char* path, int is_dir, char* out, size_t size) {
+	const char* name = baseName(path);
+	const char* dot = is_dir ? NULL : strrchr(name, '.');
+	if (dot && dot != name) fmt(out, size, "%.*s", (int)(dot - name), name);
+	else fmt(out, size, "%s", name);
+}
+
+int GA_validFileName(const char* name) {
+	if (!name || !name[0] || name[0] == '.' || name[0] == ' ' || strlen(name) > GA_FILE_MAX) return 0;
+	for (const unsigned char* p = (const unsigned char*)name; *p; p++) {
+		if (*p == '/' || *p == '\\' || *p < 0x20 || *p == 0x7f) return 0;
+	}
+	return 1;
+}
+
+static int pushMove(GAMove** items, int* count, int* capacity, const char* from, const char* to, int kind, int copy) {
+	if (*count == *capacity) {
+		int more = *capacity ? *capacity * 2 : 16;
+		GAMove* grown = realloc(*items, sizeof(GAMove) * (size_t)more);
+		if (!grown) return -1;
+		*items = grown;
+		*capacity = more;
+	}
+	GAMove* m = &(*items)[(*count)++];
+	if (fmt(m->from, sizeof(m->from), "%s", from) >= (int)sizeof(m->from) || fmt(m->to, sizeof(m->to), "%s", to) >= (int)sizeof(m->to)) {
+		(*count)--;
+		return -1;
+	}
+	m->kind = kind;
+	m->copy = copy;
+	return 0;
+}
+
+static int addMove(GARename* r, const char* from, const char* to, int kind, int copy) {
+	for (int i = 0; i < r->count; i++) {
+		if (!strcmp(r->moves[i].from, from)) return 0;
+	}
+	if (pushMove(&r->moves, &r->count, &r->capacity, from, to, kind, copy) != 0) return -1;
+	r->counts[kind]++;
+	return 0;
+}
+
+// The same file, as when only a name's case changes on a card that
+// ignores case.
+static int sameFile(const char* a, const char* b) {
+	struct stat sa, sb;
+	return lstat(a, &sa) == 0 && lstat(b, &sb) == 0 && sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
+}
+
+typedef struct RenameSidecars {
+	GARename* r;
+	const char* sd_real;
+	const char* old_name;
+	const char* new_name;
+	char old_cut[GA_PATH_LEN];
+	char new_cut[GA_PATH_LEN];
+	int shared_full; // another game has the old whole name
+	int shared_cut;  // or cuts to the same name
+	int taken_cut;   // another game cuts to the new one
+} RenameSidecars;
+
+// A sidecar that's there, as a file or a link in a folder inside the card,
+// moves to the new name, or is copied when another game shares it. A
+// shared link stays, as copying it would follow it.
+static int sidecarStep(GARename* r, const char* sd_real, const char* dir, const char* old_file, const char* new_file, int kind, int shared) {
+	char from[GA_PATH_LEN];
+	char to[GA_PATH_LEN];
+	int n = fmt(from, sizeof(from), "%s/%s", dir, old_file);
+	int m = fmt(to, sizeof(to), "%s/%s", dir, new_file);
+	if (n < 0 || (size_t)n >= sizeof(from) || m < 0 || (size_t)m >= sizeof(to)) return 0;
+	struct stat st;
+	if (lstat(from, &st) != 0 || !(S_ISREG(st.st_mode) || S_ISLNK(st.st_mode))) return 0;
+	if (!parentInside(sd_real, from)) return 0;
+	if (shared && !S_ISREG(st.st_mode)) return 0;
+	return addMove(r, from, to, kind, shared);
+}
+
+static int renameSidecar(const char* dir, int cut, const char* suffix, int kind, void* ctx) {
+	RenameSidecars* d = ctx;
+	char old_file[GA_PATH_LEN];
+	char new_file[GA_PATH_LEN];
+	fmt(old_file, sizeof(old_file), "%s%s", cut ? d->old_cut : d->old_name, suffix);
+	fmt(new_file, sizeof(new_file), "%s%s", cut ? d->new_cut : d->new_name, suffix);
+	int before = d->r->count;
+	int result = sidecarStep(d->r, d->sd_real, dir, old_file, new_file, kind, cut ? d->shared_cut : d->shared_full);
+	// the new cut name another game's would share it from then on
+	if (!result && cut && d->r->count > before && d->taken_cut) {
+		d->r->error = GA_RENAME_TAKEN;
+		fmt(d->r->clash, sizeof(d->r->clash), "%s", d->new_cut);
+		return 1;
+	}
+	return result;
+}
+
+// Whether another entry in dir than the game and the files it lists has
+// the same art name.
+static int artShared(const char* dir, const char* game, const char* art, const Names* listed) {
+	DIR* dh = opendir(dir);
+	if (!dh) return 0;
+	struct dirent* dp;
+	int shared = 0;
+	while (!shared && (dp = readdir(dh)) != NULL) {
+		if (dp->d_name[0] == '.' || !strcmp(dp->d_name, game) || namesHas(listed, dp->d_name)) continue;
+		char other[GA_PATH_LEN];
+		artName(dp->d_name, other, sizeof(other));
+		if (!strcmp(other, art)) shared = 1;
+	}
+	closedir(dh);
+	return shared;
+}
+
+static int addCarry(GARename* r, const char* from) {
+	if (r->carry_count >= GA_CARRY_MAX) return 0;
+	char to[GA_PATH_LEN];
+	if (!GA_renamedPath(r, from, to, sizeof(to))) return 0;
+	for (int i = 0; i < r->carry_count; i++) {
+		if (!strcmp(r->carries[i].from, from)) return 0;
+	}
+	return pushMove(&r->carries, &r->carry_count, &r->carry_capacity, from, to, GA_GAME, 0);
+}
+
+// The paths recents, sets and play history can know the game by: the
+// game, and in a game folder its .m3u and .cue and each file beside them.
+static int addCarries(GARename* r) {
+	if (addCarry(r, r->from) != 0) return -1;
+	if (!r->is_dir) return 0;
+	for (int i = 0; i < r->list_count; i++) {
+		char path[GA_PATH_LEN];
+		fmt(path, sizeof(path), "%s/%s", r->from, r->lists[i][0]);
+		if (addCarry(r, path) != 0) return -1;
+	}
+	DIR* dh = opendir(r->from);
+	if (!dh) return 0;
+	struct dirent* dp;
+	int result = 0;
+	while (!result && (dp = readdir(dh)) != NULL) {
+		if (dp->d_name[0] == '.') continue;
+		char path[GA_PATH_LEN];
+		int n = fmt(path, sizeof(path), "%s/%s", r->from, dp->d_name);
+		if (n < 0 || (size_t)n >= sizeof(path) || isRealDir(path)) continue;
+		result = addCarry(r, path);
+	}
+	closedir(dh);
+	return result;
+}
+
+static int refuse(GARename* r, int error, const char* clash) {
+	int keep = r->error ? r->error : error;
+	char saved[GA_PATH_LEN];
+	fmt(saved, sizeof(saved), "%s", r->error ? r->clash : clash ? clash : "");
+	GA_renameFree(r);
+	r->error = keep;
+	fmt(r->clash, sizeof(r->clash), "%s", saved);
+	return -1;
+}
+
+int GA_planRename(const GACard* card, const char* path, const char* new_name, GARename* r) {
+	GA_renameFree(r);
+	char target[GA_PATH_LEN];
+	int is_dir = 0;
+	if (!card || !card->sdcard || !path || !GA_gameFor(card->sdcard, path, target, sizeof(target), &is_dir)) {
+		return refuse(r, GA_RENAME_GAME, NULL);
+	}
+	char sd_real[GA_PATH_LEN];
+	if (!resolve(card->sdcard, sd_real)) return refuse(r, GA_RENAME_GAME, NULL);
+	if (!GA_validFileName(new_name)) return refuse(r, GA_RENAME_NAME, NULL);
+
+	const char* old_file = baseName(target);
+	const char* dot = is_dir ? NULL : strrchr(old_file, '.');
+	if (dot == old_file) dot = NULL;
+	char new_file[GA_PATH_LEN];
+	fmt(new_file, sizeof(new_file), "%s%s", new_name, dot ? dot : "");
+	if (strlen(new_file) > GA_FILE_MAX) return refuse(r, GA_RENAME_NAME, NULL);
+	if (!strcmp(new_file, old_file)) return refuse(r, GA_RENAME_SAME, NULL);
+
+	char dir[GA_PATH_LEN];
+	dirName(target, dir, sizeof(dir));
+	fmt(r->sdcard, sizeof(r->sdcard), "%s", card->sdcard);
+	fmt(r->from, sizeof(r->from), "%s", target);
+	if (fmt(r->to, sizeof(r->to), "%s/%s", dir, new_file) >= (int)sizeof(r->to)) return refuse(r, GA_RENAME_NAME, NULL);
+	r->is_dir = is_dir;
+	struct stat st;
+	if (lstat(r->to, &st) == 0 && !sameFile(r->from, r->to)) return refuse(r, GA_RENAME_EXISTS, r->to);
+
+	Names launched_old = {0}; // the names minarch saves the game under, before
+	Names launched_new = {0}; // and after
+	int result = 0;
+	if (is_dir) {
+		// the .m3u and .cue named after the folder, renamed inside it first
+		static const char* exts[] = { ".m3u", ".cue" };
+		for (int e = 0; !result && e < 2; e++) {
+			char list[GA_PATH_LEN];
+			if (!namedAfter(target, exts[e], list, sizeof(list))) continue;
+			char renamed[GA_PATH_LEN];
+			fmt(r->lists[r->list_count][0], sizeof(r->lists[0][0]), "%s", baseName(list));
+			fmt(r->lists[r->list_count][1], sizeof(r->lists[0][1]), "%s%s", new_file, exts[e]);
+			fmt(renamed, sizeof(renamed), "%s/%s", target, r->lists[r->list_count][1]);
+			result |= addMove(r, list, renamed, GA_GAME, 0);
+			result |= namesAdd(&launched_old, r->lists[r->list_count][0]);
+			result |= namesAdd(&launched_new, r->lists[r->list_count][1]);
+			r->list_count++;
+		}
+	}
+	else {
+		result |= namesAdd(&launched_old, old_file);
+		result |= namesAdd(&launched_new, new_file);
+	}
+	result |= addMove(r, target, r->to, GA_GAME, 0);
+	// a loose .cue or .m3u's own files aren't other games
+	Names listed = {0};
+	if (!result && !is_dir && (endsWithCase(target, ".cue") || endsWithCase(target, ".m3u"))) {
+		result |= listedFiles(target, &listed);
+	}
+
+	// its art and details in .media, beside the game
+	char old_art[GA_PATH_LEN];
+	char new_art[GA_PATH_LEN];
+	artName(old_file, old_art, sizeof(old_art));
+	artName(new_file, new_art, sizeof(new_art));
+	char media[GA_PATH_LEN];
+	fmt(media, sizeof(media), "%s/.media", dir);
+	if (!result && old_art[0] && new_art[0] && strcmp(old_art, new_art) != 0 && strlen(old_art) <= 250 && isRealDir(media)) {
+		int shared = artShared(dir, old_file, old_art, &listed);
+		static const char* kinds[] = { ".png", ".info" };
+		for (int k = 0; !result && k < 2; k++) {
+			char from_name[GA_PATH_LEN];
+			char to_name[GA_PATH_LEN];
+			fmt(from_name, sizeof(from_name), "%s%s", old_art, kinds[k]);
+			fmt(to_name, sizeof(to_name), "%s%s", new_art, kinds[k]);
+			result |= sidecarStep(r, sd_real, media, from_name, to_name, GA_ART, shared);
+		}
+	}
+
+	// saves, states and settings, by the system's tag
+	char roms[GA_PATH_LEN];
+	fmt(roms, sizeof(roms), "%s/Roms", card->sdcard);
+	const char* rest = target + strlen(roms) + 1;
+	char folder[GA_PATH_LEN];
+	fmt(folder, sizeof(folder), "%.*s", (int)(strchr(rest, '/') - rest), rest);
+	char tag[GA_PATH_LEN];
+	GA_tagOf(folder, tag, sizeof(tag));
+	Names other_full = {0};
+	Names other_cut = {0};
+	if (!result && tag[0]) {
+		Names skip = {0};
+		result |= namesAdd(&skip, target);
+		for (int i = 0; !result && i < listed.count; i++) {
+			char path[GA_PATH_LEN];
+			fmt(path, sizeof(path), "%s/%s", dir, listed.items[i]);
+			result |= namesAdd(&skip, path);
+		}
+		if (!result) result |= systemNames(roms, tag, &skip, &other_full, &other_cut);
+		namesFree(&skip);
+	}
+	for (int i = 0; !result && tag[0] && i < launched_old.count; i++) {
+		const char* old_launch = launched_old.items[i];
+		const char* new_launch = launched_new.items[i];
+		if (namesHas(&other_full, new_launch)) {
+			r->error = GA_RENAME_TAKEN;
+			fmt(r->clash, sizeof(r->clash), "%s", new_launch);
+			result = 1;
+			break;
+		}
+		if (strlen(old_launch) > 255) continue;
+		RenameSidecars d = { r, sd_real, old_launch, new_launch, "", "", namesHas(&other_full, old_launch), 0, 0 };
+		stripped(old_launch, d.old_cut, sizeof(d.old_cut));
+		stripped(new_launch, d.new_cut, sizeof(d.new_cut));
+		d.shared_cut = namesHas(&other_cut, d.old_cut);
+		d.taken_cut = namesHas(&other_cut, d.new_cut);
+		result = eachSidecar(card, tag, renameSidecar, &d);
+	}
+	namesFree(&listed);
+	namesFree(&launched_old);
+	namesFree(&launched_new);
+	namesFree(&other_full);
+	namesFree(&other_cut);
+	if (result) return refuse(r, GA_RENAME_MEMORY, NULL);
+
+	// every target checked before anything changes: none may be there, or
+	// be another step's too
+	for (int i = 0; i < r->count; i++) {
+		GAMove* m = &r->moves[i];
+		int there = lstat(m->to, &st) == 0;
+		if (there && sameFile(m->from, m->to)) {
+			if (m->copy) { // the same file under both names: nothing to copy
+				r->counts[m->kind]--;
+				memmove(m, m + 1, sizeof(GAMove) * (size_t)(r->count - i - 1));
+				r->count--;
+				i--;
+			}
+			continue;
+		}
+		// a folder's .m3u checked where it'll be once the folder moves
+		char final[GA_PATH_LEN];
+		if (is_dir && isUnder(target, m->to) && GA_renamedPath(r, m->from, final, sizeof(final)) && lstat(final, &st) == 0) {
+			return refuse(r, GA_RENAME_EXISTS, final);
+		}
+		if (there) return refuse(r, GA_RENAME_EXISTS, m->to);
+		for (int j = 0; j < i; j++) {
+			if (!strcmp(r->moves[j].to, m->to)) return refuse(r, GA_RENAME_EXISTS, m->to);
+		}
+	}
+	if (addCarries(r) != 0) return refuse(r, GA_RENAME_MEMORY, NULL);
+	return 0;
+}
+
+// Copies a regular file to a new one, never following a link or writing
+// over anything.
+static int copyFile(const char* from, const char* to) {
+	int in = open(from, O_RDONLY | O_NOFOLLOW);
+	if (in < 0) return -1;
+	struct stat st;
+	if (fstat(in, &st) != 0 || !S_ISREG(st.st_mode)) {
+		close(in);
+		return -1;
+	}
+	int out = open(to, O_WRONLY | O_CREAT | O_EXCL, 0644);
+	if (out < 0) {
+		close(in);
+		return -1;
+	}
+	char buffer[16384];
+	ssize_t got;
+	int ok = 1;
+	while (ok && (got = read(in, buffer, sizeof(buffer))) != 0) {
+		if (got < 0) ok = 0;
+		else ok = write(out, buffer, (size_t)got) == got;
+	}
+	ok = close(out) == 0 && ok;
+	close(in);
+	if (!ok) unlink(to);
+	return ok ? 0 : -1;
+}
+
+int GA_undoRename(const GARename* r, int done, GARenameResult* out) {
+	int stuck = 0;
+	for (int i = done - 1; i >= 0; i--) {
+		const GAMove* m = &r->moves[i];
+		struct stat st;
+		int ok = m->copy ? unlink(m->to) == 0
+			: (lstat(m->from, &st) != 0 || sameFile(m->from, m->to)) && rename(m->to, m->from) == 0;
+		if (ok) continue;
+		if (!stuck++ && out) fmt(out->stuck_path, sizeof(out->stuck_path), "%s", m->to);
+	}
+	if (out) out->stuck += stuck;
+	return stuck;
+}
+
+int GA_runRename(const GARename* r, GARenameResult* out) {
+	if (out) memset(out, 0, sizeof(*out));
+	char sd_real[GA_PATH_LEN];
+	char roms_real[GA_PATH_LEN];
+	char roms[GA_PATH_LEN];
+	fmt(roms, sizeof(roms), "%s/Roms", r->sdcard);
+	if (!r->count || !r->sdcard[0] || !resolve(r->sdcard, sd_real) || !resolve(roms, roms_real)) {
+		if (out) fmt(out->failed, sizeof(out->failed), "%s", r->from);
+		return -1;
+	}
+	for (int i = 0; i < r->count; i++) {
+		const GAMove* m = &r->moves[i];
+		struct stat st;
+		int ok = cleanPath(m->from) && cleanPath(m->to) && lstat(m->from, &st) == 0;
+		if (ok && m->kind == GA_GAME) ok = parentInside(roms_real, m->from) && parentInside(roms_real, m->to);
+		else if (ok) ok = parentInside(sd_real, m->from) && parentInside(sd_real, m->to);
+		if (ok) {
+			struct stat there;
+			// never over anything, apart from the same file under another case
+			if (lstat(m->to, &there) == 0 && !(there.st_dev == st.st_dev && there.st_ino == st.st_ino && !m->copy)) ok = 0;
+		}
+		if (ok) ok = m->copy ? copyFile(m->from, m->to) == 0 : rename(m->from, m->to) == 0;
+		if (!ok) {
+			if (out) fmt(out->failed, sizeof(out->failed), "%s", m->from);
+			GA_undoRename(r, i, out);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int GA_renamedPath(const GARename* r, const char* path, char* out, size_t size) {
+	if (!path || !r->from[0]) return 0;
+	if (!strcmp(path, r->from)) {
+		fmt(out, size, "%s", r->to);
+		return 1;
+	}
+	if (!r->is_dir || !isUnder(r->from, path)) return 0;
+	const char* rest = path + strlen(r->from) + 1;
+	for (int i = 0; i < r->list_count; i++) {
+		if (!strcmp(rest, r->lists[i][0])) {
+			fmt(out, size, "%s/%s", r->to, r->lists[i][1]);
+			return 1;
+		}
+	}
+	int n = fmt(out, size, "%s/%s", r->to, rest);
+	return n > 0 && (size_t)n < size;
+}
+
+void GA_renameSummary(const GARename* r, char* out, size_t size) {
+	GAPlan counts;
+	GA_planInit(&counts);
+	memcpy(counts.counts, r->counts, sizeof(counts.counts));
+	GA_planSummary(&counts, out, size);
+}
+
+int GA_collectionRename(const char* file, const char* sdcard, const GARename* r) {
+	if (!sdcard) return -1;
+	size_t length;
+	char* data = readAll(file, &length);
+	if (!data) return -1;
+	size_t sd_len = strlen(sdcard);
+	size_t room = length + 1 + (size_t)GA_PATH_LEN * 4;
+	char* out = malloc(room);
+	if (!out) {
+		free(data);
+		return -1;
+	}
+	size_t used = 0;
+	int changed = 0;
+	int result = 0;
+	for (char* line = data; *line && !result;) {
+		char* end = strchr(line, '\n');
+		size_t len = end ? (size_t)(end - line) + 1 : strlen(line);
+		size_t text = len;
+		while (text && (line[text - 1] == '\n' || line[text - 1] == '\r')) text--;
+		char full[GA_PATH_LEN * 2];
+		char moved[GA_PATH_LEN];
+		const char* put = line;
+		size_t put_len = len;
+		char rewritten[GA_PATH_LEN + 2];
+		if (line[0] == '/' && text < GA_PATH_LEN) {
+			fmt(full, sizeof(full), "%s%.*s", sdcard, (int)text, line);
+			if (GA_renamedPath(r, full, moved, sizeof(moved)) && isUnder(sdcard, moved)) {
+				int n = fmt(rewritten, sizeof(rewritten), "%s%s", moved + sd_len, end ? "\n" : "");
+				put = rewritten;
+				put_len = (size_t)n;
+				changed++;
+				// there already: the old line just goes
+				for (char* other = data; *other;) {
+					char* other_end = strchr(other, '\n');
+					size_t other_len = other_end ? (size_t)(other_end - other) : strlen(other);
+					if (lineMatches(other, other_len, moved + sd_len, 0)) put_len = 0;
+					other += other_len + (other_end ? 1 : 0);
+				}
+			}
+		}
+		if (used + put_len + 1 > room) {
+			room = (used + put_len + 1) * 2;
+			char* grown = realloc(out, room);
+			if (!grown) result = -1;
+			else out = grown;
+		}
+		if (!result) {
+			memcpy(out + used, put, put_len);
+			used += put_len;
+		}
+		line += len;
+	}
+	if (!result && changed && writeAll(file, out, used) != 0) result = -1;
+	free(out);
+	free(data);
+	return result < 0 ? -1 : changed;
 }

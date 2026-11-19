@@ -535,37 +535,44 @@ static int run(sqlite3* db, const char* query, const char* a, const char* b) {
 	return ok ? sql.changes(db) : -1;
 }
 
+// gametimectl's name for a game: its file name without the extension.
+static void gameName(const char* rel, char* out, size_t size) {
+	const char* base = strrchr(rel, '/');
+	snprintf(out, size, "%s", base ? base + 1 : rel);
+	char* dot = strrchr(out, '.');
+	if (dot && dot != out) *dot = '\0';
+}
+
+// Moves one path's rows inside an open transaction: onto the first row
+// the new path already has, as gametimectl would find it, leaving the old
+// row with no sessions; otherwise renamed. Returns the rows changed, or -1.
+static int movePair(sqlite3* db, const char* from_rel, const char* to_rel) {
+	char name[512];
+	gameName(to_rel, name, sizeof(name));
+	sqlite3_stmt* stmt = NULL;
+	int has_to = 0;
+	if (sql.prepare_v2(db, "SELECT 1 FROM rom WHERE file_path = ?1 LIMIT 1;", -1, &stmt, NULL) == SQL_OK) {
+		if (sql.bind_text(stmt, 1, to_rel, -1, NULL) == SQL_OK) has_to = sql.step(stmt) == SQL_ROW;
+		sql.finalize(stmt);
+	}
+	if (has_to) {
+		return run(db, "UPDATE play_activity SET rom_id = (SELECT id FROM rom WHERE file_path = ?2 ORDER BY id LIMIT 1) "
+			"WHERE rom_id IN (SELECT id FROM rom WHERE file_path = ?1);", from_rel, to_rel);
+	}
+	int moved = run(db, "UPDATE rom SET file_path = ?2 WHERE file_path = ?1;", from_rel, to_rel);
+	if (moved > 0 && run(db, "UPDATE rom SET name = ?1 WHERE file_path = ?2;", name, to_rel) < 0) moved = -1;
+	return moved;
+}
+
 int PlayHistory_move(const char* from, const char* to) {
 	char from_rel[512], to_rel[512];
 	if (!from || !to || !Play_relPath(roms_path, from, from_rel, sizeof(from_rel))
 			|| !Play_relPath(roms_path, to, to_rel, sizeof(to_rel)) || !strcmp(from_rel, to_rel)) return -1;
 	sqlite3* db = openDatabaseAs(SQL_OPEN_READWRITE);
 	if (!db) return -1;
-	// the name gametimectl gives a game: its file name without the extension
-	char name[512];
-	const char* base = strrchr(to_rel, '/');
-	snprintf(name, sizeof(name), "%s", base ? base + 1 : to_rel);
-	char* dot = strrchr(name, '.');
-	if (dot && dot != name) *dot = '\0';
-
 	int moved = -1;
 	if (run(db, "BEGIN IMMEDIATE;", NULL, NULL) >= 0) {
-		sqlite3_stmt* stmt = NULL;
-		int has_to = 0;
-		if (sql.prepare_v2(db, "SELECT 1 FROM rom WHERE file_path = ?1 LIMIT 1;", -1, &stmt, NULL) == SQL_OK) {
-			if (sql.bind_text(stmt, 1, to_rel, -1, NULL) == SQL_OK) has_to = sql.step(stmt) == SQL_ROW;
-			sql.finalize(stmt);
-		}
-		// onto the first row the new path already has, as gametimectl would
-		// find it, leaving the old row with no sessions; otherwise renamed
-		if (has_to) {
-			moved = run(db, "UPDATE play_activity SET rom_id = (SELECT id FROM rom WHERE file_path = ?2 ORDER BY id LIMIT 1) "
-				"WHERE rom_id IN (SELECT id FROM rom WHERE file_path = ?1);", from_rel, to_rel);
-		}
-		else {
-			moved = run(db, "UPDATE rom SET file_path = ?2 WHERE file_path = ?1;", from_rel, to_rel);
-			if (moved > 0 && run(db, "UPDATE rom SET name = ?1 WHERE file_path = ?2;", name, to_rel) < 0) moved = -1;
-		}
+		moved = movePair(db, from_rel, to_rel);
 		if (run(db, moved < 0 ? "ROLLBACK;" : "COMMIT;", NULL, NULL) < 0) moved = -1;
 	}
 	if (moved < 0) note("play history: couldn't move %s to %s: %s", from_rel, to_rel, sql.errmsg(db));
@@ -573,6 +580,50 @@ int PlayHistory_move(const char* from, const char* to) {
 	sql.close(db);
 	PlayHistory_invalidate();
 	return moved < 0 ? -1 : moved > 0;
+}
+
+int PlayHistory_movePaths(const char* const* from, const char* const* to, int count) {
+	if (!from || !to || count < 1 || count > PLAY_MOVE_MAX) return -1;
+	char (*rels)[2][512] = malloc(sizeof(*rels) * (size_t)count);
+	if (!rels) return -1;
+	int ok = 1;
+	for (int i = 0; ok && i < count; i++) {
+		ok = from[i] && to[i] && Play_relPath(roms_path, from[i], rels[i][0], sizeof(rels[i][0]))
+			&& Play_relPath(roms_path, to[i], rels[i][1], sizeof(rels[i][1])) && strcmp(rels[i][0], rels[i][1]) != 0;
+	}
+	struct stat st;
+	if (!ok || !db_path[0] || stat(db_path, &st) != 0) {
+		// no database is nothing to move, as before gametimectl's first game
+		if (ok) note("play history: no %s, nothing to move", db_path[0] ? db_path : "database");
+		free(rels);
+		return ok ? 0 : -1;
+	}
+	sqlite3* db = openDatabaseAs(SQL_OPEN_READWRITE);
+	if (!db) {
+		free(rels);
+		PlayHistory_invalidate();
+		return -1;
+	}
+	int moved = -1;
+	// IMMEDIATE, as PlayHistory_forget: every pair or none
+	if (run(db, "BEGIN IMMEDIATE;", NULL, NULL) >= 0) {
+		moved = 0;
+		for (int i = 0; moved >= 0 && i < count; i++) {
+			int rows = movePair(db, rels[i][0], rels[i][1]);
+			if (rows < 0) moved = -1;
+			else if (rows > 0) moved++;
+		}
+		if (run(db, moved < 0 ? "ROLLBACK;" : "COMMIT;", NULL, NULL) < 0) {
+			if (moved >= 0) run(db, "ROLLBACK;", NULL, NULL);
+			moved = -1;
+		}
+	}
+	if (moved < 0) note("play history: couldn't move %i path%s from %s: %s", count, count == 1 ? "" : "s", rels[0][0], sql.errmsg(db));
+	else note("play history: moved %i of %i path%s from %s", moved, count, count == 1 ? "" : "s", rels[0][0]);
+	sql.close(db);
+	free(rels);
+	PlayHistory_invalidate();
+	return moved;
 }
 
 // The sessions of the rows in ids, or every session with none: -1 when a

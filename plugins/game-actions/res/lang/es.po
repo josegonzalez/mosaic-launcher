@@ -132,3 +132,48 @@ msgstr "sus archivos de reanudación"
 
 msgid "its settings"
 msgstr "sus ajustes"
+
+#, c-format
+msgid "\nAlso moves %s."
+msgstr "\nTambién mueve %s."
+
+#, c-format
+msgid "%.80s is there already"
+msgstr "%.80s ya existe"
+
+#, c-format
+msgid "Another game in this system is named %.80s"
+msgstr "Otro juego de este sistema se llama %.80s"
+
+msgid "Can't rename that"
+msgstr "No se puede renombrar eso"
+
+#, c-format
+msgid "Couldn't move %.80s, so nothing was renamed"
+msgstr "No se pudo mover %.80s, así que no se renombró nada"
+
+msgid "Couldn't move its play time, so nothing was renamed"
+msgstr "No se pudo mover su tiempo de juego, así que no se renombró nada"
+
+#, c-format
+msgid "Couldn't rename, and %i file couldn't be put back: %.60s"
+msgid_plural "Couldn't rename, and %i files couldn't be put back, such as %.60s"
+msgstr[0] "No se pudo renombrar, y %i archivo no se pudo devolver: %.60s"
+msgstr[1] "No se pudo renombrar, y %i archivos no se pudieron devolver, como %.60s"
+
+msgid "RENAME FILE"
+msgstr "RENOMBRAR ARCHIVO"
+
+#, c-format
+msgid "Rename %.40s%s to %.40s%s?%s"
+msgstr "¿Renombrar %.40s%s a %.40s%s?%s"
+
+msgid "Rename file"
+msgstr "Renombrar archivo"
+
+#, c-format
+msgid "Renamed to %.80s"
+msgstr "Renombrado a %.80s"
+
+msgid "That can't be a file name"
+msgstr "Eso no puede ser un nombre de archivo"

@@ -495,6 +495,79 @@ static const char* rowsLeft(const char* query) {
 #define SESSIONS_LEFT() rowsLeft("SELECT rom_id, play_time FROM play_activity ORDER BY rowid;")
 #define ROMS_LEFT() rowsLeft("SELECT id, name FROM rom ORDER BY id;")
 
+// Moving several paths in one transaction: a folder's .m3u and disc
+// moved together, nothing else touched, nothing at all when one pair is
+// bad or the database is locked, and 0 with no database.
+static void testMovePaths(void) {
+	makeFixture();
+	PlayHistory_configure(DB, ROMS, onLog);
+	sqlite3* db = openWriter();
+	exec(db, "INSERT INTO rom(id, type, name, file_path) VALUES(6, '', 'FF7', 'PS (PS)/FF7/FF7.m3u');"
+		"INSERT INTO rom(id, type, name, file_path) VALUES(7, '', 'FF7 (Disc 2)', 'PS (PS)/FF7/FF7 (Disc 2).cue');");
+	session(db, 6, midnight - 50, "40");
+	session(db, 7, midnight - 30, "20");
+	db_close(db);
+	const char* paths_before = rowsLeft("SELECT id, file_path FROM rom ORDER BY id;");
+	char saved_paths[512];
+	snprintf(saved_paths, sizeof(saved_paths), "%s", paths_before);
+	const char* sessions_before = "1:3600 1:900 1:1200 2:NULL 3:50 5:77 6:40 7:20";
+	CHECK_STR(SESSIONS_LEFT(), sessions_before);
+
+	const char* from[] = { ROMS "/PS (PS)/FF7/FF7.m3u", ROMS "/PS (PS)/FF7/FF7 (Disc 2).cue", ROMS "/PS (PS)/FF7/FF7 (Disc 1).cue" };
+	const char* to[] = { ROMS "/PS (PS)/Final/Final.m3u", ROMS "/PS (PS)/Final/FF7 (Disc 2).cue", ROMS "/PS (PS)/Final/FF7 (Disc 1).cue" };
+	CHECK(PlayHistory_seconds(ROMS "/PS (PS)/FF7/FF7.m3u") == 40);
+
+	// a bad pair: nothing moves
+	const char* bad_to[] = { ROMS "/PS (PS)/Final/Final.m3u", "/elsewhere/x.cue", ROMS "/PS (PS)/Final/FF7 (Disc 1).cue" };
+	CHECK(PlayHistory_movePaths(from, bad_to, 3) == -1);
+	const char* same_to[] = { ROMS "/PS (PS)/Final/Final.m3u", ROMS "/PS (PS)/FF7/FF7 (Disc 2).cue", ROMS "/PS (PS)/Final/FF7 (Disc 1).cue" };
+	CHECK(PlayHistory_movePaths(from, same_to, 3) == -1);
+	CHECK(PlayHistory_movePaths(from, to, 0) == -1);
+	CHECK(PlayHistory_movePaths(NULL, to, 3) == -1);
+	CHECK_STR(rowsLeft("SELECT id, file_path FROM rom ORDER BY id;"), saved_paths);
+
+	// locked by gametimectl: it gives up and changes nothing
+	sqlite3* writer = openWriter();
+	exec(writer, "BEGIN IMMEDIATE; INSERT INTO play_activity(rom_id, play_time, created_at) VALUES(2, 10, 1);");
+	time_t started = time(NULL);
+	CHECK(PlayHistory_movePaths(from, to, 3) == -1);
+	CHECK(time(NULL) - started <= 3);
+	CHECK(strstr(last_log, "play history: couldn't move 3 paths from PS (PS)/FF7/FF7.m3u") != NULL);
+	exec(writer, "ROLLBACK;");
+	db_close(writer);
+	CHECK_STR(rowsLeft("SELECT id, file_path FROM rom ORDER BY id;"), saved_paths);
+
+	// both rows moved and renamed as gametimectl names them; the third had none
+	CHECK(PlayHistory_movePaths(from, to, 3) == 2);
+	CHECK(!PlayHistory_loaded());
+	CHECK(strstr(last_log, "play history: moved 2 of 3 paths from PS (PS)/FF7/FF7.m3u") != NULL);
+	CHECK_STR(rowsLeft("SELECT id, file_path FROM rom WHERE id >= 6 ORDER BY id;"), "6:PS (PS)/Final/Final.m3u 7:PS (PS)/Final/FF7 (Disc 2).cue");
+	CHECK_STR(rowsLeft("SELECT id, file_path FROM rom WHERE id < 6 ORDER BY id;"),
+		"1:GB (GB)/Tetris.gb 2:GBA (MGBA)/Zelda.gba 3:NULL 4:NES (FCEUMM)/Unplayed.nes 5:GB (GB)/Tetris.gb");
+	CHECK_STR(ROMS_LEFT(), "1:Tetris 2:Zelda 3:Metroid 4:Unplayed 5:Tetris again 6:Final 7:FF7 (Disc 2)");
+	CHECK_STR(SESSIONS_LEFT(), sessions_before);
+	CHECK(PlayHistory_seconds(ROMS "/PS (PS)/Final/Final.m3u") == 40);
+	CHECK(PlayHistory_seconds(ROMS "/PS (PS)/FF7/FF7.m3u") == 0);
+
+	// onto a path that has a row already: its sessions join it
+	const char* tetris[] = { ROMS "/GB (GB)/Tetris.gb" };
+	const char* unplayed[] = { ROMS "/NES (FCEUMM)/Unplayed.nes" };
+	CHECK(PlayHistory_movePaths(tetris, unplayed, 1) == 1);
+	CHECK(PlayHistory_seconds(ROMS "/NES (FCEUMM)/Unplayed.nes") == 3600 + 900 + 1200 + 77);
+
+	// no database: nothing to move, and none made
+	unlink(DB);
+	CHECK(PlayHistory_movePaths(from, to, 3) == 0);
+	CHECK(access(DB, F_OK) != 0);
+	CHECK(PlayHistory_movePaths(from, bad_to, 3) == -1);
+	// an empty file, before gametimectl makes its tables
+	FILE* f = fopen(DB, "w");
+	fclose(f);
+	CHECK(PlayHistory_movePaths(from, to, 3) == -1);
+	unlink(DB);
+	PlayHistory_invalidate();
+}
+
 // Resetting play time: one game's sessions, every one of its rows', and
 // nothing else; every session; and nothing at all when the database is
 // missing, locked or outside Roms.
@@ -580,6 +653,7 @@ int main(void) {
 	testList();
 	testCaps();
 	testMove();
+	testMovePaths();
 	testSessions();
 	testForget();
 	testBig();

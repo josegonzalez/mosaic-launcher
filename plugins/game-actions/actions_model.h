@@ -144,4 +144,101 @@ int GA_namesSet(GANames* names, const char* rel, const char* name);
 // how many went.
 int GA_namesRemove(GANames* names, const char* rel, int is_dir);
 
+///////////////////////////////////////
+// renaming a game's files
+
+// The most paths a rename carries over in recents, sets and play history:
+// the game, and for a game folder each file in it.
+#define GA_CARRY_MAX 256
+// The longest new file name, so its sidecars' names still fit.
+#define GA_FILE_MAX 200
+
+// One step of a rename, in order: from moved to to, or copied when another
+// game uses the file too.
+typedef struct GAMove {
+	char from[GA_PATH_LEN];
+	char to[GA_PATH_LEN];
+	int kind; // an enum GAKind
+	int copy;
+} GAMove;
+
+// Why a rename can't go ahead.
+enum GARenameError {
+	GA_RENAME_OK,
+	GA_RENAME_GAME,   // the path isn't a game GA_gameFor accepts
+	GA_RENAME_NAME,   // the new name can't be a file name
+	GA_RENAME_SAME,   // the new name is the old one
+	GA_RENAME_EXISTS, // clash is a target that's there already
+	GA_RENAME_TAKEN,  // another game in the system has the name clash, so they'd share saves
+	GA_RENAME_MEMORY,
+};
+
+typedef struct GARename {
+	GAMove* moves; // the game first (a folder's .m3u and .cue, then the folder), then its sidecars
+	int count;
+	int capacity;
+	int counts[GA_KINDS];
+	GAMove* carries; // every path the game is known by, old and new, for recents, sets and play history
+	int carry_count;
+	int carry_capacity;
+	char sdcard[GA_PATH_LEN]; // the card it's on
+	char from[GA_PATH_LEN]; // the game, as it is
+	char to[GA_PATH_LEN];   // and after
+	int is_dir;
+	char lists[2][2][256]; // a game folder's .m3u and .cue named after it: old name, new name
+	int list_count;
+	int error;               // an enum GARenameError
+	char clash[GA_PATH_LEN]; // with GA_RENAME_EXISTS or GA_RENAME_TAKEN
+} GARename;
+
+void GA_renameInit(GARename* r);
+void GA_renameFree(GARename* r);
+
+// The part of a game's name the keyboard edits: a file's name without its
+// extension, or a folder's whole name.
+void GA_editableName(const char* path, int is_dir, char* out, size_t size);
+
+// A name a game can be renamed to: not empty, not starting with a dot or
+// space, no slash, backslash or control character, at most GA_FILE_MAX
+// bytes with its extension.
+int GA_validFileName(const char* name);
+
+// Lists every step renaming the game at path to new_name (the editable
+// part; a file keeps its extension) takes, and checks each target, before
+// anything changes: the game (for a game folder, the .m3u and .cue named
+// after it too), its art and .info in .media, and its saves, states,
+// resume slot and previews and emulator settings under the name minarch
+// launches it by, as GA_planDelete finds them. A sidecar another game
+// uses too is copied, not moved, and one that's a link is moved as a link,
+// never followed. Returns 0, or -1 with r->error saying why, and for a
+// clash r->clash naming the first target that's there (one that's the
+// same file, as when only the case changes, isn't a clash).
+int GA_planRename(const GACard* card, const char* path, const char* new_name, GARename* r);
+
+// What happened in GA_runRename or GA_undoRename.
+typedef struct GARenameResult {
+	char failed[GA_PATH_LEN]; // the step that failed, its from
+	int stuck;                // steps that couldn't be undone
+	char stuck_path[GA_PATH_LEN]; // the first of them, where it is now
+} GARenameResult;
+
+// Runs the plan's steps in order, checking each again first and never
+// overwriting. When one fails it undoes the ones done and returns -1, with
+// out saying which failed and what couldn't be undone; otherwise 0.
+int GA_runRename(const GARename* r, GARenameResult* out);
+
+// Undoes the first done steps, last first. Returns how many couldn't be.
+int GA_undoRename(const GARename* r, int done, GARenameResult* out);
+
+// Where a path the game was known by is after the rename: the game, and
+// for a game folder anything in it. Returns 1, or 0 for any other path.
+int GA_renamedPath(const GARename* r, const char* path, char* out, size_t size);
+
+// The confirm or toast's list of what went with it, as GA_planSummary.
+void GA_renameSummary(const GARename* r, char* out, size_t size);
+
+// Points a collection file's lines at the game's new paths, dropping a
+// line that would then be there twice. Returns how many changed, or -1.
+int GA_collectionRename(const char* file, const char* sdcard, const GARename* r);
+
 #endif
