@@ -125,7 +125,7 @@ make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" activity-st
 TZ="TST$(printf '%+d' "$(( now / 3600 % 24 - 12 ))")"
 export TZ
 printf 'localization=on\nscreener=on\nactivity-stats=on\n' >"$STATE/plugins.txt"
-printf 'steps=action:activity-stats.open,right,right,b\n' >"$STATE/screener.cfg"
+printf 'steps=action:activity-stats.open,right,right,right,b\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/localization-activity.log" "plugin screener: done" \
 	|| fail "the launcher exited early with localization and activity-stats"
 unset TZ

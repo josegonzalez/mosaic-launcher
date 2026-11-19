@@ -105,7 +105,7 @@ shown "Longest session: 2h (Zelda)"
 expect "exported $AM_REPORTS/activity-"
 csv=$(find "$AM_REPORTS" -name 'activity-*.csv' | head -n 1)
 html="${csv%.csv}.html"
-[ -n "$csv" ] && [ -f "$csv" ] || fail "no activity CSV in Reports"
+if [ -z "$csv" ] || [ ! -f "$csv" ]; then fail "no activity CSV in Reports"; fi
 [ -f "$html" ] || fail "no activity HTML beside $csv"
 shown "Saved Reports/$(basename "$csv") and .html"
 [ "$(wc -l <"$csv" | tr -d ' ')" = 7 ] || fail "the CSV hasn't a header and a row per session: $(cat "$csv")"
