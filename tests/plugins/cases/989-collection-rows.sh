@@ -60,7 +60,9 @@ expect "art Zeta thumbnail 0 box 0"
 stock_at=$(grep -m 1 -oE "plugin collector: row Rows One name at [0-9]+" "$log" | sed 's/.* //')
 picks_at=$(grep -m 1 -oE "plugin collector: row Picks name at [0-9]+" "$log" | sed 's/.* //')
 zeta_at=$(grep -m 1 -oE "plugin collector: row Zeta name at [0-9]+" "$log" | sed 's/.* //')
-[ -n "$stock_at" ] && [ -n "$picks_at" ] || fail "collector didn't log the rows' names: $(grep "plugin collector: row " "$log")"
+if [ -z "$stock_at" ] || [ -z "$picks_at" ]; then
+	fail "collector didn't log the rows' names: $(grep "plugin collector: row " "$log")"
+fi
 # Zeta is drawn only when the screen has room for its row
 [ -z "$zeta_at" ] || [ "$zeta_at" = "$stock_at" ] || fail "Zeta's name moved without an icon: $zeta_at, not $stock_at"
 [ "$picks_at" -gt "$stock_at" ] || fail "Picks' name didn't move for its icon: $picks_at, not past $stock_at"
