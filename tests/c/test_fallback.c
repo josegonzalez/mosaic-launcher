@@ -145,6 +145,33 @@ static void testLines(void) {
 }
 
 // A font with ASCII only.
+static void testWrap(void) {
+	char out[64];
+	// the dialog's message: each line it wraps to is one of its own, so
+	// stock's GFX_blitMessage centres each in the width given
+	CHECK(FallbackModel_wrap("one two three", 25, measure, NULL, out, sizeof(out)) == 3);
+	CHECK_STR(out, "one\ntwo\nthree");
+	CHECK(FallbackModel_wrap("one two three", 40, measure, NULL, out, sizeof(out)) == 2);
+	CHECK_STR(out, "one two\nthree");
+	// no line is wider than the width, short of a lone character
+	CHECK(FallbackModel_wrap("abcdefgh ij", 20, measure, NULL, out, sizeof(out)) == 3);
+	CHECK_STR(out, "abcd\nefgh\nij");
+	// newlines kept, a blank line and one at the end too
+	CHECK(FallbackModel_wrap("one\n\ntwo\n", 100, measure, NULL, out, sizeof(out)) == 4);
+	CHECK_STR(out, "one\n\ntwo\n");
+	// what fits is unchanged
+	CHECK(FallbackModel_wrap("one two", 35, measure, NULL, out, sizeof(out)) == 1);
+	CHECK_STR(out, "one two");
+	CHECK(FallbackModel_wrap("", 35, measure, NULL, out, sizeof(out)) == 0);
+	CHECK_STR(out, "");
+	// stops before a line that doesn't fit in out
+	CHECK(FallbackModel_wrap("one two three", 25, measure, NULL, out, 9) == 2);
+	CHECK_STR(out, "one\ntwo");
+	CHECK(FallbackModel_wrap(NULL, 25, measure, NULL, out, sizeof(out)) == -1);
+	CHECK(FallbackModel_wrap("one", 25, NULL, NULL, out, sizeof(out)) == -1);
+	CHECK(FallbackModel_wrap("one", 25, measure, NULL, out, 0) == -1);
+}
+
 static int asciiOnly(uint32_t cp, void* data) {
 	(*(int*)data)++;
 	return cp < 0x80;
@@ -178,6 +205,7 @@ int main(void) {
 	testRuns();
 	testWidths();
 	testLines();
+	testWrap();
 	testMissing();
 	CHECK_DONE();
 }

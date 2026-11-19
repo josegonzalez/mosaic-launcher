@@ -1,5 +1,6 @@
 #include "launcher.h"
 #include "drawmodel.h"
+#include "fallbackmodel.h"
 
 static int measure(const char* text, void* data) {
 	int w = 0;
@@ -17,6 +18,23 @@ int Text_truncate(TTF_Font* font, const char* text, char* out, size_t size, int 
 		return padding;
 	}
 	return width;
+}
+
+// fallbackmodel.c's measure, for the font at data
+static int measureLen(const char* text, size_t len, void* data) {
+	char line[512];
+	if (len >= sizeof(line)) return -1;
+	memcpy(line, text, len);
+	line[len] = '\0';
+	return measure(line, data);
+}
+
+void Text_wrap(TTF_Font* font, const char* text, char* out, size_t size, int max_width) {
+	if (!size) return;
+	if (fontMutex) SDL_LockMutex(fontMutex);
+	int lines = FallbackModel_wrap(text ? text : "", max_width, measureLen, font, out, size);
+	if (fontMutex) SDL_UnlockMutex(fontMutex);
+	if (lines < 0) out[0] = '\0';
 }
 
 void Text_hardwareHints(SDL_Surface* dst, int show_setting) {

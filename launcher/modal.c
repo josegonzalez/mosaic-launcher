@@ -210,15 +210,23 @@ static void drawCentered(TTF_Font* f, int size, const char* text, SDL_Color colo
 	GFX_blitText(f, text, SCALE1(size), color, screen, &r);
 }
 
+// The message centred above the hints, each line it wraps to centred too
+// and kept the screen's padding in from either side, as minarch draws its
+// own messages.
+static void blitMessage(void) {
+	SDL_Rect area = { SCALE1(PADDING), 0, screen->w - SCALE1(PADDING * 2), screen->h - SCALE1(PADDING + PILL_SIZE) };
+	char wrapped[sizeof(message) * 2];
+	Text_wrap(font.large, message, wrapped, sizeof(wrapped), area.w);
+	GFX_blitMessage(font.large, wrapped, screen, &area);
+}
+
 static void confirmRender(void) {
-	SDL_Rect area = { 0, 0, screen->w, screen->h - SCALE1(PADDING + PILL_SIZE) };
-	GFX_blitMessage(font.large, message, screen, &area);
+	blitMessage();
 	GFX_blitButtonGroup((char*[]){ "B", TR("CANCEL"), "A", TR(yes_label), NULL }, 1, screen, 1);
 }
 
 static void messageRender(void) {
-	SDL_Rect area = { 0, 0, screen->w, screen->h - SCALE1(PADDING + PILL_SIZE) };
-	GFX_blitMessage(font.large, message, screen, &area);
+	blitMessage();
 	GFX_blitButtonGroup((char*[]){ "A", TR("OK"), NULL }, 0, screen, 1);
 }
 

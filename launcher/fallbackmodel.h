@@ -51,6 +51,12 @@ typedef int (*FallbackMeasure)(const char* text, size_t len, void* data);
 // writes where the next line starts (len after the last line).
 size_t FallbackModel_line(const char* text, size_t len, int max_width, FallbackMeasure measure, void* data, size_t* next);
 
+// text with each line FallbackModel_line breaks it into in max_width
+// ended by a newline but the last, into out (size bytes), so a line that
+// wraps becomes lines of its own. Stops before a line that doesn't fit in
+// size. Returns the lines written, or -1 for a bad argument.
+int FallbackModel_wrap(const char* text, int max_width, FallbackMeasure measure, void* data, char* out, size_t size);
+
 // 1 when a font has a glyph for cp.
 typedef int (*FallbackHas)(uint32_t cp, void* data);
 

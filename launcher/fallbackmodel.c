@@ -127,6 +127,34 @@ size_t FallbackModel_line(const char* text, size_t len, int max_width, FallbackM
 	return len;
 }
 
+int FallbackModel_wrap(const char* text, int max_width, FallbackMeasure measure, void* data, char* out, size_t size) {
+	if (!text || !measure || !out || !size) return -1;
+	out[0] = '\0';
+	size_t len = strlen(text);
+	size_t used = 0;
+	size_t at = 0;
+	int lines = 0;
+	while (at < len) {
+		size_t next;
+		size_t n = FallbackModel_line(text + at, len - at, max_width, measure, data, &next);
+		size_t sep = lines ? 1 : 0;
+		if (used + sep + n >= size) break;
+		if (sep) out[used++] = '\n';
+		memcpy(out + used, text + at, n);
+		used += n;
+		out[used] = '\0';
+		lines++;
+		at += next;
+	}
+	// a newline at the end is a last, empty line
+	if (at == len && len && text[len - 1] == '\n' && used + 1 < size) {
+		out[used++] = '\n';
+		out[used] = '\0';
+		lines++;
+	}
+	return lines;
+}
+
 int FallbackModel_missing(const char* text, size_t len, FallbackHas has, void* data, char* out, size_t size) {
 	if (out && size) out[0] = '\0';
 	// one bit for each code point, so each is counted once
