@@ -36,8 +36,6 @@ SQL
 printf 'game1=%s\ndb=%s\nhistory=1\n' "$PLAY_ROMS/Tetris.gb" "$PLAY_DB" >"$STATE/tracker.cfg"
 printf 'tracker=on\n' >"$STATE/plugins.txt"
 build_plugin tracker 'id=tracker\nname=Tracker\napi=1\n'
-# no post_return on the first start, whatever an earlier case launched
-rm -f /tmp/mosaic-launcher-launched
 TZ="TST$(printf '%+d' "$hours_behind")"
 export TZ
 run_launcher "$WORK/history.log" "plugin tracker: done" || fail "the launcher exited early with tracker listing the history"

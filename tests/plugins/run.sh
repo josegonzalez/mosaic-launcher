@@ -131,6 +131,16 @@ clear_guard() {
 	rm -f "$STATE/loading" "$STATE/plugins_paused" "$STATE/crashes" "$STATE/fallback"
 }
 
+# clear_tmp: removes the launcher's files in /tmp that change its next start,
+# before each case, so none inherits another's: the launch marker (post_return
+# and launcher.return), where home was left from, and the paks' stay awake
+# files. A case that wants one writes it itself. Stock's /tmp/last.txt stays,
+# as 190-last-path follows what 080-drawer's launch saved there, so a case
+# that needs a last path writes its own.
+clear_tmp() {
+	rm -f /tmp/mosaic-launcher-launched /tmp/mosaic-launcher-home /tmp/stay_awake /tmp/stay_alive
+}
+
 # start_launcher <log> [line...]: starts the launcher, keeping the crash
 # guard's state. With lines, stops once the log has all of them and the
 # first frame is up (the loading marker is gone); without, runs until it
@@ -482,6 +492,7 @@ else
 		# where the cases write the shared settings and recents, which only a
 		# launch makes on a new card
 		mkdir -p "$(dirname "$RECENTS")"
+		clear_tmp
 		# shellcheck source=/dev/null
 		. "$ROOT/tests/plugins/cases/$case_name.sh"
 		case_ms=$(($(now_ms) - case_started))
