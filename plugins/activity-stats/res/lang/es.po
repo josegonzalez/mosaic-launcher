@@ -100,8 +100,8 @@ msgstr "SELECT"
 msgid "Sat"
 msgstr "sáb"
 
-msgid "Shows how long you played each day and which games you played most, on a screen of its own. It reads the play history the Game Tracker tool keeps."
-msgstr "Muestra cuánto jugaste cada día y a qué juegos jugaste más, en una pantalla propia. Lee el historial de juego que guarda la herramienta Game Tracker."
+msgid "Shows how long you played each day, all time and per game, on a screen of its own, from the play history the Game Tracker tool keeps. It can save the history to Reports, add a Most Played folder and reset play time."
+msgstr "Muestra cuánto jugaste cada día, en total y por juego, en una pantalla propia, a partir del historial de juego que guarda la herramienta Game Tracker. Puede guardar el historial en Reports, añadir una carpeta Más jugados y restablecer el tiempo de juego."
 
 msgid "Sun"
 msgstr "dom"
@@ -123,3 +123,78 @@ msgstr "Y"
 
 msgid "none"
 msgstr "ninguno"
+
+msgid "All time"
+msgstr "Total"
+
+msgid "By hour of day"
+msgstr "Por hora del día"
+
+msgid "Couldn't reset the play time. Try again after a moment."
+msgstr "No se pudo restablecer el tiempo de juego. Vuelve a intentarlo en un momento."
+
+msgid "Couldn't save the activity report"
+msgstr "No se pudo guardar el informe de actividad"
+
+msgid "Day"
+msgstr "Día"
+
+msgid "EXPORT"
+msgstr "EXPORTAR"
+
+msgid "Game"
+msgstr "Juego"
+
+msgid "Hour"
+msgstr "Hora"
+
+msgid "Longest session: %s (%s)"
+msgstr "Sesión más larga: %s (%s)"
+
+msgid "Most Played"
+msgstr "Más jugados"
+
+msgid "Most Played folder"
+msgstr "Carpeta Más jugados"
+
+msgid "Most active hour: %02i:00"
+msgstr "Hora más activa: %02i:00"
+
+msgid "No play by hour yet"
+msgstr "Aún no hay juego por hora"
+
+msgid "Other"
+msgstr "Otro"
+
+msgid "Play time reset"
+msgstr "Tiempo de juego restablecido"
+
+msgid "Played"
+msgstr "Jugado"
+
+msgid "RESET"
+msgstr "RESTABLECER"
+
+msgid "RESET ALL"
+msgstr "RESTABLECER TODO"
+
+msgid "Reset all play time? Every session is deleted from the play history, so the Game Tracker loses them too. This can't be undone."
+msgstr "¿Restablecer todo el tiempo de juego? Se borran todas las sesiones del historial de juego, así que Game Tracker también las pierde. No se puede deshacer."
+
+msgid "Reset the play time of %.120s? Its sessions are deleted from the play history, so the Game Tracker loses them too. This can't be undone."
+msgstr "¿Restablecer el tiempo de juego de %.120s? Sus sesiones se borran del historial de juego, así que Game Tracker también las pierde. No se puede deshacer."
+
+msgid "Saved Reports/activity-%s.csv and .html"
+msgstr "Guardado Reports/activity-%s.csv y .html"
+
+msgid "System"
+msgstr "Sistema"
+
+msgid "Time"
+msgstr "Tiempo"
+
+msgid "Time each day"
+msgstr "Tiempo cada día"
+
+msgid "Time per system"
+msgstr "Tiempo por sistema"

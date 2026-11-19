@@ -71,7 +71,7 @@ msgstr ""
 msgid "<1m"
 msgstr ""
 
-#: activity_stats.c
+#: activity_report.c activity_stats.c
 msgid "Activity"
 msgstr ""
 
@@ -83,17 +83,49 @@ msgstr ""
 msgid "Activity stats"
 msgstr ""
 
+#: activity_model.c
+msgid "All time"
+msgstr ""
+
+#: activity_report.c
+msgid "By hour of day"
+msgstr ""
+
 #: activity_stats.c
 #, c-format
 msgid "Couldn't open %s"
+msgstr ""
+
+#: activity_stats.c
+msgid "Couldn't reset the play time. Try again after a moment."
+msgstr ""
+
+#: activity_stats.c
+msgid "Couldn't save the activity report"
+msgstr ""
+
+#: activity_report.c
+msgid "Day"
+msgstr ""
+
+#: activity_stats.c
+msgid "EXPORT"
 msgstr ""
 
 #: activity_model.c
 msgid "Fri"
 msgstr ""
 
-#: activity_model.c
+#: activity_report.c
+msgid "Game"
+msgstr ""
+
+#: activity_model.c activity_report.c
 msgid "Games"
+msgstr ""
+
+#: activity_report.c
+msgid "Hour"
 msgstr ""
 
 #: plugin.txt
@@ -105,7 +137,29 @@ msgid "Launches"
 msgstr ""
 
 #: activity_model.c
+#, c-format
+msgid "Longest session: %s (%s)"
+msgstr ""
+
+#: activity_model.c
 msgid "Mon"
+msgstr ""
+
+#: activity_stats.c
+msgid "Most Played"
+msgstr ""
+
+#: plugin.txt
+msgid "Most Played folder"
+msgstr ""
+
+#: activity_model.c
+#, c-format
+msgid "Most active hour: %02i:00"
+msgstr ""
+
+#: activity_model.c
+msgid "No play by hour yet"
 msgstr ""
 
 #: activity_stats.c
@@ -116,12 +170,41 @@ msgstr ""
 msgid "Nothing played yet"
 msgstr ""
 
+#: activity_model.c
+msgid "Other"
+msgstr ""
+
+#: activity_stats.c
+msgid "Play time reset"
+msgstr ""
+
+#: activity_report.c
+msgid "Played"
+msgstr ""
+
 #: plugin.txt
 msgid "Quick menu tile"
 msgstr ""
 
 #: plugin.txt
 msgid "R2"
+msgstr ""
+
+#: activity_stats.c
+msgid "RESET"
+msgstr ""
+
+#: activity_stats.c
+msgid "RESET ALL"
+msgstr ""
+
+#: activity_model.c
+msgid "Reset all play time? Every session is deleted from the play history, so the Game Tracker loses them too. This can't be undone."
+msgstr ""
+
+#: activity_model.c
+#, c-format
+msgid "Reset the play time of %.120s? Its sessions are deleted from the play history, so the Game Tracker loses them too. This can't be undone."
 msgstr ""
 
 #: plugin.txt
@@ -132,16 +215,37 @@ msgstr ""
 msgid "Sat"
 msgstr ""
 
+#: activity_stats.c
+#, c-format
+msgid "Saved Reports/activity-%s.csv and .html"
+msgstr ""
+
 #: plugin.txt
-msgid "Shows how long you played each day and which games you played most, on a screen of its own. It reads the play history the Game Tracker tool keeps."
+msgid "Shows how long you played each day, all time and per game, on a screen of its own, from the play history the Game Tracker tool keeps. It can save the history to Reports, add a Most Played folder and reset play time."
 msgstr ""
 
 #: activity_model.c
 msgid "Sun"
 msgstr ""
 
+#: activity_report.c
+msgid "System"
+msgstr ""
+
 #: activity_model.c
 msgid "Thu"
+msgstr ""
+
+#: activity_report.c
+msgid "Time"
+msgstr ""
+
+#: activity_report.c
+msgid "Time each day"
+msgstr ""
+
+#: activity_report.c
+msgid "Time per system"
 msgstr ""
 
 #: activity_model.c

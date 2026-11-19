@@ -877,6 +877,32 @@ static int hostPlayGameInfo(int index, MosaicPlayGame* out) {
 	return 0;
 }
 
+static int hostPlaySessionInfo(int index, MosaicPlaySession* out) {
+	if (!out || out->size < sizeof(out->size)) return -1;
+	long long start = 0, seconds = 0;
+	const PlayRom* rom = NULL;
+	if (PlayHistory_session(index, &start, &seconds, &rom) != 0) return -1;
+	MosaicPlaySession full;
+	memset(&full, 0, sizeof(full));
+	full.size = out->size;
+	if (rom && rom->path) Play_fullPath(ROMS_PATH, rom->path, full.path, sizeof(full.path));
+	if (rom && rom->name) snprintf(full.name, sizeof(full.name), "%s", rom->name);
+	full.start = start;
+	full.seconds = seconds;
+	full.orphan = !full.path[0];
+	// only the fields the plugin knows about
+	memcpy(out, &full, out->size < sizeof(full) ? out->size : sizeof(full));
+	return 0;
+}
+
+static int hostPlayForget(const char* path) {
+	LoadedPlugin* caller = callingPlugin("play_forget");
+	if (!caller) return -1;
+	int deleted = PlayHistory_forget(path);
+	LOG_info("plugins: %s forgot the play history of %s: %i\n", caller->id, path ? path : "every game", deleted);
+	return deleted;
+}
+
 static int hostAchievements(const char* path, MosaicAchievements* out) {
 	RASummary summary;
 	int rc = RAProgress_get(path, &summary);
@@ -2348,6 +2374,9 @@ static const MosaicHost host = {
 	.entry_free = hostEntryFree,
 	.action_flags = hostActionFlags,
 	.stick = hostStick,
+	.play_sessions_count = PlayHistory_sessionCount,
+	.play_session_info = hostPlaySessionInfo,
+	.play_forget = hostPlayForget,
 };
 
 ///////////////////////////////////////

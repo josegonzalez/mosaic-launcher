@@ -20,6 +20,10 @@ static const char* tr(const char* text) {
 	return words.tr ? words.tr(text) : text;
 }
 
+const char* AS_word(const char* text) {
+	return tr(text);
+}
+
 static const char* trPlural(const char* singular, const char* plural, unsigned long n) {
 	if (words.tr_plural) return words.tr_plural(singular, plural, n);
 	return n == 1 ? singular : plural;
@@ -54,6 +58,8 @@ void AS_name(const char* name, const char* path, char* out, size_t size) {
 
 ///////////////////////////////////////
 // ranking
+
+#define DOT " \xc2\xb7 "
 
 static const ASGame* ranking; // the games being sorted, for the comparators
 
@@ -105,6 +111,171 @@ void AS_totals(const ASGame* games, int count, long long* seconds, long long* se
 }
 
 ///////////////////////////////////////
+// all time
+
+void AS_allTimeStart(ASAllTime* all, const ASGame* games, int count) {
+	memset(all, 0, sizeof(*all));
+	AS_totals(games, count, &all->seconds, &all->sessions);
+	for (int i = 0; i < count; i++) {
+		if (games[i].count > 0) all->games++;
+	}
+}
+
+void AS_addHours(long long hours[AS_HOURS], long long start, long long seconds) {
+	if (seconds <= 0) return;
+	long long days = seconds / 86400;
+	if (days) {
+		for (int h = 0; h < AS_HOURS; h++) hours[h] += days * 3600;
+		seconds -= days * 86400;
+	}
+	long long at = start;
+	while (seconds > 0) {
+		time_t t = (time_t)at;
+		struct tm tm;
+		localtime_r(&t, &tm);
+		long long left = 3600 - (tm.tm_min * 60 + tm.tm_sec);
+		if (left <= 0) left = 1;
+		long long part = seconds < left ? seconds : left;
+		hours[tm.tm_hour % AS_HOURS] += part;
+		at += part;
+		seconds -= part;
+	}
+}
+
+void AS_allTimeAdd(ASAllTime* all, long long start, long long seconds, const char* name) {
+	if (seconds <= 0) return;
+	if (seconds > all->longest) {
+		all->longest = seconds;
+		snprintf(all->longest_name, sizeof(all->longest_name), "%s", name ? name : "");
+	}
+	AS_addHours(all->hours, start, seconds);
+}
+
+int AS_busiestHour(const long long hours[AS_HOURS]) {
+	int best = -1;
+	for (int h = 0; h < AS_HOURS; h++) {
+		if (hours[h] > 0 && (best < 0 || hours[h] > hours[best])) best = h;
+	}
+	return best;
+}
+
+void AS_hourCaption(const long long hours[AS_HOURS], char* out, size_t size) {
+	int hour = AS_busiestHour(hours);
+	if (hour < 0) snprintf(out, size, "%s", tr("No play by hour yet"));
+	else snprintf(out, size, tr("Most active hour: %02i:00"), hour);
+}
+
+void AS_allTimeCaption(const ASAllTime* all, char* out, size_t size) {
+	char played[32], sessions[32], count[64];
+	AS_duration(all->seconds, played, sizeof(played));
+	AS_sessions(all->sessions, sessions, sizeof(sessions));
+	snprintf(count, sizeof(count), trPlural("%i game", "%i games", (unsigned long)all->games), all->games);
+	snprintf(out, size, "%s" DOT "%s" DOT "%s", played, sessions, count);
+}
+
+void AS_longestCaption(const ASAllTime* all, char* out, size_t size) {
+	if (!size) return;
+	out[0] = '\0';
+	if (all->longest <= 0) return;
+	char longest[32];
+	AS_duration(all->longest, longest, sizeof(longest));
+	snprintf(out, size, tr("Longest session: %s (%s)"), longest, all->longest_name);
+}
+
+void AS_systemFolder(const char* roms, const char* path, char* out, size_t size) {
+	if (!size) return;
+	out[0] = '\0';
+	if (!roms || !path) return;
+	size_t n = strlen(roms);
+	if (!n || strncmp(path, roms, n) != 0 || path[n] != '/') return;
+	const char* folder = path + n + 1;
+	const char* end = strchr(folder, '/');
+	if (!end || end == folder) return;
+	size_t len = (size_t)(end - folder);
+	if (len >= size) len = size - 1;
+	memcpy(out, folder, len);
+	out[len] = '\0';
+}
+
+void AS_systemLabel(const char* folder, char* out, size_t size) {
+	if (!size) return;
+	if (!folder || !folder[0]) {
+		snprintf(out, size, "%s", tr("Other"));
+		return;
+	}
+	size_t len = strlen(folder);
+	// " (TAG)" at the end, as stock hides it
+	if (len > 3 && folder[len - 1] == ')') {
+		const char* open = strrchr(folder, '(');
+		if (open && open > folder + 1 && open[-1] == ' ') len = (size_t)(open - 1 - folder);
+	}
+	if (len >= size) len = size - 1;
+	memcpy(out, folder, len);
+	out[len] = '\0';
+}
+
+static int bySystem(const void* a, const void* b) {
+	const ASSystem *x = a, *y = b;
+	int c = compareLong(x->seconds, y->seconds);
+	return c ? c : strcmp(x->label, y->label);
+}
+
+int AS_systems(const ASGame* games, int count, const char* roms, ASSystem* out) {
+	int n = 0;
+	for (int i = 0; i < count; i++) {
+		char folder[AS_NAME_MAX], label[AS_NAME_MAX];
+		AS_systemFolder(roms, games[i].path, folder, sizeof(folder));
+		AS_systemLabel(folder, label, sizeof(label));
+		int k = 0;
+		while (k < n && strcmp(out[k].label, label) != 0) k++;
+		if (k == n) {
+			memset(&out[n], 0, sizeof(out[n]));
+			snprintf(out[n].label, sizeof(out[n].label), "%s", label);
+			n++;
+		}
+		if (games[i].seconds > 0) out[k].seconds += games[i].seconds;
+		out[k].games++;
+	}
+	if (n > 1) qsort(out, (size_t)n, sizeof(ASSystem), bySystem);
+	return n;
+}
+
+int AS_pickTop(const ASGame* games, int count, const unsigned char* keep, int max, int* order, int* top) {
+	if (count <= 0 || max <= 0) return 0;
+	AS_rankPlayed(games, count, order);
+	int n = 0;
+	for (int i = 0; i < count && n < max; i++) {
+		if (keep[order[i]]) top[n++] = order[i];
+	}
+	return n;
+}
+
+static int byPath(const void* a, const void* b) {
+	return strcmp(*(const char* const*)a, *(const char* const*)b);
+}
+
+void AS_sortPaths(const char** paths, int count) {
+	if (count > 1) qsort(paths, (size_t)count, sizeof(char*), byPath);
+}
+
+int AS_pathIn(const char* const* sorted, int count, const char* path) {
+	if (!path || count <= 0) return 0;
+	return bsearch(&path, sorted, (size_t)count, sizeof(char*), byPath) != NULL;
+}
+
+const char* AS_resetPath(const ASGame* game) {
+	return game && game->path[0] ? game->path : NULL;
+}
+
+void AS_resetQuestion(const char* name, char* out, size_t size) {
+	snprintf(out, size, tr("Reset the play time of %.120s? Its sessions are deleted from the play history, so the Game Tracker loses them too. This can't be undone."), name);
+}
+
+void AS_resetAllQuestion(char* out, size_t size) {
+	snprintf(out, size, "%s", tr("Reset all play time? Every session is deleted from the play history, so the Game Tracker loses them too. This can't be undone."));
+}
+
+///////////////////////////////////////
 // formatting
 
 void AS_duration(long long seconds, char* out, size_t size) {
@@ -126,8 +297,6 @@ void AS_duration(long long seconds, char* out, size_t size) {
 void AS_sessions(long long count, char* out, size_t size) {
 	snprintf(out, size, trPlural("%lld session", "%lld sessions", (unsigned long)count), count);
 }
-
-#define DOT " \xc2\xb7 "
 
 void AS_rowRight(const ASGame* game, int launches, char* out, size_t size) {
 	char played[32], sessions[32];
@@ -241,6 +410,7 @@ const char* AS_tabLabel(int tab) {
 	switch (tab) {
 		case AS_TAB_WEEK: return TR_MARK("7 days");
 		case AS_TAB_MONTH: return TR_MARK("30 days");
+		case AS_TAB_ALL: return TR_MARK("All time");
 		case AS_TAB_GAMES: return TR_MARK("Games");
 		case AS_TAB_LAUNCHES: return TR_MARK("Launches");
 		default: return "";
@@ -274,14 +444,16 @@ int AS_window(int selected, int count, int fit, int first) {
 	return first < 0 ? 0 : first;
 }
 
-void AS_hints(int can_open, MosaicHint left[1], int* left_count, MosaicHint right[1], int* right_count) {
-	left[0] = (MosaicHint){ MOSAIC_BUTTON_B, "BACK" };
-	*left_count = 1;
-	*right_count = 0;
-	if (can_open) {
-		right[0] = (MosaicHint){ MOSAIC_BUTTON_A, "PLAY" };
-		*right_count = 1;
-	}
+void AS_hints(int offer, MosaicHint left[2], int* left_count, MosaicHint right[2], int* right_count) {
+	int n = 0;
+	left[n++] = (MosaicHint){ MOSAIC_BUTTON_B, "BACK" };
+	if (offer & AS_HINT_EXPORT) left[n++] = (MosaicHint){ MOSAIC_BUTTON_Y, "EXPORT" };
+	*left_count = n;
+	n = 0;
+	if (offer & AS_HINT_RESET) right[n++] = (MosaicHint){ MOSAIC_BUTTON_X, "RESET" };
+	else if (offer & AS_HINT_RESET_ALL) right[n++] = (MosaicHint){ MOSAIC_BUTTON_X, "RESET ALL" };
+	if (offer & AS_HINT_OPEN) right[n++] = (MosaicHint){ MOSAIC_BUTTON_A, "PLAY" };
+	*right_count = n;
 }
 
 ///////////////////////////////////////
@@ -351,6 +523,28 @@ MosaicRect AS_plot(const MosaicRect* room, int scale, int caption_h, int axis_w,
 	int gap = PADDING * scale / 2;
 	MosaicRect plot = { room->x + axis_w + gap, room->y + caption_h + 2 * gap, 0, 0 };
 	plot.w = room->x + room->w - plot.x;
+	plot.h = room->y + room->h - label_h - gap - plot.y;
+	return empty(&plot) ? none : plot;
+}
+
+void AS_allTimeRooms(const MosaicRect* room, int scale, int caption_h, MosaicRect* systems, MosaicRect* hours) {
+	MosaicRect none = { 0, 0, 0, 0 };
+	*systems = *hours = none;
+	if (empty(room) || scale < 1) return;
+	int pad = PADDING * scale;
+	int top = room->y + 2 * caption_h + pad;
+	int h = room->y + room->h - top;
+	int w = (room->w - pad) / 2;
+	if (h <= 0 || w <= 0) return;
+	*systems = (MosaicRect){ room->x, top, w, h };
+	*hours = (MosaicRect){ room->x + w + pad, top, room->x + room->w - (room->x + w + pad), h };
+}
+
+MosaicRect AS_hourPlot(const MosaicRect* room, int scale, int caption_h, int label_h) {
+	MosaicRect none = { 0, 0, 0, 0 };
+	if (empty(room) || scale < 1) return none;
+	int gap = PADDING * scale / 2;
+	MosaicRect plot = { room->x, room->y + caption_h + gap, room->w, 0 };
 	plot.h = room->y + room->h - label_h - gap - plot.y;
 	return empty(&plot) ? none : plot;
 }

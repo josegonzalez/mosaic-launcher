@@ -58,6 +58,12 @@ static long long today_end = 0;
 static int days_loaded = 0;   // every session read, or found unreadable, since the last invalidate
 static int days_readable = 0; // and they're in days
 static PlayDays days;
+static int log_loaded = 0;   // every session with its game read, or found unreadable, since the last invalidate
+static int log_readable = 0; // and they're in entries and roms
+static int log_capped = 0;
+static PlayEntry* entries = NULL;
+static int entry_count = 0;
+static PlayRoms roms;
 static long long day_cache[DAY_CACHE]; // each day back's total
 static char day_cached[DAY_CACHE];     // once it's worked out
 
@@ -99,6 +105,13 @@ void PlayHistory_invalidate(void) {
 	days_loaded = 0;
 	days_readable = 0;
 	forgetDays();
+	free(entries);
+	entries = NULL;
+	entry_count = 0;
+	PlayRoms_free(&roms);
+	log_loaded = 0;
+	log_readable = 0;
+	log_capped = 0;
 }
 
 void PlayHistory_quit(void) {
@@ -419,6 +432,98 @@ long long PlayHistory_day(int days_ago) {
 	return seconds;
 }
 
+// Every rom row into into, for the sessions' games and for forgetting.
+static int readRoms(sqlite3* db, PlayRoms* into) {
+	sqlite3_stmt* stmt = NULL;
+	if (sql.prepare_v2(db, "SELECT id, file_path, name, type FROM rom;", -1, &stmt, NULL) != SQL_OK) return 0;
+	int rc;
+	while ((rc = sql.step(stmt)) == SQL_ROW) {
+		const char* type = text(stmt, 3);
+		if (PlayRoms_add(into, sql.column_int64(stmt, 0), text(stmt, 1), text(stmt, 2), type && !strcmp(type, "ORPHAN"))) break;
+	}
+	sql.finalize(stmt);
+	if (rc != SQL_DONE) return 0;
+	PlayRoms_finish(into);
+	return 1;
+}
+
+// Every session with its rom_id, newest first up to sessions_max: one
+// more says there were more.
+static int readEntries(sqlite3* db, long long now) {
+	char query[256];
+	snprintf(query, sizeof(query),
+		"SELECT created_at, play_time, rom_id FROM play_activity WHERE created_at IS NOT NULL "
+		"ORDER BY created_at DESC LIMIT %i;",
+		sessions_max + 1);
+	sqlite3_stmt* stmt = NULL;
+	if (sql.prepare_v2(db, query, -1, &stmt, NULL) != SQL_OK) return 0;
+	int rc, cap = 0;
+	while ((rc = sql.step(stmt)) == SQL_ROW) {
+		if (entry_count == sessions_max) {
+			log_capped = 1;
+			continue;
+		}
+		if (entry_count == cap) {
+			int more = cap ? cap * 2 : 256;
+			PlayEntry* grown = realloc(entries, more * sizeof(PlayEntry));
+			if (!grown) break;
+			entries = grown;
+			cap = more;
+		}
+		PlayEntry* entry = &entries[entry_count++];
+		entry->start = sql.column_int64(stmt, 0);
+		entry->seconds = sql.column_type(stmt, 1) == SQL_NULL ? now - entry->start : sql.column_int64(stmt, 1);
+		if (entry->seconds < 0) entry->seconds = 0;
+		entry->rom = sql.column_type(stmt, 2) == SQL_NULL ? -1 : sql.column_int64(stmt, 2);
+	}
+	sql.finalize(stmt);
+	if (rc != SQL_DONE) return 0;
+	PlayEntries_sort(entries, entry_count);
+	return 1;
+}
+
+// Only after the rest read, as loadDays.
+static void loadLog(void) {
+	if (log_loaded) return;
+	log_loaded = 1;
+	if (!readable) return;
+	sqlite3* db = openDatabase();
+	if (!db) return;
+	int ok = readRoms(db, &roms) && readEntries(db, (long long)time(NULL));
+	if (!ok) {
+		note("play history: unknown sessions, can't read %s: %s", db_path, sql.errmsg(db));
+		free(entries);
+		entries = NULL;
+		entry_count = 0;
+		PlayRoms_free(&roms);
+		log_capped = 0;
+	}
+	sql.close(db);
+	if (!ok) return;
+	log_readable = 1;
+	note("play history: %i session%s with their games from %s%s", entry_count, entry_count == 1 ? "" : "s", db_path,
+		log_capped ? ", older ones not read" : "");
+}
+
+int PlayHistory_sessionCount(void) {
+	load();
+	loadLog();
+	return log_readable ? entry_count : PLAY_UNKNOWN;
+}
+
+int PlayHistory_session(int index, long long* start, long long* seconds, const PlayRom** rom) {
+	if (PlayHistory_sessionCount() <= 0 || index < 0 || index >= entry_count) return -1;
+	const PlayEntry* entry = &entries[index];
+	if (start) *start = entry->start;
+	if (seconds) *seconds = entry->seconds;
+	if (rom) *rom = PlayRoms_byId(&roms, entry->rom);
+	return 0;
+}
+
+int PlayHistory_sessionsCapped(void) {
+	return PlayHistory_sessionCount() >= 0 && log_capped;
+}
+
 // Runs one statement with up to two text arguments. Returns the rows it
 // changed, or -1.
 static int run(sqlite3* db, const char* query, const char* a, const char* b) {
@@ -468,4 +573,56 @@ int PlayHistory_move(const char* from, const char* to) {
 	sql.close(db);
 	PlayHistory_invalidate();
 	return moved < 0 ? -1 : moved > 0;
+}
+
+// The sessions of the rows in ids, or every session with none: -1 when a
+// statement fails.
+static int forgetRows(sqlite3* db, const long long* ids, int count, int all) {
+	if (all) return run(db, "DELETE FROM play_activity;", NULL, NULL);
+	int deleted = 0;
+	for (int i = 0; i < count; i++) {
+		char query[96];
+		snprintf(query, sizeof(query), "DELETE FROM play_activity WHERE rom_id = %lld;", ids[i]);
+		int rows = run(db, query, NULL, NULL);
+		if (rows < 0) return -1;
+		deleted += rows;
+	}
+	return deleted;
+}
+
+int PlayHistory_forget(const char* path) {
+	char rel[512] = "";
+	if (path && !Play_relPath(roms_path, path, rel, sizeof(rel))) return -1;
+	sqlite3* db = openDatabaseAs(SQL_OPEN_READWRITE);
+	if (!db) {
+		PlayHistory_invalidate();
+		return -1;
+	}
+	int deleted = -1;
+	// IMMEDIATE takes the write lock before reading, so the rows matched are
+	// the ones deleted, and a writer holding it past the busy timeout leaves
+	// the database untouched
+	if (run(db, "BEGIN IMMEDIATE;", NULL, NULL) >= 0) {
+		PlayRoms rows;
+		PlayRoms_init(&rows);
+		if (!path || readRoms(db, &rows)) {
+			int count = path ? PlayRoms_match(&rows, rel, NULL, 0) : 0;
+			long long* ids = count ? malloc(count * sizeof(long long)) : NULL;
+			if (!count || ids) {
+				if (count) PlayRoms_match(&rows, rel, ids, count);
+				deleted = forgetRows(db, ids, count, !path);
+			}
+			free(ids);
+		}
+		PlayRoms_free(&rows);
+		if (run(db, deleted < 0 ? "ROLLBACK;" : "COMMIT;", NULL, NULL) < 0) {
+			if (deleted >= 0) run(db, "ROLLBACK;", NULL, NULL);
+			deleted = -1;
+		}
+	}
+	if (deleted < 0) note("play history: couldn't forget %s: %s", path ? rel : "every session", sql.errmsg(db));
+	else note("play history: forgot %s (%i session%s)", path ? rel : "every session", deleted, deleted == 1 ? "" : "s");
+	sql.close(db);
+	PlayHistory_invalidate();
+	return deleted;
 }

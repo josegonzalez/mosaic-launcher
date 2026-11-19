@@ -434,6 +434,136 @@ static void testMove(void) {
 	PlayHistory_invalidate();
 }
 
+// Every session with its game, oldest first.
+static void testSessions(void) {
+	makeFixture();
+	PlayHistory_configure(DB, ROMS, onLog);
+	long long now = (long long)time(NULL);
+	CHECK(PlayHistory_sessionCount() == 6);
+	CHECK(!PlayHistory_sessionsCapped());
+	long long start = 0, seconds = 0;
+	const PlayRom* rom = NULL;
+	CHECK(PlayHistory_session(0, &start, &seconds, &rom) == 0);
+	CHECK(start == midnight - 3 * 86400 && seconds == 50 && rom && rom->orphan && !rom->path);
+	CHECK_STR(rom->name, "Metroid");
+	CHECK(PlayHistory_session(1, &start, &seconds, &rom) == 0);
+	CHECK(start == midnight - 7200 && seconds == 3600 && rom && rom->id == 1);
+	CHECK_STR(rom->path, "GB (GB)/Tetris.gb");
+	CHECK(PlayHistory_session(3, &start, &seconds, &rom) == 0);
+	CHECK(start == midnight + 100 && seconds == 77 && rom->id == 5);
+	// still open: up to now
+	CHECK(PlayHistory_session(5, &start, &seconds, &rom) == 0);
+	CHECK(start == midnight + 7200 && seconds >= now - start && seconds <= now - start + 5);
+	CHECK(PlayHistory_session(6, &start, &seconds, &rom) == -1);
+	CHECK(PlayHistory_session(-1, &start, &seconds, &rom) == -1);
+	CHECK(strstr(last_log, "play history: 6 sessions with their games from " DB) != NULL);
+
+	// capped to the newest
+	PlayHistory_setCaps(0, 2);
+	CHECK(PlayHistory_sessionCount() == 2);
+	CHECK(PlayHistory_sessionsCapped());
+	CHECK(PlayHistory_session(0, &start, NULL, NULL) == 0 && start == midnight + 3600);
+	PlayHistory_setCaps(0, 0);
+
+	unlink(DB);
+	PlayHistory_invalidate();
+	CHECK(PlayHistory_sessionCount() == PLAY_UNKNOWN);
+	CHECK(PlayHistory_session(0, &start, &seconds, &rom) == -1);
+}
+
+// What's left in play_activity, as "rom_id:play_time" in rowid order, and
+// the rom table's rows, to check a reset deleted exactly its own.
+static char left[512];
+static int addLeft(void* data, int columns, char** values, char** names) {
+	(void)data;
+	(void)names;
+	size_t used = strlen(left);
+	snprintf(left + used, sizeof(left) - used, "%s%s:%s", used ? " " : "", values[0] ? values[0] : "NULL",
+		columns > 1 && values[1] ? values[1] : "NULL");
+	return 0;
+}
+
+static const char* rowsLeft(const char* query) {
+	left[0] = '\0';
+	sqlite3* db = openWriter();
+	char* error = NULL;
+	CHECK(db_exec(db, query, (void*)addLeft, NULL, &error) == 0);
+	db_close(db);
+	return left;
+}
+
+#define SESSIONS_LEFT() rowsLeft("SELECT rom_id, play_time FROM play_activity ORDER BY rowid;")
+#define ROMS_LEFT() rowsLeft("SELECT id, name FROM rom ORDER BY id;")
+
+// Resetting play time: one game's sessions, every one of its rows', and
+// nothing else; every session; and nothing at all when the database is
+// missing, locked or outside Roms.
+static void testForget(void) {
+	makeFixture();
+	PlayHistory_configure(DB, ROMS, onLog);
+	CHECK_STR(SESSIONS_LEFT(), "1:3600 1:900 1:1200 2:NULL 3:50 5:77");
+	const char* roms_before = "1:Tetris 2:Zelda 3:Metroid 4:Unplayed 5:Tetris again";
+	CHECK_STR(ROMS_LEFT(), roms_before);
+	CHECK(PlayHistory_seconds(ROMS "/GB (GB)/Tetris.gb") == 5700);
+
+	// both of Tetris's rows' sessions go, and nothing else
+	CHECK(PlayHistory_forget(ROMS "/GB (GB)/Tetris.gb") == 4);
+	CHECK(!PlayHistory_loaded());
+	CHECK(strstr(last_log, "play history: forgot GB (GB)/Tetris.gb (4 sessions)") != NULL);
+	CHECK_STR(SESSIONS_LEFT(), "2:NULL 3:50");
+	CHECK_STR(ROMS_LEFT(), roms_before);
+	CHECK(PlayHistory_seconds(ROMS "/GB (GB)/Tetris.gb") == 0);
+	CHECK(PlayHistory_count(ROMS "/GB (GB)/Tetris.gb") == 0);
+	// again: none left
+	CHECK(PlayHistory_forget(ROMS "/GB (GB)/Tetris.gb") == 0);
+	// a game with no row, matched to the orphan of its name, as play_time is
+	CHECK(PlayHistory_seconds(ROMS "/NES (FCEUMM)/Metroid.nes") == 50);
+	CHECK(PlayHistory_forget(ROMS "/NES (FCEUMM)/Metroid.nes") == 1);
+	CHECK_STR(SESSIONS_LEFT(), "2:NULL");
+	CHECK(PlayHistory_forget(ROMS "/GB (GB)/Never.gb") == 0);
+	CHECK(PlayHistory_forget("/elsewhere/Zelda.gba") == -1);
+	CHECK_STR(SESSIONS_LEFT(), "2:NULL");
+
+	// everything
+	makeFixture();
+	CHECK(PlayHistory_forget(NULL) == 6);
+	CHECK(strstr(last_log, "play history: forgot every session (6 sessions)") != NULL);
+	CHECK_STR(SESSIONS_LEFT(), "");
+	CHECK_STR(ROMS_LEFT(), roms_before);
+	CHECK(PlayHistory_today() == 0);
+	CHECK(PlayHistory_gameCount() == 0);
+
+	// gametimectl writing: it waits a little, then gives up and deletes nothing
+	makeFixture();
+	sqlite3* writer = openWriter();
+	exec(writer, "BEGIN IMMEDIATE; INSERT INTO play_activity(rom_id, play_time, created_at) VALUES(2, 10, 1);");
+	time_t started = time(NULL);
+	CHECK(PlayHistory_forget(ROMS "/GB (GB)/Tetris.gb") == -1);
+	CHECK(PlayHistory_forget(NULL) == -1);
+	CHECK(time(NULL) - started <= 3);
+	CHECK(strstr(last_log, "play history: couldn't forget every session") != NULL);
+	exec(writer, "COMMIT;");
+	db_close(writer);
+	CHECK_STR(SESSIONS_LEFT(), "1:3600 1:900 1:1200 2:NULL 3:50 5:77 2:10");
+	CHECK(access(DB "-journal", F_OK) != 0);
+	// and once it's done, the reset goes through
+	CHECK(PlayHistory_forget(ROMS "/GBA (MGBA)/Zelda.gba") == 2);
+	CHECK_STR(SESSIONS_LEFT(), "1:3600 1:900 1:1200 3:50 5:77");
+
+	// no database: nothing made
+	unlink(DB);
+	CHECK(PlayHistory_forget(NULL) == -1);
+	CHECK(PlayHistory_forget(ROMS "/GB (GB)/Tetris.gb") == -1);
+	CHECK(access(DB, F_OK) != 0);
+	// an empty file, before gametimectl makes its tables
+	FILE* f = fopen(DB, "w");
+	fclose(f);
+	CHECK(PlayHistory_forget(NULL) == -1);
+	CHECK(PlayHistory_forget(ROMS "/GB (GB)/Tetris.gb") == -1);
+	unlink(DB);
+	PlayHistory_invalidate();
+}
+
 int main(void) {
 	mkdir(TEST_DIR, 0755);
 	if (!bindWriter()) {
@@ -450,6 +580,8 @@ int main(void) {
 	testList();
 	testCaps();
 	testMove();
+	testSessions();
+	testForget();
 	testBig();
 	PlayHistory_quit();
 	CHECK_DONE();

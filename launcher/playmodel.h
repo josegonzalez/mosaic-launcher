@@ -112,4 +112,49 @@ void PlayDays_finish(PlayDays* days, int capped);
 // weren't all read.
 long long PlayDays_seconds(const PlayDays* days, long long from, long long to);
 
+// gametimectl's rom table, row by row with its id, for every session's
+// game and for forgetting a game's sessions.
+typedef struct PlayRom {
+	long long id;
+	char* path; // relative to Roms, or NULL
+	char* name; // the name gametimectl keeps, or NULL
+	int orphan; // its type is ORPHAN
+} PlayRom;
+
+typedef struct PlayRoms {
+	PlayRom* roms;
+	int count, cap;
+	int sorted;
+} PlayRoms;
+
+void PlayRoms_init(PlayRoms* roms);
+void PlayRoms_free(PlayRoms* roms);
+
+// Adds a row; path and name are copied, and either can be NULL or empty.
+// Returns 0, or -1 when out of memory.
+int PlayRoms_add(PlayRoms* roms, long long id, const char* path, const char* name, int orphan);
+
+// Sorts the rows by id for PlayRoms_byId; call it once they're all added.
+void PlayRoms_finish(PlayRoms* roms);
+
+// The row with id, or NULL.
+const PlayRom* PlayRoms_byId(const PlayRoms* roms, long long id);
+
+// The rows whose sessions are the game at rel_path (relative to Roms), as
+// PlayTable_find matches it: every row with that path, or failing that
+// every orphan named for the file without its extension, or failing that
+// with it. Writes the first max of their ids to ids and returns how many
+// matched, 0 for none or an empty rel_path.
+int PlayRoms_match(const PlayRoms* roms, const char* rel_path, long long* ids, int max);
+
+// One session with the id of its game's row, for the list of every session.
+typedef struct PlayEntry {
+	long long start;   // a Unix time
+	long long seconds; // how long it ran
+	long long rom;     // its row's id
+} PlayEntry;
+
+// Sorts entries oldest first, then by row id.
+void PlayEntries_sort(PlayEntry* entries, int count);
+
 #endif

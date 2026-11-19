@@ -232,6 +232,9 @@ static void testChart(void) {
 static void testTabs(void) {
 	CHECK_STR(AS_tabLabel(AS_TAB_WEEK), "7 days");
 	CHECK_STR(AS_tabLabel(AS_TAB_MONTH), "30 days");
+	CHECK_STR(AS_tabLabel(AS_TAB_ALL), "All time");
+	CHECK(!AS_isList(AS_TAB_ALL));
+	CHECK(AS_tabStep(AS_TAB_MONTH, 1) == AS_TAB_ALL && AS_tabStep(AS_TAB_ALL, 1) == AS_TAB_GAMES);
 	CHECK_STR(AS_tabLabel(AS_TAB_GAMES), "Games");
 	CHECK_STR(AS_tabLabel(AS_TAB_LAUNCHES), "Launches");
 	CHECK_STR(AS_tabLabel(AS_TABS), "");
@@ -259,15 +262,23 @@ static void testTabs(void) {
 	CHECK(AS_window(2, 3, 4, 2) == 0);
 	CHECK(AS_window(0, 0, 4, 2) == 0);
 
-	MosaicHint left[1], right[1];
+	MosaicHint left[2], right[2];
 	int lc = -1, rc = -1;
-	AS_hints(1, left, &lc, right, &rc);
+	AS_hints(AS_HINT_OPEN, left, &lc, right, &rc);
 	CHECK(lc == 1 && left[0].button == MOSAIC_BUTTON_B);
 	CHECK_STR(left[0].label, "BACK");
 	CHECK(rc == 1 && right[0].button == MOSAIC_BUTTON_A);
 	CHECK_STR(right[0].label, "PLAY");
 	AS_hints(0, left, &lc, right, &rc);
 	CHECK(lc == 1 && rc == 0);
+	AS_hints(AS_HINT_OPEN | AS_HINT_EXPORT | AS_HINT_RESET, left, &lc, right, &rc);
+	CHECK(lc == 2 && left[1].button == MOSAIC_BUTTON_Y);
+	CHECK_STR(left[1].label, "EXPORT");
+	CHECK(rc == 2 && right[0].button == MOSAIC_BUTTON_X && right[1].button == MOSAIC_BUTTON_A);
+	CHECK_STR(right[0].label, "RESET");
+	AS_hints(AS_HINT_EXPORT | AS_HINT_RESET_ALL, left, &lc, right, &rc);
+	CHECK(lc == 2 && rc == 1);
+	CHECK_STR(right[0].label, "RESET ALL");
 }
 
 static void testLayout(void) {
@@ -312,6 +323,213 @@ static void testLayout(void) {
 	CHECK(AS_plot(&room, 0, 12, 20, 8).w == 0);
 }
 
+static time_t localTimeOf(int hour, int minute) {
+	struct tm tm = { .tm_year = 2026 - 1900, .tm_mon = 10, .tm_mday = 18, .tm_hour = hour, .tm_min = minute,
+		.tm_isdst = -1 };
+	return mktime(&tm);
+}
+
+static void testAllTime(void) {
+	static const ASGame games[] = {
+		{ "/c/Roms/GBA (MGBA)/Zelda.gba", "Zelda", 8100, 900, 2 },
+		{ "/c/Roms/GB (GB)/Tetris.gb", "Tetris", 1600, 800, 2 },
+		{ "", "Metroid", 50, 50, 1 },
+		{ "/c/Roms/GB (GB)/Never.gb", "Never", 0, 0, 0 },
+	};
+	ASAllTime all;
+	AS_allTimeStart(&all, games, 4);
+	CHECK(all.seconds == 9750 && all.sessions == 5 && all.games == 3);
+	CHECK(all.longest == 0 && AS_busiestHour(all.hours) == -1);
+	char out[256];
+	AS_longestCaption(&all, out, sizeof(out));
+	CHECK_STR(out, "");
+	AS_hourCaption(all.hours, out, sizeof(out));
+	CHECK_STR(out, "No play by hour yet");
+
+	// 20:30 for 2h: 30m at 20, 1h at 21, 30m at 22
+	AS_allTimeAdd(&all, localTimeOf(20, 30), 7200, "Zelda");
+	CHECK(all.hours[20] == 1800 && all.hours[21] == 3600 && all.hours[22] == 1800 && all.hours[19] == 0);
+	AS_allTimeAdd(&all, localTimeOf(9, 0), 7200, "Tetris"); // as long: the first stays
+	AS_allTimeAdd(&all, localTimeOf(23, 50), 1200, "Metroid"); // over midnight
+	CHECK(all.hours[23] == 600 && all.hours[0] == 600);
+	AS_allTimeAdd(&all, localTimeOf(1, 0), 0, "None");
+	AS_allTimeAdd(&all, localTimeOf(1, 0), -5, "None");
+	CHECK(all.hours[1] == 0);
+	CHECK(all.longest == 7200);
+	CHECK_STR(all.longest_name, "Zelda");
+	CHECK(AS_busiestHour(all.hours) == 9); // 9 and 10 have 3600 as 21 does: the first
+	AS_hourCaption(all.hours, out, sizeof(out));
+	CHECK_STR(out, "Most active hour: 09:00");
+	AS_allTimeCaption(&all, out, sizeof(out));
+	CHECK_STR(out, "2h 42m \xc2\xb7 5 sessions \xc2\xb7 3 games");
+	AS_longestCaption(&all, out, sizeof(out));
+	CHECK_STR(out, "Longest session: 2h (Zelda)");
+
+	// whole days go to every hour
+	long long hours[AS_HOURS] = { 0 };
+	AS_addHours(hours, localTimeOf(6, 0), 2 * 86400 + 600);
+	CHECK(hours[6] == 7200 + 600 && hours[5] == 7200 && hours[7] == 7200);
+
+	// systems
+	char folder[64];
+	AS_systemFolder("/c/Roms", "/c/Roms/GBA (MGBA)/Zelda.gba", folder, sizeof(folder));
+	CHECK_STR(folder, "GBA (MGBA)");
+	AS_systemFolder("/c/Roms", "/c/Roms/GBA (MGBA)/Sub/Zelda.gba", folder, sizeof(folder));
+	CHECK_STR(folder, "GBA (MGBA)");
+	AS_systemFolder("/c/Roms", "/c/Roms/Zelda.gba", folder, sizeof(folder));
+	CHECK_STR(folder, "");
+	AS_systemFolder("/c/Roms", "/c/Romsx/GB/Zelda.gba", folder, sizeof(folder));
+	CHECK_STR(folder, "");
+	AS_systemFolder("/c/Roms", "", folder, sizeof(folder));
+	CHECK_STR(folder, "");
+	AS_systemLabel("GBA (MGBA)", folder, sizeof(folder));
+	CHECK_STR(folder, "GBA");
+	AS_systemLabel("Game Boy", folder, sizeof(folder));
+	CHECK_STR(folder, "Game Boy");
+	AS_systemLabel("(GB)", folder, sizeof(folder));
+	CHECK_STR(folder, "(GB)");
+	AS_systemLabel("", folder, sizeof(folder));
+	CHECK_STR(folder, "Other");
+
+	static const ASGame spread[] = {
+		{ "/c/Roms/GB (GB)/Tetris.gb", "Tetris", 1600, 800, 2 },
+		{ "/c/Roms/GBA (MGBA)/Zelda.gba", "Zelda", 8100, 900, 2 },
+		{ "/c/Roms/GB (GB2)/Kirby.gb", "Kirby", 500, 800, 1 },
+		{ "", "Metroid", 50, 50, 1 },
+		{ "/elsewhere/Doom.wad", "Doom", 50, 50, 1 },
+	};
+	ASSystem systems[6];
+	CHECK(AS_systems(spread, 5, "/c/Roms", systems) == 3);
+	CHECK_STR(systems[0].label, "GBA");
+	CHECK(systems[0].seconds == 8100 && systems[0].games == 1);
+	CHECK_STR(systems[1].label, "GB");
+	CHECK(systems[1].seconds == 2100 && systems[1].games == 2);
+	CHECK_STR(systems[2].label, "Other");
+	CHECK(systems[2].seconds == 100 && systems[2].games == 2);
+	CHECK(AS_systems(spread, 0, "/c/Roms", systems) == 0);
+}
+
+static void testTop(void) {
+	ASGame games[40];
+	unsigned char keep[40];
+	int order[40], top[AS_TOP];
+	memset(games, 0, sizeof(games));
+	for (int i = 0; i < 40; i++) {
+		snprintf(games[i].path, sizeof(games[i].path), "/c/Roms/GB/%02i.gb", i);
+		games[i].seconds = 100 * (i % 20); // 0 to 1900, twice
+		games[i].last_played = i;
+		games[i].count = 1;
+		keep[i] = i % 7 != 0; // every 7th hidden
+	}
+	int n = AS_pickTop(games, 40, keep, AS_TOP, order, top);
+	CHECK(n == AS_TOP);
+	// most played first, ties to the latest played, none left out kept
+	CHECK(top[0] == 39 && top[1] == 19 && top[2] == 38 && top[3] == 18);
+	for (int i = 0; i < n; i++) CHECK(keep[top[i]]);
+	for (int i = 1; i < n; i++) CHECK(games[top[i - 1]].seconds >= games[top[i]].seconds);
+	CHECK(AS_pickTop(games, 3, keep, AS_TOP, order, top) == 2 && top[0] == 2 && top[1] == 1);
+	CHECK(AS_pickTop(games, 0, keep, AS_TOP, order, top) == 0);
+	CHECK(AS_pickTop(games, 40, keep, 0, order, top) == 0);
+
+	const char* paths[] = { "/c/b", "/c/a", "/c/c" };
+	AS_sortPaths(paths, 3);
+	CHECK_STR(paths[0], "/c/a");
+	CHECK(AS_pathIn(paths, 3, "/c/b") && AS_pathIn(paths, 3, "/c/c") && !AS_pathIn(paths, 3, "/c/d"));
+	CHECK(!AS_pathIn(paths, 0, "/c/a") && !AS_pathIn(paths, 3, NULL));
+
+	ASGame orphan = { "", "Metroid", 50, 50, 1 };
+	CHECK(AS_resetPath(&orphan) == NULL);
+	CHECK(AS_resetPath(NULL) == NULL);
+	CHECK_STR(AS_resetPath(&games[3]), "/c/Roms/GB/03.gb");
+	char out[512];
+	AS_resetQuestion("Zelda", out, sizeof(out));
+	CHECK_STR(out, "Reset the play time of Zelda? Its sessions are deleted from the play history, so the Game Tracker loses them too. This can't be undone.");
+	AS_resetAllQuestion(out, sizeof(out));
+	CHECK(strstr(out, "Every session is deleted") && strstr(out, "Game Tracker loses them too") && strstr(out, "can't be undone"));
+}
+
+static char* slurpFile(const char* path) {
+	FILE* f = fopen(path, "rb");
+	if (!f) return NULL;
+	static char data[65536];
+	size_t n = fread(data, 1, sizeof(data) - 1, f);
+	data[n] = '\0';
+	fclose(f);
+	return data;
+}
+
+static void testReport(void) {
+	CHECK(system("mkdir -p '" CARD "'") == 0);
+	const char* path = CARD "/escape.txt";
+	FILE* f = fopen(path, "w");
+	AR_csvField(f, "Plain");
+	fputc('|', f);
+	AR_csvField(f, "Pok\xc3\xa9mon, Red");
+	fputc('|', f);
+	AR_csvField(f, "Say \"hi\"");
+	fputc('|', f);
+	AR_csvField(f, "two\nlines");
+	fputc('|', f);
+	AR_csvField(f, " padded");
+	fputc('|', f);
+	AR_csvField(f, "");
+	fputc('|', f);
+	AR_csvField(f, NULL);
+	fputc('|', f);
+	AR_html(f, "Tom & Jerry <\"Cat's\"> & co");
+	fclose(f);
+	CHECK_STR(slurpFile(path), "Plain|\"Pok\xc3\xa9mon, Red\"|\"Say \"\"hi\"\"\"|\"two\nlines\"|\" padded\"|||"
+		"Tom &amp; Jerry &lt;&quot;Cat&#39;s&quot;&gt; &amp; co");
+
+	f = fopen(path, "w");
+	AR_csvHeader(f);
+	AR_csvRow(f, localTimeOf(20, 30), 7230, "Tetris, \"DX\"", "GB", "/c/Roms/GB (GB)/Tetris, DX.gb");
+	fclose(f);
+	char want[256];
+	snprintf(want, sizeof(want), "started,start_unix,seconds,minutes,game,system,path\r\n"
+		"2026-11-18 20:30:00,%lld,7230,121,\"Tetris, \"\"DX\"\"\",GB,\"/c/Roms/GB (GB)/Tetris, DX.gb\"\r\n",
+		(long long)localTimeOf(20, 30));
+	CHECK_STR(slurpFile(path), want);
+
+	char stamp[32];
+	AR_stamp(localTimeOf(9, 5) + 7, stamp, sizeof(stamp));
+	CHECK_STR(stamp, "2026-11-18-090507");
+
+	ASGame games[] = {
+		{ "/c/Roms/GB (GB)/Tetris.gb", "Tetris & <Friends>", 1600, 800, 2 },
+		{ "/c/Roms/GBA (MGBA)/Zelda.gba", "Zelda", 8100, 900, 2 },
+	};
+	int order[] = { 1, 0 };
+	ASAllTime all;
+	AS_allTimeStart(&all, games, 2);
+	AS_allTimeAdd(&all, localTimeOf(21, 0), 3600, "Zelda");
+	ASSystem systems[3];
+	int system_count = AS_systems(games, 2, "/c/Roms", systems);
+	long long days[3] = { 600, -1, 0 };
+	ARSummary summary = { localTimeOf(12, 0), &all, systems, system_count, games, order, 2, days, 3 };
+	f = fopen(path, "w");
+	AR_htmlWrite(f, &summary);
+	fclose(f);
+	const char* html = slurpFile(path);
+	CHECK(strstr(html, "<!DOCTYPE html>") == html);
+	CHECK(strstr(html, "<title>Activity</title>") != NULL);
+	CHECK(strstr(html, "2h 41m \xc2\xb7 4 sessions \xc2\xb7 2 games") != NULL);
+	CHECK(strstr(html, "Longest session: 1h (Zelda)") != NULL);
+	CHECK(strstr(html, "Most active hour: 21:00") != NULL);
+	CHECK(strstr(html, "<tr><td>2026-11-18</td><td>10m</td></tr>") != NULL);
+	CHECK(strstr(html, "<tr><td>2026-11-17</td><td></td></tr>") != NULL);
+	CHECK(strstr(html, "<tr><td>21:00</td><td>1h</td></tr>") != NULL);
+	CHECK(strstr(html, "<tr><td>20:00</td><td>0m</td></tr>") != NULL);
+	CHECK(strstr(html, "<tr><td>GBA</td><td>2h 15m</td></tr>") != NULL);
+	// most played first, names escaped
+	const char* zelda = strstr(html, "<tr><td>Zelda</td><td>2h 15m, 2 sessions</td></tr>");
+	const char* tetris = strstr(html, "<tr><td>Tetris &amp; &lt;Friends&gt;</td><td>26m, 2 sessions</td></tr>");
+	CHECK(zelda && tetris && zelda < tetris);
+	CHECK(strstr(html, "<Friends>") == NULL);
+	CHECK(strstr(html, "</html>\n") != NULL);
+	unlink(path);
+}
+
 ///////////////////////////////////////
 // the plugin against a fake host
 
@@ -335,11 +553,12 @@ static char opened_screen[64];
 static char opened_path[600];
 static int opened_type = -1, open_answer = 1;
 static int redraws = 0;
-static MosaicHint hints_right[2];
+static MosaicHint hints_right[2], hints_left[2];
 static int hints_right_count = 0, hints_left_count = 0;
 static char toast_text[300];
 static const char* tile_setting = "on";
 static const char* button_setting = "none";
+static const char* folder_setting = "off";
 static int fills_into_hole = 0, texts_into_hole = 0;
 
 typedef struct {
@@ -363,6 +582,7 @@ static void fakeLog(const char* id, const char* message) {
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "tile")) return tile_setting;
 	if (!strcmp(key, "button")) return button_setting;
+	if (!strcmp(key, "folder")) return folder_setting;
 	return fallback;
 }
 
@@ -376,14 +596,65 @@ static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
 	return 0;
 }
 
+// every action registered, by id
+typedef struct {
+	char id[64], label[64];
+	int flags;
+	int (*available)(const char*, void*);
+	void (*run)(const char*, void*);
+} FakeAction;
+static FakeAction actions[8];
+static int action_count = 0;
+
+static const FakeAction* actionOf(const char* id) {
+	for (int i = 0; i < action_count; i++) {
+		if (!strcmp(actions[i].id, id)) return &actions[i];
+	}
+	return NULL;
+}
+
 static int fakeAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
-	(void)flags;
 	(void)data;
-	snprintf(action_id, sizeof(action_id), "%s", id);
-	snprintf(action_label, sizeof(action_label), "%s", label);
-	action_available = available;
-	action_run = run;
+	if (!actionOf(id) && action_count < 8) {
+		FakeAction* a = &actions[action_count++];
+		snprintf(a->id, sizeof(a->id), "%s", id);
+		snprintf(a->label, sizeof(a->label), "%s", label);
+		a->flags = flags;
+		a->available = available;
+		a->run = run;
+	}
+	if (!strcmp(id, "activity-stats.open")) {
+		snprintf(action_id, sizeof(action_id), "%s", id);
+		snprintf(action_label, sizeof(action_label), "%s", label);
+		action_available = available;
+		action_run = run;
+	}
 	return 0;
+}
+
+// run_action as the launcher runs it: the gate (a PIN always typed right
+// here) is only counted
+static char ran_action[64], ran_path[600];
+static int gated = 0;
+static int fakeRunAction(const char* id, const char* path) {
+	snprintf(ran_action, sizeof(ran_action), "%s", id);
+	snprintf(ran_path, sizeof(ran_path), "%s", path ? path : "");
+	const FakeAction* a = actionOf(id);
+	if (!a) return -1;
+	const char* given = a->flags & MOSAIC_ACTION_PATH ? path : NULL;
+	if (a->available && !a->available(given, NULL)) return -1;
+	if (a->flags & MOSAIC_ACTION_EDITS) gated++;
+	a->run(given, NULL);
+	return 0;
+}
+
+// confirm: the question, and A pressed on it when confirm_yes
+static char confirm_text[1024], confirm_label[64];
+static int confirm_yes = 1;
+static void fakeConfirm(const char* message, const char* yes, void (*on_yes)(void*), void* data) {
+	snprintf(confirm_text, sizeof(confirm_text), "%s", message);
+	snprintf(confirm_label, sizeof(confirm_label), "%s", yes);
+	if (confirm_yes) on_yes(data);
 }
 
 static int fakeTile(const char* id, int row, const char* icon, const char* icon_off, int (*is_on)(void*)) {
@@ -470,6 +741,7 @@ static int fakeDrawHints(MosaicSurface* screen, int group, const MosaicHint* hin
 		for (int i = 0; i < count && i < 2; i++) hints_right[i] = hints[i];
 	} else {
 		hints_left_count = count;
+		for (int i = 0; i < count && i < 2; i++) hints_left[i] = hints[i];
 	}
 	return 0;
 }
@@ -497,7 +769,129 @@ static long long fakeTimeOn(int days_ago) {
 }
 
 static const char* filtered_path = "";
-static int fakeFiltered(const char* path) { return filtered_path[0] && !strcmp(path, filtered_path); }
+static int filtered_asks = 0;
+static int fakeFiltered(const char* path) {
+	filtered_asks++;
+	return filtered_path[0] && !strcmp(path, filtered_path);
+}
+
+typedef struct {
+	const char* path; // "" for an orphan
+	const char* name;
+	long long start, seconds;
+} SessionFixture;
+static const SessionFixture* sessions_fixture = NULL;
+static int sessions_count = 0;
+
+static int fakeSessionsCount(void) {
+	return fixture_count < 0 ? MOSAIC_PLAY_UNKNOWN : sessions_count;
+}
+
+static int fakeSessionInfo(int index, MosaicPlaySession* out) {
+	if (!out || index < 0 || index >= sessions_count) return -1;
+	const SessionFixture* f = &sessions_fixture[index];
+	snprintf(out->path, sizeof(out->path), "%s", f->path);
+	snprintf(out->name, sizeof(out->name), "%s", f->name);
+	out->start = f->start;
+	out->seconds = f->seconds;
+	out->orphan = !f->path[0];
+	return 0;
+}
+
+static char forgot[600];
+static int forget_calls = 0, forget_answer = 3;
+static int fakeForget(const char* path) {
+	forget_calls++;
+	snprintf(forgot, sizeof(forgot), "%s", path ? path : "(everything)");
+	return forget_answer;
+}
+
+static int fakePlayCount(const char* path) {
+	for (int i = 0; i < fixture_count; i++) {
+		if (!fixture[i].orphan && !strcmp(fixture[i].path, path)) return fixture[i].count;
+	}
+	return fixture_count < 0 ? MOSAIC_PLAY_UNKNOWN : 0;
+}
+
+// the set and the lists
+static int (*set_has)(const char*, const char*);
+static void (*set_list)(const char*, void (*)(const char*, void*), void*);
+static char set_name[64];
+static int fakeSetRegister(const char* name, int (*has)(const char*, const char*),
+	void (*list)(const char*, void (*)(const char*, void*), void*)) {
+	snprintf(set_name, sizeof(set_name), "%s", name);
+	set_has = has;
+	set_list = list;
+	return 0;
+}
+
+static int sets_changed = 0, reloads = 0;
+static int fakeSetChanged(const char* name) {
+	(void)name;
+	sets_changed++;
+	return 0;
+}
+
+static int fakeSetNames(void (*each)(const char*, void*), void* data) {
+	(void)each;
+	(void)data;
+	return 0;
+}
+
+static void (*on_set_changed)(const char*, const char*, void*);
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	if (!strcmp(name, "launcher.set_changed")) on_set_changed = on_event;
+	return 0;
+}
+
+static int fakeEventValue(const char* payload, const char* key, char* out, size_t size) {
+	size_t n = strlen(key);
+	if (strncmp(payload, key, n) || payload[n] != '=') return -1;
+	snprintf(out, size, "%s", payload + n + 1);
+	return (int)strlen(payload + n + 1);
+}
+
+static void fakeReload(void) {
+	reloads++;
+}
+
+struct MosaicList {
+	char paths[AS_TOP + 2][600];
+	int types[AS_TOP + 2];
+	char name[64];
+	int count;
+};
+struct MosaicEntry {
+	char path[600];
+	char name[64];
+	int type;
+};
+static MosaicList lists[2];
+static int lists_made = 0;
+static MosaicEntry entries[AS_TOP + 2];
+static int entries_made = 0;
+
+static MosaicList* fakeListNew(void) {
+	MosaicList* list = &lists[lists_made++ % 2];
+	memset(list, 0, sizeof(*list));
+	return list;
+}
+
+static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
+	MosaicEntry* e = &entries[entries_made++ % (AS_TOP + 2)];
+	snprintf(e->path, sizeof(e->path), "%s", path);
+	snprintf(e->name, sizeof(e->name), "%s", name ? name : "");
+	e->type = type;
+	return e;
+}
+
+static void fakeListPush(MosaicList* list, MosaicEntry* e) {
+	if (list->count >= AS_TOP + 2) return;
+	snprintf(list->paths[list->count], sizeof(list->paths[0]), "%s", e->path);
+	snprintf(list->name, sizeof(list->name), "%s", e->name);
+	list->types[list->count++] = e->type;
+}
 
 static void setupHost(void) {
 	memset(&fake_host, 0, sizeof(fake_host));
@@ -527,10 +921,26 @@ static void setupHost(void) {
 	fake_host.play_game_info = fakeGameInfo;
 	fake_host.play_time_on = fakeTimeOn;
 	fake_host.is_filtered = fakeFiltered;
+	fake_host.play_count = fakePlayCount;
+	fake_host.run_action = fakeRunAction;
+	fake_host.confirm = fakeConfirm;
+	fake_host.set_register = fakeSetRegister;
+	fake_host.set_changed = fakeSetChanged;
+	fake_host.set_names = fakeSetNames;
+	fake_host.subscribe = fakeSubscribe;
+	fake_host.event_value = fakeEventValue;
+	fake_host.reload_lists = fakeReload;
+	fake_host.list_new = fakeListNew;
+	fake_host.entry_new = fakeEntryNew;
+	fake_host.list_push = fakeListPush;
+	fake_host.play_sessions_count = fakeSessionsCount;
+	fake_host.play_session_info = fakeSessionInfo;
+	fake_host.play_forget = fakeForget;
 }
 
 static const MosaicPlugin* start(void) {
 	setupHost();
+	action_count = 0;
 	tile_id[0] = '\0';
 	bound_button = -1;
 	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
@@ -547,6 +957,7 @@ static void draw(void) {
 	v.screen = SCREEN_ID;
 	hints_right_count = 0;
 	hints_left_count = 0;
+	hints_left[1].button = -1;
 	CHECK(registered.render(&screen_surface, &v, registered.data) == 0);
 }
 
@@ -620,7 +1031,7 @@ static void testScreen(void) {
 	fills_into_hole = texts_into_hole = 0;
 	draw();
 	CHECK_STR(last_log, "showing 7 days: days 900 1600 7200 50 300 0 0, axis 7200, 7 days: 2h 47m \xc2\xb7 23m a day");
-	CHECK(hints_left_count == 1 && hints_right_count == 0);
+	CHECK(hints_left_count == 2 && hints_right_count == 0);
 
 	redraws = 0;
 	CHECK(press(MOSAIC_BUTTON_R1) == MOSAIC_SCREEN_STAY);
@@ -631,8 +1042,12 @@ static void testScreen(void) {
 
 	press(MOSAIC_BUTTON_RIGHT);
 	draw();
+	CHECK(strstr(last_log, "showing All time: ") == last_log);
+	press(MOSAIC_BUTTON_RIGHT);
+	draw();
 	CHECK_STR(last_log, "showing Games: 0 of 5: Zelda, 2h 15m \xc2\xb7 2 sessions, can open");
-	CHECK(hints_right_count == 1 && hints_right[0].button == MOSAIC_BUTTON_A);
+	CHECK(hints_right_count == 2 && hints_right[0].button == MOSAIC_BUTTON_X && hints_right[1].button == MOSAIC_BUTTON_A);
+	CHECK(hints_left_count == 2 && hints_left[1].button == MOSAIC_BUTTON_Y);
 	press(MOSAIC_BUTTON_DOWN);
 	draw();
 	CHECK_STR(last_log, "showing Games: 1 of 5: Tetris, 26m \xc2\xb7 2 sessions, can open");
@@ -647,6 +1062,7 @@ static void testScreen(void) {
 	press(MOSAIC_BUTTON_DOWN);
 	draw();
 	CHECK_STR(last_log, "showing Games: 3 of 5: Metroid, <1m \xc2\xb7 1 session, can't open");
+	// an orphan can't be reset on its own either
 	CHECK(hints_right_count == 0);
 	opened_path[0] = '\0';
 	press(MOSAIC_BUTTON_A);
@@ -692,6 +1108,7 @@ static void testScreen(void) {
 	CHECK_STR(last_log, "showing Games: 0 of 5: Zelda, 2h 15m \xc2\xb7 2 sessions, can open");
 	press(MOSAIC_BUTTON_LEFT);
 	press(MOSAIC_BUTTON_LEFT);
+	press(MOSAIC_BUTTON_LEFT);
 	draw();
 	CHECK(strstr(last_log, "showing 7 days: ") == last_log);
 	// up and down do nothing on a chart
@@ -716,6 +1133,10 @@ static void testScreen(void) {
 	press(MOSAIC_BUTTON_A);
 	press(MOSAIC_BUTTON_DOWN);
 	press(MOSAIC_BUTTON_L1);
+	draw();
+	CHECK_STR(last_log, "showing All time: 0m \xc2\xb7 0 sessions \xc2\xb7 0 games, no sessions, No play by hour yet, hours 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0");
+	CHECK(hints_right_count == 0);
+	press(MOSAIC_BUTTON_L1);
 	press(MOSAIC_BUTTON_L1);
 	draw();
 	CHECK_STR(last_log, "showing 7 days: days 0 0 0 0 0 0 0, axis 3600, 7 days: 0m \xc2\xb7 0m a day");
@@ -733,9 +1154,329 @@ static void testScreen(void) {
 		CHECK(hints_left_count == 1 && hints_right_count == 0);
 		press(MOSAIC_BUTTON_R1);
 	}
+	// nothing to export or reset
+	ran_action[0] = '\0';
+	press(MOSAIC_BUTTON_Y);
+	press(MOSAIC_BUTTON_X);
+	CHECK_STR(ran_action, "");
 	press(MOSAIC_BUTTON_A);
 	registered.exit(NULL);
 	mosaic_plugin_get(&fake_host)->quit();
+}
+
+// sessions for the history above: Tetris is filtered in some tests
+static SessionFixture history_sessions[6];
+
+static void makeSessions(void) {
+	SessionFixture made[] = {
+		{ "", "Metroid", localTimeOf(8, 0), 50 },
+		{ ROMS "/Zelda.gba", "Zelda", localTimeOf(20, 30), 7200 },
+		{ ROMS "/Tetris.gb", "Tetris", localTimeOf(9, 0), 800 },
+		{ ROMS "/Tetris.gb", "Tetris", localTimeOf(9, 30), 800 },
+		{ ROMS "/Zelda.gba", "Zelda", localTimeOf(22, 0), 900 },
+		{ ROMS "/Puzzle.gb", "", localTimeOf(7, 0), 300 },
+	};
+	memcpy(history_sessions, made, sizeof(made));
+	sessions_fixture = history_sessions;
+	sessions_count = 6;
+}
+
+static void testAllTimeScreen(void) {
+	makeCard();
+	makeSessions();
+	start();
+	fixture = history;
+	fixture_count = 5;
+	tab = AS_TAB_ALL;
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(strstr(last_log, "showing All time: 2h 48m \xc2\xb7 11 sessions \xc2\xb7 5 games, Longest session: 2h (Zelda), "
+		"Most active hour: 21:00, hours 0 0 0 0 0 0 0 300 50 1600 0 0 0 0 0 0 0 0 0 0 1800 3600 2700 0, "
+		"systems Stats 2h 47m, Other <1m") == last_log);
+	CHECK(hints_left_count == 2 && hints_right_count == 1 && hints_right[0].button == MOSAIC_BUTTON_X);
+	CHECK_STR(hints_right[0].label, "RESET ALL");
+	CHECK(fills_into_hole == 0 && texts_into_hole == 0);
+	registered.exit(NULL);
+
+	// a filtered game's sessions are left out too
+	filtered_path = ROMS "/Tetris.gb";
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(strstr(last_log, "showing All time: 2h 21m \xc2\xb7 9 sessions \xc2\xb7 4 games, Longest session: 2h (Zelda), "
+		"Most active hour: 21:00, hours 0 0 0 0 0 0 0 300 50 0 0 0") == last_log);
+	registered.exit(NULL);
+	filtered_path = "";
+
+	// a launcher without sessions: the totals, but no hours, export or reset
+	setupHost();
+	fake_host.size = offsetof(MosaicHost, play_sessions_count);
+	CHECK(mosaic_plugin_get(&fake_host)->init(&fake_host) == 0);
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(strstr(last_log, "showing All time: 2h 48m \xc2\xb7 11 sessions \xc2\xb7 5 games, no sessions, No play by hour yet") == last_log);
+	CHECK(hints_left_count == 1 && hints_right_count == 0);
+	registered.exit(NULL);
+	sessions_count = 0;
+}
+
+static void testExport(void) {
+	makeCard();
+	makeSessions();
+	start();
+	fixture = history;
+	fixture_count = 5;
+	filtered_path = ROMS "/Puzzle.gb";
+	const FakeAction* a = actionOf("activity-stats.export");
+	CHECK(a && a->flags == 0);
+	CHECK_STR(a->label, "EXPORT");
+	// from the screen, through run_action
+	tab = AS_TAB_WEEK;
+	CHECK(registered.enter(NULL) == 0);
+	toast_text[0] = '\0';
+	press(MOSAIC_BUTTON_Y);
+	CHECK_STR(ran_action, "activity-stats.export");
+	CHECK(strstr(toast_text, "Saved Reports/activity-") == toast_text);
+	CHECK(strstr(toast_text, ".csv and .html") != NULL);
+	char stamp[32];
+	snprintf(stamp, sizeof(stamp), "%.17s", toast_text + strlen("Saved Reports/activity-"));
+	char csv[700], html[700];
+	snprintf(csv, sizeof(csv), CARD "/Reports/activity-%s.csv", stamp);
+	snprintf(html, sizeof(html), CARD "/Reports/activity-%s.html", stamp);
+	char want[1500];
+	snprintf(want, sizeof(want), "exported %s and %s", csv, html);
+	CHECK_STR(last_log, want);
+	const char* text = slurpFile(csv);
+	CHECK(text && strstr(text, "started,start_unix,seconds,minutes,game,system,path\r\n") == text);
+	// a row per session, oldest first as the launcher lists them, but the filtered game's
+	CHECK(text && strstr(text, ",50,1,Metroid,Other,\r\n") != NULL);
+	CHECK(text && strstr(text, ",7200,120,Zelda,Stats," ROMS "/Zelda.gba\r\n") != NULL);
+	CHECK(text && strstr(text, "Puzzle") == NULL);
+	int rows = 0;
+	for (const char* c = text; c && *c; c++) rows += *c == '\n';
+	CHECK(rows == 6);
+	text = slurpFile(html);
+	CHECK(text && strstr(text, "<title>Activity</title>") != NULL);
+	CHECK(text && strstr(text, "<tr><td>Puzzle</td>") == NULL);
+	CHECK(text && strstr(text, "<tr><td>Zelda</td><td>2h 15m, 2 sessions</td></tr>") != NULL);
+	struct stat st;
+	char temp[720];
+	snprintf(temp, sizeof(temp), "%s.tmp", csv);
+	CHECK(stat(temp, &st) != 0);
+	registered.exit(NULL);
+
+	// from elsewhere, with the screen shut: the games read for it alone
+	CHECK(game_count == -1);
+	toast_text[0] = '\0';
+	CHECK(fakeRunAction("activity-stats.export", NULL) == 0);
+	CHECK(strstr(toast_text, "Saved Reports/activity-") == toast_text);
+	CHECK(game_count == -1 && games == NULL);
+
+	// a card that can't take it
+	CHECK(system("rm -rf '" CARD "/Reports' && touch '" CARD "/Reports'") == 0);
+	toast_text[0] = '\0';
+	fakeRunAction("activity-stats.export", NULL);
+	CHECK_STR(toast_text, "Couldn't save the activity report");
+	CHECK(system("rm -f '" CARD "/Reports'") == 0);
+
+	// no history: not available
+	fixture_count = -1;
+	CHECK(a->available(NULL, NULL) == 0);
+	filtered_path = "";
+	sessions_count = 0;
+}
+
+static void testReset(void) {
+	makeCard();
+	start();
+	fixture = history;
+	fixture_count = 5;
+	const FakeAction* one = actionOf("activity-stats.reset");
+	const FakeAction* all = actionOf("activity-stats.reset_all");
+	CHECK(one && one->flags == (MOSAIC_ACTION_PATH | MOSAIC_ACTION_EDITS));
+	CHECK(all && all->flags == MOSAIC_ACTION_EDITS);
+	CHECK(one->available(ROMS "/Tetris.gb", NULL) == 1);
+	CHECK(one->available(ROMS "/Never.gb", NULL) == 0);
+	CHECK(one->available(NULL, NULL) == 0);
+	CHECK(all->available(NULL, NULL) == 1);
+
+	// X on the Games tab: the selected game, through the gate, after a confirm
+	tab = AS_TAB_GAMES;
+	selected[0] = 1;
+	CHECK(registered.enter(NULL) == 0);
+	draw();
+	CHECK(strstr(last_log, "showing Games: 1 of 5: Tetris") == last_log);
+	gated = forget_calls = sets_changed = 0;
+	toast_text[0] = '\0';
+	confirm_yes = 0;
+	press(MOSAIC_BUTTON_X);
+	CHECK_STR(ran_action, "activity-stats.reset");
+	CHECK_STR(ran_path, ROMS "/Tetris.gb");
+	CHECK(gated == 1);
+	CHECK_STR(confirm_text, "Reset the play time of Tetris? Its sessions are deleted from the play history, so the Game Tracker loses them too. This can't be undone.");
+	CHECK_STR(confirm_label, "RESET");
+	CHECK(forget_calls == 0); // B on the confirm
+	confirm_yes = 1;
+	redraws = 0;
+	press(MOSAIC_BUTTON_X);
+	CHECK(forget_calls == 1);
+	CHECK_STR(forgot, ROMS "/Tetris.gb");
+	CHECK_STR(toast_text, "Play time reset");
+	CHECK(redraws >= 1 && sets_changed == 1);
+	CHECK(game_count == 5); // read again
+
+	// an orphan has no reset of its own
+	selected[0] = 3;
+	ran_action[0] = '\0';
+	press(MOSAIC_BUTTON_X);
+	CHECK_STR(ran_action, "");
+
+	// X on All time: everything
+	tab = AS_TAB_ALL;
+	makeSessions();
+	registered.exit(NULL);
+	registered.enter(NULL);
+	press(MOSAIC_BUTTON_X);
+	CHECK_STR(ran_action, "activity-stats.reset_all");
+	CHECK_STR(forgot, "(everything)");
+	CHECK(strstr(confirm_text, "Reset all play time? Every session is deleted") == confirm_text);
+	CHECK(strstr(confirm_text, "the Game Tracker loses them too. This can't be undone.") != NULL);
+
+	// locked or missing: it says so, and the history is read again
+	forget_answer = -1;
+	press(MOSAIC_BUTTON_X);
+	CHECK_STR(toast_text, "Couldn't reset the play time. Try again after a moment.");
+	CHECK_STR(last_log, "reset everything: -1");
+	forget_answer = 3;
+	registered.exit(NULL);
+
+	// from the game list, on a game, with its tracker name
+	CHECK(fakeRunAction("activity-stats.reset", ROMS "/Puzzle.gb") == 0);
+	CHECK(strstr(confirm_text, "Reset the play time of Puzzle?") == confirm_text);
+	CHECK_STR(forgot, ROMS "/Puzzle.gb");
+	sessions_count = 0;
+
+	// a launcher without play_forget registers no reset
+	setupHost();
+	action_count = 0;
+	fake_host.size = offsetof(MosaicHost, play_sessions_count);
+	CHECK(mosaic_plugin_get(&fake_host)->init(&fake_host) == 0);
+	CHECK(actionOf("activity-stats.reset") == NULL && actionOf("activity-stats.reset_all") == NULL);
+}
+
+static int set_listed = 0;
+static void countListed(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	set_listed++;
+}
+
+static void testFolder(void) {
+	makeCard();
+	// 30 games on the card, most played last, and a hidden one, an orphan and one gone
+	static Fixture many[34];
+	static char paths[34][600];
+	for (int i = 0; i < 30; i++) {
+		snprintf(paths[i], sizeof(paths[i]), ROMS "/G%02i.gb", i);
+		FILE* f = fopen(paths[i], "w");
+		if (f) fclose(f);
+		many[i] = (Fixture){ paths[i], "", 1000 + i, 0, i, 1, 0 };
+	}
+	many[30] = (Fixture){ ROMS "/Hidden.gb", "", 99999, 0, 0, 1, 0 };
+	FILE* f = fopen(ROMS "/Hidden.gb", "w");
+	if (f) fclose(f);
+	many[31] = (Fixture){ "", "Metroid", 99998, 0, 0, 1, 1 };
+	many[32] = (Fixture){ ROMS "/Gone.gb", "", 99997, 0, 0, 1, 0 };
+	CHECK(system("mkdir -p '" ROMS "/Pak.pak'") == 0);
+	many[33] = (Fixture){ ROMS "/Pak.pak", "", 5000, 0, 0, 1, 0 };
+	// most played first, as the launcher lists them
+	static Fixture listed[34];
+	int order[34];
+	for (int i = 0; i < 34; i++) order[i] = i;
+	for (int i = 0; i < 34; i++) {
+		for (int k = i + 1; k < 34; k++) {
+			if (many[order[k]].seconds > many[order[i]].seconds) {
+				int t = order[i];
+				order[i] = order[k];
+				order[k] = t;
+			}
+		}
+	}
+	for (int i = 0; i < 34; i++) listed[i] = many[order[i]];
+	fixture = listed;
+	fixture_count = 34;
+	filtered_path = ROMS "/Hidden.gb";
+
+	// off by default: no folder, but the set
+	folder_setting = "off";
+	const MosaicPlugin* p = start();
+	CHECK_STR(set_name, "activity-stats.most-played");
+	lists_made = 0;
+	MosaicList root;
+	memset(&root, 0, sizeof(root));
+	p->root_entries(&root);
+	CHECK(root.count == 0);
+	CHECK(p->virtual_dir(CARD "/Most Played") == NULL);
+	CHECK(set_has("activity-stats.most-played", ROMS "/G29.gb") == 1);
+	CHECK(set_has("activity-stats.most-played", ROMS "/G06.gb") == 1);
+	CHECK(set_has("activity-stats.most-played", ROMS "/G05.gb") == 0);
+	CHECK(set_has("activity-stats.most-played", ROMS "/Hidden.gb") == 0);
+	CHECK(set_has("activity-stats.most-played", ROMS "/Gone.gb") == 0);
+	CHECK(set_has("activity-stats.most-played", NULL) == 0);
+
+	folder_setting = "on";
+	p = start();
+	memset(&root, 0, sizeof(root));
+	p->root_entries(&root);
+	CHECK(root.count == 1);
+	CHECK_STR(root.paths[0], CARD "/Most Played");
+	CHECK_STR(root.name, "Most Played");
+	CHECK(root.types[0] == MOSAIC_ENTRY_DIR);
+	CHECK(p->virtual_dir(CARD "/Other") == NULL);
+	MosaicList* list = p->virtual_dir(CARD "/Most Played");
+	CHECK(list && list->count == AS_TOP);
+	CHECK_STR(list->paths[0], ROMS "/Pak.pak");
+	CHECK(list->types[0] == MOSAIC_ENTRY_PAK);
+	CHECK_STR(list->paths[1], ROMS "/G29.gb");
+	CHECK(list->types[1] == MOSAIC_ENTRY_ROM);
+	CHECK_STR(list->paths[AS_TOP - 1], ROMS "/G06.gb");
+	CHECK_STR(last_log, "most played: 25 games");
+	for (int i = 0; i < list->count; i++) CHECK(strcmp(list->paths[i], ROMS "/Hidden.gb") != 0);
+
+	// kept until something changes: no more is_filtered asks
+	int asks = filtered_asks;
+	CHECK(set_has("activity-stats.most-played", ROMS "/G29.gb") == 1);
+	CHECK(filtered_asks == asks);
+	set_listed = 0;
+	set_list("activity-stats.most-played", countListed, NULL);
+	CHECK(set_listed == AS_TOP);
+	// another set changing, such as hidden's, works it out again
+	filtered_path = "";
+	on_set_changed("launcher.set_changed", "name=hidden", NULL);
+	CHECK(set_has("activity-stats.most-played", ROMS "/Hidden.gb") == 1);
+	CHECK(filtered_asks > asks);
+	// its own set's change doesn't
+	asks = filtered_asks;
+	on_set_changed("launcher.set_changed", "name=activity-stats.most-played", NULL);
+	CHECK(set_has("activity-stats.most-played", ROMS "/Hidden.gb") == 1);
+	CHECK(filtered_asks == asks);
+	// a game returning announces it
+	sets_changed = 0;
+	p->post_return();
+	CHECK(sets_changed == 1);
+	CHECK(set_has("activity-stats.most-played", ROMS "/Hidden.gb") == 1);
+	CHECK(filtered_asks > asks);
+	// a reset reloads the lists for the folder
+	reloads = 0;
+	fakeRunAction("activity-stats.reset", ROMS "/G29.gb");
+	CHECK(reloads == 1);
+
+	// no history: an empty folder
+	fixture_count = -1;
+	p->post_return();
+	list = p->virtual_dir(CARD "/Most Played");
+	CHECK(list && list->count == 0);
+	folder_setting = "off";
+	filtered_path = "";
 }
 
 // the text in the words it's given, and English again without them
@@ -781,6 +1522,9 @@ static void testWords(void) {
 
 int main(void) {
 	testName();
+	testAllTime();
+	testTop();
+	testReport();
 	testRank();
 	testFormat();
 	testWords();
@@ -790,5 +1534,9 @@ int main(void) {
 	testLayout();
 	testInit();
 	testScreen();
+	testAllTimeScreen();
+	testExport();
+	testReset();
+	testFolder();
 	CHECK_DONE();
 }

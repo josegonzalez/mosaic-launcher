@@ -1,7 +1,8 @@
 // Activity stats, without the host: the games ranked by play time and by
-// sessions, the chart's scale and bars, the durations and captions shown,
-// the tabs, where the d-pad moves in a list, the hints and the layout. No
-// SDL, so it's tested on the host.
+// sessions, the all-time totals, time per system and play by hour of day,
+// the 25 most played, the chart's scale and bars, the durations and
+// captions shown, the tabs, where the d-pad moves in a list, the hints and
+// the layout. No SDL, so it's tested on the host.
 
 #ifndef ACTIVITY_MODEL_H
 #define ACTIVITY_MODEL_H
@@ -15,6 +16,10 @@
 // days the month chart shows; the week chart shows the last AS_WEEK
 #define AS_DAYS 30
 #define AS_WEEK 7
+// the hours of the day the All time tab's chart shows
+#define AS_HOURS 24
+// the games the Most Played folder and set hold
+#define AS_TOP 25
 
 // Where the text the model builds gets its words: tr(text) for fixed
 // English and tr_plural(singular, plural, n) for a count's form, each
@@ -26,6 +31,9 @@ typedef struct ASWords {
 	const char* (*tr_plural)(const char* singular, const char* plural, unsigned long n);
 } ASWords;
 void AS_setWords(const ASWords* words);
+
+// text in those words.
+const char* AS_word(const char* text);
 
 // One game from the play history.
 typedef struct ASGame {
@@ -50,6 +58,90 @@ void AS_rankLaunched(const ASGame* games, int count, int* order);
 
 // The totals over the games: seconds and sessions, leaving out negatives.
 void AS_totals(const ASGame* games, int count, long long* seconds, long long* sessions);
+
+///////////////////////////////////////
+// all time
+
+// The totals the All time tab shows: the time, sessions and games from the
+// games, and the longest session and play by hour of day from the
+// sessions.
+typedef struct ASAllTime {
+	long long seconds;
+	long long sessions;
+	int games; // with any session
+	long long longest; // the longest session's seconds, 0 for none
+	char longest_name[AS_NAME_MAX];
+	long long hours[AS_HOURS]; // seconds played in each local hour of the day
+} ASAllTime;
+
+// Starts all from the games: their time and sessions (as AS_totals), how
+// many have a session, and no sessions yet.
+void AS_allTimeStart(ASAllTime* all, const ASGame* games, int count);
+
+// Adds a session that started at start (a Unix time) and ran seconds, of
+// the game named name: the longest, the first of equals, and its time
+// spread over the local hours it ran in. A negative or 0 seconds adds
+// nothing.
+void AS_allTimeAdd(ASAllTime* all, long long start, long long seconds, const char* name);
+
+// Spreads seconds from start over the local hours of the day it runs in,
+// into hours; whole days add a day's worth to every hour at once.
+void AS_addHours(long long hours[AS_HOURS], long long start, long long seconds);
+
+// The hour of the day with the most play, the first of equals, or -1 when
+// none has any.
+int AS_busiestHour(const long long hours[AS_HOURS]);
+
+// The All time tab's hour caption: "Most active hour: 21:00", or "No
+// play by hour yet".
+void AS_hourCaption(const long long hours[AS_HOURS], char* out, size_t size);
+
+// The All time tab's captions: "12h 5m · 40 sessions · 9 games" and
+// "Longest session: 2h (Zelda)", or "" when there's no session.
+void AS_allTimeCaption(const ASAllTime* all, char* out, size_t size);
+void AS_longestCaption(const ASAllTime* all, char* out, size_t size);
+
+// The system folder a game's full path is in, under roms (the card's Roms
+// folder): "GBA (MGBA)" for <roms>/GBA (MGBA)/Zelda.gba, or "" for an
+// empty path or one outside roms.
+void AS_systemFolder(const char* roms, const char* path, char* out, size_t size);
+
+// What a list shows for a system folder: its name without the " (TAG)"
+// stock hides, "GBA" for "GBA (MGBA)", or "Other" for "".
+void AS_systemLabel(const char* folder, char* out, size_t size);
+
+// One system's time, for the All time tab and the export.
+typedef struct ASSystem {
+	char label[AS_NAME_MAX]; // as AS_systemLabel shows it
+	long long seconds;
+	int games;
+} ASSystem;
+
+// Sums the games' time by system, as AS_systemLabel names them (so two
+// folders of one system add up, and orphans and games outside roms are
+// Other), into out, most played first, then by label. out has room for
+// count + 1. Returns how many systems.
+int AS_systems(const ASGame* games, int count, const char* roms, ASSystem* out);
+
+// The most played of the games keep says to keep (keep[i] non-zero for
+// games[i]), up to max of them, as indexes into games in top, ranked as
+// AS_rankPlayed. Returns how many. order has room for count.
+int AS_pickTop(const ASGame* games, int count, const unsigned char* keep, int max, int* order, int* top);
+
+// Sorts paths bytewise, and finds path in them, for the paths a filter
+// hides. AS_pathIn returns 1 when it's there.
+void AS_sortPaths(const char** paths, int count);
+int AS_pathIn(const char* const* sorted, int count, const char* path);
+
+// The path a reset of game forgets with play_forget: its full path, or
+// NULL for an orphan, which only a reset of everything forgets.
+const char* AS_resetPath(const ASGame* game);
+
+// The confirms before a reset: of one game ("Reset Zelda's play time?
+// ...") and of everything, each saying it can't be undone and that stock's
+// Game Tracker loses it too.
+void AS_resetQuestion(const char* name, char* out, size_t size);
+void AS_resetAllQuestion(char* out, size_t size);
 
 ///////////////////////////////////////
 // formatting
@@ -109,6 +201,7 @@ MosaicRect AS_slot(const MosaicRect* plot, int days, int days_ago);
 enum ASTab {
 	AS_TAB_WEEK,
 	AS_TAB_MONTH,
+	AS_TAB_ALL,
 	AS_TAB_GAMES,
 	AS_TAB_LAUNCHES,
 	AS_TABS,
@@ -131,8 +224,17 @@ int AS_step(int selected, int count, int by, int fresh);
 // as far as it takes to show selected, with fit rows in view.
 int AS_window(int selected, int count, int fit, int first);
 
-// The hints: B BACK on the left, and A PLAY on the right when can_open.
-void AS_hints(int can_open, MosaicHint left[1], int* left_count, MosaicHint right[1], int* right_count);
+// What the hints offer, as AS_HINT_ bits.
+enum {
+	AS_HINT_OPEN = 1 << 0,      // A PLAY, for a game on the card
+	AS_HINT_EXPORT = 1 << 1,    // Y EXPORT
+	AS_HINT_RESET = 1 << 2,     // X RESET, for the selected game
+	AS_HINT_RESET_ALL = 1 << 3, // X RESET ALL
+};
+
+// The hints, as offer says: B BACK and Y EXPORT on the left, and X RESET
+// or RESET ALL and A PLAY on the right, in that order.
+void AS_hints(int offer, MosaicHint left[2], int* left_count, MosaicHint right[2], int* right_count);
 
 ///////////////////////////////////////
 // layout
@@ -157,6 +259,16 @@ int AS_tabsFit(const int* tab_w, int count, int arrows_w, int room_w);
 // and a PADDING) and hole, above the hint pills, PADDING in at the sides.
 // w 0 when there's none.
 MosaicRect AS_room(const MosaicRect* area, const MosaicRect* hole, int scale);
+
+// The All time tab's two halves of room, under its captions (two lines
+// caption_h tall and a PADDING): systems on the left and the hour chart on
+// the right, PADDING apart. w 0 for both when there's no room.
+void AS_allTimeRooms(const MosaicRect* room, int scale, int caption_h, MosaicRect* systems, MosaicRect* hours);
+
+// The hour chart's plot in room: under a caption caption_h tall and half
+// a PADDING, over hour labels label_h tall and half a PADDING. w 0 when it
+// doesn't fit.
+MosaicRect AS_hourPlot(const MosaicRect* room, int scale, int caption_h, int label_h);
 
 // The chart's plot in room: under a caption caption_h tall and a
 // PADDING, right of the scale's labels axis_w wide and half a PADDING,

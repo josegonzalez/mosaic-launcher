@@ -62,6 +62,26 @@ long long PlayHistory_day(int days_ago);
 // that can't be written. Forgets the answers, as PlayHistory_invalidate.
 int PlayHistory_move(const char* from, const char* to);
 
+// Every session with its game, oldest first: how many there are, up to
+// the newest PLAY_SESSIONS_MAX, or PLAY_UNKNOWN. Read the first time it's
+// asked, in a read of its own after the rest, and kept until the next
+// invalidate. PlayHistory_session writes the one at index's start and
+// seconds, its game's row (NULL when the session's rom_id has none) and
+// returns 0, or -1 past the end. PlayHistory_sessionsCapped says older
+// sessions than those weren't read.
+int PlayHistory_sessionCount(void);
+int PlayHistory_session(int index, long long* start, long long* seconds, const PlayRom** rom);
+int PlayHistory_sessionsCapped(void);
+
+// Deletes a game's sessions, the play_activity rows of the rom rows
+// PlayRoms_match finds for its full path, or with a NULL path every
+// session, opening the database read-write for it, in one transaction.
+// The rom table and every other table are left as they are. Returns how
+// many sessions it deleted, or -1 for a path outside Roms, or a database
+// that's missing, locked past the busy timeout or can't be written, when
+// nothing is deleted. Forgets the answers, as PlayHistory_invalidate.
+int PlayHistory_forget(const char* path);
+
 // At most the PLAY_GAMES_MAX most played games are read, and the newest
 // PLAY_SESSIONS_MAX sessions for PlayHistory_day.
 #define PLAY_GAMES_MAX 10000

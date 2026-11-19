@@ -292,3 +292,114 @@ long long PlayDays_seconds(const PlayDays* days, long long from, long long to) {
 	while (end < days->count && days->sessions[end].start < to) end++;
 	return Play_secondsBetween(days->sessions + lo, end - lo, from, to);
 }
+
+void PlayRoms_init(PlayRoms* roms) {
+	memset(roms, 0, sizeof(*roms));
+}
+
+void PlayRoms_free(PlayRoms* roms) {
+	for (int i = 0; i < roms->count; i++) {
+		free(roms->roms[i].path);
+		free(roms->roms[i].name);
+	}
+	free(roms->roms);
+	PlayRoms_init(roms);
+}
+
+static char* copyOrNull(const char* text, int* failed) {
+	if (!text || !text[0]) return NULL;
+	char* copy = strdup(text);
+	if (!copy) *failed = 1;
+	return copy;
+}
+
+int PlayRoms_add(PlayRoms* roms, long long id, const char* path, const char* name, int orphan) {
+	if (roms->count == roms->cap) {
+		int cap = roms->cap ? roms->cap * 2 : 64;
+		PlayRom* grown = realloc(roms->roms, cap * sizeof(PlayRom));
+		if (!grown) return -1;
+		roms->roms = grown;
+		roms->cap = cap;
+	}
+	int failed = 0;
+	char* path_copy = copyOrNull(path, &failed);
+	char* name_copy = copyOrNull(name, &failed);
+	if (failed) {
+		free(path_copy);
+		free(name_copy);
+		return -1;
+	}
+	PlayRom* rom = &roms->roms[roms->count++];
+	rom->id = id;
+	rom->path = path_copy;
+	rom->name = name_copy;
+	rom->orphan = orphan ? 1 : 0;
+	roms->sorted = 0;
+	return 0;
+}
+
+static int compareIds(const void* a, const void* b) {
+	const PlayRom* x = a;
+	const PlayRom* y = b;
+	return x->id < y->id ? -1 : x->id > y->id;
+}
+
+void PlayRoms_finish(PlayRoms* roms) {
+	if (roms->count > 1) qsort(roms->roms, roms->count, sizeof(PlayRom), compareIds);
+	roms->sorted = 1;
+}
+
+const PlayRom* PlayRoms_byId(const PlayRoms* roms, long long id) {
+	if (!roms || !roms->sorted) return NULL;
+	int lo = 0, hi = roms->count;
+	while (lo < hi) {
+		int mid = lo + (hi - lo) / 2;
+		if (roms->roms[mid].id < id) lo = mid + 1;
+		else hi = mid;
+	}
+	return lo < roms->count && roms->roms[lo].id == id ? &roms->roms[lo] : NULL;
+}
+
+// The rows of one kind with key: by path, or orphans by name.
+static int matchKey(const PlayRoms* roms, int orphans, const char* key, long long* ids, int max) {
+	int n = 0;
+	for (int i = 0; i < roms->count; i++) {
+		const PlayRom* rom = &roms->roms[i];
+		const char* field = orphans ? (rom->orphan ? rom->name : NULL) : rom->path;
+		if (!field || strcmp(field, key)) continue;
+		if (n < max) ids[n] = rom->id;
+		n++;
+	}
+	return n;
+}
+
+int PlayRoms_match(const PlayRoms* roms, const char* rel_path, long long* ids, int max) {
+	if (!roms || !rel_path || !rel_path[0]) return 0;
+	int n = matchKey(roms, 0, rel_path, ids, max);
+	if (n) return n;
+	const char* file = strrchr(rel_path, '/');
+	file = file ? file + 1 : rel_path;
+	if (!file[0]) return 0;
+	char name[512];
+	size_t len = strlen(file);
+	if (len >= sizeof(name)) return 0;
+	memcpy(name, file, len + 1);
+	char* dot = strrchr(name, '.');
+	if (dot && dot != name) {
+		*dot = '\0';
+		n = matchKey(roms, 1, name, ids, max);
+		if (n) return n;
+	}
+	return matchKey(roms, 1, file, ids, max);
+}
+
+static int compareEntries(const void* a, const void* b) {
+	const PlayEntry* x = a;
+	const PlayEntry* y = b;
+	if (x->start != y->start) return x->start < y->start ? -1 : 1;
+	return x->rom < y->rom ? -1 : x->rom > y->rom;
+}
+
+void PlayEntries_sort(PlayEntry* entries, int count) {
+	if (count > 1) qsort(entries, count, sizeof(PlayEntry), compareEntries);
+}

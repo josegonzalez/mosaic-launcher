@@ -358,6 +358,19 @@ typedef struct MosaicPlayGame {
 	int orphan;             // 1 for a game carried over from Onion, known only by its name
 } MosaicPlayGame;
 
+// A session in the play history, for host->play_session_info. The plugin
+// sets size to sizeof(MosaicPlaySession) before asking, and the launcher
+// fills in only the fields that fit in it, so fields are only added at the
+// end.
+typedef struct MosaicPlaySession {
+	size_t size;       // sizeof(MosaicPlaySession) in the plugin
+	char path[512];    // its game's full path on the card, as in MosaicPlayGame, or "" for an orphan
+	char name[256];    // the name the tracker keeps for its game, or ""
+	long long start;   // when it started, as a Unix time
+	long long seconds; // how long it ran, up to now for one gametimectl hasn't closed yet
+	int orphan;        // 1 for a game carried over from Onion, known only by its name
+} MosaicPlaySession;
+
 // Whose binding an FN button runs, for host->fn_binding.
 enum MosaicFnBy {
 	MOSAIC_FN_NONE,   // unassigned, so it does nothing
@@ -1890,6 +1903,28 @@ typedef struct MosaicHost {
 	// when the device has no such stick, such as the Brick and desktop.
 	// Main thread only. Check for it with MOSAIC_HOST_HAS(host, stick).
 	int (*stick)(int which, int* x, int* y);
+
+	// Every session in the play history, from the same read as play_time.
+	// play_sessions_count returns how many there are, up to the newest
+	// 100000, read the first time a plugin asks. play_session_info fills
+	// out (see MosaicPlaySession) for the session at index, oldest first,
+	// and returns 0, or -1 for an index past the end or a NULL out.
+	// play_forget deletes a game's sessions from the tracker's database,
+	// the ones play_time counts for its full path, or with a NULL path every
+	// session, for a reset of its play time, which stock's Game Tracker
+	// loses too. It opens the database read-write only for that, deletes
+	// only play_activity rows, in one transaction, and returns how many it
+	// deleted, or -1, with nothing deleted, for a path outside Roms, a
+	// missing database, one gametimectl holds past a short wait, one that
+	// can't be written, or a call where cfg_get is refused; the launcher
+	// logs each. play_count and the rest read the tracker again afterwards.
+	// play_sessions_count returns MOSAIC_PLAY_UNKNOWN when the history
+	// can't be read, as play_time does, and the answers are kept until a
+	// game or pak returns. Check for them with
+	// MOSAIC_HOST_HAS(host, play_forget).
+	int (*play_sessions_count)(void);
+	int (*play_session_info)(int index, MosaicPlaySession* out);
+	int (*play_forget)(const char* path);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

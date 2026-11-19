@@ -347,7 +347,48 @@ static void testDaysMany(void) {
 	PlayDays_free(&days);
 }
 
+// The rows a reset forgets: every row with the path, else the orphans
+// named for the file without its extension, else with it.
+static void testRomsMatch(void) {
+	PlayRoms roms;
+	PlayRoms_init(&roms);
+	CHECK(PlayRoms_add(&roms, 5, "GB (GB)/Tetris.gb", "Tetris again", 0) == 0);
+	CHECK(PlayRoms_add(&roms, 1, "GB (GB)/Tetris.gb", "Tetris", 0) == 0);
+	CHECK(PlayRoms_add(&roms, 3, NULL, "Metroid", 1) == 0);
+	CHECK(PlayRoms_add(&roms, 4, "", "Metroid", 1) == 0);
+	CHECK(PlayRoms_add(&roms, 6, NULL, "Kirby.gb", 1) == 0);
+	CHECK(PlayRoms_add(&roms, 7, NULL, "Mario", 0) == 0); // not an orphan: never matched by name
+	CHECK(PlayRoms_add(&roms, 8, "NES (FCEUMM)/Metroid.nes", "Metroid", 0) == 0);
+	PlayRoms_finish(&roms);
+	CHECK(PlayRoms_byId(&roms, 4) && PlayRoms_byId(&roms, 4)->orphan && !PlayRoms_byId(&roms, 4)->path);
+	CHECK_STR(PlayRoms_byId(&roms, 5)->name, "Tetris again");
+	CHECK(PlayRoms_byId(&roms, 2) == NULL);
+
+	long long ids[8];
+	CHECK(PlayRoms_match(&roms, "GB (GB)/Tetris.gb", ids, 8) == 2);
+	CHECK(ids[0] == 1 && ids[1] == 5);
+	// a path with a row of its own isn't matched to the orphan of its name
+	CHECK(PlayRoms_match(&roms, "NES (FCEUMM)/Metroid.nes", ids, 8) == 1 && ids[0] == 8);
+	CHECK(PlayRoms_match(&roms, "GBA (MGBA)/Metroid.gba", ids, 8) == 2);
+	CHECK(ids[0] == 3 && ids[1] == 4);
+	CHECK(PlayRoms_match(&roms, "GB (GB)/Kirby.gb", ids, 8) == 1 && ids[0] == 6);
+	CHECK(PlayRoms_match(&roms, "GB (GB)/Mario.gb", ids, 8) == 0);
+	CHECK(PlayRoms_match(&roms, "", ids, 8) == 0);
+	CHECK(PlayRoms_match(&roms, NULL, ids, 8) == 0);
+	// counts them all, writing only max
+	ids[1] = -7;
+	CHECK(PlayRoms_match(&roms, "GB (GB)/Tetris.gb", ids, 1) == 2 && ids[0] == 1 && ids[1] == -7);
+	CHECK(PlayRoms_match(&roms, "GB (GB)/Tetris.gb", NULL, 0) == 2);
+	PlayRoms_free(&roms);
+	CHECK(roms.count == 0 && roms.roms == NULL);
+
+	PlayEntry entries[] = { { 30, 5, 2 }, { 10, 5, 9 }, { 30, 5, 1 }, { 20, 5, 3 } };
+	PlayEntries_sort(entries, 4);
+	CHECK(entries[0].start == 10 && entries[1].start == 20 && entries[2].rom == 1 && entries[3].rom == 2);
+}
+
 int main(void) {
+	testRomsMatch();
 	testFind();
 	testMany();
 	testList();

@@ -2,8 +2,9 @@
 
 # the bundled activity-stats, over a fixture game_logs.sqlite made with
 # gametimectl's schema: screener runs its action, steps from the week's
-# chart to the month's, through the games list, most played first, to the
-# orphan, then to the launches list, most sessions first, and backs out.
+# chart to the month's and All time, through the games list, most played
+# first, to the orphan, then to the launches list, most sessions first,
+# and backs out.
 # Then A on a game whose file is on the card opens it, which quits the
 # launcher to launch it (the card's recents and the launch's /tmp files
 # are put back afterwards), and with no sqlite every tab says there's no
@@ -51,7 +52,7 @@ export TZ
 plugin=activity-stats
 dot=$(printf '\302\267')
 
-printf 'steps=action:activity-stats.open,right,right,down,down,down,right,b\n' >"$STATE/screener.cfg"
+printf 'steps=action:activity-stats.open,right,right,right,down,down,down,right,b\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/activity-stats.log" "plugin screener: done" || fail "the launcher exited early with activity-stats"
 log="$WORK/activity-stats.log"
 expect "history: 4 games, 10 sessions, 10050 seconds"
@@ -67,7 +68,7 @@ grep -qF "plugins: activity-stats's screen activity-stats.main's" "$log" && fail
 grep -qF "plugin activity-stats: couldn't" "$log" && fail "activity-stats couldn't set up: $(grep -F "plugin activity-stats: couldn't" "$log")"
 
 # A on a game on the card opens it
-printf 'steps=action:activity-stats.open,right,right,down,a\n' >"$STATE/screener.cfg"
+printf 'steps=action:activity-stats.open,right,right,right,down,a\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/activity-stats-open.log" && fail "the launcher didn't quit to launch the game from activity-stats"
 log="$WORK/activity-stats-open.log"
 expect "open $AS_ROMS/Tetris.gb 1"
@@ -76,7 +77,7 @@ rm -f /tmp/mosaic-launcher-launched
 # no sqlite: no history
 MOSAIC_LAUNCHER_SQLITE="$WORK/no-such-libsqlite3"
 export MOSAIC_LAUNCHER_SQLITE
-printf 'steps=action:activity-stats.open,right,right,b\n' >"$STATE/screener.cfg"
+printf 'steps=action:activity-stats.open,right,right,right,b\n' >"$STATE/screener.cfg"
 run_launcher "$WORK/activity-stats-nodb.log" "plugin screener: done" || fail "the launcher exited early with activity-stats and no sqlite"
 unset MOSAIC_LAUNCHER_SQLITE
 log="$WORK/activity-stats-nodb.log"
