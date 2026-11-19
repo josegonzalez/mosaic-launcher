@@ -378,10 +378,10 @@ static int overlayRender(MosaicSurface* overlay, const MosaicScreenView* view) {
 	MosaicRect track = { view->area.x, view->area.y, view->area.w, h };
 	int fill = PL_barFill(shown.played, shown.limit, shown.grant, track.w);
 	if (fill < 0) return 0;
-	int main = host->theme_color(MOSAIC_COLOR_MAIN);
+	int track_rgb = host->theme_color(MOSAIC_COLOR_MAIN);
 	int ink = warning() ? WARN_RGB : host->theme_color(MOSAIC_COLOR_ACCENT);
-	if (main < 0 || ink < 0) return -1;
-	host->fill_rect(overlay, &track, mosaic_color((unsigned int)main, BAR_TRACK_ALPHA));
+	if (track_rgb < 0 || ink < 0) return -1;
+	host->fill_rect(overlay, &track, mosaic_color((unsigned int)track_rgb, BAR_TRACK_ALPHA));
 	MosaicRect done = { track.x, track.y, fill, h };
 	if (fill > 0) host->fill_rect(overlay, &done, mosaic_color((unsigned int)ink, 255));
 

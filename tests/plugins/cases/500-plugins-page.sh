@@ -49,8 +49,8 @@ printf 'playtime-limit=on\n' >"$STATE/plugins.txt"
 
 # no PIN: the values show as usual, and the code is typed on a keyboard
 # that starts empty
-plugins_page pin-none "a down down down down a a right a right a right a right a start"
-drew "Daily limit (minutes)"
+plugins_page pin-none "a down down down down down a a right a right a right a right a start"
+drew "Weekday limit (minutes)"
 drew "Not set"
 drew "Set"
 grep -qxF "Locked" "$texts" && fail "a setting showed Locked with no PIN set"
@@ -60,7 +60,7 @@ grep -qF "qwert" "$log" && fail "the code was logged"
 # once set, the code is never shown, even on its keyboard, which Y
 # cancels; with no PIN, turning the plugin off needs nothing
 printf 'limit=30\ncode=qwert\n' >"$LIMIT_CFG"
-plugins_page pin-none-secret "a wait down down down down a y b right"
+plugins_page pin-none-secret "a wait down down down down down a y b right"
 drew "30"
 drew "Set"
 never_shown "qwert"

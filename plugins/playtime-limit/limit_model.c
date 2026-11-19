@@ -57,7 +57,12 @@ int PL_parseClock(const char* setting, int fallback) {
 void PL_formatClock(int minutes, char out[PL_CLOCK_LEN]) {
 	minutes %= PL_MINUTES_MAX;
 	if (minutes < 0) minutes += PL_MINUTES_MAX;
-	snprintf(out, PL_CLOCK_LEN, "%02d:%02d", minutes / 60, minutes % 60);
+	out[0] = (char)('0' + minutes / 600);
+	out[1] = (char)('0' + minutes / 60 % 10);
+	out[2] = ':';
+	out[3] = (char)('0' + minutes % 60 / 10);
+	out[4] = (char)('0' + minutes % 10);
+	out[5] = '\0';
 }
 
 int PL_inWindow(int start, int end, int now) {
