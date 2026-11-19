@@ -36,6 +36,29 @@ typedef struct FLLayout {
 int FL_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int scale, int panel,
 	FLLayout* out);
 
+// Where the art panel goes, for the Art position setting.
+enum {
+	FL_ART_RIGHT, // as stock's thumbnail
+	FL_ART_LEFT,  // mirrored: the panel on the left, the rows on the right
+	FL_ART_TOP,   // across the top half, the rows under it
+};
+
+// The setting's value as one of those, right for anything else, and back.
+int FL_position(const char* value);
+const char* FL_positionName(int position);
+
+// FL_layout with the panel at position. FL_ART_RIGHT is FL_layout.
+// FL_ART_LEFT mirrors it: the panel as far in from the left edge, below
+// only what of status and header is above it, and the rows, as wide,
+// ending FL_MARGIN short of the right edge. FL_ART_TOP puts the panel
+// across area, 3 * FL_MARGIN in from either side, from FL_PADDING down to
+// FL_PADDING above area's middle, centred and narrowed on both sides to
+// stay FL_PADDING clear of status and header; or, where that would leave
+// less than half its width, across and below them. The rows go from the
+// middle down as wide as with no panel.
+int FL_layoutAt(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int scale, int panel,
+	int position, FLLayout* out);
+
 // How many rows fit in area under layout, at least 1.
 int FL_rows(const FLLayout* layout, const MosaicRect* area);
 
@@ -83,6 +106,52 @@ MosaicRect FL_contain(const MosaicRect* to, int w, int h);
 // show_names is 0, always when the name isn't hidden or art is off, and a
 // hidden name only on the selected row while the panel has no art.
 int FL_nameShown(int show_names, int hidden, int show_art, int selected, int has_art);
+
+///////////////////////////////////////
+// the description, from the game's .info sidecar
+
+#define FL_DESC_WAIT_MS 2000 // how long the selection stays put before the description scrolls
+#define FL_DESC_SPEED 10     // how fast it scrolls, in units of stock's layout a second
+#define FL_DESC_LINES 64     // lines kept of a description
+
+// Where the art and the description go in the panel while there's a
+// description: the art in the top half and the description in the bottom
+// half, gap apart, or for FL_ART_TOP, whose panel is wide, the art in the
+// left half and the description in the right half.
+void FL_descParts(const MosaicRect* panel, int position, int gap, MosaicRect* art, MosaicRect* desc);
+
+// Where the description goes once the art is drawn: the panel under drawn
+// (to its right for FL_ART_TOP), gap apart, or the whole panel when
+// nothing was drawn (w 0).
+MosaicRect FL_descRest(const MosaicRect* panel, const MosaicRect* drawn, int position, int gap);
+
+// fitted (from FL_contain inside region) moved to region's top, or for
+// FL_ART_TOP its left, so the description has what's left.
+MosaicRect FL_pin(const MosaicRect* fitted, const MosaicRect* region, int position);
+
+// A line of wrapped text: len bytes from start.
+typedef struct FLLine {
+	int start, len;
+} FLLine;
+
+// Wraps text into lines no wider than max_w, as width (the text's first len
+// bytes) measures them: whole words split at spaces, the spaces between
+// lines left out, and a word wider than a line cut between UTF-8
+// characters, with at least one on each line. Writes up to max lines and
+// returns how many.
+int FL_wrap(const char* text, int max_w, int (*width)(const char* text, int len, void* ctx), void* ctx, FLLine* lines,
+	int max);
+
+// How far up the description has scrolled since_ms after the selection
+// settled: 0 while it fits in view_h or for FL_DESC_WAIT_MS, then speed
+// pixels a second, starting again each content_h + gap pixels.
+int FL_scrollOffset(long since_ms, int content_h, int view_h, int gap, int speed);
+
+// What to draw of text content_h tall, scrolled up by offset, in view:
+// up to two parts, the text from offset and, a gap under it, the text
+// again from its top once it's taller than view. Writes each part's rect
+// in the text (src, from 0,0) and on the screen (dst) and returns how many.
+int FL_scrollParts(const MosaicRect* view, int content_h, int gap, int offset, MosaicRect src[2], MosaicRect dst[2]);
 
 ///////////////////////////////////////
 // save states, where stock looks for them

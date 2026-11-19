@@ -60,6 +60,165 @@ static void testLayout(void) {
 	CHECK(FL_layout(&tiny, &none, &none, 3, 1, &l) == -1);
 }
 
+static void testPositions(void) {
+	CHECK(FL_position("right") == FL_ART_RIGHT && FL_position("left") == FL_ART_LEFT && FL_position("top") == FL_ART_TOP);
+	CHECK(FL_position("") == FL_ART_RIGHT && FL_position(NULL) == FL_ART_RIGHT && FL_position("Left") == FL_ART_RIGHT);
+	CHECK_STR(FL_positionName(FL_ART_LEFT), "left");
+	CHECK_STR(FL_positionName(FL_ART_TOP), "top");
+	CHECK_STR(FL_positionName(FL_ART_RIGHT), "right");
+
+	MosaicRect area = { 0, 0, 1024, 663 };
+	MosaicRect status = { 794, 30, 200, 90 };
+	MosaicRect none = { 0, 0, 0, 0 };
+	FLLayout a, b;
+	// right is FL_layout
+	CHECK(FL_layoutAt(&area, &status, &none, 3, 1, FL_ART_RIGHT, &a) == 0);
+	CHECK(FL_layout(&area, &status, &none, 3, 1, &b) == 0);
+	CHECK(!memcmp(&a, &b, sizeof(a)));
+
+	// left: mirrored, the panel from the top as the pill isn't above it, and
+	// the top row stops short of the pill
+	CHECK(FL_layoutAt(&area, &status, &none, 3, 1, FL_ART_LEFT, &a) == 0);
+	CHECK(rectIs(a.panel, 45, 30, 460, 603));
+	CHECK(a.row_x == 566 && a.row_y == 30 && a.row_w == 443 && a.row_h == 90);
+	CHECK(a.top_w == 794 - 30 - 566);
+	CHECK(rectIs(FL_row(&a, 1), 566, 120, 443, 90));
+	CHECK(FL_rows(&a, &area) == 7);
+	// header widgets above the panel push it down
+	MosaicRect header = { 300, 30, 494, 90 };
+	CHECK(FL_layoutAt(&area, &status, &header, 3, 1, FL_ART_LEFT, &a) == 0);
+	CHECK(rectIs(a.panel, 45, 150, 460, 483));
+	CHECK(a.top_w == 0);
+	// no panel: as FL_layout's
+	CHECK(FL_layoutAt(&area, &status, &none, 3, 0, FL_ART_LEFT, &a) == 0);
+	CHECK(FL_layout(&area, &status, &none, 3, 0, &b) == 0);
+	CHECK(!memcmp(&a, &b, sizeof(a)));
+
+	// top: the top half, centred and clear of the pill, the rows under it as wide as without art
+	CHECK(FL_layoutAt(&area, &status, &none, 3, 1, FL_ART_TOP, &a) == 0);
+	CHECK(rectIs(a.panel, 260, 30, 504, 271));
+	CHECK(a.row_x == 15 && a.row_y == 331 && a.row_w == 949 && a.top_w == 949);
+	CHECK(FL_rows(&a, &area) == 3);
+	CHECK(FL_layoutAt(&area, &none, &none, 3, 1, FL_ART_TOP, &a) == 0);
+	CHECK(rectIs(a.panel, 45, 30, 934, 271));
+	// header widgets reaching past the middle: across, below them
+	CHECK(FL_layoutAt(&area, &status, &header, 3, 1, FL_ART_TOP, &a) == 0);
+	CHECK(rectIs(a.panel, 45, 150, 934, 151));
+	// something on the left keeps it clear there too
+	MosaicRect left = { 0, 30, 100, 90 };
+	CHECK(FL_layoutAt(&area, &left, &none, 3, 1, FL_ART_TOP, &a) == 0);
+	CHECK(rectIs(a.panel, 130, 30, 764, 271));
+	CHECK(FL_layoutAt(&area, &status, &none, 3, 0, FL_ART_TOP, &a) == 0);
+	CHECK(a.panel.w == 0 && a.row_y == 30);
+
+	// 640x480 at scale 2
+	MosaicRect small = { 0, 0, 640, 400 };
+	CHECK(FL_layoutAt(&small, &none, &none, 2, 1, FL_ART_LEFT, &a) == 0);
+	CHECK(a.row_x == 358 && a.row_w == 272 && rectIs(a.panel, 30, 20, 288, 360));
+	CHECK(FL_layoutAt(&small, &none, &none, 2, 1, FL_ART_TOP, &a) == 0);
+	CHECK(rectIs(a.panel, 30, 20, 580, 160) && a.row_y == 200 && FL_rows(&a, &small) == 3);
+}
+
+static void testDescParts(void) {
+	MosaicRect panel = { 519, 150, 460, 483 }, art, desc;
+	FL_descParts(&panel, FL_ART_RIGHT, 30, &art, &desc);
+	CHECK(rectIs(art, 519, 150, 460, 226) && rectIs(desc, 519, 407, 460, 226));
+	FL_descParts(&panel, FL_ART_LEFT, 30, &art, &desc);
+	CHECK(rectIs(art, 519, 150, 460, 226) && rectIs(desc, 519, 407, 460, 226));
+	MosaicRect wide = { 45, 150, 934, 151 };
+	FL_descParts(&wide, FL_ART_TOP, 30, &art, &desc);
+	CHECK(rectIs(art, 45, 150, 452, 151) && rectIs(desc, 527, 150, 452, 151));
+
+	// the description fills what's under (beside) the art drawn
+	MosaicRect drawn = { 664, 150, 169, 226 }, nothing = { 519, 150, 0, 0 };
+	CHECK(rectIs(FL_descRest(&panel, &drawn, FL_ART_RIGHT, 30), 519, 406, 460, 227));
+	CHECK(rectIs(FL_descRest(&panel, &nothing, FL_ART_RIGHT, 30), 519, 150, 460, 483));
+	CHECK(rectIs(FL_descRest(&panel, NULL, FL_ART_LEFT, 30), 519, 150, 460, 483));
+	MosaicRect beside = { 45, 150, 113, 151 };
+	CHECK(rectIs(FL_descRest(&wide, &beside, FL_ART_TOP, 30), 188, 150, 791, 151));
+	// art filling the panel leaves nothing
+	CHECK(FL_descRest(&panel, &panel, FL_ART_RIGHT, 30).h == 0);
+
+	// the art goes to its place's top, or left at the top
+	MosaicRect fitted = { 600, 200, 100, 50 };
+	CHECK(rectIs(FL_pin(&fitted, &art, FL_ART_RIGHT), 600, 150, 100, 50));
+	CHECK(rectIs(FL_pin(&fitted, &art, FL_ART_TOP), 45, 200, 100, 50));
+}
+
+// each byte 10 wide
+static int tenEach(const char* text, int len, void* ctx) {
+	(void)text;
+	(*(int*)ctx)++;
+	return len * 10;
+}
+
+static int lineIs(const char* text, FLLine line, const char* want) {
+	return (int)strlen(want) == line.len && !strncmp(text + line.start, want, (size_t)line.len);
+}
+
+static void testWrap(void) {
+	FLLine lines[8];
+	int calls = 0;
+	const char* t = "the quick brown fox";
+	CHECK(FL_wrap(t, 100, tenEach, &calls, lines, 8) == 2);
+	CHECK(lineIs(t, lines[0], "the quick") && lineIs(t, lines[1], "brown fox"));
+	CHECK(calls > 0);
+	// spaces at the start and between lines go, inner ones stay
+	t = "  a   b  ";
+	CHECK(FL_wrap(t, 30, tenEach, &calls, lines, 8) == 2);
+	CHECK(lineIs(t, lines[0], "a") && lineIs(t, lines[1], "b"));
+	CHECK(FL_wrap(t, 50, tenEach, &calls, lines, 8) == 1);
+	CHECK(lineIs(t, lines[0], "a   b"));
+	// a word wider than a line is cut
+	t = "abcdefghijklmnop qr";
+	CHECK(FL_wrap(t, 50, tenEach, &calls, lines, 8) == 4);
+	CHECK(lineIs(t, lines[0], "abcde") && lineIs(t, lines[2], "klmno") && lineIs(t, lines[3], "p qr"));
+	// between UTF-8 characters, at least one a line
+	t = "\xc3\xa9\xc3\xa9\xc3\xa9";
+	CHECK(FL_wrap(t, 30, tenEach, &calls, lines, 8) == 3);
+	CHECK(lines[0].len == 2 && lines[1].start == 2 && lines[2].len == 2);
+	CHECK(FL_wrap(t, 5, tenEach, &calls, lines, 8) == 3);
+	// up to max lines
+	CHECK(FL_wrap("a b c d e f g h i j", 10, tenEach, &calls, lines, 4) == 4);
+	CHECK(FL_wrap("", 100, tenEach, &calls, lines, 8) == 0);
+	CHECK(FL_wrap("   ", 100, tenEach, &calls, lines, 8) == 0);
+	CHECK(FL_wrap(NULL, 100, tenEach, &calls, lines, 8) == 0);
+	CHECK(FL_wrap("a", 0, tenEach, &calls, lines, 8) == 0);
+}
+
+static void testScroll(void) {
+	// still for the first two seconds, then 30 a second, looping each 300 + 48
+	CHECK(FL_scrollOffset(0, 300, 200, 48, 30) == 0);
+	CHECK(FL_scrollOffset(1999, 300, 200, 48, 30) == 0);
+	CHECK(FL_scrollOffset(2000, 300, 200, 48, 30) == 0);
+	CHECK(FL_scrollOffset(3000, 300, 200, 48, 30) == 30);
+	CHECK(FL_scrollOffset(2000 + 11600, 300, 200, 48, 30) == 0);
+	CHECK(FL_scrollOffset(14000, 300, 200, 48, 30) == 12);
+	// a description that fits never moves
+	CHECK(FL_scrollOffset(10000, 200, 200, 48, 30) == 0);
+	CHECK(FL_scrollOffset(10000, 100, 200, 48, 30) == 0);
+	CHECK(FL_scrollOffset(10000, 300, 200, 48, 0) == 0);
+
+	MosaicRect view = { 519, 406, 460, 227 }, src[2], dst[2];
+	CHECK(FL_scrollParts(&view, 300, 48, 0, src, dst) == 1);
+	CHECK(rectIs(src[0], 0, 0, 460, 227) && rectIs(dst[0], 519, 406, 460, 227));
+	CHECK(FL_scrollParts(&view, 300, 48, 100, src, dst) == 1);
+	CHECK(rectIs(src[0], 0, 100, 460, 200) && rectIs(dst[0], 519, 406, 460, 200));
+	// its end, the gap, and its start again
+	CHECK(FL_scrollParts(&view, 300, 48, 200, src, dst) == 2);
+	CHECK(rectIs(src[0], 0, 200, 460, 100) && rectIs(dst[0], 519, 406, 460, 100));
+	CHECK(rectIs(src[1], 0, 0, 460, 79) && rectIs(dst[1], 519, 554, 460, 79));
+	// inside the gap, only the start again
+	CHECK(FL_scrollParts(&view, 300, 48, 320, src, dst) == 1);
+	CHECK(rectIs(src[0], 0, 0, 460, 199) && rectIs(dst[0], 519, 434, 460, 199));
+	// one that fits: once, at the top
+	CHECK(FL_scrollParts(&view, 100, 48, 0, src, dst) == 1);
+	CHECK(rectIs(src[0], 0, 0, 460, 100) && rectIs(dst[0], 519, 406, 460, 100));
+	CHECK(FL_scrollParts(&view, 0, 48, 0, src, dst) == 0);
+	MosaicRect empty = { 0, 0, 0, 0 };
+	CHECK(FL_scrollParts(&empty, 300, 48, 0, src, dst) == 0);
+}
+
 static void testWindow(void) {
 	CHECK(FL_window(0, 0, 10, 7) == 0);
 	CHECK(FL_window(0, 6, 10, 7) == 0);
@@ -224,6 +383,12 @@ static MosaicRect blit_box, blit_shot;
 static int loads = 0;
 static char loaded[1024];
 static const char* prefer_cfg = "on";
+static const char* position_cfg = "right";
+static const char* desc_cfg = NULL; // NULL for unset
+// the description's surface, and what of it was drawn last
+static const MosaicSurface desc_origin = { 0, 0, 0, NULL };
+static int blits_desc = 0, desc_surfaces = 0, infos = 0, redraws = 0;
+static MosaicRect desc_src, desc_dst;
 static MosaicSurface video = { 720, 480, 0, NULL }; // another plugin's art_replace surface
 static int replaced_index = -1; // the entry it's for, or -1 for none
 static int blits_video = 0;
@@ -234,6 +399,8 @@ static MosaicRect art_decorated_rect;
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "prefer_preview")) return prefer_cfg;
+	if (!strcmp(key, "position")) return position_cfg;
+	if (!strcmp(key, "description") && desc_cfg) return desc_cfg;
 	return fallback;
 }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
@@ -289,11 +456,42 @@ static int fakeBlit(MosaicSurface* t, const MosaicSurface* s, const MosaicRect* 
 		blits_shot++;
 		blit_shot = *dr;
 	}
+	if (o == &desc_origin) {
+		blits_desc++;
+		desc_src = sr ? *sr : (MosaicRect){ 0, 0, s->w, s->h };
+		desc_dst = *dr;
+	}
 	if (s == &video) {
 		blits_video++;
 		blit_video = *dr;
 	}
 	return 0;
+}
+static int fakeTextWidth(int font, const char* text) {
+	(void)font;
+	return (int)strlen(text) * 24;
+}
+static MosaicSurface* fakeSurfaceNew(const char* id, int w, int h) {
+	(void)id;
+	if (copy_count >= 64) return NULL;
+	desc_surfaces++;
+	MosaicSurface* s = &copies[copy_count++];
+	*s = (MosaicSurface){ w, h, 1, &desc_origin };
+	return s;
+}
+// Mario's description is long, Tetris's short, and the rest have none
+static const char* mario_desc = "Mario runs and jumps through the Mushroom Kingdom to save the princess from "
+	"Bowser, across land, sea and sky, with mushrooms, flowers and stars to help him on his way.";
+static int fakeEntryInfo(const MosaicEntry* e, const char* key, char* out, size_t size) {
+	infos++;
+	const char* value = NULL;
+	if (!strcmp(key, "description") && !strcmp(e->name, "Mario")) value = mario_desc;
+	if (!strcmp(key, "description") && !strcmp(e->name, "Tetris")) value = "Blocks fall.";
+	snprintf(out, size, "%s", value ? value : "");
+	return value ? 1 : 0;
+}
+static void fakeRequestRedraw(void) {
+	redraws++;
 }
 static int fakeSurfaceSize(const MosaicSurface* s, int* w, int* h) {
 	*w = s->w;
@@ -448,6 +646,154 @@ static void resetCounts(void) {
 	blits_video = 0;
 	art_decorated = 0;
 	art_decorated_index = -1;
+	blits_desc = 0;
+	desc_surfaces = 0;
+	infos = 0;
+	redraws = 0;
+}
+
+static void testPositionRender(void) {
+	setUp();
+	makeCard();
+	fake_host.decorate_art = fakeDecorateArt;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+
+	// left: Mario's box down the panel on the left, the rows on the right
+	position_cfg = "left";
+	CHECK(p->init(&fake_host) == 0);
+	resetCounts();
+	MosaicListView v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_box == 1 && rectIs(blit_box, 49, 30, 452, 603));
+	CHECK(decorated == 7 && rectIs(decorated_rect[0], 566, 30, 198, 90) && rectIs(decorated_rect[1], 566, 120, 443, 90));
+	CHECK(art_decorated == 1 && rectIs(art_decorated_rect, 49, 30, 452, 603));
+	p->quit();
+
+	// top: the box across the top half, three rows under it, the window following the selection
+	position_cfg = "top";
+	CHECK(p->init(&fake_host) == 0);
+	resetCounts();
+	v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_box == 1 && rectIs(blit_box, 410, 30, 203, 271));
+	CHECK(decorated == 3 && rectIs(decorated_rect[0], 15, 331, 949, 90) && rectIs(decorated_rect[2], 15, 511, 949, 90));
+	resetCounts();
+	v = makeView(5);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(decorated == 3 && decorated_index[0] == 3 && decorated_index[2] == 5);
+	p->quit();
+	position_cfg = "right";
+	CHECK(system("rm -rf '" CARD "'") == 0);
+}
+
+static void testDescription(void) {
+	setUp();
+	makeCard();
+	fake_host.decorate_art = fakeDecorateArt;
+	fake_host.entry_info = fakeEntryInfo;
+	fake_host.text_width = fakeTextWidth;
+	fake_host.surface_new = fakeSurfaceNew;
+	fake_host.request_redraw = fakeRequestRedraw;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+
+	// off by default: Mario as before, its description never asked for, and no frames asked for
+	desc_cfg = NULL;
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = frees = 0;
+	resetCounts();
+	p->tick(1000);
+	MosaicListView v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(rectIs(blit_box, 568, 150, 362, 483) && art_decorated == 1);
+	CHECK(infos == 0 && blits_desc == 0);
+	p->tick(5000);
+	CHECK(redraws == 0);
+	p->quit();
+
+	// on: Mario's box in the top half, pinned to its top, and its description,
+	// 19 characters to a line, under it with no art decorators
+	desc_cfg = "on";
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = frees = 0;
+	resetCounts();
+	p->tick(1000);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_box == 1 && rectIs(blit_box, 664, 150, 169, 226));
+	CHECK(art_decorated == 0);
+	CHECK(desc_surfaces == 1 && blits_desc == 1);
+	CHECK(copies[copy_count - 1].w == 460 && copies[copy_count - 1].h == 240);
+	CHECK(rectIs(desc_src, 0, 0, 460, 227) && rectIs(desc_dst, 519, 406, 460, 227));
+	// still for two seconds: no frames asked for
+	p->tick(1500);
+	p->tick(2999);
+	CHECK(redraws == 0);
+	// then a frame each frame while it scrolls, and only once each is drawn
+	p->tick(3000);
+	CHECK(redraws == 1);
+	p->tick(3016);
+	CHECK(redraws == 1);
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(desc_surfaces == 0 && infos == 0 && blits_desc == 1 && rectIs(desc_src, 0, 0, 460, 227));
+	p->tick(4000);
+	CHECK(redraws == 1);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	// 30 a second for a second, of its 10 lines, 240 tall
+	CHECK(rectIs(desc_src, 0, 30, 460, 210) && rectIs(desc_dst, 519, 406, 460, 210));
+
+	// Tetris's fits under its preview: it never moves
+	resetCounts();
+	p->tick(5000);
+	v = makeView(1);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_shot == 1 && blits_desc == 1 && desc_src.h == 24);
+	CHECK(rectIs(blit_shot, 598, 150, 301, 226));
+	redraws = 0;
+	p->tick(5100);
+	p->tick(9000);
+	CHECK(redraws == 0);
+
+	// Zelda has none: its thumbnail as before, with art decorators
+	resetCounts();
+	v = makeView(2);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_thumb == 1 && blits_desc == 0 && art_decorated == 1);
+	p->tick(20000);
+	CHECK(redraws == 0);
+
+	// back on Mario, the wait starts again
+	resetCounts();
+	p->tick(30000);
+	v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(desc_surfaces == 1);
+	p->tick(31000);
+	CHECK(redraws == 0);
+	p->tick(32000);
+	CHECK(redraws == 1);
+	// art off: no panel, no description, no frames
+	resetCounts();
+	v.show_art = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blits_desc == 0);
+	p->tick(40000);
+	CHECK(redraws == 0);
+	p->quit();
+	CHECK(frees == copy_count);
+
+	// at the top: the box in the panel's left half, pinned left, the description beside it
+	position_cfg = "top";
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = frees = 0;
+	resetCounts();
+	v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(rectIs(blit_box, 260, 30, 203, 271));
+	CHECK(desc_dst.x == 493 && desc_dst.y == 30 && desc_dst.w == 271 && desc_dst.h <= 271);
+	p->quit();
+	position_cfg = "right";
+	desc_cfg = NULL;
+	CHECK(system("rm -rf '" CARD "'") == 0);
 }
 
 static void testInput(void) {
@@ -670,11 +1016,17 @@ static void testReplacement(void) {
 
 int main(void) {
 	testLayout();
+	testPositions();
+	testDescParts();
+	testWrap();
+	testScroll();
 	testWindow();
 	testPanel();
 	testStatePaths();
 	testInput();
 	testRender();
 	testReplacement();
+	testPositionRender();
+	testDescription();
 	CHECK_DONE();
 }

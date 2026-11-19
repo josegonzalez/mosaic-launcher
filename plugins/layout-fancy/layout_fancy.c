@@ -32,6 +32,19 @@
 // surface, never copied, since each of its frames is new. Art decorators,
 // such as metadata-band's, go under the panel's art with
 // host->decorate_art.
+//
+// The position setting puts the panel on the right (as stock), on the
+// left with the rows on the right, or across the top half with the rows
+// under it (see FL_layoutAt). With the description setting on, a game
+// whose .info sidecar has a description shows it wrapped in the panel:
+// the art in the panel's top half (its left half at the top), pinned to
+// that half's top (left), and the description in what's left under (beside)
+// it. Its lines are drawn once a selection into a surface of the plugin's
+// own, which each frame blits the part in view of. Once the selection has
+// stayed put FL_DESC_WAIT_MS, a description taller than its place scrolls
+// up and loops, and only then does tick ask for a frame each frame, while
+// the layout is still drawn. Art decorators don't run while a description
+// shows, as it takes the space under the art they'd draw in.
 
 #include <stdio.h>
 #include <string.h>
@@ -46,7 +59,10 @@
 
 static const MosaicHost* host;
 static int prefer_preview = 1;
+static int position = FL_ART_RIGHT;
+static int show_desc = 0;
 static char roms[MAX_PATH_LEN];
+static unsigned long now_ms = 0; // the last tick's
 
 ///////////////////////////////////////
 // the selected game's save state, looked for once a selection
@@ -137,11 +153,18 @@ static Scaled* cacheSlot(void) {
 
 // Draws image, known by key, fitted inside rect; writes where it went to
 // drawn.
+static int pinned = 0; // the art goes to its place's top (left), as a description is under (beside) it
+
+static MosaicRect fitted(const MosaicRect* rect, int w, int h) {
+	MosaicRect to = FL_contain(rect, w, h);
+	return pinned ? FL_pin(&to, rect, position) : to;
+}
+
 static void drawImage(MosaicSurface* screen, const char* key, const MosaicSurface* image, const MosaicRect* rect,
 		MosaicRect* drawn) {
 	int w = 0, h = 0;
 	if (rect->w <= 0 || rect->h <= 0 || host->surface_size(image, &w, &h) != 0) return;
-	MosaicRect to = FL_contain(rect, w, h);
+	MosaicRect to = fitted(rect, w, h);
 	if (to.w <= 0 || to.h <= 0) return;
 	*drawn = to;
 	Scaled* hit = cacheFind(key, to.w, to.h);
@@ -168,6 +191,110 @@ static void drawImage(MosaicSurface* screen, const char* key, const MosaicSurfac
 }
 
 ///////////////////////////////////////
+// the selected game's description, drawn once into a surface of its own
+
+#define DESC_FONT MOSAIC_FONT_SMALL
+
+static char desc_for[MAX_PATH_LEN]; // the entry path it's for; "" for none yet
+static char desc_text[512];         // its description, or "" for none
+static MosaicSurface* desc_surface; // its lines, desc_w wide and desc_h tall; NULL before they're drawn
+static int desc_w = 0, desc_h = 0, desc_lines = 0;
+static unsigned long desc_since = 0; // when the selection moved to it
+static int scrolling = 0;            // the description is taller than its place, so it scrolls once settled
+static int drawn = 0;                // layout_render ran since tick last asked for a frame
+static int scroll_logged = 0;
+
+static void descFree(void) {
+	if (desc_surface) host->surface_free(ID, desc_surface);
+	desc_surface = NULL;
+	desc_w = desc_h = desc_lines = 0;
+}
+
+static void descReset(void) {
+	descFree();
+	desc_for[0] = '\0';
+	desc_text[0] = '\0';
+	scrolling = 0;
+}
+
+// the selected game's description, read when the selection moved to it
+static const char* descFor(const MosaicEntry* entry) {
+	const char* path = host->entry_path(entry);
+	if (!path || strlen(path) >= sizeof(desc_for)) return "";
+	if (!desc_for[0] || strcmp(path, desc_for) != 0) {
+		descFree();
+		snprintf(desc_for, sizeof(desc_for), "%s", path);
+		desc_since = now_ms;
+		scrolling = 0;
+		scroll_logged = 0;
+		if (!MOSAIC_HOST_HAS(host, entry_info) || host->entry_info(entry, "description", desc_text, sizeof(desc_text)) != 1)
+			desc_text[0] = '\0';
+	}
+	return desc_text;
+}
+
+static int measure(const char* text, int len, void* ctx) {
+	(void)ctx;
+	char part[sizeof(desc_text)];
+	if (len < 0 || (size_t)len >= sizeof(part)) return 1 << 30;
+	memcpy(part, text, (size_t)len);
+	part[len] = '\0';
+	int w = host->text_width(DESC_FONT, part);
+	return w < 0 ? 1 << 30 : w;
+}
+
+// draws the description's lines, w wide, into desc_surface
+static void descDraw(int w, MosaicColor color) {
+	descFree();
+	int line_h = host->text_height(DESC_FONT);
+	if (w <= 0 || line_h <= 0) return;
+	FLLine lines[FL_DESC_LINES];
+	int count = FL_wrap(desc_text, w, measure, NULL, lines, FL_DESC_LINES);
+	if (count * line_h > 4096) count = 4096 / line_h;
+	if (count <= 0) return;
+	desc_surface = host->surface_new(ID, w, count * line_h);
+	if (!desc_surface) return;
+	for (int i = 0; i < count; i++) {
+		char part[sizeof(desc_text)];
+		snprintf(part, sizeof(part), "%.*s", lines[i].len, desc_text + lines[i].start);
+		host->draw_text(desc_surface, DESC_FONT, part, 0, i * line_h, color, w);
+	}
+	desc_w = w;
+	desc_h = count * line_h;
+	desc_lines = count;
+}
+
+// the gap between the art and the description, and between a description's end and its start again
+static int descGap(void) {
+	return FL_PADDING * host->screen_scale();
+}
+
+// Draws the description in rect, scrolled as far as it has since the
+// selection settled.
+static void drawDesc(MosaicSurface* screen, const MosaicRect* rect, MosaicColor color) {
+	if (rect->w <= 0 || rect->h <= 0) return;
+	if (!desc_surface || desc_w != rect->w) {
+		descDraw(rect->w, color);
+		if (!desc_surface) return;
+		char message[160];
+		snprintf(message, sizeof(message), "description %i line%s, %i tall in %ix%i at %i,%i", desc_lines,
+			desc_lines == 1 ? "" : "s", desc_h, rect->w, rect->h, rect->x, rect->y);
+		host->log(ID, message);
+	}
+	int gap = 2 * host->text_height(DESC_FONT);
+	scrolling = desc_h > rect->h;
+	int offset = FL_scrollOffset((long)(now_ms - desc_since), desc_h, rect->h, gap,
+		FL_DESC_SPEED * host->screen_scale());
+	if (offset > 0 && !scroll_logged) {
+		scroll_logged = 1;
+		host->log(ID, "description scrolling");
+	}
+	MosaicRect src[2], dst[2];
+	int parts = FL_scrollParts(rect, desc_h, gap, offset, src, dst);
+	for (int i = 0; i < parts; i++) host->blit(screen, desc_surface, &src[i], &dst[i]);
+}
+
+///////////////////////////////////////
 // drawing
 
 static MosaicColor themeColor(int index, unsigned int fallback) {
@@ -177,7 +304,7 @@ static MosaicColor themeColor(int index, unsigned int fallback) {
 
 static int layoutOf(const MosaicListView* view, FLLayout* layout) {
 	MosaicRect header = MOSAIC_VIEW_HAS(view, header) ? view->header : (MosaicRect){ 0, 0, 0, 0 };
-	return FL_layout(&view->area, &view->status, &header, host->screen_scale(), view->show_art, layout);
+	return FL_layoutAt(&view->area, &view->status, &header, host->screen_scale(), view->show_art, position, layout);
 }
 
 // logs the layout each time its shape changes, such as when art turns off
@@ -205,19 +332,25 @@ static int hiddenName(const MosaicListView* view, int index) {
 static void drawStraight(MosaicSurface* screen, const MosaicSurface* image, const MosaicRect* rect, MosaicRect* drawn) {
 	int w = 0, h = 0;
 	if (rect->w <= 0 || rect->h <= 0 || host->surface_size(image, &w, &h) != 0) return;
-	MosaicRect to = FL_contain(rect, w, h);
+	MosaicRect to = fitted(rect, w, h);
 	if (to.w > 0 && to.h > 0 && host->blit(screen, image, NULL, &to) == 0) *drawn = to;
 }
 
 // Draws the selected entry's art in the panel, writing the rect around
-// what it drew to drawn (w 0 for nothing). Returns 1 when it has art
-// (drawn, or still loading), or 0 when it has none.
+// what it drew to drawn (w 0 for nothing), and its description when it
+// has one, writing 1 to described. Returns 1 when it has art (drawn, or
+// still loading), or 0 when it has none.
 static int drawPanel(MosaicSurface* screen, const MosaicListView* view, const FLLayout* layout,
-		const MosaicEntry* entry, MosaicRect* drawn) {
+		const MosaicEntry* entry, MosaicRect* drawn, int* described) {
 	*drawn = (MosaicRect){ layout->panel.x, layout->panel.y, 0, 0 };
+	*described = 0;
+	scrolling = 0;
 	if (!view->show_art || layout->panel.w <= 0) return 0;
 	const char* path = host->entry_path(entry);
 	if (!path) return 0;
+	MosaicRect art_area = layout->panel, desc_area = layout->panel;
+	pinned = show_desc && descFor(entry)[0];
+	if (pinned) FL_descParts(&layout->panel, position, descGap(), &art_area, &desc_area);
 
 	const char* state = stateFor(entry);
 	const MosaicSurface* shot = NULL;
@@ -241,7 +374,7 @@ static int drawPanel(MosaicSurface* screen, const MosaicListView* view, const FL
 	int show = replaced ? FL_replacedArt(view->show_art, prefer_preview, has_preview)
 		: FL_panelArt(view->show_art, prefer_preview, box_state != MOSAIC_ART_MISSING, has_preview);
 	MosaicRect box_rect, preview_rect, box_drawn = *drawn, preview_drawn = *drawn;
-	FL_panelParts(&layout->panel, show, FL_PADDING * host->screen_scale(), &box_rect, &preview_rect);
+	FL_panelParts(&art_area, show, FL_PADDING * host->screen_scale(), &box_rect, &preview_rect);
 	if ((show & FL_SHOW_BOX) && replaced) {
 		drawStraight(screen, replaced, &box_rect, &box_drawn);
 	} else if ((show & FL_SHOW_BOX) && box_state == MOSAIC_ART_READY && box) {
@@ -253,6 +386,13 @@ static int drawPanel(MosaicSurface* screen, const MosaicListView* view, const FL
 		drawImage(screen, state, shot, &preview_rect, &preview_drawn);
 	}
 	*drawn = FL_around(&box_drawn, &preview_drawn);
+	if (pinned) {
+		// under (beside) what's drawn, or the whole panel while there's no art
+		MosaicRect rest = FL_descRest(&layout->panel, show ? drawn : NULL, position, descGap());
+		if (show && drawn->w <= 0) rest = desc_area; // still loading: where it'll be once the art's in
+		drawDesc(screen, &rest, themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF));
+		*described = 1;
+	}
 	return show != 0;
 }
 
@@ -283,8 +423,11 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 	const MosaicEntry* selected = host->list_get(view->list, view->selected);
 	// the panel first, so row decorators can see it, with art decorators under its art
 	MosaicRect art = { 0, 0, 0, 0 };
-	int has_art = selected ? drawPanel(screen, view, &layout, selected, &art) : 0;
-	if (art.w > 0 && art.h > 0 && MOSAIC_HOST_HAS(host, decorate_art)) host->decorate_art(screen, view->selected, &art);
+	int described = 0;
+	int has_art = selected ? drawPanel(screen, view, &layout, selected, &art, &described) : 0;
+	drawn = 1;
+	if (art.w > 0 && art.h > 0 && !described && MOSAIC_HOST_HAS(host, decorate_art))
+		host->decorate_art(screen, view->selected, &art);
 
 	int rows = FL_rows(&layout, &view->area);
 	if (view->rows > 0 && view->rows < rows) rows = view->rows;
@@ -323,6 +466,16 @@ static void postReturn(void) {
 	// a game may have saved a state: look again, and copy its preview again
 	state_for[0] = '\0';
 	cacheClear();
+	descReset();
+}
+
+static void tick(unsigned long now) {
+	now_ms = now;
+	// a frame each frame only while the description scrolls, and only while
+	// the layout is still drawn (it drew the last frame asked for)
+	if (!scrolling || !drawn || (long)(now - desc_since) < FL_DESC_WAIT_MS) return;
+	drawn = 0;
+	host->request_redraw();
 }
 
 static int init(const MosaicHost* h) {
@@ -333,13 +486,22 @@ static int init(const MosaicHost* h) {
 	}
 	snprintf(roms, sizeof(roms), "%s/Roms", host->sdcard_path);
 	prefer_preview = strcmp(host->cfg_get("prefer_preview", "on"), "off") != 0;
+	position = FL_position(host->cfg_get("position", "right"));
+	show_desc = strcmp(host->cfg_get("description", "off"), "on") == 0;
 	state_for[0] = '\0';
 	preview[0] = '\0';
+	desc_surface = NULL;
+	descReset();
+	drawn = 0;
+	char message[96];
+	snprintf(message, sizeof(message), "art %s, description %s", FL_positionName(position), show_desc ? "on" : "off");
+	host->log(ID, message);
 	return 0;
 }
 
 static void quit(void) {
 	cacheClear();
+	descFree();
 }
 
 static const MosaicPlugin plugin = {
@@ -349,6 +511,7 @@ static const MosaicPlugin plugin = {
 	.init = init,
 	.quit = quit,
 	.post_return = postReturn,
+	.tick = tick,
 	.layout_init = layoutInit,
 	.layout_input = layoutInput,
 	.layout_render = layoutRender,

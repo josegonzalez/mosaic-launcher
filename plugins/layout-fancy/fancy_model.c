@@ -17,8 +17,36 @@ static int leftOf(const MosaicRect* r, int y, int h, int limit) {
 	return r->x < limit ? r->x : limit;
 }
 
+int FL_position(const char* value) {
+	if (value && !strcmp(value, "left")) return FL_ART_LEFT;
+	if (value && !strcmp(value, "top")) return FL_ART_TOP;
+	return FL_ART_RIGHT;
+}
+
+const char* FL_positionName(int position) {
+	return position == FL_ART_LEFT ? "left" : position == FL_ART_TOP ? "top" : "right";
+}
+
+// whether r is beside x to x + w
+static int across(const MosaicRect* r, int x, int w) {
+	return r && r->w > 0 && r->h > 0 && r->x < x + w && r->x + r->w > x;
+}
+
+// how far in from either side x to x + w goes to stay padding clear of r
+// where r is beside y0 to y1, at least inset
+static int clearOf(const MosaicRect* r, int x, int w, int y0, int y1, int padding, int inset) {
+	if (!across(r, x, w) || r->y >= y1 || r->y + r->h <= y0) return inset;
+	int in = r->x + r->w / 2 >= x + w / 2 ? x + w - (r->x - padding) : r->x + r->w + padding - x;
+	return in > inset ? in : inset;
+}
+
 int FL_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int scale, int panel,
 		FLLayout* out) {
+	return FL_layoutAt(area, status, header, scale, panel, FL_ART_RIGHT, out);
+}
+
+int FL_layoutAt(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int scale, int panel,
+		int position, FLLayout* out) {
 	memset(out, 0, sizeof(*out));
 	if (scale < 1) scale = 1;
 	int margin = FL_MARGIN * scale, padding = FL_PADDING * scale;
@@ -26,17 +54,45 @@ int FL_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect
 	out->row_y = area->y + padding;
 	out->row_h = FL_PILL * scale;
 	out->name_pad = FL_NAME_PADDING * scale;
-	if (panel) {
+	if (panel && position == FL_ART_TOP) {
+		// the art across the top half, the rows under it as wide as without art
+		int split = area->y + area->h / 2;
+		out->row_y = split;
+		out->row_w = area->w - margin - 2 * padding;
+		int x = area->x + 3 * margin, w = area->w - 6 * margin;
+		// from the top, centred and kept clear of status and header beside it
+		int top = area->y + padding, inset = 0;
+		inset = clearOf(status, x, w, top, split - padding, padding, inset);
+		inset = clearOf(header, x, w, top, split - padding, padding, inset);
+		if (2 * inset <= w / 2) {
+			x += inset;
+			w -= 2 * inset;
+		} else {
+			// too narrow that way: across, under them
+			if (across(status, x, w) && bottom(status) + padding > top) top = bottom(status) + padding;
+			if (across(header, x, w) && bottom(header) + padding > top) top = bottom(header) + padding;
+		}
+		MosaicRect p = { x, top, w, split - padding - top };
+		if (p.w > 0 && p.h > 0) out->panel = p;
+	} else if (panel) {
 		// as stock's list beside its thumbnail: the list's share, rounded
 		// down as stock's float is, less five margins, plus one, less two
 		// paddings
 		int list_w = area->w - (area->w * FL_PANEL_SHARE + 99) / 100;
 		out->row_w = list_w - 4 * margin - 2 * padding;
 		int panel_w = area->w * FL_PANEL_SHARE / 100;
+		int x = area->x + area->w - 3 * margin - panel_w;
+		if (position == FL_ART_LEFT) {
+			// mirrored: the panel as far in from the left, the rows ending a margin short of the right
+			x = area->x + 3 * margin;
+			out->row_x = area->x + area->w - margin - out->row_w;
+		}
 		int top = area->y + padding;
-		if (bottom(status) + padding > top) top = bottom(status) + padding;
-		if (bottom(header) + padding > top) top = bottom(header) + padding;
-		MosaicRect p = { area->x + area->w - 3 * margin - panel_w, top, panel_w, area->y + area->h - padding - top };
+		// on the right, below status and header as before; on the left, only below those above the panel
+		int left = position == FL_ART_LEFT;
+		if ((!left || across(status, x, panel_w)) && bottom(status) + padding > top) top = bottom(status) + padding;
+		if ((!left || across(header, x, panel_w)) && bottom(header) + padding > top) top = bottom(header) + padding;
+		MosaicRect p = { x, top, panel_w, area->y + area->h - padding - top };
 		if (p.w > 0 && p.h > 0) out->panel = p;
 	} else {
 		out->row_w = area->w - margin - 2 * padding;
@@ -135,6 +191,126 @@ int FL_nameShown(int show_names, int hidden, int show_art, int selected, int has
 	if (!show_names) return 0;
 	if (!hidden || !show_art) return 1;
 	return selected && !has_art;
+}
+
+///////////////////////////////////////
+// the description
+
+void FL_descParts(const MosaicRect* panel, int position, int gap, MosaicRect* art, MosaicRect* desc) {
+	if (gap < 0) gap = 0;
+	*art = *panel;
+	*desc = *panel;
+	if (position == FL_ART_TOP) {
+		int w = (panel->w - gap) / 2;
+		if (w < 0) w = 0;
+		art->w = w;
+		desc->x = panel->x + panel->w - w;
+		desc->w = w;
+	} else {
+		int h = (panel->h - gap) / 2;
+		if (h < 0) h = 0;
+		art->h = h;
+		desc->y = panel->y + panel->h - h;
+		desc->h = h;
+	}
+}
+
+MosaicRect FL_descRest(const MosaicRect* panel, const MosaicRect* drawn, int position, int gap) {
+	if (!drawn || drawn->w <= 0 || drawn->h <= 0) return *panel;
+	if (gap < 0) gap = 0;
+	MosaicRect r = *panel;
+	if (position == FL_ART_TOP) {
+		int x = drawn->x + drawn->w + gap;
+		if (x < panel->x) x = panel->x;
+		r.x = x;
+		r.w = panel->x + panel->w - x;
+	} else {
+		int y = drawn->y + drawn->h + gap;
+		if (y < panel->y) y = panel->y;
+		r.y = y;
+		r.h = panel->y + panel->h - y;
+	}
+	if (r.w < 0) r.w = 0;
+	if (r.h < 0) r.h = 0;
+	return r;
+}
+
+MosaicRect FL_pin(const MosaicRect* fitted, const MosaicRect* region, int position) {
+	MosaicRect r = *fitted;
+	if (position == FL_ART_TOP) r.x = region->x;
+	else r.y = region->y;
+	return r;
+}
+
+// the end of the UTF-8 character starting at i
+static int charEnd(const char* text, int i, int n) {
+	i++;
+	while (i < n && ((unsigned char)text[i] & 0xC0) == 0x80) i++;
+	return i;
+}
+
+int FL_wrap(const char* text, int max_w, int (*width)(const char* text, int len, void* ctx), void* ctx, FLLine* lines,
+		int max) {
+	if (!text || max_w <= 0 || !width || !lines || max <= 0) return 0;
+	int n = (int)strlen(text), count = 0, pos = 0;
+	while (count < max) {
+		while (pos < n && text[pos] == ' ') pos++;
+		if (pos >= n) break;
+		int fit = -1, cursor = pos;
+		// as many whole words as fit
+		while (cursor < n) {
+			int end = cursor;
+			while (end < n && text[end] != ' ') end++;
+			if (width(text + pos, end - pos, ctx) > max_w) break;
+			fit = end;
+			cursor = end;
+			while (cursor < n && text[cursor] == ' ') cursor++;
+		}
+		if (fit < 0) {
+			// a word wider than a line, cut between characters, at least one
+			fit = charEnd(text, pos, n);
+			while (fit < n && text[fit] != ' ') {
+				int next = charEnd(text, fit, n);
+				if (width(text + pos, next - pos, ctx) > max_w) break;
+				fit = next;
+			}
+		}
+		lines[count].start = pos;
+		lines[count].len = fit - pos;
+		count++;
+		pos = fit;
+	}
+	return count;
+}
+
+int FL_scrollOffset(long since_ms, int content_h, int view_h, int gap, int speed) {
+	if (content_h <= view_h || since_ms < FL_DESC_WAIT_MS || speed <= 0) return 0;
+	if (gap < 0) gap = 0;
+	long moved = (since_ms - FL_DESC_WAIT_MS) * speed / 1000;
+	return (int)(moved % (content_h + gap));
+}
+
+int FL_scrollParts(const MosaicRect* view, int content_h, int gap, int offset, MosaicRect src[2], MosaicRect dst[2]) {
+	if (view->w <= 0 || view->h <= 0 || content_h <= 0) return 0;
+	if (gap < 0) gap = 0;
+	int period = content_h + gap;
+	if (offset < 0 || offset >= period) offset = 0;
+	int count = 0;
+	if (offset < content_h) {
+		int h = content_h - offset < view->h ? content_h - offset : view->h;
+		src[count] = (MosaicRect){ 0, offset, view->w, h };
+		dst[count] = (MosaicRect){ view->x, view->y, view->w, h };
+		count++;
+	}
+	// the next copy, a gap under it, once the text scrolls
+	int next = period - offset;
+	if (content_h > view->h && next < view->h) {
+		int h = view->h - next < content_h ? view->h - next : content_h;
+		src[count] = (MosaicRect){ 0, 0, view->w, h };
+		dst[count] = (MosaicRect){ view->x, view->y + next, view->w, h };
+		count++;
+	}
+	return count;
 }
 
 ///////////////////////////////////////

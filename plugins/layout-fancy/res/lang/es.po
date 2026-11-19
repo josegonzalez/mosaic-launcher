@@ -17,3 +17,18 @@ msgstr "Preferir la vista del estado"
 
 msgid "Shows the game list's rows beside a panel with the selected game's art."
 msgstr "Muestra las filas de la lista de juegos junto a un panel con la imagen del juego seleccionado."
+
+msgid "Art position"
+msgstr "Posición de la imagen"
+
+msgid "Description"
+msgstr "Descripción"
+
+msgid "left"
+msgstr "izquierda"
+
+msgid "right"
+msgstr "derecha"
+
+msgid "top"
+msgstr "arriba"

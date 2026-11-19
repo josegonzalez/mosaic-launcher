@@ -15,6 +15,14 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: plugin.txt
+msgid "Art position"
+msgstr ""
+
+#: plugin.txt
+msgid "Description"
+msgstr ""
+
+#: plugin.txt
 msgid "Fancy layout"
 msgstr ""
 
@@ -24,4 +32,16 @@ msgstr ""
 
 #: plugin.txt
 msgid "Shows the game list's rows beside a panel with the selected game's art."
+msgstr ""
+
+#: plugin.txt
+msgid "left"
+msgstr ""
+
+#: plugin.txt
+msgid "right"
+msgstr ""
+
+#: plugin.txt
+msgid "top"
 msgstr ""

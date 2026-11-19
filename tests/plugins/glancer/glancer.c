@@ -5,9 +5,12 @@
 // down a column through the panel (three quarters of the way across) on
 // the selected game's row, and logs the stretches of pure red, green and
 // blue there, as "panel <game> runs <colour>:<from>-<to> ...", each time
-// they change, as art comes in. It logs "done" after the last game.
+// they change, as art comes in. It logs "done" after the last game. Its
+// cfg's step_ms sets how long each game stays selected, and column how far
+// across the column is, in percent, for a panel elsewhere.
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -24,6 +27,8 @@ static char last[GAMES][256]; // the last line logged for each game
 static int step = 0;          // 0 before the folder opens, then 1 + the game selected, then GAMES + 1 when done
 static long step_at = 0;
 static int ticks = 0;
+static long step_ms = 1500;
+static int column = 75;
 
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
@@ -77,7 +82,7 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 
 	int w = 0, h = 0;
 	if (host->surface_size(screen, &w, &h) != 0) return 0;
-	int x = w * 3 / 4;
+	int x = w * column / 100;
 	char line[256];
 	int n = snprintf(line, sizeof(line), "panel %s runs", name);
 	int runs = 0;
@@ -111,7 +116,7 @@ static void tick(unsigned long now) {
 		step_at = nowMs();
 		return;
 	}
-	if (nowMs() - step_at < 1500) return;
+	if (nowMs() - step_at < step_ms) return;
 	step_at = nowMs();
 	if (step < GAMES) host->select_index(step);
 	else say("done");
@@ -122,6 +127,10 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (!MOSAIC_HOST_HAS(host, decorate_cell)) return 1;
 	snprintf(folder, sizeof(folder), "%s/Roms/Glancer (GLANCE)", host->sdcard_path);
+	step_ms = atol(host->cfg_get("step_ms", "1500"));
+	column = atoi(host->cfg_get("column", "75"));
+	if (step_ms <= 0) step_ms = 1500;
+	if (column < 0 || column > 99) column = 75;
 	return 0;
 }
 
