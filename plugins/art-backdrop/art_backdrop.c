@@ -17,6 +17,13 @@
 // surfaces are full) is drawn straight from the cache's image that frame
 // instead, dimmed as it's drawn.
 //
+// With the fill setting at full, the art covers the whole screen and is
+// darkened toward the side the game list is on (see BD_side and BD_shade),
+// baked into the copy with the dimming, so it's drawn once each time the
+// selection moves to a game, never each frame. The side is the layout
+// slot owner's, found with plugin_loaded on the first frame, once every
+// plugin has loaded, and for layout-fancy its public position setting.
+//
 // The dim setting at theme, the default, takes the theme slot owner's
 // art-backdrop.dim key, read once the theme is in place and again on
 // launcher.theme_changed; a new dim drops the copies, which have the old
@@ -33,6 +40,9 @@
 
 static const MosaicHost* host;
 static int style = BD_STYLE_GRADIENT;
+static int fill = BD_FILL_TOP;
+static int side = BD_SIDE_LEFT;
+static int side_resolved = 0; // 0 until the layout is known, on the first frame
 static int dim = 0; // alpha of the black over the art
 static char dim_setting[16];
 static int dim_resolved = 0; // 0 until the theme's dim is read, and again when the theme changes
@@ -84,6 +94,20 @@ static Copy* copySlot(void) {
 
 static const MosaicColor black = { 0, 0, 0, 255 };
 
+// the darkening toward the list over a w by h surface, with fill at full
+static int shade(MosaicSurface* s, int w, int h) {
+	int bands = BD_shades(w, h, side);
+	for (int i = 0; i < bands; i++) {
+		MosaicRect r;
+		int alpha = 0;
+		if (BD_shade(w, h, side, i, &r, &alpha) != 0 || r.w <= 0 || r.h <= 0 || alpha <= 0) continue;
+		MosaicColor c = black;
+		c.a = (unsigned char)alpha;
+		if (host->fill_rect(s, &r, c) != 0) return -1;
+	}
+	return 0;
+}
+
 // crop of src drawn over area of screen in the style, dimmed as it's drawn
 // unless the dimming is already in src
 static int draw(MosaicSurface* screen, const MosaicSurface* src, const MosaicRect* crop, const MosaicRect* area,
@@ -96,11 +120,18 @@ static int draw(MosaicSurface* screen, const MosaicSurface* src, const MosaicRec
 		int rgb = host->theme_color(MOSAIC_COLOR_BACKGROUND);
 		if (host->fill_rect(screen, area, mosaic_color(rgb < 0 ? 0x000000 : (unsigned int)rgb, 255)) != 0) return -1;
 	}
-	MosaicColor shade = black;
+	MosaicColor shade_color = black;
+	if (fill == BD_FILL_FULL) {
+		if (host->blit(screen, src, crop, area) != 0) return -1;
+		if (dimmed) return 0;
+		shade_color.a = (unsigned char)dim;
+		if (dim && host->fill_rect(screen, area, shade_color) != 0) return -1;
+		return shade(screen, area->w, area->h);
+	}
 	if (style == BD_STYLE_FULL) {
 		if (host->blit(screen, src, crop, area) != 0) return -1;
-		shade.a = (unsigned char)dim;
-		return dimmed || !dim ? 0 : host->fill_rect(screen, area, shade);
+		shade_color.a = (unsigned char)dim;
+		return dimmed || !dim ? 0 : host->fill_rect(screen, area, shade_color);
 	}
 	int bands = BD_bands(area->h);
 	for (int i = 0; i < bands; i++) {
@@ -111,8 +142,8 @@ static int draw(MosaicSurface* screen, const MosaicSurface* src, const MosaicRec
 		int rc = alpha >= 255 ? host->blit(screen, src, &from, &to) : host->blit_alpha(screen, src, &from, &to, alpha);
 		if (rc != 0) return -1;
 		if (dimmed || !dim) continue;
-		shade.a = (unsigned char)BD_mulAlpha(dim, alpha);
-		if (host->fill_rect(screen, &to, shade) != 0) return -1;
+		shade_color.a = (unsigned char)BD_mulAlpha(dim, alpha);
+		if (host->fill_rect(screen, &to, shade_color) != 0) return -1;
 	}
 	return 0;
 }
@@ -143,6 +174,26 @@ static void resolveDim(void) {
 	host->log(ID, message);
 }
 
+// the side the list is on, from the layout slot's owner
+static void resolveSide(void) {
+	side_resolved = 1;
+	const char* layout = NULL;
+	if (MOSAIC_HOST_HAS(host, has_capability)) {
+		for (int i = 0; i < BD_LAYOUT_COUNT && !layout; i++) {
+			if (host->plugin_loaded(BD_layouts[i])) layout = BD_layouts[i];
+		}
+	}
+	const char* position = NULL;
+	if (layout && !strcmp(layout, "layout-fancy") && MOSAIC_HOST_HAS(host, cfg_read)) {
+		position = host->cfg_read("layout-fancy", "position", "right");
+	}
+	side = BD_side(layout, position);
+	char message[128];
+	snprintf(message, sizeof(message), "darkened toward the %s, under %s", BD_sideName(side),
+		layout ? layout : "the built-in list");
+	host->log(ID, message);
+}
+
 static void themeChanged(const char* name, const char* payload, void* data) {
 	(void)name;
 	(void)payload;
@@ -154,12 +205,13 @@ static int backgroundRender(MosaicSurface* screen, const MosaicEntry* selected) 
 	frame++;
 	// the theme is put in place after every plugin's init
 	if (!dim_resolved) resolveDim();
+	if (fill == BD_FILL_FULL && !side_resolved) resolveSide();
 	if (!selected || host->entry_type(selected) != MOSAIC_ENTRY_ROM) return 0;
 	const char* path = host->entry_path(selected);
 	if (!path || strlen(path) >= MAX_PATH_LEN) return 0;
 	int w = 0, h = 0;
 	if (host->surface_size(screen, &w, &h) != 0) return -1;
-	MosaicRect area = BD_area(w, h, divisor);
+	MosaicRect area = BD_area(w, h, fill == BD_FILL_FULL ? 1 : divisor);
 	if (area.w <= 0 || area.h <= 0) return 0;
 
 	Copy* hit = copyFind(path, area.w, area.h);
@@ -180,9 +232,10 @@ static int backgroundRender(MosaicSurface* screen, const MosaicEntry* selected) 
 
 	MosaicSurface* copy = host->surface_scale(ID, image, area.w, area.h, MOSAIC_FIT_COVER);
 	if (copy) {
-		MosaicColor shade = black;
-		shade.a = (unsigned char)dim;
-		if (dim) host->fill_rect(copy, NULL, shade);
+		MosaicColor dimming = black;
+		dimming.a = (unsigned char)dim;
+		if (dim) host->fill_rect(copy, NULL, dimming);
+		if (fill == BD_FILL_FULL) shade(copy, area.w, area.h);
 		Copy* c = copySlot();
 		snprintf(c->path, sizeof(c->path), "%s", path);
 		c->w = area.w;
@@ -208,6 +261,9 @@ static int init(const MosaicHost* h) {
 	const char* style_name = host->cfg_get("style", "gradient");
 	const char* height = host->cfg_get("height", "full");
 	style = BD_style(style_name);
+	fill = BD_fill(host->cfg_get("fill", "top"));
+	side = BD_SIDE_LEFT;
+	side_resolved = 0;
 	snprintf(dim_setting, sizeof(dim_setting), "%s", host->cfg_get("dim", "theme"));
 	dim = BD_dim(BD_themed(dim_setting, NULL));
 	dim_resolved = 0;
@@ -217,8 +273,14 @@ static int init(const MosaicHost* h) {
 		kinds);
 	none_path[0] = '\0';
 	char message[128];
-	snprintf(message, sizeof(message), "%s, dimmed by %i of 255, over 1/%i of the screen, from %i kinds of art",
-		style == BD_STYLE_FULL ? "full-bleed" : "gradient", dim, divisor, kind_count);
+	if (fill == BD_FILL_FULL) {
+		snprintf(message, sizeof(message), "over the whole screen, dimmed by %i of 255, from %i kinds of art", dim,
+			kind_count);
+	}
+	else {
+		snprintf(message, sizeof(message), "%s, dimmed by %i of 255, over 1/%i of the screen, from %i kinds of art",
+			style == BD_STYLE_FULL ? "full-bleed" : "gradient", dim, divisor, kind_count);
+	}
 	host->log(ID, message);
 	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
 		host->log(ID, "couldn't follow theme changes");

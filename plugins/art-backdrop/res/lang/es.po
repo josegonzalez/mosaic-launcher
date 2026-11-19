@@ -39,6 +39,9 @@ msgstr "Usar la captura si no hay"
 msgid "Fall back to the thumbnail"
 msgstr "Usar la miniatura si no hay"
 
+msgid "Fill"
+msgstr "Relleno"
+
 msgid "Height"
 msgstr "Altura"
 
@@ -59,3 +62,6 @@ msgstr "tercio"
 
 msgid "theme"
 msgstr "tema"
+
+msgid "top"
+msgstr "arriba"

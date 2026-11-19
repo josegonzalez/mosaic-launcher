@@ -8,6 +8,6 @@ slots=layout
 # shows the last save state's preview in place of the box art when there is one
 setting.prefer_preview=toggle|Prefer state preview|on
 # where the art panel goes: right of the rows (as stock), left of them, or across the top half above them
-setting.position=choice|Art position|right|right,left,top
+setting.position=choice|Art position|right|right,left,top|public
 # shows the game's .info description wrapped in the panel under the art, scrolling once the selection settles
 setting.description=toggle|Description|off

@@ -55,6 +55,10 @@ msgid "Fall back to the thumbnail"
 msgstr ""
 
 #: plugin.txt
+msgid "Fill"
+msgstr ""
+
+#: plugin.txt
 msgid "Height"
 msgstr ""
 
@@ -80,4 +84,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "third"
+msgstr ""
+
+#: plugin.txt
+msgid "top"
 msgstr ""

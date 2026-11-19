@@ -5,6 +5,8 @@ category=Looks
 summary=Draws the selected game's art behind the game list.
 description=Draws the selected game's art behind the game list, dimmed.
 slots=background
+# top: the art over the top of the screen, as the style and height say; full: over the whole screen, darkened toward the list
+setting.fill=choice|Fill|top|top,full
 # full: the art over its whole height; gradient: fading out over its bottom half
 setting.style=choice|Style|gradient|gradient,full
 # how much darker the art is, in percent; theme: the theme's art-backdrop.dim, or 50 without one

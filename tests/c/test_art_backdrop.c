@@ -52,6 +52,90 @@ static void testSettings(void) {
 	CHECK(r.h == 480);
 }
 
+static void testFill(void) {
+	CHECK(BD_fill("top") == BD_FILL_TOP);
+	CHECK(BD_fill("full") == BD_FILL_FULL);
+	CHECK(BD_fill("Full") == BD_FILL_TOP);
+	CHECK(BD_fill(NULL) == BD_FILL_TOP);
+
+	CHECK(BD_side(NULL, NULL) == BD_SIDE_LEFT);
+	CHECK(BD_side("layout-fancy", NULL) == BD_SIDE_LEFT);
+	CHECK(BD_side("layout-fancy", "right") == BD_SIDE_LEFT);
+	CHECK(BD_side("layout-fancy", "left") == BD_SIDE_RIGHT);
+	CHECK(BD_side("layout-fancy", "top") == BD_SIDE_BOTTOM);
+	CHECK(BD_side("layout-grid", NULL) == BD_SIDE_ALL);
+	CHECK(BD_side("layout-carousel", NULL) == BD_SIDE_ALL);
+	CHECK(BD_side("layout-shelf", NULL) == BD_SIDE_ALL);
+	CHECK(BD_side("layout-hero-rail", NULL) == BD_SIDE_BOTTOM);
+	CHECK(BD_side("someone-elses", "left") == BD_SIDE_LEFT);
+	for (int i = 0; i < BD_LAYOUT_COUNT; i++) CHECK(BD_layouts[i] && !strncmp(BD_layouts[i], "layout-", 7));
+	CHECK_STR(BD_sideName(BD_SIDE_LEFT), "left");
+	CHECK_STR(BD_sideName(BD_SIDE_ALL), "whole screen");
+}
+
+// the bands cover w by h along the side's axis exactly once, darkest nearest
+// the list and never darker further from it
+static void checkShades(int w, int h, int side) {
+	int n = BD_shades(w, h, side);
+	CHECK(n > 0 && n <= BD_MAX_BANDS + 1);
+	int length = side == BD_SIDE_TOP || side == BD_SIDE_BOTTOM ? h : w;
+	int covered = 0, last = 256;
+	for (int i = 0; i < n; i++) {
+		MosaicRect r;
+		int alpha = -1;
+		CHECK(BD_shade(w, h, side, i, &r, &alpha) == 0);
+		CHECK(r.x >= 0 && r.y >= 0 && r.x + r.w <= w && r.y + r.h <= h && r.w > 0 && r.h > 0);
+		CHECK(alpha >= 0 && alpha <= BD_SHADE_MAX && alpha <= last);
+		last = alpha;
+		// distance from the list's side to the band's near edge
+		int from = side == BD_SIDE_LEFT ? r.x : side == BD_SIDE_RIGHT ? w - r.x - r.w : side == BD_SIDE_TOP ? r.y : h - r.y - r.h;
+		CHECK(from == covered);
+		covered += side == BD_SIDE_TOP || side == BD_SIDE_BOTTOM ? r.h : r.w;
+		if (side == BD_SIDE_TOP || side == BD_SIDE_BOTTOM) CHECK(r.x == 0 && r.w == w);
+		else CHECK(r.y == 0 && r.h == h);
+	}
+	CHECK(covered == length);
+	MosaicRect r;
+	int alpha;
+	CHECK(BD_shade(w, h, side, n, &r, &alpha) == -1);
+	CHECK(BD_shade(w, h, side, -1, &r, &alpha) == -1);
+}
+
+static void testShades(void) {
+	checkShades(1024, 768, BD_SIDE_LEFT);
+	checkShades(1024, 768, BD_SIDE_RIGHT);
+	checkShades(1024, 768, BD_SIDE_TOP);
+	checkShades(1024, 768, BD_SIDE_BOTTOM);
+	checkShades(640, 480, BD_SIDE_LEFT);
+	checkShades(5, 3, BD_SIDE_RIGHT);
+	checkShades(1, 1, BD_SIDE_LEFT);
+
+	// the third nearest the list holds the max, then 64 bands fade out
+	CHECK(BD_shades(1024, 768, BD_SIDE_LEFT) == 1 + BD_MAX_BANDS);
+	MosaicRect r;
+	int alpha;
+	CHECK(BD_shade(1024, 768, BD_SIDE_LEFT, 0, &r, &alpha) == 0);
+	CHECK(r.x == 0 && r.w == 341 && r.h == 768 && alpha == BD_SHADE_MAX);
+	CHECK(BD_shade(1024, 768, BD_SIDE_LEFT, 1, &r, &alpha) == 0);
+	CHECK(r.x == 341 && alpha < BD_SHADE_MAX && alpha > BD_SHADE_MAX - 5);
+	CHECK(BD_shade(1024, 768, BD_SIDE_LEFT, BD_MAX_BANDS, &r, &alpha) == 0);
+	CHECK(r.x + r.w == 1024 && alpha < 5);
+	// on the right, mirrored
+	CHECK(BD_shade(1024, 768, BD_SIDE_RIGHT, 0, &r, &alpha) == 0);
+	CHECK(r.x == 1024 - 341 && r.w == 341 && alpha == BD_SHADE_MAX);
+	// toward the bottom, along the height
+	CHECK(BD_shade(1024, 768, BD_SIDE_BOTTOM, 0, &r, &alpha) == 0);
+	CHECK(r.y == 512 && r.h == 256 && r.w == 1024);
+
+	// over all of it, one band
+	CHECK(BD_shades(1024, 768, BD_SIDE_ALL) == 1);
+	CHECK(BD_shade(1024, 768, BD_SIDE_ALL, 0, &r, &alpha) == 0);
+	CHECK(r.x == 0 && r.y == 0 && r.w == 1024 && r.h == 768 && alpha == BD_SHADE_MAX);
+
+	CHECK(BD_shades(0, 768, BD_SIDE_LEFT) == 0);
+	CHECK(BD_shades(1024, 0, BD_SIDE_ALL) == 0);
+}
+
 static void testKinds(void) {
 	int kinds[BD_MAX_KINDS];
 	CHECK(BD_kinds(1, 1, 1, kinds) == 4);
@@ -160,12 +244,15 @@ struct MosaicSurface {
 	int mine; // the plugin made it
 	int freed;
 	int dimmed; // alpha of the last fill over all of it
+	int shades; // fills over part of it, the darkening toward the list
+	int shade_first; // the first one's alpha
+	MosaicRect shade_rect; // and rect
 };
 
 static MosaicSurface pool[16];
 static int pool_count = 0;
-static MosaicSurface screen = { 1024, 768, 0, 0, 0 };
-static MosaicSurface art = { 1920, 1080, 0, 0, 0 };
+static MosaicSurface screen = { 1024, 768, 0, 0, 0, 0, -1, { 0, 0, 0, 0 } };
+static MosaicSurface art = { 1920, 1080, 0, 0, 0, 0, -1, { 0, 0, 0, 0 } };
 static int scales = 0, scale_fail = 0, frees = 0, finds = 0, art_gets = 0;
 static int blits = 0, alpha_blits = 0, fills = 0;
 static int last_get_kind = -1, first_alpha = -1, last_fill_alpha = -1, clear = 0;
@@ -173,7 +260,7 @@ static unsigned theme_fill = 0x1000000;
 static MosaicRect first_blit, last_dst;
 static const MosaicSurface* blit_src = NULL;
 static const char* cfg[][2] = {
-	{ "style", NULL }, { "dim", NULL }, { "height", NULL }, { "screenshot", NULL }, { "thumbnail", NULL }, { "box", NULL },
+	{ "fill", NULL }, { "style", NULL }, { "dim", NULL }, { "height", NULL }, { "screenshot", NULL }, { "thumbnail", NULL }, { "box", NULL },
 };
 
 static const char* fakeCfgGet(const char* key, const char* fallback) {
@@ -206,7 +293,7 @@ static MosaicSurface* fakeScale(const char* id, const MosaicSurface* src, int w,
 	scales++;
 	if (scale_fail || pool_count >= 16) return NULL;
 	MosaicSurface* s = &pool[pool_count++];
-	*s = (MosaicSurface){ w, h, 1, 0, -1 };
+	*s = (MosaicSurface){ w, h, 1, 0, -1, 0, -1, { 0, 0, 0, 0 } };
 	return s;
 }
 static int fakeFree(const char* id, MosaicSurface* s) {
@@ -217,7 +304,18 @@ static int fakeFree(const char* id, MosaicSurface* s) {
 }
 static int fakeFillRect(MosaicSurface* s, const MosaicRect* rect, MosaicColor color) {
 	if (s != &screen) {
-		CHECK(s->mine && !s->freed && !rect);
+		CHECK(s->mine && !s->freed);
+		if (rect) {
+			CHECK(rect->x >= 0 && rect->y >= 0 && rect->x + rect->w <= s->w && rect->y + rect->h <= s->h);
+			CHECK(color.r == 0 && color.g == 0 && color.b == 0);
+			if (!s->shades) {
+				s->shade_first = color.a;
+				s->shade_rect = *rect;
+			}
+			s->shades++;
+			return 0;
+		}
+		CHECK(!s->shades);
 		s->dimmed = color.a;
 		return 0;
 	}
@@ -508,13 +606,104 @@ static void testThemeDim(void) {
 	themeDim = NULL;
 }
 
+// fill at full: the whole screen, darkened toward the layout's list side
+static const char* loadedLayout = NULL;
+static const char* fancyPosition = NULL;
+static int fakePluginLoaded(const char* id) { return loadedLayout && !strcmp(id, loadedLayout); }
+static int fakeHasCapability(const char* name) { (void)name; return 0; }
+static const char* fakeCfgRead(const char* id, const char* key, const char* fallback) {
+	CHECK_STR(id, "layout-fancy");
+	CHECK_STR(key, "position");
+	return fancyPosition ? fancyPosition : fallback;
+}
+
+static void testFullFill(void) {
+	MosaicHost h = fakeHost();
+	h.plugin_loaded = fakePluginLoaded;
+	h.has_capability = fakeHasCapability;
+	h.cfg_read = fakeCfgRead;
+	const MosaicPlugin* p = mosaic_plugin_get(&h);
+	// every copy so far was freed with quit
+	pool_count = 0;
+	// the height and style don't apply
+	setCfg("fill", "full");
+	setCfg("height", "third");
+	CHECK(p->init(&h) == 0);
+	MosaicEntry a = { "/r/GB/FullA.gb", MOSAIC_ENTRY_ROM, BIT(MOSAIC_ART_BACKDROP), MOSAIC_ART_READY };
+	reset();
+	int before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(scales == 1 && pool[before].w == 1024 && pool[before].h == 768);
+	// dimmed, then darkened toward the built-in list on the left, on the copy
+	CHECK(pool[before].dimmed == 128);
+	CHECK(pool[before].shades == 1 + BD_MAX_BANDS && pool[before].shade_first == BD_SHADE_MAX);
+	CHECK(pool[before].shade_rect.x == 0 && pool[before].shade_rect.w == 341);
+	// one blit of the copy over the whole screen, nothing on the screen itself
+	CHECK(blits == 1 && alpha_blits == 0 && fills == 0 && blit_src == &pool[before]);
+	CHECK(first_blit.y == 0 && first_blit.h == 768);
+	// the next frame draws the copy as it is, with nothing built again
+	reset();
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(scales == 0 && blits == 1 && fills == 0 && pool[before].shades == 1 + BD_MAX_BANDS);
+
+	// no copy: straight from the art, dimmed and darkened on the screen
+	MosaicEntry b = { "/r/GB/FullB.gb", MOSAIC_ENTRY_ROM, BIT(MOSAIC_ART_BACKDROP), MOSAIC_ART_READY };
+	scale_fail = 1;
+	reset();
+	CHECK(p->background_render(&screen, &b) == 0);
+	CHECK(blits == 1 && blit_src == &art && fills == 2 + BD_MAX_BANDS);
+	scale_fail = 0;
+	p->quit();
+
+	// fancy with its art on the left: the rows, and the darkening, on the right
+	loadedLayout = "layout-fancy";
+	fancyPosition = "left";
+	CHECK(p->init(&h) == 0);
+	reset();
+	before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(pool[before].shade_rect.x == 1024 - 341 && pool[before].shade_rect.w == 341);
+	p->quit();
+	// with it across the top: the rows, under it
+	fancyPosition = "top";
+	CHECK(p->init(&h) == 0);
+	reset();
+	before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(pool[before].shade_rect.y == 512 && pool[before].shade_rect.h == 256);
+	p->quit();
+	// a grid: evenly over all of it
+	loadedLayout = "layout-grid";
+	CHECK(p->init(&h) == 0);
+	reset();
+	before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(pool[before].shades == 1 && pool[before].shade_rect.w == 1024 && pool[before].shade_rect.h == 768);
+	p->quit();
+
+	// top, the default, never darkens toward the list
+	setCfg("fill", NULL);
+	setCfg("height", NULL);
+	loadedLayout = NULL;
+	fancyPosition = NULL;
+	CHECK(p->init(&h) == 0);
+	reset();
+	before = pool_count;
+	CHECK(p->background_render(&screen, &a) == 0);
+	CHECK(pool[before].shades == 0 && alpha_blits > 0);
+	p->quit();
+}
+
 int main(void) {
 	testSettings();
+	testFill();
+	testShades();
 	testKinds();
 	testCover();
 	testBands();
 	testSrcBand();
 	testPlugin();
 	testThemeDim();
+	testFullFill();
 	CHECK_DONE();
 }

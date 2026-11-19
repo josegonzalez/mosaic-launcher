@@ -2,6 +2,90 @@
 #include <string.h>
 #include "backdrop_model.h"
 
+int BD_fill(const char* value) {
+	return value && !strcmp(value, "full") ? BD_FILL_FULL : BD_FILL_TOP;
+}
+
+const char* const BD_layouts[BD_LAYOUT_COUNT] = {
+	"layout-fancy", "layout-grid", "layout-carousel", "layout-shelf", "layout-hero-rail",
+};
+
+int BD_side(const char* layout, const char* fancy_position) {
+	if (!layout) return BD_SIDE_LEFT;
+	if (!strcmp(layout, "layout-fancy")) {
+		if (fancy_position && !strcmp(fancy_position, "left")) return BD_SIDE_RIGHT;
+		if (fancy_position && !strcmp(fancy_position, "top")) return BD_SIDE_BOTTOM;
+		return BD_SIDE_LEFT;
+	}
+	if (!strcmp(layout, "layout-hero-rail")) return BD_SIDE_BOTTOM;
+	if (!strcmp(layout, "layout-grid") || !strcmp(layout, "layout-carousel") || !strcmp(layout, "layout-shelf")) {
+		return BD_SIDE_ALL;
+	}
+	return BD_SIDE_LEFT;
+}
+
+const char* BD_sideName(int side) {
+	switch (side) {
+	case BD_SIDE_RIGHT: return "right";
+	case BD_SIDE_TOP: return "top";
+	case BD_SIDE_BOTTOM: return "bottom";
+	case BD_SIDE_ALL: return "whole screen";
+	default: return "left";
+	}
+}
+
+// the length across the screen from the list's side, and how many bands
+// fade after the held third
+static int shadeLength(int w, int h, int side) {
+	if (w <= 0 || h <= 0) return 0;
+	return side == BD_SIDE_TOP || side == BD_SIDE_BOTTOM ? h : w;
+}
+
+static int shadeFades(int length) {
+	int fade = length - length / 3;
+	if (fade <= 0) return 0;
+	int n = fade / BD_MIN_BAND;
+	if (n < 1) n = 1;
+	if (n > BD_MAX_BANDS) n = BD_MAX_BANDS;
+	return n;
+}
+
+int BD_shades(int w, int h, int side) {
+	int length = shadeLength(w, h, side);
+	if (length <= 0) return 0;
+	if (side == BD_SIDE_ALL) return 1;
+	return (length / 3 > 0 ? 1 : 0) + shadeFades(length);
+}
+
+int BD_shade(int w, int h, int side, int i, MosaicRect* rect, int* alpha) {
+	if (i < 0 || i >= BD_shades(w, h, side)) return -1;
+	if (side == BD_SIDE_ALL) {
+		*rect = (MosaicRect){ 0, 0, w, h };
+		*alpha = BD_SHADE_MAX;
+		return 0;
+	}
+	int length = shadeLength(w, h, side);
+	int hold = length / 3;
+	int from = 0, size = hold;
+	*alpha = BD_SHADE_MAX;
+	if (hold <= 0 || i > 0) {
+		if (hold > 0) i--;
+		int n = shadeFades(length);
+		int fade = length - hold;
+		from = hold + (int)((long)fade * i / n);
+		size = hold + (int)((long)fade * (i + 1) / n) - from;
+		// at the band's middle: the max nearest the list, 0 at the far side
+		*alpha = (BD_SHADE_MAX * (2 * (n - i) - 1) + n) / (2 * n);
+	}
+	switch (side) {
+	case BD_SIDE_RIGHT: *rect = (MosaicRect){ w - from - size, 0, size, h }; break;
+	case BD_SIDE_TOP: *rect = (MosaicRect){ 0, from, w, size }; break;
+	case BD_SIDE_BOTTOM: *rect = (MosaicRect){ 0, h - from - size, w, size }; break;
+	default: *rect = (MosaicRect){ from, 0, size, h }; break;
+	}
+	return 0;
+}
+
 int BD_style(const char* value) {
 	return value && !strcmp(value, "full") ? BD_STYLE_FULL : BD_STYLE_GRADIENT;
 }
