@@ -4,8 +4,11 @@
 // The "promote" setting names the collections to put on the root, or "*"
 // for all of them; they go after the consoles, as other plugins' root
 // folders do, in the "order" setting's order, then promote's, then by name.
-// "order" also orders the Collections folder. The "hide_folder" setting
-// drops the Collections folder from the root (the quick menu still has it).
+// "order" also orders the Collections folder, and it can name systems too:
+// then the systems it names go in its order, each collection it names goes
+// after the system named before it (or before the first one), and the rest
+// keep their places. The "hide_folder" setting drops the Collections
+// folder from the root (the quick menu still has it).
 //
 // Inside a collection, the "file_order" setting keeps the collection file's
 // own order, which stock gives up for names when Collections/map.txt
@@ -14,7 +17,9 @@
 // below Collections, that folder's map.txt, before stock's shared one; a
 // name starting with a dot hides the game, as in any map.txt. The "art"
 // setting gives a collection's thumbnail and box from
-// <dir>/.media/<name>.png or .jpg, so layouts that want a box show it too.
+// <dir>/.media/<name>.png or .jpg, so layouts that want a box show it too,
+// and its thumbnail from its icon, <dir>/.icons/<name>.png or
+// Collections/.icons/<name>.png, first.
 // The "hide_games" setting hides the quick menu's Games tile.
 
 #include <dirent.h>
@@ -29,9 +34,11 @@
 
 #define ID "collections-plus"
 #define ROOT_MAX 128
+#define PLACED_MAX 256
 
 static const MosaicHost* host;
 static char collections_dir[CP_PATH_LEN]; // <sd>/Collections
+static char roms_dir[CP_PATH_LEN];        // <sd>/Roms
 static CPNames order;                     // the "order" setting
 static CPNames promote;                   // the "promote" setting
 static int hide_folder = 0;
@@ -46,6 +53,17 @@ static char map_dir[CP_PATH_LEN];   // the collection own_names is for
 static CPMap own_names;
 static char order_dir[CP_PATH_LEN]; // the collection file_lines is for
 static CPOrder file_lines;
+
+// The root's rows' places when "order" names a system on it, by path, from
+// the last root_entries; empty when it names none. Rows added after it,
+// such as later plugins' folders and Tools, have none and stay after.
+typedef struct Placed {
+	char path[CP_PATH_LEN];
+	int place;
+} Placed;
+static Placed placed[PLACED_MAX];
+static int placed_count = 0;
+static int placed_pending = 0; // root_entries ran for the root being listed
 
 __attribute__((format(printf, 1, 2)))
 static void say(const char* fmt, ...) {
@@ -125,7 +143,7 @@ static int inList(const MosaicList* list, const char* path) {
 	return 0;
 }
 
-static void rootEntries(MosaicList* root) {
+static void promoteCollections(MosaicList* root) {
 	if (!promote.all && promote.count == 0) return;
 	DIR* dh = opendir(collections_dir);
 	if (!dh) return;
@@ -166,13 +184,75 @@ static void rootEntries(MosaicList* root) {
 	}
 }
 
+// A root row's place in "order": a system by its folder name, tag or the
+// name it shows, a collection by its file name or the name it shows. Sets
+// *kind to what it is (CP_ROW_*).
+static int rootRank(const MosaicEntry* entry, int* kind) {
+	const char* path = host->entry_path(entry);
+	size_t len = strlen(roms_dir);
+	*kind = CP_ROW_OTHER;
+	if (!strncmp(path, roms_dir, len) && path[len] == '/' && path[len + 1] && !strchr(path + len + 1, '/')) {
+		*kind = CP_ROW_SYSTEM;
+		return CP_rankSystem(&order, path + len + 1, host->entry_name(entry));
+	}
+	char base[CP_NAME_LEN];
+	if (!CP_topCollection(collections_dir, path, base, sizeof(base))) return -1;
+	*kind = CP_ROW_COLLECTION;
+	return CP_rank(&order, base, host->entry_name(entry));
+}
+
+// Works out the root's places when "order" names a system on it.
+static void placeRoot(const MosaicList* root) {
+	placed_count = 0;
+	if (!order.count) return;
+	int count = host->list_count(root);
+	if (count > PLACED_MAX) {
+		say("the root has %i rows, over %i, so order leaves its systems in place", count, PLACED_MAX);
+		return;
+	}
+	static int ranks[PLACED_MAX];
+	static int kinds[PLACED_MAX];
+	static int places[PLACED_MAX];
+	int any_system = 0;
+	for (int i = 0; i < count; i++) {
+		ranks[i] = rootRank(host->list_get(root, i), &kinds[i]);
+		if (kinds[i] == CP_ROW_SYSTEM && ranks[i] >= 0) any_system = 1;
+	}
+	if (!any_system) return; // the root as before
+	CP_placeRows(ranks, kinds, count, places);
+	for (int i = 0; i < count; i++) {
+		snprintf(placed[i].path, sizeof(placed[i].path), "%s", host->entry_path(host->list_get(root, i)));
+		placed[i].place = places[i];
+	}
+	placed_count = count;
+}
+
+static void rootEntries(MosaicList* root) {
+	promoteCollections(root);
+	placeRoot(root);
+	placed_pending = 1;
+}
+
+// A root row's place from placeRoot, or past them all.
+static int placeOf(const MosaicEntry* entry) {
+	const char* path = host->entry_path(entry);
+	for (int i = 0; i < placed_count; i++) {
+		if (!strcmp(placed[i].path, path)) return placed[i].place;
+	}
+	return PLACED_MAX;
+}
+
 ///////////////////////////////////////
 // listing hooks
 
 static int filter(const MosaicEntry* entry, const char* dir_path) {
 	if (!dir_path) return 1;
 	const char* path = host->entry_path(entry);
-	if (hide_folder && !strcmp(dir_path, host->sdcard_path) && !strcmp(path, collections_dir)) return 0;
+	if (!strcmp(dir_path, host->sdcard_path)) {
+		// a root listed without root_entries, such as a plugin's own root
+		if (!placed_pending) placed_count = 0;
+		if (hide_folder && !strcmp(path, collections_dir)) return 0;
+	}
 	if (!own_map || !CP_isCollection(collections_dir, dir_path)) {
 		// display_name only renames inside a collection
 		map_dir[0] = '\0';
@@ -204,6 +284,10 @@ static int orderRank(const MosaicEntry* entry) {
 
 static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* dir_path) {
 	if (!dir_path) return 0;
+	if (placed_count && !strcmp(dir_path, host->sdcard_path)) {
+		int x = placeOf(a), y = placeOf(b);
+		return x < y ? -1 : x > y ? 1 : 0;
+	}
 	if (CP_isCollection(collections_dir, dir_path)) {
 		if (!file_order) return 0;
 		if (strcmp(order_dir, dir_path) != 0) {
@@ -224,7 +308,8 @@ static int sortCompare(const MosaicEntry* a, const MosaicEntry* b, const char* d
 
 static void listReady(const MosaicList* list, const char* dir_path) {
 	(void)list;
-	(void)dir_path;
+	// the places stay for a sort again after renames, until the next root
+	if (dir_path && !strcmp(dir_path, host->sdcard_path)) placed_pending = 0;
 	forgetListing(); // read again for the next listing, in case they changed
 }
 
@@ -234,7 +319,14 @@ static int artPath(const MosaicEntry* entry, int kind, char* out, size_t size) {
 	const char* path = host->entry_path(entry);
 	if (!CP_isCollection(collections_dir, path)) return 0;
 	char paths[2][CP_PATH_LEN];
-	int n = CP_artPaths(path, paths, 2);
+	int n = kind == MOSAIC_ART_THUMBNAIL ? CP_iconPaths(collections_dir, path, paths, 2) : 0;
+	for (int i = 0; i < n; i++) {
+		if (isFile(paths[i])) {
+			snprintf(out, size, "%s", paths[i]);
+			return 1;
+		}
+	}
+	n = CP_artPaths(path, paths, 2);
 	for (int i = 0; i < n; i++) {
 		if (isFile(paths[i])) {
 			snprintf(out, size, "%s", paths[i]);
@@ -253,6 +345,8 @@ static void quit(void) {
 static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(collections_dir, sizeof(collections_dir), "%s/Collections", host->sdcard_path);
+	snprintf(roms_dir, sizeof(roms_dir), "%s/Roms", host->sdcard_path);
+	placed_count = placed_pending = 0;
 	CP_parseNames(host->cfg_get("order", ""), &order);
 	order.all = 0; // "*" means nothing as an order
 	CP_parseNames(host->cfg_get("promote", ""), &promote);

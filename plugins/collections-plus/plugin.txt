@@ -6,7 +6,7 @@ summary=Puts your collections on the first screen in your order, with their art.
 description=Puts your collections on the first screen in your order, with their art, and adds options for how collections list.
 # collections to put on the root, comma-separated by name, eg. RPGs, Shooters, or * for all
 setting.promote=text|On the root|
-# the order collections go in, on the root and in Collections, comma-separated by name; the rest follow by name
+# the order collections go in, on the root and in Collections, comma-separated by name; the rest follow by name. Naming systems too mixes the collections between them on the root
 setting.order=text|Order|
 # leave the Collections folder off the root (the quick menu still has it)
 setting.hide_folder=toggle|Hide Collections folder|off
@@ -14,7 +14,7 @@ setting.hide_folder=toggle|Hide Collections folder|off
 setting.file_order=toggle|Keep file order|on
 # name a collection's games from Collections/.media/<name>.map.txt, or its folder's map.txt, first
 setting.own_map=toggle|Collection map.txt|on
-# a collection's art from Collections/.media/<name>.png or .jpg, as its thumbnail and box
+# a collection's art from Collections/.media/<name>.png or .jpg, as its thumbnail and box, and its icon from Collections/.icons/<name>.png as its thumbnail first
 setting.art=toggle|Collection art|on
 # hide the quick menu's Games tile
 setting.hide_games=toggle|Hide Games tile|off

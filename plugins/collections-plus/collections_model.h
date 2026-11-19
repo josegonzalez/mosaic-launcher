@@ -34,6 +34,33 @@ int CP_rank(const CPNames* names, const char* file, const char* shown);
 // no opinion between two that aren't ranked.
 int CP_compareRanks(int a, int b);
 
+// A system folder's tag, what's in its name's last parentheses, eg. "GB"
+// for "Game Boy (GB)", or "" when it has none.
+void CP_systemTag(const char* folder, char* out, size_t size);
+
+// Where a system is in names: matched ignoring case against its folder
+// name (folder, eg. "Game Boy (GB)"), its tag ("GB") or the name the root
+// shows (shown, eg. "Game Boy"; NULL to skip). -1 when it isn't there.
+int CP_rankSystem(const CPNames* names, const char* folder, const char* shown);
+
+// What a root row is, for CP_placeRows.
+enum {
+	CP_ROW_OTHER = 0,      // stays where it is
+	CP_ROW_SYSTEM = 1,     // a console
+	CP_ROW_COLLECTION = 2, // a collection, which can go between consoles
+};
+
+// Places the root's rows for an order that names systems and collections.
+// ranks[i] is row i's place in the order, in today's order of rows, or -1
+// for a row it doesn't name, and kinds[i] what it is. The systems named
+// take the places named systems have today, in the order's order; each
+// collection named goes right after the last system named before it in
+// the order, or, with none, right before the first system named; and the
+// rest keep their places. Equal ranks keep today's order, and a collection
+// whose rank equals a system's goes after it. With no system named nothing
+// moves. Writes each row's new place to out.
+void CP_placeRows(const int* ranks, const int* kinds, int count, int* out);
+
 // True when path is a collection: a .txt anywhere below collections, the
 // collections folder, eg. /mnt/SDCARD/Collections.
 int CP_isCollection(const char* collections, const char* path);
@@ -83,5 +110,11 @@ void CP_orderFree(CPOrder* order);
 // and <dir>/.media/<name>.jpg, for a collection <dir>/<name>.txt. Writes up
 // to max paths and returns how many, 0 for a path that isn't a .txt.
 int CP_artPaths(const char* path, char out[][CP_PATH_LEN], int max);
+
+// The images a collection's icon can be, in order: <dir>/.icons/<name>.png
+// for a collection <dir>/<name>.txt, then <collections>/.icons/<name>.png
+// for one in a folder below the collections folder. Writes up to max paths
+// and returns how many, 0 for a path that isn't a collection.
+int CP_iconPaths(const char* collections, const char* path, char out[][CP_PATH_LEN], int max);
 
 #endif

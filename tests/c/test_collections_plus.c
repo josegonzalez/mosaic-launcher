@@ -184,6 +184,47 @@ static void testModel(void) {
 	CHECK(CP_compareRanks(-1, 0) > 0);
 	CHECK(CP_compareRanks(-1, -1) == 0);
 
+	char tag[32];
+	CP_systemTag("Game Boy (GB)", tag, sizeof(tag));
+	CHECK_STR(tag, "GB");
+	CP_systemTag("Sega (Japan) (MD)", tag, sizeof(tag));
+	CHECK_STR(tag, "MD");
+	CP_systemTag("Homebrew", tag, sizeof(tag));
+	CHECK_STR(tag, "");
+	CP_systemTag("Odd ()", tag, sizeof(tag));
+	CHECK_STR(tag, "");
+	CP_parseNames("game boy, RPGs, sfc, Game Boy Advance (GBA)", &n);
+	CHECK(CP_rankSystem(&n, "Game Boy (GB)", "Game Boy") == 0);
+	CHECK(CP_rankSystem(&n, "Super Nintendo (SFC)", "Super Nintendo") == 2);
+	CHECK(CP_rankSystem(&n, "Game Boy Advance (GBA)", "Game Boy Advance") == 3);
+	CHECK(CP_rankSystem(&n, "Nintendo (FC)", NULL) == -1);
+	CHECK(CP_rankSystem(&n, "RPGs", NULL) == 1); // a folder name like any other
+
+	// rows: GB, GBA, NES, SNES, Collections, RPGs, Shooters
+	int kinds[] = { CP_ROW_SYSTEM, CP_ROW_SYSTEM, CP_ROW_SYSTEM, CP_ROW_SYSTEM, CP_ROW_OTHER, CP_ROW_COLLECTION,
+		CP_ROW_COLLECTION };
+	int places[7];
+	// "Game Boy, RPGs, SNES": RPGs right after Game Boy
+	int ranks[] = { 0, -1, -1, 2, -1, 1, -1 };
+	CP_placeRows(ranks, kinds, 7, places);
+	CHECK(places[0] == 0 && places[5] == 1 && places[1] == 2 && places[2] == 3 && places[3] == 4);
+	CHECK(places[4] == 5 && places[6] == 6);
+	// "RPGs, SNES, Shooters, Game Boy": systems swap places, RPGs before
+	// the first, Shooters after SNES
+	int swapped[] = { 3, -1, -1, 1, -1, 0, 2 };
+	CP_placeRows(swapped, kinds, 7, places);
+	CHECK(places[5] == 0 && places[3] == 1 && places[6] == 2 && places[1] == 3 && places[2] == 4);
+	CHECK(places[0] == 5 && places[4] == 6);
+	// equal ranks: the collection after the system
+	int same[] = { -1, -1, 0, -1, -1, 0, -1 };
+	CP_placeRows(same, kinds, 7, places);
+	CHECK(places[2] == 2 && places[5] == 3 && places[3] == 4 && places[4] == 5 && places[6] == 6);
+	// no system named, nothing moves
+	int none[] = { -1, -1, -1, -1, -1, 1, 0 };
+	CP_placeRows(none, kinds, 7, places);
+	for (int i = 0; i < 7; i++) CHECK(places[i] == i);
+	CP_placeRows(none, kinds, 0, places);
+
 	CHECK(CP_isCollection("/c/Collections", "/c/Collections/A.txt"));
 	CHECK(CP_isCollection("/c/Collections", "/c/Collections/Sub/B.txt"));
 	CHECK(!CP_isCollection("/c/Collections", "/c/Collections"));
@@ -206,6 +247,12 @@ static void testModel(void) {
 	CHECK_STR(paths[0], "/c/Collections/.media/A.png");
 	CHECK_STR(paths[1], "/c/Collections/.media/A.jpg");
 	CHECK(CP_artPaths("/c/Collections/A", paths, 2) == 0);
+	CHECK(CP_iconPaths("/c/Collections", "/c/Collections/A.txt", paths, 2) == 1);
+	CHECK_STR(paths[0], "/c/Collections/.icons/A.png");
+	CHECK(CP_iconPaths("/c/Collections", "/c/Collections/Sub/B.txt", paths, 2) == 2);
+	CHECK_STR(paths[0], "/c/Collections/Sub/.icons/B.png");
+	CHECK_STR(paths[1], "/c/Collections/.icons/B.png");
+	CHECK(CP_iconPaths("/c/Collections", "/c/Roms/GB.txt", paths, 2) == 0);
 
 	char file[256];
 	snprintf(file, sizeof(file), "%s/model-map.txt", CARD);
@@ -252,6 +299,11 @@ static void makeCard(void) {
 	writeText(COLL "/.media/B.jpg", "");
 	writeText(COLL "/Sub/S.txt", "/Roms/GB/Alpha.gb\n");
 	writeText(COLL "/Sub/map.txt", "Alpha.gb\tSub Alpha\n");
+	mkdir(COLL "/.icons", 0755);
+	mkdir(COLL "/Sub/.icons", 0755);
+	writeText(COLL "/.icons/A.png", "");
+	writeText(COLL "/.icons/S.png", "");
+	remove(COLL "/Sub/.icons/S.png"); // testArt adds it
 }
 
 static void testRoot(void) {
@@ -296,6 +348,64 @@ static void testRoot(void) {
 	CHECK(p->filter(folder, CARD) == 0);
 	CHECK(p->filter(folder, CARD "/Roms") == 1);
 	free(folder);
+}
+
+// The root as the launcher lists it: stock's rows in front, the plugin's
+// root entries, rows added after them (eg. Tools), then the plugin's sort.
+static void mixedRoot(const MosaicPlugin* p, const char** stock, const char** after, char* out, size_t size) {
+	MosaicList* root = fakeListNew();
+	for (int i = 0; stock[i]; i++) fakeListPush(root, fakeEntryNew(stock[i], MOSAIC_ENTRY_DIR, NULL));
+	p->root_entries(root);
+	for (int i = 0; after && after[i]; i++) fakeListPush(root, fakeEntryNew(after[i], MOSAIC_ENTRY_DIR, NULL));
+	for (int i = 0; i < root->count; i++) p->filter(root->items[i], CARD);
+	sortBy(p, root->items, root->count, CARD);
+	p->list_ready(root, CARD);
+	names(root, out, size);
+	freeList(root);
+}
+
+static void testMixedRoot(void) {
+	char got[512];
+	const char* stock[] = { CARD "/Recently Played", COLL, CARD "/Roms/Game Boy (GB)", CARD "/Roms/Nintendo (FC)",
+		CARD "/Roms/Super Nintendo (SFC)", NULL };
+	const char* after[] = { CARD "/Most Played", CARD "/Tools/test", NULL };
+	resetSettings();
+	set("promote", "*");
+	// order naming no systems: as before, the collections after the consoles
+	set("order", "C (x), Bee");
+	const MosaicPlugin* p = start();
+	mixedRoot(p, stock, after, got, sizeof(got));
+	CHECK_STR(got, "Recently Played,Collections,Game Boy (GB),Nintendo (FC),Super Nintendo (SFC),C (x),Bee,A,Most Played,test");
+
+	// a collection between consoles, by a system's folder name, tag or shown name
+	set("order", "game boy (gb), Bee, SFC");
+	p = start();
+	mixedRoot(p, stock, after, got, sizeof(got));
+	CHECK_STR(got, "Recently Played,Collections,Game Boy (GB),Bee,Nintendo (FC),Super Nintendo (SFC),A,C (x),Most Played,test");
+	set("order", "Bee, GB, A");
+	p = start();
+	mixedRoot(p, stock, after, got, sizeof(got));
+	CHECK_STR(got, "Recently Played,Collections,Bee,Game Boy (GB),A,Nintendo (FC),Super Nintendo (SFC),C (x),Most Played,test");
+
+	// other plugins' root folders and the Collections folder aren't named
+	set("order", "Most Played, Collections, SFC, A");
+	p = start();
+	mixedRoot(p, stock, after, got, sizeof(got));
+	CHECK_STR(got, "Recently Played,Collections,Game Boy (GB),Nintendo (FC),Super Nintendo (SFC),A,Bee,C (x),Most Played,test");
+
+	// systems only, without promote: the systems in order
+	set("promote", NULL);
+	set("order", "SFC, GB");
+	p = start();
+	mixedRoot(p, stock, after, got, sizeof(got));
+	CHECK_STR(got, "Recently Played,Collections,Super Nintendo (SFC),Nintendo (FC),Game Boy (GB),Most Played,test");
+
+	// a root listed without root_entries, such as a plugin's own, isn't placed
+	MosaicEntry* items[3] = { fakeEntryNew(CARD "/Roms/Game Boy (GB)", MOSAIC_ENTRY_DIR, NULL),
+		fakeEntryNew(CARD "/Roms/Nintendo (FC)", MOSAIC_ENTRY_DIR, NULL),
+		fakeEntryNew(CARD "/Roms/Super Nintendo (SFC)", MOSAIC_ENTRY_DIR, NULL) };
+	listing(p, CARD, items, 3, got, sizeof(got));
+	CHECK_STR(got, "Game Boy (GB),Nintendo (FC),Super Nintendo (SFC)");
 }
 
 static void testCollection(void) {
@@ -363,10 +473,20 @@ static void testArt(void) {
 	MosaicEntry* b = fakeEntryNew(COLL "/B.txt", MOSAIC_ENTRY_DIR, NULL);
 	MosaicEntry* c = fakeEntryNew(COLL "/C (x).txt", MOSAIC_ENTRY_DIR, NULL);
 	MosaicEntry* rom = fakeEntryNew(CARD "/Roms/GB/A.txt", MOSAIC_ENTRY_ROM, NULL);
+	MosaicEntry* sub = fakeEntryNew(COLL "/Sub/S.txt", MOSAIC_ENTRY_DIR, NULL);
+	// the icon is the thumbnail, over the art; the box stays the art
 	CHECK(p->art_path(a, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
-	CHECK_STR(out, COLL "/.media/A.png");
+	CHECK_STR(out, COLL "/.icons/A.png");
 	CHECK(p->art_path(a, MOSAIC_ART_BOX, out, sizeof(out)) == 1);
 	CHECK_STR(out, COLL "/.media/A.png");
+	CHECK(p->art_path(b, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
+	CHECK_STR(out, COLL "/.media/B.jpg");
+	CHECK(p->art_path(sub, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
+	CHECK_STR(out, COLL "/.icons/S.png");
+	writeText(COLL "/Sub/.icons/S.png", "");
+	CHECK(p->art_path(sub, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
+	CHECK_STR(out, COLL "/Sub/.icons/S.png");
+	free(sub);
 	CHECK(p->art_path(b, MOSAIC_ART_BOX, out, sizeof(out)) == 1);
 	CHECK_STR(out, COLL "/.media/B.jpg");
 	CHECK(p->art_path(a, MOSAIC_ART_LOGO, out, sizeof(out)) == 0);
@@ -375,6 +495,7 @@ static void testArt(void) {
 	set("art", "off");
 	p = start();
 	CHECK(p->art_path(a, MOSAIC_ART_BOX, out, sizeof(out)) == 0);
+	CHECK(p->art_path(a, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 0);
 	free(a);
 	free(b);
 	free(c);
@@ -395,6 +516,7 @@ int main(void) {
 	makeCard();
 	testModel();
 	testRoot();
+	testMixedRoot();
 	testCollection();
 	testFolder();
 	testArt();

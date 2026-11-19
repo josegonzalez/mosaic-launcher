@@ -67,6 +67,79 @@ int CP_compareRanks(int a, int b) {
 	return a < b ? -1 : a > b ? 1 : 0;
 }
 
+void CP_systemTag(const char* folder, char* out, size_t size) {
+	if (!size) return;
+	out[0] = '\0';
+	if (!folder) return;
+	const char* open = strrchr(folder, '(');
+	const char* close = open ? strchr(open, ')') : NULL;
+	if (!open || !close || close == open + 1) return;
+	snprintf(out, size, "%.*s", (int)(close - open - 1), open + 1);
+}
+
+int CP_rankSystem(const CPNames* names, const char* folder, const char* shown) {
+	char tag[CP_NAME_LEN];
+	CP_systemTag(folder, tag, sizeof(tag));
+	int rank = CP_rank(names, folder, shown);
+	int by_tag = tag[0] ? CP_rank(names, tag, NULL) : -1;
+	if (rank < 0 || (by_tag >= 0 && by_tag < rank)) rank = by_tag;
+	return rank;
+}
+
+// qsort has no context argument; the launcher sorts on one thread.
+static const int* placing;
+
+static int byPlace(const void* x, const void* y) {
+	int a = *(const int*)x, b = *(const int*)y;
+	if (placing[a] != placing[b]) return placing[a] < placing[b] ? -1 : 1;
+	return a - b;
+}
+
+void CP_placeRows(const int* ranks, const int* kinds, int count, int* out) {
+	for (int i = 0; i < count; i++) out[i] = i;
+	if (count <= 0) return;
+	int* slots = malloc(sizeof(int) * (size_t)count);   // named systems' rows, today's order
+	int* systems = malloc(sizeof(int) * (size_t)count); // the same, by rank
+	int* moving = malloc(sizeof(int) * (size_t)count);  // named collections, by rank
+	int* rows = malloc(sizeof(int) * (size_t)count);    // the new order
+	if (!slots || !systems || !moving || !rows) goto done;
+	int n = 0, m = 0;
+	for (int i = 0; i < count; i++) {
+		if (ranks[i] < 0) continue;
+		if (kinds[i] == CP_ROW_SYSTEM) slots[n++] = i;
+		else if (kinds[i] == CP_ROW_COLLECTION) moving[m++] = i;
+	}
+	if (!n) goto done;
+	memcpy(systems, slots, sizeof(int) * (size_t)n);
+	placing = ranks;
+	qsort(systems, (size_t)n, sizeof(int), byPlace);
+	qsort(moving, (size_t)m, sizeof(int), byPlace);
+
+	int k = 0;    // rows written
+	int next = 0; // the next collection to place
+	int s = 0;    // named systems written
+	for (int i = 0; i < count; i++) {
+		if (ranks[i] >= 0 && kinds[i] == CP_ROW_COLLECTION) continue;
+		if (ranks[i] < 0 || kinds[i] != CP_ROW_SYSTEM) {
+			rows[k++] = i;
+			continue;
+		}
+		int system = systems[s++];
+		// those before the first system named go before it
+		while (s == 1 && next < m && ranks[moving[next]] < ranks[system]) rows[k++] = moving[next++];
+		rows[k++] = system;
+		// and those up to the next system named after it
+		int limit = s < n ? ranks[systems[s]] : -1;
+		while (next < m && (limit < 0 || ranks[moving[next]] < limit)) rows[k++] = moving[next++];
+	}
+	for (int i = 0; i < k; i++) out[rows[i]] = i;
+done:
+	free(slots);
+	free(systems);
+	free(moving);
+	free(rows);
+}
+
 ///////////////////////////////////////
 // paths
 
@@ -111,6 +184,15 @@ int CP_artPaths(const char* path, char out[][CP_PATH_LEN], int max) {
 	static const char* exts[] = { "png", "jpg" };
 	int n = 0;
 	for (int i = 0; i < 2 && n < max; i++) snprintf(out[n++], CP_PATH_LEN, "%.200s/.media/%.200s.%s", dir, name, exts[i]);
+	return n;
+}
+
+int CP_iconPaths(const char* collections, const char* path, char out[][CP_PATH_LEN], int max) {
+	char dir[CP_PATH_LEN], name[CP_PATH_LEN];
+	if (max <= 0 || !CP_isCollection(collections, path) || !split(path, dir, sizeof(dir), name, sizeof(name))) return 0;
+	int n = 0;
+	snprintf(out[n++], CP_PATH_LEN, "%.200s/.icons/%.200s.png", dir, name);
+	if (n < max && strcmp(dir, collections) != 0) snprintf(out[n++], CP_PATH_LEN, "%.200s/.icons/%.200s.png", collections, name);
 	return n;
 }
 

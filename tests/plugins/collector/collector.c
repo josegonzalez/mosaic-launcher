@@ -2,7 +2,8 @@
 // collections-plus plugin. Once the lists are up it opens the root, then
 // <sd>/Collections, then the collection its "collection" setting names
 // (card-relative), logging each list's names in order, and what art_find
-// answers for the thumbnail and box of the root's collections.
+// answers for the thumbnail (and its file name) and box of the root's
+// collections.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -55,7 +56,9 @@ static void logArt(void) {
 		char thumb[512], box[512];
 		int has_thumb = host->art_find(entry, MOSAIC_ART_THUMBNAIL, thumb, sizeof(thumb));
 		int has_box = host->art_find(entry, MOSAIC_ART_BOX, box, sizeof(box));
-		say("art %s thumbnail %i box %i", host->entry_name(entry), has_thumb, has_box);
+		const char* slash = strrchr(thumb, '/');
+		say("art %s thumbnail %i box %i%s%s", host->entry_name(entry), has_thumb, has_box, has_thumb ? " " : "",
+			has_thumb ? (slash ? slash + 1 : thumb) : "");
 	}
 }
 

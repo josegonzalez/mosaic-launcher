@@ -18,3 +18,12 @@ cfg collections-plus "promote=*"
 collection_art
 press "down down down down down down"
 shot promote
+
+# Homebrew between the consoles, with its icon
+begin
+on collections-plus
+cfg collections-plus "promote=*" "order=Game Boy, Homebrew, Game Boy Color"
+mkdir -p "$CARD/Collections/.icons"
+cp "$CARD/Roms/Game Boy (GB)/.media/Libbet and the Magic Floor.png" "$CARD/Collections/.icons/Homebrew.png"
+press "down down down"
+shot rows
