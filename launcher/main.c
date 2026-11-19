@@ -313,7 +313,7 @@ int main (int argc, char *argv[]) {
 				SDL_LockMutex(animMutex);
 				if (list_show_selected_name && !list_layout_drawn) {
 					GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
-					GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING), pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
+					GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING) + pillInset, pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
 				}
 				SDL_UnlockMutex(animMutex);
 			}
@@ -367,6 +367,7 @@ int main (int argc, char *argv[]) {
 					if (state.top->selected == state.top->start && !had_thumb) available_width -= ow;
 					if (state.top->selected == state.top->start)
 						available_width = HeaderRow_topRowWidth(available_width, screen->w, SCALE1(PADDING), SCALE1(BUTTON_MARGIN), ow, header_w);
+					available_width -= pillInset; // a row icon's room
 
 					SDL_Color text_color = uintToColour(THEME_COLOR5_255);
 
@@ -379,7 +380,7 @@ int main (int argc, char *argv[]) {
 						GFX_scrollTextTexture(
 							font.large,
 							entry_text,
-							SCALE1(BUTTON_MARGIN + BUTTON_PADDING), SCALE1(PADDING + state.previous_row * PILL_SIZE) + text_offset_y,
+							SCALE1(BUTTON_MARGIN + BUTTON_PADDING) + pillInset, SCALE1(PADDING + state.previous_row * PILL_SIZE) + text_offset_y,
 							max_width - SCALE1(BUTTON_PADDING * 2),
 							0,
 							text_color,
@@ -394,7 +395,7 @@ int main (int argc, char *argv[]) {
 					SDL_LockMutex(animMutex);
 					if (list_show_selected_name && !list_layout_drawn) {
 						GFX_drawOnLayer(globalpill, pillRect.x, pillRect.y, globallpillW, globalpill->h, 1.0f, 0, LAYER_TRANSITION);
-						GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING),pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
+						GFX_drawOnLayer(globalText, SCALE1(BUTTON_MARGIN + BUTTON_PADDING) + pillInset, pilltargetTextY, globalText->w, globalText->h, 1.0f, 0, LAYER_SCROLLTEXT);
 					}
 					SDL_UnlockMutex(animMutex);
 					PLAT_GPU_Flip();

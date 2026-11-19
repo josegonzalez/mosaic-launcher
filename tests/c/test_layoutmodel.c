@@ -144,6 +144,25 @@ static void testListRow(void) {
 	CHECK(row.name.w == 100);
 	ListRow_rects(1, 15, 30, 90, -4, 200, 1, &row);
 	CHECK(row.rect.w == 0 && row.name.w == 0);
+
+	// a row icon 48 wide, 18 from the row's left: the name moves past it
+	CHECK(ListRow_iconInset(48, 18, 600) == 84);
+	CHECK(ListRow_iconInset(0, 18, 600) == 0);
+	CHECK(ListRow_iconInset(48, 18, 84) == 0); // no room left
+	MosaicRect icon;
+	ListRow_rects(2, 15, 30, 90, 600, 200, 1, &row);
+	ListRow_shift(&row, 84, 48, 40, 18, &icon);
+	CHECK(row.rect.x == 15 && row.rect.w == 600);
+	CHECK(row.name.x == 15 + 84 && row.name.w == 200 && row.name.y == row.rect.y);
+	CHECK(icon.x == 15 + 18 && icon.y == 30 + 2 * 90 + 25 && icon.w == 48 && icon.h == 40);
+	// the shifted name still stops at the row's end
+	ListRow_rects(0, 15, 30, 90, 300, 290, 1, &row);
+	ListRow_shift(&row, 84, 48, 40, 18, &icon);
+	CHECK(row.name.x == 99 && row.name.w == 300 - 84);
+	// without an icon the row is as before
+	ListRow_rects(2, 15, 30, 90, 600, 200, 1, &row);
+	ListRow_shift(&row, 0, 0, 0, 18, &icon);
+	CHECK(row.name.x == 15 && row.name.w == 200 && icon.w == 0);
 }
 
 static void testNameShown(void) {
@@ -172,6 +191,11 @@ static void testSelection(void) {
 	MosaicRow row;
 	ListRow_rects(2, 15, 30, 90, 600, 200, 1, &row);
 	CHECK(!memcmp(&sel.row, &row.rect, sizeof(sel.row)) && !memcmp(&sel.pill, &row.name, sizeof(sel.pill)));
+	// with a row icon, the pill is the shifted name
+	MosaicRect icon;
+	ListRow_shift(&row, 84, 48, 40, 18, &icon);
+	ListSelection_fromRow(&sel, &row);
+	CHECK(sel.row.x == 15 && sel.row.w == 600 && sel.pill.x == 99 && sel.pill.w == 200);
 	// the pill never runs past the row
 	ListSelection_row(&sel, 0, 15, 30, 90, 100, 200, 1);
 	CHECK(sel.row.w == 100 && sel.pill.w == 100);

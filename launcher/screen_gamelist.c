@@ -1,4 +1,5 @@
 #include "launcher.h"
+#include "plugindraw.h"
 
 static int canResume(const char* path, void* data) {
 	(void)path;
@@ -556,6 +557,33 @@ void GameList_update(void) {
 		CFG_getShowGameArt(), 1, had_thumb);
 }
 
+// Plugins' row icons (row_icon), shrunk to fit the text's height, kept by
+// path and height for the rows drawn next; NULL for one that didn't load.
+#define ROW_ICONS 16
+#define ROW_ICON_OWNER "row icons"
+static struct {
+	char path[512];
+	int h;
+	SDL_Surface* image;
+} row_icons[ROW_ICONS];
+static int row_icon_next = 0;
+
+static SDL_Surface* rowIcon(Entry* entry) {
+	char path[512];
+	if (!Plugins_rowIcon(entry, state.top->path, path, sizeof(path))) return NULL;
+	int h = TTF_FontHeight(font.large);
+	for (int i = 0; i < ROW_ICONS; i++) {
+		if (row_icons[i].h == h && !strcmp(row_icons[i].path, path)) return row_icons[i].image;
+	}
+	int i = row_icon_next;
+	row_icon_next = (row_icon_next + 1) % ROW_ICONS;
+	if (row_icons[i].image) PluginDraw_surfaceFree(ROW_ICON_OWNER, (MosaicSurface*)row_icons[i].image);
+	snprintf(row_icons[i].path, sizeof(row_icons[i].path), "%s", path);
+	row_icons[i].h = h;
+	row_icons[i].image = (SDL_Surface*)PluginDraw_imageLoadFit(ROW_ICON_OWNER, path, h * 3, h);
+	return row_icons[i].image;
+}
+
 void GameList_render(void) {
 	// what's behind the list, from the background slot's owner
 	Background_render();
@@ -651,9 +679,18 @@ void GameList_render(void) {
 			if (entry_unique) // Only render if a unique name exists
 				trimSortingMeta(&entry_unique);
 
+			// a plugin's icon at the row's start moves its name over
+			SDL_Surface* icon = name_shown ? rowIcon(entry) : NULL;
+			int inset = icon ? ListRow_iconInset(icon->w, SCALE1(BUTTON_PADDING), available_width) : 0;
+			MosaicRow rects;
+			MosaicRect icon_rect;
+
 			char display_name[256];
-			int text_width = GFX_getTextWidth(font.large, entry_unique ? entry_unique : entry_name, display_name, available_width, SCALE1(BUTTON_PADDING * 2));
-			int max_width = MIN(available_width, text_width);
+			int text_width = GFX_getTextWidth(font.large, entry_unique ? entry_unique : entry_name, display_name, available_width - inset, SCALE1(BUTTON_PADDING * 2));
+			int max_width = MIN(available_width - inset, text_width);
+			ListRow_rects(j, SCALE1(BUTTON_MARGIN), SCALE1(PADDING), SCALE1(PILL_SIZE), available_width, max_width,
+				name_shown, &rects);
+			ListRow_shift(&rects, inset, icon ? icon->w : 0, icon ? icon->h : 0, SCALE1(BUTTON_PADDING), &icon_rect);
 
 			// This spaghetti is preventing white text on white pill when volume/color temp is shown,
 			// dont ask me why. This all needs to get tossed out and redone properly later.
@@ -672,8 +709,7 @@ void GameList_render(void) {
 			const int text_offset_y = (SCALE1(PILL_SIZE) - text->h + 1) >> 1;
 			if (row_is_selected) {
 				// the row the pill rests on, as decorators get it
-				ListSelection_row(&shown, j, SCALE1(BUTTON_MARGIN), SCALE1(PADDING), SCALE1(PILL_SIZE), available_width,
-					max_width, name_shown);
+				ListSelection_fromRow(&shown, &rects);
 				is_scrolling = name_shown && GFX_textShouldScroll(font.large,display_name, max_width - SCALE1(BUTTON_PADDING*2), fontMutex);
 				GFX_resetScrollText();
 				bool should_animate = state.previous_depth == state.stack->count;
@@ -688,9 +724,10 @@ void GameList_render(void) {
 				SDL_UnlockMutex(animMutex);
 				updatePillTextSurface(entry_name, max_width, uintToColour(THEME_COLOR5_255));
 				AnimTask* task = malloc(sizeof(AnimTask));
-				task->startX = SCALE1(BUTTON_MARGIN);
+				task->startX = SCALE1(BUTTON_MARGIN) + pillInset;
 				task->startY = SCALE1(previousY+PADDING);
-				task->targetX = SCALE1(BUTTON_MARGIN);
+				task->targetX = SCALE1(BUTTON_MARGIN) + inset;
+				pillInset = inset;
 				task->targetY = SCALE1(targetY+PADDING);
 				task->targetTextY = SCALE1(PADDING + targetY) + text_offset_y;
 				pilltargetTextY = task->targetTextY;
@@ -701,8 +738,9 @@ void GameList_render(void) {
 				animPill(task);
 			}
 			SDL_Rect text_rect = { 0, 0, max_width - SCALE1(BUTTON_PADDING*2), text->h };
-			SDL_Rect dest_rect = { SCALE1(BUTTON_MARGIN + BUTTON_PADDING), SCALE1(PADDING + (j * PILL_SIZE)) + text_offset_y };
+			SDL_Rect dest_rect = { SCALE1(BUTTON_MARGIN + BUTTON_PADDING) + inset, SCALE1(PADDING + (j * PILL_SIZE)) + text_offset_y };
 
+			if (inset) SDL_BlitSurface(icon, NULL, screen, &(SDL_Rect){ icon_rect.x, icon_rect.y, icon_rect.w, icon_rect.h });
 			if(name_shown) {
 				SDL_BlitSurface(text_unique, &text_rect, screen, &dest_rect);
 				SDL_BlitSurface(text, &text_rect, screen, &dest_rect);
@@ -712,9 +750,7 @@ void GameList_render(void) {
 
 			// plugins' badges and captions, over the row
 			if (Plugins_hasDecorators()) {
-				MosaicRow row;
-				ListRow_rects(j, SCALE1(BUTTON_MARGIN), SCALE1(PADDING), SCALE1(PILL_SIZE), available_width, max_width,
-					name_shown, &row);
+				MosaicRow row = rects;
 				row.index = i;
 				row.selected = row_is_selected;
 				row.name_hidden = nameHidden(i);

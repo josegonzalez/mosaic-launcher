@@ -108,6 +108,9 @@ extern int currentAnimQueueSize;
 extern SDL_Rect pillRect;
 extern int pilltargetY;
 extern int pilltargetTextY;
+// how far right a plugin's row icon (row_icon) moved the selected row's
+// pill and name, or 0
+extern int pillInset;
 extern bool frameReady;
 extern bool pillanimdone;
 

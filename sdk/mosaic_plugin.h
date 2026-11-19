@@ -2474,6 +2474,18 @@ typedef struct MosaicPlugin {
 	// MOSAIC_GATE_RUN, actions run as before. Check for it with
 	// MOSAIC_HOST_HAS(host, action_flags).
 	int (*action_gate)(const char* action_id, int flags);
+
+	// A small icon at the start of a row of the built-in list, such as a
+	// collection's. Writes the path of a PNG or JPEG and returns 1, or
+	// returns 0 for none; the first plugin in load order to answer wins.
+	// The list draws it as tall as the row's text at most, keeping its
+	// shape, a little in from the row's left, and moves that row's name,
+	// and its pill when it's selected, right past it; decorate_row's
+	// row->name follows the name. Rows with no icon, and rows whose name
+	// doesn't show, are drawn as before. It's asked each time a row is
+	// drawn, so answer from what's at hand. Plugin layouts draw their own
+	// rows and aren't asked.
+	int (*row_icon)(const MosaicEntry* entry, const char* dir_path, char* out, size_t size);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

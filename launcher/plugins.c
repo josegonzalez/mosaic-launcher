@@ -3591,6 +3591,16 @@ int Plugins_artPath(const Entry* entry, int kind, char* out, size_t size) {
 	return 0;
 }
 
+int Plugins_rowIcon(const Entry* entry, const char* dir_path, char* out, size_t size) {
+	if (!entry || !out || size == 0) return 0;
+	EACH_PLUGIN_WITH(row_icon) {
+		out[0] = '\0';
+		if (p->row_icon((const MosaicEntry*)entry, dir_path, out, size) && out[0]) return 1;
+	}
+	out[0] = '\0';
+	return 0;
+}
+
 int Plugins_artAlias(const Entry* entry, char* out, size_t size) {
 	if (!entry || !out || size == 0) return 0;
 	EACH_PLUGIN_WITH(art_alias) {

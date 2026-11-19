@@ -243,6 +243,7 @@ ArtLoad* takeLoadedArt(void) {
 SDL_Rect pillRect;
 int pilltargetY =0;
 int pilltargetTextY =0;
+int pillInset = 0;
 static void animcallback(finishedTask *task) {
 	SDL_LockMutex(animMutex);
 	pillRect = task->dst;

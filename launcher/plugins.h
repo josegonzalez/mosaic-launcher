@@ -168,6 +168,10 @@ void Plugins_backgroundSkip(void);
 // number serial.
 int Plugins_backgroundShow(int on_gamelist, unsigned serial);
 
+// The first plugin's row_icon for an entry in dir_path: writes its image's
+// path and returns 1, or returns 0 with none.
+int Plugins_rowIcon(const Entry* entry, const char* dir_path, char* out, size_t size);
+
 // 1 while any plugin decorates rows.
 int Plugins_hasDecorators(void);
 

@@ -14,7 +14,7 @@ setting.hide_folder=toggle|Hide Collections folder|off
 setting.file_order=toggle|Keep file order|on
 # name a collection's games from Collections/.media/<name>.map.txt, or its folder's map.txt, first
 setting.own_map=toggle|Collection map.txt|on
-# a collection's art from Collections/.media/<name>.png or .jpg, as its thumbnail and box, and its icon from Collections/.icons/<name>.png as its thumbnail first
+# a collection's art from Collections/.media/<name>.png or .jpg, as its thumbnail and box
 setting.art=toggle|Collection art|on
 # hide the quick menu's Games tile
 setting.hide_games=toggle|Hide Games tile|off

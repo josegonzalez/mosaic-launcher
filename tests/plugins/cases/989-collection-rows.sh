@@ -5,7 +5,9 @@
 # by display name and folder name, the unnamed Zeta stays after the
 # consoles and activity-stats' Most Played folder (named in the order, but
 # not a system or collection) keeps its place. Picks' icon in
-# Collections/.icons is its thumbnail, and Zeta has none. With the plugin's
+# Collections/.icons goes at the start of its row, moving its name right,
+# while the systems and Zeta, with none, keep theirs, and the icon isn't
+# Picks' thumbnail. With the plugin's
 # settings empty, or an order naming only collections, the root is the
 # same as with the plugin off.
 CR_DIR="$CARD/Collections"
@@ -53,8 +55,15 @@ case ",$got," in *",Rows One,Picks,Rows Two,"*) ;; *) fail "Picks isn't between 
 case ",$got," in *",Most Played,Zeta,"*) ;; *) fail "Most Played and Zeta moved: $got" ;; esac
 case ",$got," in *",Rows Two,"*"Most Played,"*) ;; *) fail "Most Played isn't after the consoles: $got" ;; esac
 plugin=collector
-expect "art Picks thumbnail 1 box 0 Picks.png"
+expect "art Picks thumbnail 0 box 0"
 expect "art Zeta thumbnail 0 box 0"
+stock_at=$(grep -m 1 -oE "plugin collector: row Rows One name at [0-9]+" "$log" | sed 's/.* //')
+picks_at=$(grep -m 1 -oE "plugin collector: row Picks name at [0-9]+" "$log" | sed 's/.* //')
+zeta_at=$(grep -m 1 -oE "plugin collector: row Zeta name at [0-9]+" "$log" | sed 's/.* //')
+[ -n "$stock_at" ] && [ -n "$picks_at" ] || fail "collector didn't log the rows' names: $(grep "plugin collector: row " "$log")"
+# Zeta is drawn only when the screen has room for its row
+[ -z "$zeta_at" ] || [ "$zeta_at" = "$stock_at" ] || fail "Zeta's name moved without an icon: $zeta_at, not $stock_at"
+[ "$picks_at" -gt "$stock_at" ] || fail "Picks' name didn't move for its icon: $picks_at, not past $stock_at"
 
 rm -rf "$WORK/plugins/collections-plus.plugin" "$WORK/plugins/activity-stats.plugin" "$WORK/plugins/collector.plugin" \
 	"$CR_DIR" "$CR_ONE" "$CR_TWO" "$STATE/collections-plus.cfg" "$STATE/activity-stats.cfg" "$STATE/collector.cfg" \

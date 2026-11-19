@@ -17,9 +17,9 @@
 // below Collections, that folder's map.txt, before stock's shared one; a
 // name starting with a dot hides the game, as in any map.txt. The "art"
 // setting gives a collection's thumbnail and box from
-// <dir>/.media/<name>.png or .jpg, so layouts that want a box show it too,
-// and its thumbnail from its icon, <dir>/.icons/<name>.png or
-// Collections/.icons/<name>.png, first.
+// <dir>/.media/<name>.png or .jpg, so layouts that want a box show it too.
+// A collection's icon, <dir>/.icons/<name>.png or
+// Collections/.icons/<name>.png, goes at the start of its row.
 // The "hide_games" setting hides the quick menu's Games tile.
 
 #include <dirent.h>
@@ -319,14 +319,22 @@ static int artPath(const MosaicEntry* entry, int kind, char* out, size_t size) {
 	const char* path = host->entry_path(entry);
 	if (!CP_isCollection(collections_dir, path)) return 0;
 	char paths[2][CP_PATH_LEN];
-	int n = kind == MOSAIC_ART_THUMBNAIL ? CP_iconPaths(collections_dir, path, paths, 2) : 0;
+	int n = CP_artPaths(path, paths, 2);
 	for (int i = 0; i < n; i++) {
 		if (isFile(paths[i])) {
 			snprintf(out, size, "%s", paths[i]);
 			return 1;
 		}
 	}
-	n = CP_artPaths(path, paths, 2);
+	return 0;
+}
+
+// A collection's icon at the start of its row, wherever it's listed.
+static int rowIcon(const MosaicEntry* entry, const char* dir_path, char* out, size_t size) {
+	(void)dir_path;
+	if (host->entry_type(entry) != MOSAIC_ENTRY_DIR) return 0;
+	char paths[2][CP_PATH_LEN];
+	int n = CP_iconPaths(collections_dir, host->entry_path(entry), paths, 2);
 	for (int i = 0; i < n; i++) {
 		if (isFile(paths[i])) {
 			snprintf(out, size, "%s", paths[i]);
@@ -383,6 +391,7 @@ static const MosaicPlugin plugin = {
 	.art_path = artPath,
 	.sort_compare = sortCompare,
 	.list_ready = listReady,
+	.row_icon = rowIcon,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

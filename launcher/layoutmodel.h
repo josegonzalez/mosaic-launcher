@@ -109,6 +109,18 @@ int LayoutRect_clip(const MosaicRect* a, const MosaicRect* b, MosaicRect* out);
 void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int name_w, int show_names,
 	MosaicRow* out);
 
+// How far a row's name moves for a plugin's row icon icon_w wide: the icon
+// goes gap in from the row's left, and the name gap past it. 0 for no icon
+// (icon_w under 1), or when that leaves no room in a row width wide.
+int ListRow_iconInset(int icon_w, int gap, int width);
+
+// Moves the name of a row from ListRow_rects right by inset (from
+// ListRow_iconInset), keeping its width as far as the row's end, and
+// writes where the icon, icon_w by icon_h, goes: gap in from the row's
+// left, centred in its height. With an inset of 0 the row is left as it
+// is and icon is empty.
+void ListRow_shift(MosaicRow* row, int inset, int icon_w, int icon_h, int gap, MosaicRect* icon);
+
 // Whether the built-in list draws a row's name: names show in the folder
 // (show_names), and either no plugin hid it (hidden) or there's no art to
 // stand in for it, which is while Show game art is off (show_art), or on
@@ -130,6 +142,9 @@ void ListSelection_clear(ListSelection* sel);
 // under, and empty when names don't show, as stock draws none then.
 void ListSelection_row(ListSelection* sel, int row, int margin, int padding, int pill_h, int width, int name_w,
 	int show_names);
+
+// The same from a row's rects, such as one ListRow_shift moved the name of.
+void ListSelection_fromRow(ListSelection* sel, const MosaicRow* row);
 
 // A cell a plugin layout passed to decorate_cell for index: when it's the
 // selected entry, the part of rect in area becomes the row, replacing an

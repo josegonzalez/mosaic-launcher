@@ -303,7 +303,7 @@ static void makeCard(void) {
 	mkdir(COLL "/Sub/.icons", 0755);
 	writeText(COLL "/.icons/A.png", "");
 	writeText(COLL "/.icons/S.png", "");
-	remove(COLL "/Sub/.icons/S.png"); // testArt adds it
+	remove(COLL "/Sub/.icons/S.png"); // testRowIcon adds it
 }
 
 static void testRoot(void) {
@@ -473,20 +473,10 @@ static void testArt(void) {
 	MosaicEntry* b = fakeEntryNew(COLL "/B.txt", MOSAIC_ENTRY_DIR, NULL);
 	MosaicEntry* c = fakeEntryNew(COLL "/C (x).txt", MOSAIC_ENTRY_DIR, NULL);
 	MosaicEntry* rom = fakeEntryNew(CARD "/Roms/GB/A.txt", MOSAIC_ENTRY_ROM, NULL);
-	MosaicEntry* sub = fakeEntryNew(COLL "/Sub/S.txt", MOSAIC_ENTRY_DIR, NULL);
-	// the icon is the thumbnail, over the art; the box stays the art
 	CHECK(p->art_path(a, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
-	CHECK_STR(out, COLL "/.icons/A.png");
+	CHECK_STR(out, COLL "/.media/A.png");
 	CHECK(p->art_path(a, MOSAIC_ART_BOX, out, sizeof(out)) == 1);
 	CHECK_STR(out, COLL "/.media/A.png");
-	CHECK(p->art_path(b, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
-	CHECK_STR(out, COLL "/.media/B.jpg");
-	CHECK(p->art_path(sub, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
-	CHECK_STR(out, COLL "/.icons/S.png");
-	writeText(COLL "/Sub/.icons/S.png", "");
-	CHECK(p->art_path(sub, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 1);
-	CHECK_STR(out, COLL "/Sub/.icons/S.png");
-	free(sub);
 	CHECK(p->art_path(b, MOSAIC_ART_BOX, out, sizeof(out)) == 1);
 	CHECK_STR(out, COLL "/.media/B.jpg");
 	CHECK(p->art_path(a, MOSAIC_ART_LOGO, out, sizeof(out)) == 0);
@@ -495,11 +485,35 @@ static void testArt(void) {
 	set("art", "off");
 	p = start();
 	CHECK(p->art_path(a, MOSAIC_ART_BOX, out, sizeof(out)) == 0);
-	CHECK(p->art_path(a, MOSAIC_ART_THUMBNAIL, out, sizeof(out)) == 0);
 	free(a);
 	free(b);
 	free(c);
 	free(rom);
+}
+
+static void testRowIcon(void) {
+	resetSettings();
+	const MosaicPlugin* p = start();
+	char out[512];
+	MosaicEntry* a = fakeEntryNew(COLL "/A.txt", MOSAIC_ENTRY_DIR, NULL);
+	MosaicEntry* b = fakeEntryNew(COLL "/B.txt", MOSAIC_ENTRY_DIR, NULL);
+	MosaicEntry* sub = fakeEntryNew(COLL "/Sub/S.txt", MOSAIC_ENTRY_DIR, NULL);
+	MosaicEntry* system = fakeEntryNew(CARD "/Roms/GB", MOSAIC_ENTRY_DIR, NULL);
+	CHECK(p->row_icon(a, CARD, out, sizeof(out)) == 1);
+	CHECK_STR(out, COLL "/.icons/A.png");
+	CHECK(p->row_icon(a, COLL, out, sizeof(out)) == 1);
+	CHECK(p->row_icon(b, CARD, out, sizeof(out)) == 0); // no icon, no change
+	CHECK(p->row_icon(system, CARD, out, sizeof(out)) == 0);
+	// a collection in a folder: the folder's own icon, else the shared one
+	CHECK(p->row_icon(sub, COLL "/Sub", out, sizeof(out)) == 1);
+	CHECK_STR(out, COLL "/.icons/S.png");
+	writeText(COLL "/Sub/.icons/S.png", "");
+	CHECK(p->row_icon(sub, COLL "/Sub", out, sizeof(out)) == 1);
+	CHECK_STR(out, COLL "/Sub/.icons/S.png");
+	free(a);
+	free(b);
+	free(sub);
+	free(system);
 }
 
 static void testGamesTile(void) {
@@ -520,6 +534,7 @@ int main(void) {
 	testCollection();
 	testFolder();
 	testArt();
+	testRowIcon();
 	testGamesTile();
 	CHECK_DONE();
 }

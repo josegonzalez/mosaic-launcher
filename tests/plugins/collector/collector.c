@@ -3,7 +3,9 @@
 // <sd>/Collections, then the collection its "collection" setting names
 // (card-relative), logging each list's names in order, and what art_find
 // answers for the thumbnail (and its file name) and box of the root's
-// collections.
+// collections. It also logs, once for each name, how far a row's name
+// starts from the row's left as decorate_row gets it, which a row icon
+// moves.
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -62,6 +64,22 @@ static void logArt(void) {
 	}
 }
 
+// names whose row was logged
+static char rows[32][128];
+static int row_count = 0;
+
+static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row) {
+	(void)screen;
+	const char* name = host->entry_name(entry);
+	if (row->name.w <= 0) return 0;
+	for (int i = 0; i < row_count; i++) {
+		if (!strcmp(rows[i], name)) return 0;
+	}
+	if (row_count < 32) snprintf(rows[row_count++], sizeof(rows[0]), "%s", name);
+	say("row %s name at %i", name, row->name.x - row->rect.x);
+	return 0;
+}
+
 static void tick(unsigned long now) {
 	(void)now;
 	if (!host->current_list()) return;
@@ -88,6 +106,7 @@ static MosaicPlugin plugin = {
 	.id = ID,
 	.init = init,
 	.tick = tick,
+	.decorate_row = decorateRow,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

@@ -88,6 +88,24 @@ void ListRow_rects(int row, int margin, int padding, int pill_h, int width, int 
 	out->name = (MosaicRect){ margin, out->rect.y, name_w, pill_h };
 }
 
+int ListRow_iconInset(int icon_w, int gap, int width) {
+	if (icon_w < 1) return 0;
+	if (gap < 0) gap = 0;
+	int inset = icon_w + gap * 2;
+	return inset < width ? inset : 0;
+}
+
+void ListRow_shift(MosaicRow* row, int inset, int icon_w, int icon_h, int gap, MosaicRect* icon) {
+	*icon = (MosaicRect){ 0, 0, 0, 0 };
+	if (inset <= 0) return;
+	if (gap < 0) gap = 0;
+	*icon = (MosaicRect){ row->rect.x + gap, row->rect.y + (row->rect.h - icon_h) / 2, icon_w, icon_h };
+	int end = row->rect.x + row->rect.w;
+	row->name.x = row->rect.x + inset;
+	if (row->name.x + row->name.w > end) row->name.w = end - row->name.x;
+	if (row->name.w < 0) row->name.w = 0;
+}
+
 int ListRow_nameShown(int show_names, int hidden, int show_art, int selected, int has_art) {
 	if (!show_names) return 0;
 	if (!hidden || !show_art) return 1;
@@ -103,10 +121,14 @@ void ListSelection_row(ListSelection* sel, int row, int margin, int padding, int
 		int show_names) {
 	MosaicRow rects;
 	ListRow_rects(row, margin, padding, pill_h, width, name_w, show_names, &rects);
+	ListSelection_fromRow(sel, &rects);
+}
+
+void ListSelection_fromRow(ListSelection* sel, const MosaicRow* row) {
 	ListSelection_clear(sel);
-	if (rects.rect.w <= 0 || rects.rect.h <= 0) return;
-	sel->row = rects.rect;
-	if (rects.name.w > 0) sel->pill = rects.name;
+	if (row->rect.w <= 0 || row->rect.h <= 0) return;
+	sel->row = row->rect;
+	if (row->name.w > 0) sel->pill = row->name;
 }
 
 void ListSelection_cell(ListSelection* sel, int index, int selected, const MosaicRect* rect, const MosaicRect* area) {
