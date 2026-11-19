@@ -82,6 +82,17 @@ int Draw_clampRadius(int radius, int w, int h);
 // for a radius from Draw_clampRadius.
 int Draw_roundInset(int radius, int h, int row);
 
+// How much of pixel x, y of a w by h rect a ring covers, from 0 to 255:
+// an outline thickness wide just inside the rect, its corners rounded by
+// radius outside and radius - thickness inside, sampled 4 by 4 in each
+// pixel so its edges are smooth. radius is from Draw_clampRadius, and
+// thickness at least 1. 0 outside the rect.
+int Draw_ringCover(int w, int h, int radius, int thickness, int x, int y);
+
+// 1 when no part of pixel x, y of that rect is on the ring, inside it
+// clear of its corners, so it can be skipped without sampling.
+int Draw_ringClear(int w, int h, int radius, int thickness, int x, int y);
+
 // The part of a sw by sh source (src) to draw where in a dw by dh one
 // (dst) for an enum MosaicFit. Returns 0, or -1 for a bad argument.
 int Draw_fit(int sw, int sh, int dw, int dh, int fit, MosaicRect* src, MosaicRect* dst);

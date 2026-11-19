@@ -9,7 +9,12 @@
 // theme's background colour, and the rest of the area below it filled with
 // that colour. The cards sit in a row along the bottom, each with its name
 // below it, and the selected one is raised. The logo, or else the name,
-// sits over the hero at the bottom left, above the cards.
+// sits over the hero at the bottom left, above the cards, and the count of
+// entries at the rail's top right.
+//
+// With the blur on, the hero instead covers the whole area, sharp at the
+// top, and the band along the bottom, from just above the count down,
+// shows a blurred, darkened copy of it, the sharp art fading into it.
 
 #ifndef HERO_MODEL_H
 #define HERO_MODEL_H
@@ -40,6 +45,12 @@ int HR_tint(const char* value);
 #define HR_FADE_DEFAULT 300
 int HR_fadeMs(const char* value);
 
+// The blur and animation settings: 1 unless value is off.
+int HR_on(const char* value);
+
+// How dark the blurred band is: the alpha of the black over it.
+#define HR_DARKEN 96
+
 typedef struct HRLayout {
 	MosaicRect hero;  // the hero art, from the area's top to the middle of the cards
 	int fade_y;       // where in the hero, from its top, it starts fading into the background colour
@@ -54,18 +65,26 @@ typedef struct HRLayout {
 	int raise;  // how far the selected card is raised
 	int frame;  // the selected card's highlight around it
 	int name_h; // the name strip under each card, 0 for none
+	int bounce; // how far past raise the selected card goes as it lifts
+	MosaicRect count; // the count's line above the rail, right-aligned in it (h 0 for none)
+	MosaicRect band;  // the blurred band, from above the count to the area's bottom
+	int blend_y;      // where in the area, from its top, the sharp art starts fading into the band
+	int blur;         // the band's blur radius, in pixels
 } HRLayout;
 
 // Lays the rail and hero out in area, leaving status and header (either
 // can be NULL or empty) clear. percent is the cards' height (see
-// HR_cardPercent), and name_h the name strip under each card, 0 when names
-// don't show. Returns 0, or -1 when the area is too small for a card.
+// HR_cardPercent), name_h the name strip under each card, 0 when names
+// don't show, and count_h the count's line, 0 for none. Returns 0, or -1
+// when the area is too small for a card.
 int HR_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int scale, int percent,
-	int name_h, HRLayout* out);
+	int name_h, int count_h, HRLayout* out);
 
 // The card at slot, counted from the left of the rail, raised when it's
-// the selected one; and the name strip under a card (h 0 for none).
+// the selected one, or lifted by lift pixels; and the name strip under a
+// card (h 0 for none).
 MosaicRect HR_card(const HRLayout* layout, int slot, int raised);
+MosaicRect HR_cardLifted(const HRLayout* layout, int slot, int lift);
 MosaicRect HR_nameStrip(const HRLayout* layout, const MosaicRect* card);
 
 // The first entry in view, given the one in view before, so the rail moves
@@ -86,6 +105,19 @@ int HR_move(int selected, int count, int cards, int dir, int fresh);
 // The logo's alpha, 0 to 255, elapsed milliseconds into a fade of duration,
 // easing out. A duration of 0 or less is 255 at once.
 int HR_fade(long elapsed, int duration);
+
+// How far the selected card is lifted, elapsed milliseconds after the
+// selection moved to it, in a lift of duration: rising to raise + bounce
+// over the first half, easing out, then settling back to raise, once.
+// raise at once for a duration of 0 or less, and after it.
+#define HR_LIFT_MS 240
+int HR_lift(long elapsed, int duration, int raise, int bounce);
+
+// The count of entries, "N of M", for the entry at selected of count, by
+// format, which takes the two numbers in that order, such as "%i of %i"
+// (a translation of it). Writes "" and returns -1 for an empty list, else
+// returns 0.
+int HR_count(int selected, int count, const char* format, char* out, size_t size);
 
 // The parts of r outside hole: above it, either side of it and below it,
 // written to out and counted, or r itself when they don't meet.

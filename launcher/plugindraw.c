@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include "launcher.h"
+#include "blurmodel.h"
 #include "drawmodel.h"
 #include "plugindraw.h"
 #include "shrinkmodel.h"
@@ -400,6 +401,93 @@ int PluginDraw_blitAlpha(MosaicSurface* target, const MosaicSurface* src, const 
 	SDL_SetSurfaceAlphaMod(s, mod);
 	SDL_SetSurfaceBlendMode(s, mode);
 	return result;
+}
+
+// A ring of thickness just inside rect, drawn into a layer the size of
+// the part of it inside the clip, which is blended on.
+int PluginDraw_drawRing(MosaicSurface* target, const MosaicRect* rect, int radius, int thickness, MosaicColor color) {
+	SDL_Surface* dst = drawable(target);
+	if (!dst || thickness < 1) return -1;
+	MosaicRect r = rect ? *rect : whole(dst);
+	if (!rectOk(&r)) return -1;
+	radius = Draw_clampRadius(radius, r.w, r.h);
+	if (radius < 0) return -1;
+	int most = (lesser(r.w, r.h) + 1) / 2;
+	if (thickness > most) thickness = most;
+
+	SDL_Rect area = { r.x, r.y, r.w, r.h }, clip, box;
+	SDL_GetClipRect(dst, &clip);
+	if (color.a == 0 || r.w == 0 || r.h == 0 || !SDL_IntersectRect(&area, &clip, &box)) return 0;
+	SDL_Surface* layer = SDL_CreateRGBSurfaceWithFormat(0, box.w, box.h, 32, SDL_PIXELFORMAT_ARGB8888);
+	if (!layer) return -1;
+	Uint32 rgb = (Uint32)color.r << 16 | (Uint32)color.g << 8 | color.b;
+	for (int y = 0; y < box.h; y++) {
+		Uint32* row = (Uint32*)((Uint8*)layer->pixels + (size_t)y * layer->pitch);
+		int ry = box.y + y - r.y;
+		for (int x = 0; x < box.w; x++) {
+			int rx = box.x + x - r.x;
+			if (Draw_ringClear(r.w, r.h, radius, thickness, rx, ry)) continue;
+			int cover = Draw_ringCover(r.w, r.h, radius, thickness, rx, ry);
+			if (cover > 0) row[x] = (Uint32)((color.a * cover + 127) / 255) << 24 | rgb;
+		}
+	}
+	SDL_SetSurfaceBlendMode(layer, SDL_BLENDMODE_BLEND);
+	int result = SDL_BlitSurface(layer, NULL, dst, &box);
+	SDL_FreeSurface(layer);
+	return result == 0 ? 0 : -1;
+}
+
+// Shrinks from of s into the small copy a row at a time, each converted
+// to ARGB8888 as it's fed in, then blurs it and enlarges it into a new
+// surface of owner's.
+MosaicSurface* PluginDraw_surfaceBlur(const char* owner, const MosaicSurface* src, const MosaicRect* src_rect, int w, int h, int radius) {
+	SDL_Surface* s = known(src);
+	if (!s || w < 1 || h < 1 || w > DRAW_MAX_SIDE || h > DRAW_MAX_SIDE) return NULL;
+	MosaicRect from = src_rect ? *src_rect : whole(s);
+	if (!rectOk(&from) || from.x < 0 || from.y < 0 || from.w < 1 || from.h < 1 || from.x + from.w > s->w ||
+		from.y + from.h > s->h) {
+		return NULL;
+	}
+	int sw = 0, sh = 0, r = 0;
+	if (Blur_plan(from.w, from.h, w, h, radius, &sw, &sh, &r) != 0) return NULL;
+	SDL_Surface* converted = NULL;
+	SDL_Surface* in = s;
+	if (SDL_ISPIXELFORMAT_INDEXED(s->format->format)) {
+		converted = SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_ARGB8888, 0);
+		if (!converted) return NULL;
+		in = converted;
+	}
+	Uint32* small = malloc(sizeof(Uint32) * sw * sh);
+	uint64_t* sums = malloc(sizeof(uint64_t) * 4 * sw);
+	Uint32* line = malloc(sizeof(Uint32) * (from.w > sw && from.w > sh ? from.w : greater(sw, sh)));
+	SDL_Surface* out = NULL;
+	int rc = small && sums && line ? 0 : -1;
+	if (rc == 0 && SDL_MUSTLOCK(in)) rc = SDL_LockSurface(in);
+	if (rc == 0) {
+		BlurShrink shrink;
+		Blur_shrinkStart(&shrink, from.w, from.h, sw, sh, sums, small);
+		int bpp = in->format->BytesPerPixel;
+		for (int y = 0; rc == 0 && y < from.h; y++) {
+			const Uint8* p = (const Uint8*)in->pixels + (size_t)(from.y + y) * in->pitch + (size_t)from.x * bpp;
+			if (SDL_ConvertPixels(from.w, 1, in->format->format, p, in->pitch, SDL_PIXELFORMAT_ARGB8888, line, from.w * 4) != 0) rc = -1;
+			else rc = Blur_shrinkRow(&shrink, line);
+		}
+		if (SDL_MUSTLOCK(in)) SDL_UnlockSurface(in);
+	}
+	if (rc == 0) {
+		for (int i = 0; i < BLUR_PASSES; i++) Blur_box(small, sw, sh, r, line);
+		out = make(owner, w, h);
+	}
+	if (out) {
+		if (SDL_MUSTLOCK(out)) SDL_LockSurface(out);
+		Blur_grow(small, sw, sh, out->pixels, out->pitch / 4, w, h);
+		if (SDL_MUSTLOCK(out)) SDL_UnlockSurface(out);
+	}
+	free(line);
+	free(sums);
+	free(small);
+	if (converted) SDL_FreeSurface(converted);
+	return (MosaicSurface*)out;
 }
 
 ///////////////////////////////////////

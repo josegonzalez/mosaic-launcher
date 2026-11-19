@@ -27,8 +27,19 @@
 // theme's accent colour with the name's first letter, or the whole name
 // when no name strip shows. Names show under the cards when the launcher
 // shows names, except hidden ones on cards with art. The selected card is
-// raised and framed in the theme's main colour. Art only shows while Show
-// game art is on.
+// lifted with a ring in the theme's accent colour (on a launcher without
+// draw_ring, framed in the theme's main colour instead), rising a little
+// past its lift and settling back, once, as the selection moves to it,
+// unless the animation setting is off. The count of entries, "N of M",
+// sits at the rail's top right. Art only shows while Show game art is on.
+//
+// With the blur setting on (on a launcher with surface_blur), the hero
+// covers the whole area instead, sharp at the top, and the band along the
+// bottom behind the count and cards is a blurred copy of it, darkened by
+// HR_DARKEN, the sharp art fading into it. Both are baked into the hero's
+// copy, so the blur runs once each time the selection moves to an entry
+// whose copy isn't kept, never each frame. A plugin's art_replace surface
+// is drawn as without the blur, since each of its frames is new.
 //
 // The d-pad moves the selection with select_index (see HR_move): left and
 // right one card, up back a rail's worth and down on one. Everything else
@@ -71,6 +82,14 @@ static char cards_value[16]; // the cards setting as set, theme for the theme's
 static int themed = 0; // 0 until the theme's key is read, and again when the theme changes
 static int tint = 0; // alpha of the accent over the hero
 static int fade_ms = HR_FADE_DEFAULT;
+static int blurring = 0; // the blur setting, on a launcher with surface_blur
+static int animate = 1;  // the animation setting
+
+// the selected card's lift: the entry it's for, and when it moved there
+static char lifted_path[MAX_PATH_LEN];
+static unsigned long lifted_at = 0;
+static int lifting = 0;
+static int hero_band = -1; // where the band the heroes' copies have baked in starts
 static int first = 0; // the first card in view
 static char window_path[MAX_PATH_LEN]; // the folder first is for
 static int window_depth = -1;
@@ -189,6 +208,10 @@ static int heroKind(const MosaicEntry* entry, const char* path) {
 ///////////////////////////////////////
 // drawing
 
+static const char* tr(const char* text) {
+	return MOSAIC_HOST_HAS(host, tr) ? host->tr(ID, NULL, text) : text;
+}
+
 static MosaicColor themeColor(int index, unsigned int fallback, unsigned char alpha) {
 	int rgb = host->theme_color(index);
 	return mosaic_color(rgb < 0 ? fallback : (unsigned int)rgb, alpha);
@@ -223,7 +246,8 @@ static int layoutFor(const MosaicListView* view, HRLayout* layout) {
 	if (!themed) resolveSettings();
 	int scale = host->screen_scale();
 	MosaicRect header = MOSAIC_VIEW_HAS(view, header) ? view->header : (MosaicRect){ 0, 0, 0, 0 };
-	return HR_layout(&view->area, &view->status, &header, scale, percent, nameHeight(view, scale), layout);
+	return HR_layout(&view->area, &view->status, &header, scale, percent, nameHeight(view, scale),
+		host->text_height(MOSAIC_FONT_SMALL), layout);
 }
 
 static int nameHidden(const MosaicListView* view, int index) {
@@ -235,8 +259,7 @@ static int nameHidden(const MosaicListView* view, int index) {
 // Draws src as the hero, around the status pill and header: a copy the
 // hero's size, or with raw the crop of an image that's cover-fitted to it.
 static void blitAround(MosaicSurface* screen, const MosaicSurface* src, const MosaicRect* crop, int raw,
-		const HRLayout* layout) {
-	const MosaicRect* hero = &layout->hero;
+		const MosaicRect* hero, const HRLayout* layout) {
 	MosaicRect parts[4];
 	int n = HR_avoid(hero, &layout->hole, parts);
 	for (int i = 0; i < n; i++) {
@@ -254,9 +277,46 @@ static void blitAround(MosaicSurface* screen, const MosaicSurface* src, const Mo
 	}
 }
 
+// Blurs the band along the bottom of s, a hero copy w by h from the area's
+// top: a blurred, darkened copy of what's there from blend_y down, faded
+// in over the rows to the band and whole below. Without a blur (the
+// plugin's surfaces are full), only darkened.
+static void blurBand(MosaicSurface* s, int w, int h, const HRLayout* layout, int top) {
+	int blend = layout->blend_y;
+	int band = layout->band.y - top;
+	if (band > h) band = h;
+	if (blend > band) blend = band;
+	if (blend >= h) return;
+	MosaicColor dark = { 0, 0, 0, HR_DARKEN };
+	MosaicRect from = { 0, blend, w, h - blend };
+	MosaicSurface* b = host->surface_blur(ID, s, &from, w, h - blend, layout->blur);
+	if (!b) {
+		MosaicRect rest = { 0, band, w, h - band };
+		host->fill_rect(s, &rest, dark);
+		return;
+	}
+	host->fill_rect(b, NULL, dark);
+	int fade = band - blend;
+	int bands = MOSAIC_HOST_HAS(host, blit_alpha) ? HR_bands(0, fade) : 0;
+	for (int i = 0; i < bands; i++) {
+		int y = 0, band_h = 0, alpha = 0;
+		if (HR_band(0, fade, i, &y, &band_h, &alpha) != 0 || band_h <= 0) continue;
+		MosaicRect src = { 0, y, w, band_h };
+		MosaicRect dst = { 0, blend + y, w, band_h };
+		host->blit_alpha(s, b, &src, &dst, alpha);
+	}
+	if (!bands) fade = 0;
+	MosaicRect src = { 0, fade, w, h - blend - fade };
+	MosaicRect dst = { 0, blend + fade, w, h - blend - fade };
+	host->blit(s, b, &src, &dst);
+	host->surface_free(ID, b);
+}
+
 // The hero copy of image: cover-fitted to w by h on the background colour,
-// tinted and fading into the background colour from fade_y down.
-static MosaicSurface* makeHero(const MosaicSurface* image, int w, int h, int fade_y) {
+// tinted and fading into the background colour from fade_y down, or with
+// the blur its band blurred.
+static MosaicSurface* makeHero(const MosaicSurface* image, int w, int h, const HRLayout* layout, int top) {
+	int fade_y = layout->fade_y;
 	int iw = 0, ih = 0;
 	MosaicRect crop;
 	if (host->surface_size(image, &iw, &ih) != 0 || HR_cover(iw, ih, w, h, &crop) != 0) return NULL;
@@ -267,6 +327,10 @@ static MosaicSurface* makeHero(const MosaicSurface* image, int w, int h, int fad
 	host->fill_rect(s, NULL, bg);
 	host->blit(s, image, &crop, &all);
 	if (tint > 0) host->fill_rect(s, NULL, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257, (unsigned char)tint));
+	if (blurring) {
+		blurBand(s, w, h, layout, top);
+		return s;
+	}
 	int bands = HR_bands(fade_y, h);
 	for (int i = 0; i < bands; i++) {
 		int y = 0, band_h = 0, alpha = 0;
@@ -297,7 +361,7 @@ static int drawReplacedHero(MosaicSurface* screen, const MosaicListView* view, c
 	if (host->surface_size(image, &iw, &ih) != 0 || HR_cover(iw, ih, hero->w, hero->h, &crop) != 0) return 0;
 	MosaicColor bg = themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000, 255);
 	fillAround(screen, hero, layout, bg);
-	blitAround(screen, image, &crop, 1, layout);
+	blitAround(screen, image, &crop, 1, hero, layout);
 	if (tint > 0) fillAround(screen, hero, layout, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257, (unsigned char)tint));
 	int bands = HR_bands(layout->fade_y, hero->h);
 	for (int i = 0; i < bands; i++) {
@@ -318,7 +382,8 @@ static int drawHero(MosaicSurface* screen, const MosaicListView* view, const Mos
 		const HRLayout* layout) {
 	if (!view->show_art || !entry) return 0;
 	const char* path = host->entry_path(entry);
-	const MosaicRect* hero = &layout->hero;
+	// with the blur, the whole area
+	const MosaicRect* hero = blurring ? &view->area : &layout->hero;
 	if (!path || hero->w <= 0 || hero->h <= 0) return 0;
 	if (drawReplacedHero(screen, view, layout)) return 1;
 
@@ -333,7 +398,7 @@ static int drawHero(MosaicSurface* screen, const MosaicListView* view, const Mos
 		int kind = heroKind(entry, path);
 		const MosaicSurface* image = NULL;
 		if (kind < 0 || host->art_get(entry, kind, &image) != MOSAIC_ART_READY || !image) return 0;
-		MosaicSurface* copy = makeHero(image, hero->w, hero->h, layout->fade_y);
+		MosaicSurface* copy = makeHero(image, hero->w, hero->h, layout, hero->y);
 		if (copy) c = poolPut(heroes, HERO_COPIES, HERO_COPIES, path, hero->w, hero->h, copy);
 		if (c) {
 			src = c->surface;
@@ -345,8 +410,9 @@ static int drawHero(MosaicSurface* screen, const MosaicListView* view, const Mos
 		}
 	}
 
-	blitAround(screen, src, &crop, raw, layout);
-	fillAround(screen, &layout->below, layout, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000, 255));
+	blitAround(screen, src, &crop, raw, hero, layout);
+	if (!blurring) fillAround(screen, &layout->below, layout, themeColor(MOSAIC_COLOR_BACKGROUND, 0x000000, 255));
+	else if (raw) fillAround(screen, &layout->band, layout, (MosaicColor){ 0, 0, 0, HR_DARKEN });
 	return 1;
 }
 
@@ -453,13 +519,14 @@ static void drawCentred(MosaicSurface* screen, int font, const char* text, const
 }
 
 static void drawCard(MosaicSurface* screen, const MosaicListView* view, int index, int slot,
-		const HRLayout* layout) {
+		const HRLayout* layout, int lift) {
 	const MosaicEntry* entry = host->list_get(view->list, index);
 	if (!entry) return;
 	int scale = host->screen_scale();
 	int selected = index == view->selected;
-	MosaicRect card = HR_card(layout, slot, selected);
-	if (selected) {
+	int ring = MOSAIC_HOST_HAS(host, draw_ring);
+	MosaicRect card = HR_cardLifted(layout, slot, selected ? lift : 0);
+	if (selected && !ring) {
 		int f = layout->frame;
 		MosaicRect highlight = { card.x - f, card.y - f, card.w + 2 * f, card.h + 2 * f };
 		host->fill_round_rect(screen, &highlight, 6 * scale, themeColor(MOSAIC_COLOR_MAIN, 0xFFFFFF, 255));
@@ -480,6 +547,11 @@ static void drawCard(MosaicSurface* screen, const MosaicListView* view, int inde
 			drawCentred(screen, MOSAIC_FONT_SMALL, name, &inside, text, &unused);
 		}
 	}
+	if (selected && ring) {
+		int f = layout->frame;
+		MosaicRect around = { card.x - f, card.y - f, card.w + 2 * f, card.h + 2 * f };
+		host->draw_ring(screen, &around, 4 * scale + f, scale, themeColor(MOSAIC_COLOR_ACCENT, 0x9B2257, 255));
+	}
 	MosaicRect drawn = { 0, 0, 0, 0 };
 	MosaicRect strip = HR_nameStrip(layout, &card);
 	if (named && name) drawCentred(screen, MOSAIC_FONT_SMALL, name, &strip, text, &drawn);
@@ -487,18 +559,47 @@ static void drawCard(MosaicSurface* screen, const MosaicListView* view, int inde
 	host->decorate_cell(screen, index, &cell, named ? &drawn : NULL);
 }
 
+// The count of entries, "N of M", right-aligned in the line above the
+// rail, with a shadow so it reads over the art.
+static void drawCount(MosaicSurface* screen, const MosaicListView* view, const HRLayout* layout) {
+	const MosaicRect* line = &layout->count;
+	char text[64], shown[64];
+	if (line->h <= 0 || HR_count(view->selected, view->count, tr("%i of %i"), text, sizeof(text)) != 0) return;
+	int w = host->text_truncate(MOSAIC_FONT_SMALL, text, line->w, shown, sizeof(shown));
+	if (w < 0) return;
+	int scale = host->screen_scale();
+	int x = line->x + line->w - w;
+	host->draw_text(screen, MOSAIC_FONT_SMALL, shown, x + scale, line->y + scale, (MosaicColor){ 0, 0, 0, 191 }, line->w);
+	host->draw_text(screen, MOSAIC_FONT_SMALL, shown, x, line->y, themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF, 255),
+		line->w);
+}
+
+// The selected card's lift: rising past its lift and settling, from when
+// the selection moved to entry, or at once with the animation off.
+static int liftFor(const MosaicEntry* entry, const HRLayout* layout) {
+	const char* path = entry ? host->entry_path(entry) : NULL;
+	if (path && strlen(path) < MAX_PATH_LEN && strcmp(path, lifted_path) != 0) {
+		snprintf(lifted_path, sizeof(lifted_path), "%s", path);
+		lifted_at = now_ms;
+		lifting = animate;
+	}
+	if (!animate) return layout->raise;
+	return HR_lift((long)(now_ms - lifted_at), HR_LIFT_MS, layout->raise, layout->bounce);
+}
+
 // Asks for art about to show, so the cache has it in: the hero and logo of
 // the entries either side of the selection, and the cards either side of
 // the rail.
 static void prefetch(const MosaicListView* view, const HRLayout* layout) {
 	if (!view->show_art) return;
+	const MosaicRect* hero = blurring ? &view->area : &layout->hero;
 	const MosaicSurface* image = NULL;
 	for (int d = -1; d <= 1; d += 2) {
 		int i = view->selected + d;
 		const MosaicEntry* entry = i >= 0 && i < view->count ? host->list_get(view->list, i) : NULL;
 		const char* path = entry ? host->entry_path(entry) : NULL;
 		if (!path) continue;
-		if (!poolFind(heroes, HERO_COPIES, path, layout->hero.w, layout->hero.h)) {
+		if (!poolFind(heroes, HERO_COPIES, path, hero->w, hero->h)) {
 			int kind = heroKind(entry, path);
 			if (kind >= 0) host->art_get(entry, kind, &image);
 		}
@@ -576,6 +677,12 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 		foundClear();
 	}
 	first = HR_window(first, view->selected, view->count, layout.cards);
+	// the blurred band is baked into the heroes' copies, which are kept by
+	// the area's size, so they go when it moves, such as when names hide
+	if (blurring && layout.band.y != hero_band) {
+		poolClear(heroes, HERO_COPIES);
+		hero_band = layout.band.y;
+	}
 
 	const MosaicEntry* selected = host->list_get(view->list, view->selected);
 	int hero = drawHero(screen, view, selected, &layout);
@@ -584,11 +691,13 @@ static int layoutRender(MosaicSurface* screen, const MosaicListView* view) {
 		(!nameHidden(view, view->selected) || !hero)) {
 		drawName(screen, view, selected, &layout, alpha);
 	}
+	int lift = liftFor(selected, &layout);
 	for (int slot = 0; slot < layout.cards; slot++) {
 		int index = first + slot;
 		if (index >= view->count) break;
-		drawCard(screen, view, index, slot, &layout);
+		drawCard(screen, view, index, slot, &layout, lift);
 	}
+	drawCount(screen, view, &layout);
 	prefetch(view, &layout);
 	return 0;
 }
@@ -604,9 +713,10 @@ static int selectionChanged(const MosaicEntry* entry) {
 
 static void tick(unsigned long now) {
 	now_ms = now;
-	if (!fading) return;
-	// one more frame once it's done, at full strength
-	if ((long)(now - settled_at) >= fade_ms) fading = 0;
+	if (!lifting && !fading) return;
+	// one more frame once each is done, at its lift and at full strength
+	if (lifting && (long)(now - lifted_at) >= HR_LIFT_MS) lifting = 0;
+	if (fading && (long)(now - settled_at) >= fade_ms) fading = 0;
 	host->request_redraw();
 }
 
@@ -623,15 +733,21 @@ static int init(const MosaicHost* h) {
 	tint = HR_tint(host->cfg_get("tint", "20"));
 	fade_ms = HR_fadeMs(host->cfg_get("fade", "300"));
 	settles = MOSAIC_HOST_HAS(host, selection_settle_ms);
+	blurring = HR_on(host->cfg_get("blur", "on")) && MOSAIC_HOST_HAS(host, draw_ring);
+	animate = HR_on(host->cfg_get("animation", "on"));
+	lifted_path[0] = '\0';
+	lifting = 0;
+	hero_band = -1;
 	settled_path[0] = '\0';
 	fading = 0;
 	first = 0;
 	window_depth = -1;
 	window_path[0] = '\0';
 	foundClear();
-	char message[160];
-	snprintf(message, sizeof(message), "cards %i%% of the height, tinted by %i of 255, logo fading in over %i ms%s",
-		percent, tint, fade_ms, settles ? "" : " (no selection events, so it shows at once)");
+	char message[240];
+	snprintf(message, sizeof(message), "cards %i%% of the height, tinted by %i of 255, logo fading in over %i ms%s, blur %s, animation %s",
+		percent, tint, fade_ms, settles ? "" : " (no selection events, so it shows at once)", blurring ? "on" : "off",
+		animate ? "on" : "off");
 	host->log(ID, message);
 	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
 		host->log(ID, "couldn't follow theme changes");

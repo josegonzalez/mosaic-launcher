@@ -14,6 +14,11 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: layout_hero_rail.c
+#, c-format
+msgid "%i of %i"
+msgstr ""
+
 #: plugin.txt
 msgid "0"
 msgstr ""
@@ -36,6 +41,14 @@ msgstr ""
 
 #: plugin.txt
 msgid "600"
+msgstr ""
+
+#: plugin.txt
+msgid "Animation"
+msgstr ""
+
+#: plugin.txt
+msgid "Blur"
 msgstr ""
 
 #: plugin.txt

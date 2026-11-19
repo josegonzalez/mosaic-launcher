@@ -285,6 +285,39 @@ int Draw_roundInset(int radius, int h, int row) {
 	return radius;
 }
 
+// 1 when point x, y, in eighths of a pixel, is inside a w by h rect at
+// x0, y0, its corners rounded by r, all in eighths too
+static int inRound(long x, long y, long x0, long y0, long w, long h, long r) {
+	if (w <= 0 || h <= 0 || x < x0 || y < y0 || x >= x0 + w || y >= y0 + h) return 0;
+	long cx = x < x0 + r ? x0 + r : x > x0 + w - r ? x0 + w - r : x;
+	long cy = y < y0 + r ? y0 + r : y > y0 + h - r ? y0 + h - r : y;
+	return (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
+}
+
+int Draw_ringCover(int w, int h, int radius, int thickness, int x, int y) {
+	if (w <= 0 || h <= 0 || thickness < 1 || radius < 0 || x < 0 || y < 0 || x >= w || y >= h) return 0;
+	long t = 8L * thickness;
+	long inner_r = radius > thickness ? 8L * (radius - thickness) : 0;
+	int in = 0;
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			long px = 8L * x + 1 + 2 * i, py = 8L * y + 1 + 2 * j;
+			if (inRound(px, py, 0, 0, 8L * w, 8L * h, 8L * radius) &&
+				!inRound(px, py, t, t, 8L * w - 2 * t, 8L * h - 2 * t, inner_r)) {
+				in++;
+			}
+		}
+	}
+	return (in * 255 + 8) / 16;
+}
+
+int Draw_ringClear(int w, int h, int radius, int thickness, int x, int y) {
+	int t = thickness, r = radius > thickness ? radius : thickness;
+	if (x < t || y < t || x >= w - t || y >= h - t) return 0;
+	// clear of the inner corners' curves: between them one way or the other
+	return (x >= r && x < w - r) || (y >= r && y < h - r);
+}
+
 int Draw_fit(int sw, int sh, int dw, int dh, int fit, MosaicRect* src, MosaicRect* dst) {
 	if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0 || !src || !dst) return -1;
 	*src = (MosaicRect){ 0, 0, sw, sh };

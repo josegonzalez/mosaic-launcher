@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "hero_model.h"
@@ -25,6 +26,10 @@ int HR_fadeMs(const char* value) {
 	return number(value, 0, 2000, HR_FADE_DEFAULT);
 }
 
+int HR_on(const char* value) {
+	return !value || strcmp(value, "off") != 0;
+}
+
 static int empty(const MosaicRect* r) {
 	return !r || r->w <= 0 || r->h <= 0;
 }
@@ -41,10 +46,11 @@ static MosaicRect around(const MosaicRect* a, const MosaicRect* b) {
 }
 
 int HR_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect* header, int scale, int percent,
-		int name_h, HRLayout* out) {
+		int name_h, int count_h, HRLayout* out) {
 	memset(out, 0, sizeof(*out));
 	if (scale < 1) scale = 1;
 	if (name_h < 0) name_h = 0;
+	if (count_h < 0) count_h = 0;
 	if (percent < 1) percent = 28;
 	int gap = 4 * scale;
 	int card_h = area->h * percent / 100;
@@ -93,6 +99,22 @@ int HR_layout(const MosaicRect* area, const MosaicRect* status, const MosaicRect
 	if (logo.h < 0) logo.h = 0;
 	logo.y = bottom - logo.h;
 	out->logo = logo;
+
+	// a little past the lift, inside the gap above it
+	int bounce = raise / 4;
+	if (bounce > gap / 2) bounce = gap / 2;
+	if (bounce < scale) bounce = scale;
+	out->bounce = bounce;
+	// the count's line ends a gap above the raised card, along the rail
+	out->count = (MosaicRect){ out->card_x, bottom - count_h, total, count_h };
+	// the band from a gap above it, the sharp art fading into it over a
+	// quarter of a card
+	int band_y = bottom - count_h - gap;
+	if (band_y < area->y) band_y = area->y;
+	out->band = (MosaicRect){ area->x, band_y, area->w, area->y + area->h - band_y };
+	out->blend_y = band_y - card_h / 4 - area->y;
+	if (out->blend_y < 0) out->blend_y = 0;
+	out->blur = card_h / 5 > scale ? card_h / 5 : scale;
 	return 0;
 }
 
@@ -100,6 +122,12 @@ MosaicRect HR_card(const HRLayout* layout, int slot, int raised) {
 	if (slot < 0 || slot >= layout->cards) return (MosaicRect){ 0, 0, 0, 0 };
 	return (MosaicRect){ layout->card_x + slot * (layout->card_w + layout->gap),
 		layout->card_y - (raised ? layout->raise : 0), layout->card_w, layout->card_h };
+}
+
+MosaicRect HR_cardLifted(const HRLayout* layout, int slot, int lift) {
+	MosaicRect r = HR_card(layout, slot, 0);
+	if (r.w > 0) r.y -= lift;
+	return r;
 }
 
 MosaicRect HR_nameStrip(const HRLayout* layout, const MosaicRect* card) {
@@ -147,6 +175,33 @@ int HR_fade(long elapsed, int duration) {
 	long long left = duration - elapsed;
 	long long d = duration;
 	return 255 - (int)((255 * left * left + d * d / 2) / (d * d));
+}
+
+int HR_lift(long elapsed, int duration, int raise, int bounce) {
+	if (duration <= 0 || elapsed >= duration) return raise;
+	if (elapsed <= 0) return 0;
+	long long peak = raise + bounce;
+	long long half = duration / 2;
+	if (half < 1) half = 1;
+	if (elapsed < half) {
+		// peak * (1 - (1 - t)^2)
+		long long left = half - elapsed;
+		return (int)(peak - (peak * left * left + half * half / 2) / (half * half));
+	}
+	// back down: raise + bounce * (1 - t)^2
+	long long rest = duration - half;
+	long long left = duration - elapsed;
+	return raise + (int)((bounce * left * left + rest * rest / 2) / (rest * rest));
+}
+
+int HR_count(int selected, int count, const char* format, char* out, size_t size) {
+	if (!size) return -1;
+	out[0] = '\0';
+	if (count <= 0 || !format) return -1;
+	if (selected < 0) selected = 0;
+	if (selected >= count) selected = count - 1;
+	snprintf(out, size, format, selected + 1, count);
+	return 0;
 }
 
 int HR_avoid(const MosaicRect* r, const MosaicRect* hole, MosaicRect out[4]) {

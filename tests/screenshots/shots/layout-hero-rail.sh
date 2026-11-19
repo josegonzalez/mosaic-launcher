@@ -20,3 +20,10 @@ slot layout layout-hero-rail
 cfg layout-hero-rail tint=0
 press "right a right a right right right"
 shot tint-0
+
+begin
+on layout-hero-rail
+slot layout layout-hero-rail
+cfg layout-hero-rail blur=off
+press "right a right a right right right"
+shot blur-off

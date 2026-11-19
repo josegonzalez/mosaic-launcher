@@ -2054,6 +2054,10 @@ static MosaicSurface* hostSurfaceScale(const char* plugin_id, const MosaicSurfac
 	return isLoaded(plugin_id) ? PluginDraw_surfaceScale(plugin_id, src, w, h, fit) : NULL;
 }
 
+static MosaicSurface* hostSurfaceBlur(const char* plugin_id, const MosaicSurface* src, const MosaicRect* src_rect, int w, int h, int radius) {
+	return isLoaded(plugin_id) ? PluginDraw_surfaceBlur(plugin_id, src, src_rect, w, h, radius) : NULL;
+}
+
 static int hostSurfaceWrite(const char* plugin_id, MosaicSurface* surface, const MosaicRect* rect, const void* pixels, int pitch) {
 	return isLoaded(plugin_id) ? PluginDraw_surfaceWrite(plugin_id, surface, rect, pixels, pitch) : -1;
 }
@@ -2381,6 +2385,8 @@ static const MosaicHost host = {
 	.play_forget = hostPlayForget,
 	.action_available = hostActionAvailable,
 	.screen_buttons = hostScreenButtons,
+	.surface_blur = hostSurfaceBlur,
+	.draw_ring = PluginDraw_drawRing,
 };
 
 ///////////////////////////////////////

@@ -1952,6 +1952,26 @@ typedef struct MosaicHost {
 	// MOSAIC_HOST_HAS(host, screen_buttons).
 	int (*action_available)(const char* action_id, const char* path);
 	int (*screen_buttons)(MosaicHint* out, int max);
+
+	// Blur and rings, such as for a layout's frosted band and its selected
+	// card. surface_blur makes a new w by h surface of the plugin's own,
+	// src_rect of src (NULL for all of it, which must be inside src)
+	// stretched to w by h and blurred by about radius pixels of the new
+	// size, from 1 to 1024. It blurs a copy at most 256 pixels a side and
+	// enlarges it smoothly, so it takes little memory and time whatever the
+	// sizes, but takes too long to call each frame: call it once, such as
+	// when the selection moves, and keep what it makes. It's the plugin's
+	// to free with surface_free, as surface_new's are, and counts against
+	// its 32 MiB the same way; it returns NULL for a bad argument or past
+	// that. draw_ring draws an outline thickness pixels wide just inside
+	// rect (NULL for the whole surface) on target, its corners rounded by
+	// radius (at most half the shorter side) outside and radius - thickness
+	// inside, with smooth edges, blending by alpha as fill_rect does. It
+	// returns 0, or -1 for a bad argument or a thickness under 1. Check for
+	// both with MOSAIC_HOST_HAS(host, draw_ring).
+	MosaicSurface* (*surface_blur)(const char* plugin_id, const MosaicSurface* src, const MosaicRect* src_rect, int w,
+		int h, int radius);
+	int (*draw_ring)(MosaicSurface* target, const MosaicRect* rect, int radius, int thickness, MosaicColor color);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

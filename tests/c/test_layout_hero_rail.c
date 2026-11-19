@@ -34,6 +34,11 @@ static void testSettings(void) {
 	CHECK(HR_fadeMs("2001") == HR_FADE_DEFAULT);
 	CHECK(HR_fadeMs("-1") == HR_FADE_DEFAULT);
 	CHECK(HR_fadeMs("") == HR_FADE_DEFAULT);
+
+	CHECK(HR_on("on") == 1);
+	CHECK(HR_on("off") == 0);
+	CHECK(HR_on(NULL) == 1);
+	CHECK(HR_on("x") == 1);
 }
 
 static void testLayout(void) {
@@ -41,7 +46,7 @@ static void testLayout(void) {
 	MosaicRect area = { 0, 0, 1024, 663 };
 	MosaicRect status = { 794, 30, 200, 90 };
 	HRLayout l;
-	CHECK(HR_layout(&area, &status, NULL, 3, 28, 30, &l) == 0);
+	CHECK(HR_layout(&area, &status, NULL, 3, 28, 30, 24, &l) == 0);
 	CHECK(l.gap == 12 && l.frame == 6 && l.name_h == 30);
 	CHECK(l.card_w == 138 && l.card_h == 185 && l.raise == 23);
 	CHECK(l.cards == 6 && l.card_x == 68 && l.card_y == 436);
@@ -51,6 +56,15 @@ static void testLayout(void) {
 	CHECK(l.below.y == 528 && l.below.h == 135 && l.below.w == 1024);
 	CHECK(l.logo.x == 68 && l.logo.y == 184 && l.logo.w == 409 && l.logo.h == 211);
 	CHECK(l.hole.x == 794 && l.hole.y == 30 && l.hole.w == 200 && l.hole.h == 90);
+	// the count's line a gap above the raised card, along the rail; the
+	// band from a gap above it, the art fading into it over a quarter card
+	CHECK(l.bounce == 5);
+	CHECK(l.count.x == 68 && l.count.y == 371 && l.count.w == 888 && l.count.h == 24);
+	CHECK(l.band.x == 0 && l.band.y == 359 && l.band.w == 1024 && l.band.h == 304);
+	CHECK(l.blend_y == 313 && l.blur == 37);
+	MosaicRect lifted = HR_cardLifted(&l, 1, 10);
+	CHECK(lifted.x == 68 + 150 && lifted.y == 426);
+	CHECK(HR_cardLifted(&l, 6, 10).w == 0);
 
 	// the cards end inside the area, the raised one above the rest
 	MosaicRect last = HR_card(&l, 5, 0);
@@ -63,25 +77,28 @@ static void testLayout(void) {
 
 	// header widgets join the pill in the hole
 	MosaicRect header = { 600, 30, 194, 100 };
-	CHECK(HR_layout(&area, &status, &header, 3, 28, 30, &l) == 0);
+	CHECK(HR_layout(&area, &status, &header, 3, 28, 30, 24, &l) == 0);
 	CHECK(l.hole.x == 600 && l.hole.w == 394 && l.hole.h == 100);
 	// a pill over the logo's left pushes the logo down
 	MosaicRect left = { 10, 30, 400, 250 };
-	CHECK(HR_layout(&area, &left, NULL, 3, 28, 30, &l) == 0);
+	CHECK(HR_layout(&area, &left, NULL, 3, 28, 30, 24, &l) == 0);
 	CHECK(l.logo.y == 292 && l.logo.h == 103);
 
 	// without names the cards sit lower; large cards are fewer
-	CHECK(HR_layout(&area, &status, NULL, 3, 28, 0, &l) == 0);
+	CHECK(HR_layout(&area, &status, NULL, 3, 28, 0, 24, &l) == 0);
 	CHECK(l.card_y == 466 && l.name_h == 0);
-	CHECK(HR_layout(&area, &status, NULL, 3, 34, 30, &l) == 0);
+	// no count: an empty line, the band from just above the raised card
+	CHECK(HR_layout(&area, &status, NULL, 3, 28, 30, 0, &l) == 0);
+	CHECK(l.count.h == 0 && l.count.y == 395 && l.band.y == 383);
+	CHECK(HR_layout(&area, &status, NULL, 3, 34, 30, 24, &l) == 0);
 	CHECK(l.card_h == 225 && l.card_w == 168 && l.cards == 5);
 	// 640x480 at scale 2, 412 above the hints
 	MosaicRect small = { 0, 0, 640, 412 };
-	CHECK(HR_layout(&small, NULL, NULL, 2, 22, 20, &l) == 0);
+	CHECK(HR_layout(&small, NULL, NULL, 2, 22, 20, 24, &l) == 0);
 	CHECK(l.card_h == 90 && l.card_w == 67 && l.cards == 8);
 	// too small for a card
 	MosaicRect tiny = { 0, 0, 100, 60 };
-	CHECK(HR_layout(&tiny, NULL, NULL, 3, 28, 30, &l) == -1);
+	CHECK(HR_layout(&tiny, NULL, NULL, 3, 28, 30, 24, &l) == -1);
 }
 
 static void testWindow(void) {
@@ -143,6 +160,43 @@ static void testFade(void) {
 		last = a;
 	}
 	CHECK(rising && last == 255);
+}
+
+static void testLift(void) {
+	// up to the raise and a bounce past it by halfway, easing out, then back
+	CHECK(HR_lift(0, 240, 20, 5) == 0);
+	CHECK(HR_lift(-10, 240, 20, 5) == 0);
+	CHECK(HR_lift(120, 240, 20, 5) == 25);
+	CHECK(HR_lift(240, 240, 20, 5) == 20);
+	CHECK(HR_lift(1000, 240, 20, 5) == 20);
+	CHECK(HR_lift(30, 240, 20, 5) > 25 / 4);
+	for (long t = 1; t < 120; t++) CHECK(HR_lift(t, 240, 20, 5) >= HR_lift(t - 1, 240, 20, 5));
+	for (long t = 121; t <= 240; t++) {
+		CHECK(HR_lift(t, 240, 20, 5) <= HR_lift(t - 1, 240, 20, 5));
+		CHECK(HR_lift(t, 240, 20, 5) >= 20);
+	}
+	// no animation: lifted at once
+	CHECK(HR_lift(0, 0, 20, 5) == 20);
+	CHECK(HR_lift(5, -1, 20, 5) == 20);
+	CHECK(HR_lift(0, 1, 20, 5) == 0);
+}
+
+static void testCount(void) {
+	char out[32];
+	CHECK(HR_count(0, 10, "%i of %i", out, sizeof(out)) == 0);
+	CHECK_STR(out, "1 of 10");
+	CHECK(HR_count(9, 10, "%i of %i", out, sizeof(out)) == 0);
+	CHECK_STR(out, "10 of 10");
+	CHECK(HR_count(-1, 10, "%i of %i", out, sizeof(out)) == 0);
+	CHECK_STR(out, "1 of 10");
+	CHECK(HR_count(12, 10, "%i de %i", out, sizeof(out)) == 0);
+	CHECK_STR(out, "10 de 10");
+	CHECK(HR_count(0, 0, "%i of %i", out, sizeof(out)) == -1);
+	CHECK_STR(out, "");
+	CHECK(HR_count(0, 10, NULL, out, sizeof(out)) == -1);
+	char small[5];
+	CHECK(HR_count(122, 1234, "%i of %i", small, sizeof(small)) == 0);
+	CHECK_STR(small, "123 ");
 }
 
 static void testAvoid(void) {
@@ -285,10 +339,19 @@ static MosaicSurface video = { 720, 480, 0 }; // another plugin's art_replace su
 static int replaced_index = -1; // the entry it's for, or -1 for none
 static int blits_of_video = 0, screen_tinted = 0, screen_banded = 0;
 
+static const char* blur_cfg = "on";
+static const char* animation_cfg = "on";
+static int blurs = 0, blur_radius = 0, rings = 0, ring_thickness = 0;
+static MosaicRect blur_from, blur_size, ring_rect;
+static MosaicColor ring_color;
+static MosaicSurface* blur_src = NULL;
+
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "cards")) return cards_cfg;
 	if (!strcmp(key, "fade")) return fade_cfg;
+	if (!strcmp(key, "blur")) return blur_cfg;
+	if (!strcmp(key, "animation")) return animation_cfg;
 	return fallback;
 }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
@@ -386,6 +449,25 @@ static MosaicSurface* fakeSurfaceScale(const char* id, const MosaicSurface* src,
 	(void)id; (void)src; (void)fit;
 	scales++;
 	return fakeMake(w, h);
+}
+static MosaicSurface* fakeSurfaceBlur(const char* id, const MosaicSurface* src, const MosaicRect* from, int w, int h,
+		int radius) {
+	(void)id;
+	blurs++;
+	blur_src = (MosaicSurface*)src;
+	blur_from = *from;
+	blur_size = (MosaicRect){ 0, 0, w, h };
+	blur_radius = radius;
+	return fakeMake(w, h);
+}
+static int fakeDrawRing(MosaicSurface* t, const MosaicRect* r, int radius, int thickness, MosaicColor c) {
+	(void)radius;
+	if (t != &screen_surface) return -1;
+	rings++;
+	ring_rect = *r;
+	ring_thickness = thickness;
+	ring_color = c;
+	return 0;
 }
 static int fakeSurfaceFree(const char* id, MosaicSurface* s) {
 	if (!s->owned) return -1;
@@ -573,7 +655,7 @@ static void testPlugin(void) {
 	CHECK(decorated == 6 && decorated_outside == 0 && decorated_named == 6);
 	CHECK(tiles == 4);
 	CHECK_STR(large_text, "B C E F ");
-	CHECK_STR(small_text, "Apple Banana Cherry Date elder Fig ");
+	CHECK_STR(small_text, "Apple Banana Cherry Date elder Fig 1 of 10 ");
 	CHECK(faded == -1); // the logo at alpha 0 isn't drawn
 	CHECK(blits_onto_screen_of_cache == 0);
 	// the logo's asked for, and so are the neighbour's hero (Banana has
@@ -644,7 +726,7 @@ static void testPlugin(void) {
 	v.show_names = 0;
 	CHECK(p->layout_render(&screen_surface, &v) == 0);
 	CHECK(decorated == 6 && decorated_named == 0);
-	CHECK_STR(small_text, "Banana Cherry elder Fig ");
+	CHECK_STR(small_text, "Banana Cherry elder Fig 1 of 10 ");
 	// the cards keep their size and copies; the hero and logo boxes are taller
 	CHECK(news == 1 && scales == 1);
 	// art off: tiles only, no hero, no logo, Apple's name over the hero's place
@@ -784,6 +866,114 @@ static void testReplacement(void) {
 
 // the theme's layout-hero-rail.cards while the setting is at theme,
 // followed on launcher.theme_changed, and the user's own over it
+// the blur, baked into the hero's copy once a selection, the ring and the lift
+static void testCocoon(void) {
+	setUp();
+	fake_host.surface_blur = fakeSurfaceBlur;
+	fake_host.draw_ring = fakeDrawRing;
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	blur_cfg = animation_cfg = "on";
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(blurring == 1 && animate == 1);
+	copy_count = 0;
+	frees = 0;
+	blurs = rings = 0;
+
+	// Apple: the hero is the whole area, its band from 313 down blurred
+	// out of the copy itself, darkened, and freed once it's drawn in
+	tick(1000);
+	resetCounts();
+	MosaicListView v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(copies[0].w == 1024 && copies[0].h == 663);
+	CHECK(blurs == 1 && blur_src == &copies[0] && blur_radius == 37);
+	CHECK(blur_from.y == 313 && blur_from.h == 350 && blur_from.w == 1024);
+	CHECK(blur_size.w == 1024 && blur_size.h == 350);
+	CHECK(copies[1].owned == 0 && frees == 1);
+	CHECK(belows == 0); // no background under the hero
+	// the ring in the accent, round the card at the start of its lift
+	CHECK(rings == 1 && ring_thickness == 3);
+	CHECK(ring_color.r == 0x9B && ring_color.g == 0x22 && ring_color.b == 0x57 && ring_color.a == 255);
+	CHECK(ring_rect.x == 68 - 6 && ring_rect.y == 436 - 6 && ring_rect.w == 138 + 12);
+	CHECK(tiles == 4); // only the no-art tiles in the accent, no frame behind the card
+	CHECK(strstr(small_text, "1 of 10") != NULL);
+
+	// the lift rises past the raise and settles back, redrawing from tick
+	resetCounts();
+	tick(1120);
+	CHECK(redraws == 1 && lifting);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(ring_rect.y == 436 - 23 - 5 - 6);
+	CHECK(blurs == 1); // the copy's kept
+	tick(1240);
+	CHECK(!lifting);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(ring_rect.y == 436 - 23 - 6);
+	tick(1300);
+	CHECK(redraws == 2);
+
+	// on to Date, whose box is its hero: blurred once, then kept
+	blurs = 0;
+	v = makeView(3);
+	tick(2000);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blurs == 1);
+	CHECK(lifting && ring_rect.x == 68 + 3 * 150 - 6 && ring_rect.y == 436 - 6);
+	// names off moves the band: the copy goes and the band's blurred again
+	v.show_names = 0;
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blurs == 2 && blur_from.y > 313);
+	p->quit();
+
+	// the animation off: lifted at once, still ringed
+	setUp();
+	fake_host.surface_blur = fakeSurfaceBlur;
+	fake_host.draw_ring = fakeDrawRing;
+	animation_cfg = "off";
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(animate == 0);
+	copy_count = 0;
+	resetCounts();
+	tick(5000);
+	v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(ring_rect.y == 436 - 23 - 6 && !lifting);
+	tick(5010);
+	CHECK(redraws == 0);
+	p->quit();
+
+	// the blur off: the hero as without it, faded into the background
+	setUp();
+	fake_host.surface_blur = fakeSurfaceBlur;
+	fake_host.draw_ring = fakeDrawRing;
+	blur_cfg = "off";
+	animation_cfg = "on";
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(blurring == 0);
+	copy_count = 0;
+	blurs = 0;
+	resetCounts();
+	v = makeView(0);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blurs == 0 && copies[0].w == 1024 && copies[0].h == 528 && banded == 64 && belows >= 1);
+	p->quit();
+
+	// a blur that can't be made: the band only darkened
+	setUp();
+	fake_host.surface_blur = fakeSurfaceBlur;
+	fake_host.draw_ring = fakeDrawRing;
+	blur_cfg = "on";
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = 63; // one copy left, for the hero
+	blurs = 0;
+	resetCounts();
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(blurs == 1 && copies[63].w == 1024 && copies[63].h == 663);
+	p->quit();
+	copy_count = 0;
+}
+
 static void testThemeCards(void) {
 	setUp();
 	fake_host.theme_value = fakeThemeValue;
@@ -825,6 +1015,8 @@ int main(void) {
 	testWindow();
 	testMove();
 	testFade();
+	testLift();
+	testCount();
 	testAvoid();
 	testFit();
 	testBands();
@@ -833,5 +1025,6 @@ int main(void) {
 	testReplacement();
 	testPool();
 	testThemeCards();
+	testCocoon();
 	CHECK_DONE();
 }

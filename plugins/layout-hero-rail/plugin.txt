@@ -12,3 +12,7 @@ setting.cards=choice|Card size|theme|theme,small,medium,large
 setting.tint=choice|Tint|20|0,20,40
 # how long the logo takes to fade in once the selection settles, in milliseconds
 setting.fade=choice|Logo fade|300|0,150,300,600
+# the band behind the cards shows a blurred, darkened copy of the hero art
+setting.blur=toggle|Blur|on
+# the selected card rises a little past its lift and settles back as it's selected
+setting.animation=toggle|Animation|on

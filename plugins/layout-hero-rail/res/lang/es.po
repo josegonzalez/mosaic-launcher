@@ -9,6 +9,10 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#, c-format
+msgid "%i of %i"
+msgstr "%i de %i"
+
 msgid "0"
 msgstr "0"
 
@@ -26,6 +30,12 @@ msgstr "40"
 
 msgid "600"
 msgstr "600"
+
+msgid "Animation"
+msgstr "Animación"
+
+msgid "Blur"
+msgstr "Desenfoque"
 
 msgid "Card size"
 msgstr "Tamaño de las tarjetas"

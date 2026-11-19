@@ -370,6 +370,50 @@ static void testRound(void) {
 	CHECK(Draw_roundInset(5, 10, 10) == 0);
 }
 
+static void testRing(void) {
+	// a square ring 2 wide: its edges covered, its middle and the outside not
+	CHECK(Draw_ringCover(20, 20, 0, 2, 0, 10) == 255);
+	CHECK(Draw_ringCover(20, 20, 0, 2, 1, 10) == 255);
+	CHECK(Draw_ringCover(20, 20, 0, 2, 2, 10) == 0);
+	CHECK(Draw_ringCover(20, 20, 0, 2, 19, 10) == 255);
+	CHECK(Draw_ringCover(20, 20, 0, 2, 10, 10) == 0);
+	CHECK(Draw_ringCover(20, 20, 0, 2, 20, 10) == 0);
+	CHECK(Draw_ringCover(20, 20, 0, 2, -1, 10) == 0);
+	CHECK(Draw_ringCover(20, 20, 0, 0, 0, 10) == 0);
+
+	// rounded by 8: the corner pixel is off it, the curve's edge is partly
+	// covered, and the straight sides are whole
+	CHECK(Draw_ringCover(40, 30, 8, 2, 0, 0) == 0);
+	CHECK(Draw_ringCover(40, 30, 8, 2, 20, 0) == 255);
+	CHECK(Draw_ringCover(40, 30, 8, 2, 0, 15) == 255);
+	int partial = 0;
+	for (int i = 0; i < 8; i++) {
+		int c = Draw_ringCover(40, 30, 8, 2, i, 8 - i);
+		if (c > 0 && c < 255) partial = 1;
+	}
+	CHECK(partial);
+	// the same at each corner
+	for (int y = 0; y < 10; y++) {
+		for (int x = 0; x < 10; x++) {
+			int c = Draw_ringCover(40, 30, 8, 2, x, y);
+			CHECK(Draw_ringCover(40, 30, 8, 2, 39 - x, y) == c);
+			CHECK(Draw_ringCover(40, 30, 8, 2, x, 29 - y) == c);
+			CHECK(Draw_ringCover(40, 30, 8, 2, 39 - x, 29 - y) == c);
+		}
+	}
+	// what Draw_ringClear skips is never on it, and it skips the middle
+	for (int y = 0; y < 30; y++) {
+		for (int x = 0; x < 40; x++) {
+			if (Draw_ringClear(40, 30, 8, 2, x, y)) CHECK(Draw_ringCover(40, 30, 8, 2, x, y) == 0);
+		}
+	}
+	CHECK(Draw_ringClear(40, 30, 8, 2, 20, 15));
+	CHECK(!Draw_ringClear(40, 30, 8, 2, 1, 15));
+	CHECK(!Draw_ringClear(40, 30, 8, 2, 3, 3));
+	// a ring as thick as half the rect is filled
+	CHECK(Draw_ringCover(10, 10, 0, 5, 5, 5) == 255);
+}
+
 static void testFit(void) {
 	MosaicRect src, dst;
 	CHECK(Draw_fit(200, 100, 50, 50, MOSAIC_FIT_STRETCH, &src, &dst) == 0);
@@ -491,6 +535,7 @@ int main(void) {
 	testTruncateChars();
 	testCopy();
 	testRound();
+	testRing();
 	testFit();
 	testColor();
 	testMine();

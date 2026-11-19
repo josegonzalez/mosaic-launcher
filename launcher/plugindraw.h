@@ -32,6 +32,9 @@ int PluginDraw_surfaceWrite(const char* owner, MosaicSurface* surface, const Mos
 int PluginDraw_fillRect(MosaicSurface* target, const MosaicRect* rect, MosaicColor color);
 int PluginDraw_fillRoundRect(MosaicSurface* target, const MosaicRect* rect, int radius, MosaicColor color);
 int PluginDraw_blit(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect, const MosaicRect* dst_rect);
+// host->draw_ring and host->surface_blur (see blurmodel.h).
+int PluginDraw_drawRing(MosaicSurface* target, const MosaicRect* rect, int radius, int thickness, MosaicColor color);
+MosaicSurface* PluginDraw_surfaceBlur(const char* owner, const MosaicSurface* src, const MosaicRect* src_rect, int w, int h, int radius);
 int PluginDraw_blitAlpha(MosaicSurface* target, const MosaicSurface* src, const MosaicRect* src_rect, const MosaicRect* dst_rect, int alpha);
 
 int PluginDraw_textWidth(int font, const char* text);

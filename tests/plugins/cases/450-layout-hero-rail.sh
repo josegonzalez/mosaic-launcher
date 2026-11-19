@@ -61,8 +61,8 @@ grep -qF "plugin hider: row Banana selected 0 hidden 1" "$log" && fail "Banana's
 grep -qE "plugin hider: row Banana .* named 0" "$log" && fail "Banana's card has no name: $(grep "plugin hider: row Banana" "$log")"
 rm -rf "$WORK/plugins/layout-hero-rail.plugin" "$WORK/plugins/hider.plugin" "$HIDE_DIR" "$STATE/plugins.txt"
 
-# the hero, which dimmer reads back from each push's old frame: Art's
-# backdrop, red on the left and blue on the right, tinted toward the
+# the hero with the blur off, which dimmer reads back from each push's old
+# frame: Art's backdrop, red on the left and blue on the right, tinted toward the
 # theme's accent across the top and fading into the theme's background
 # colour above the cards, with its logo from art-boxart's wheel folder,
 # green, faded in at the bottom left once the selection settled; Shot's
@@ -75,6 +75,8 @@ cp "$ROOT/tests/plugins/peeker/art.png" "$CARD/Dimmer/.media/wheel/Art.png"
 make -s -C "$ROOT/plugins" layout-hero-rail art-boxart ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" >/dev/null || fail "building layout-hero-rail"
 build_plugin dimmer 'id=dimmer\nname=Dimmer\napi=1\nslots=transition\n'
 printf 'backdrop=%s\nshot=%s\nprobe=173,289\n' "$DIM_DIR/backdrop.png" "$DIM_DIR/shot.png" >"$STATE/dimmer.cfg"
+# the blur off, as 989-hero-cocoon.sh reads the blurred band
+printf 'blur=off\n' >"$STATE/layout-hero-rail.cfg"
 printf 'dimmer=on\nart-boxart=on\nlayout-hero-rail=on\nslot.layout=layout-hero-rail\n' >"$STATE/plugins.txt"
 run_launcher "$WORK/hero-rail-hero.log" "plugin dimmer: done" || fail "the launcher exited early with layout-hero-rail's hero"
 log="$WORK/hero-rail-hero.log"
@@ -91,4 +93,4 @@ grep -qF "plugin dimmer: probe Shot 00FF00FF" "$log" && fail "Shot has a logo"
 expect "from Bare top ${theme}FF quarter ${theme}FF fade ${theme}FF low ${theme}FF right ${theme}FF, theme $theme"
 grep -qF "plugins: layout-hero-rail's" "$log" && fail "layout-hero-rail's layout was turned off"
 rm -rf "$WORK/plugins/layout-hero-rail.plugin" "$WORK/plugins/art-boxart.plugin" "$WORK/plugins/dimmer.plugin" "$DIM_DIR" \
-	"$CARD/Dimmer" "$STATE/dimmer.cfg" "$STATE/plugins.txt"
+	"$CARD/Dimmer" "$STATE/dimmer.cfg" "$STATE/plugins.txt" "$STATE/layout-hero-rail.cfg"
