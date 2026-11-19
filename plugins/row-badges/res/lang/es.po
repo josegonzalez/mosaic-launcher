@@ -9,8 +9,8 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-msgid "Adds small dots after a game's name for games you haven't played, your favorites, games with a tag or a manual, and tiers."
-msgstr "Añade pequeños puntos tras el nombre de un juego para los juegos que no has jugado, tus favoritos, los juegos con una etiqueta o un manual y los niveles."
+msgid "Adds small dots after a game's name for games you haven't played, your favorites, games with a tag or a manual, and tiers, and icons for a game's status and for 100% of its achievements."
+msgstr "Añade pequeños puntos tras el nombre de un juego para los juegos que no has jugado, tus favoritos, los juegos con una etiqueta o un manual y los niveles, e iconos para el estado de un juego y para el 100% de sus logros."
 
 msgid "Row badges"
 msgstr "Distintivos de filas"
@@ -29,3 +29,18 @@ msgstr "Marca de manual"
 
 msgid "Tag mark"
 msgstr "Marca de etiqueta"
+
+msgid "100% achievements trophy"
+msgstr "Trofeo del 100% de logros"
+
+msgid "Backlog icon"
+msgstr "Icono de pendiente"
+
+msgid "Beaten icon"
+msgstr "Icono de terminado"
+
+msgid "Broken icon"
+msgstr "Icono de roto"
+
+msgid "Completed icon"
+msgstr "Icono de completado"

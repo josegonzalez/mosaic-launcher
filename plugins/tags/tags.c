@@ -24,6 +24,16 @@
 // as they're added, deleted or edited in the file. They make a new tag
 // from another set's games with the tags.copy service, and move a game's
 // path in every tag with tags.move.
+//
+// The status flags, Completed, Beaten, Broken and Backlog, are kept apart
+// from the tags: in status.txt beside tags.txt, in the same format with
+// each flag's key as the name (see status_model.h), never as a tag, in the
+// Tags folder or as a tile. Each is on or off by itself. The tags.status
+// action, on the "status_button" setting's button (none by default),
+// opens a menu of them for the selected game, where A sets or clears one
+// and B goes back. Other plugins read them as the entry sets
+// tags.status.<key>, such as tags.status.beaten, and tags.move moves a
+// game's flags with its tags.
 
 #include <stdint.h>
 #include <stdio.h>
@@ -31,10 +41,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "mosaic_plugin.h"
+#include "status_model.h"
 #include "tags_model.h"
 
 #define ID "tags"
 #define SCREEN_ID "tags.checklist"
+#define STATUS_SCREEN_ID "tags.flags"
 #define FOLDER_NAME "Tags"
 #define TILES_MAX 8
 
@@ -54,6 +66,13 @@ static int on_card[TG_TAGS_MAX]; // each tag's games on the card
 static int selected = 0, first = 0;
 static int showing = 0, changed = 0;
 static char deleting[TG_NAME_LEN]; // waiting on the confirm
+
+// the status flags, and their menu
+static char status_path[TG_PATH_LEN + 32];
+static TGStore flags;
+static struct stat flags_seen;
+static int flag_selected = 0;
+static int status_sets = 0; // the tags.status.<key> sets are registered
 
 static char tiles[TILES_MAX][TG_NAME_LEN];
 
@@ -126,6 +145,27 @@ static void fullPath(const char* rel, char* out, size_t size) {
 	snprintf(out, size, "%s%s", host->sdcard_path, rel);
 }
 
+// The status flags' file, read again if it changed since we last saw it.
+static void refreshFlags(void) {
+	struct stat st;
+	if (stat(status_path, &st) != 0) memset(&st, 0, sizeof(st));
+	if (st.st_mtime == flags_seen.st_mtime && st.st_size == flags_seen.st_size && st.st_ino == flags_seen.st_ino) return;
+	if (TG_load(&flags, status_path) != 0) say("couldn't read the status file");
+	flags_seen = st;
+}
+
+static int saveFlags(void) {
+	mkdir(state_dir, 0755);
+	int ok = TG_save(&flags, status_path) == 0;
+	if (!ok) {
+		say("couldn't save the status file");
+		TG_load(&flags, status_path);
+		toast(tr("Couldn't save the status"));
+	}
+	if (stat(status_path, &flags_seen) != 0) memset(&flags_seen, 0, sizeof(flags_seen));
+	return ok ? 0 : -1;
+}
+
 ///////////////////////////////////////
 // the sets
 
@@ -180,6 +220,49 @@ static void syncSets(void) {
 		}
 		snprintf(set_names[set_count++], sizeof(set_names[0]), "%s", name);
 	}
+}
+
+// The tags.status.<key> sets, one per flag, registered once.
+static int statusHas(const char* name, const char* path) {
+	refreshFlags();
+	int flag = ST_fromSet(name);
+	size_t len = strlen(host->sdcard_path);
+	if (flag < 0 || !path || strncmp(path, host->sdcard_path, len) != 0 || path[len] != '/') return 0;
+	return ST_has(&flags, flag, path + len);
+}
+
+static void statusList(const char* name, void (*add)(const char* path, void* ctx), void* ctx) {
+	refreshFlags();
+	int flag = ST_fromSet(name);
+	int tag = flag < 0 ? -1 : TG_find(&flags, ST_key(flag));
+	if (tag < 0) return;
+	for (int i = 0; i < flags.tags[tag].count; i++) {
+		char full[TG_PATH_LEN * 2];
+		fullPath(flags.tags[tag].games[i], full, sizeof(full));
+		add(full, ctx);
+	}
+}
+
+static void registerStatusSets(void) {
+	if (status_sets || !MOSAIC_HOST_HAS(host, is_filtered)) return;
+	status_sets = 1;
+	for (int i = 0; i < ST_FLAGS; i++) {
+		char name[32];
+		snprintf(name, sizeof(name), "tags.status.%s", ST_key(i));
+		if (host->set_register(name, statusHas, statusList) != 0) {
+			char message[64];
+			snprintf(message, sizeof(message), "couldn't register the set %s", name);
+			say(message);
+		}
+	}
+}
+
+// Tells other plugins a flag's set changed. 0, or -1 when it couldn't.
+static int announceFlag(int flag) {
+	if (!MOSAIC_HOST_HAS(host, set_names)) return 0;
+	char name[32];
+	snprintf(name, sizeof(name), "tags.status.%s", ST_key(flag));
+	return host->set_changed(name);
 }
 
 // Tells other plugins tag's set changed, a deleted one's too. 0, or -1
@@ -290,8 +373,9 @@ static int provideCopy(const char* name, const char* args, char* out, size_t siz
 }
 
 // tags.move: from=<full path>, to=<full path>. Moves a game to its new
-// path in every tag, such as after its files moved. Replies tags=<how
-// many changed>, or error=path (either isn't on the card) or save.
+// path in every tag and status flag, such as after its files moved.
+// Replies tags=<how many tags changed> and status=<how many flags>, or
+// error=path (either isn't on the card) or save.
 static int provideMove(const char* name, const char* args, char* out, size_t size) {
 	(void)name;
 	char from[TG_PATH_LEN], to[TG_PATH_LEN];
@@ -302,12 +386,14 @@ static int provideMove(const char* name, const char* args, char* out, size_t siz
 		return 0;
 	}
 	refresh();
+	refreshFlags();
 	int changed = TG_rename(&store, from + len, to + len);
-	if (changed < 0) {
+	int moved = TG_rename(&flags, from + len, to + len);
+	if (changed < 0 || moved < 0) {
 		snprintf(out, size, "error=path");
 		return 0;
 	}
-	if (changed && save() != 0) {
+	if ((changed && save() != 0) || (moved && saveFlags() != 0)) {
 		snprintf(out, size, "error=save");
 		return 0;
 	}
@@ -320,7 +406,15 @@ static int provideMove(const char* name, const char* args, char* out, size_t siz
 		snprintf(message, sizeof(message), "moved %s to %s in %i tags", from + len, to + len, changed);
 		say(message);
 	}
-	snprintf(out, size, "tags=%i", changed);
+	if (moved) {
+		for (int i = 0; i < ST_FLAGS; i++) {
+			if (ST_has(&flags, i, to + len)) announceFlag(i);
+		}
+		char message[TG_PATH_LEN * 2 + 32];
+		snprintf(message, sizeof(message), "moved %s to %s in %i flags", from + len, to + len, moved);
+		say(message);
+	}
+	snprintf(out, size, "tags=%i\nstatus=%i", changed, moved);
 	return 0;
 }
 
@@ -347,6 +441,15 @@ static void edit(const char* path, void* data) {
 	const char* name = host->entry_name(host->selected_entry());
 	snprintf(title, sizeof(title), "%s", name && name[0] ? name : game);
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the checklist");
+}
+
+static void openStatus(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	if (showing || !selectedGame(game, sizeof(game))) return;
+	const char* name = host->entry_name(host->selected_entry());
+	snprintf(title, sizeof(title), "%s", name && name[0] ? name : game);
+	if (host->open_screen(STATUS_SCREEN_ID) != 0) say("couldn't open the status menu");
 }
 
 ///////////////////////////////////////
@@ -542,25 +645,34 @@ static void drawBox(MosaicSurface* screen, const MosaicRect* box, int on, int ro
 	host->fill_round_rect(screen, &inner, scale, row_selected ? C_MAIN() : C_BACKGROUND());
 }
 
-static int checkRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
-	(void)data;
+// Draws the game's name in the header and gives the rect the rows go in,
+// above hints_y.
+static MosaicRect drawTitle(MosaicSurface* screen, const MosaicScreenView* view, int hints_y) {
 	int scale = host->screen_scale();
 	int pad = 10 * scale;
 	int row_h = 30 * scale;
-	int hints_y = drawHints(screen);
-
 	const MosaicRect* area = &view->area;
 	int margin = view->status.w ? area->x + area->w - (view->status.x + view->status.w) : pad;
 	int bar_y = view->status.w ? view->status.y : margin;
 	int bar_h = view->status.w ? view->status.h : row_h;
 	int right = view->header.w ? view->header.x : view->status.w ? view->status.x : area->x + area->w - margin;
 	int large_h = host->text_height(MOSAIC_FONT_LARGE);
-	int small_h = host->text_height(MOSAIC_FONT_SMALL);
 	host->draw_text(screen, MOSAIC_FONT_LARGE, title, area->x + margin + pad, bar_y + (bar_h - large_h) / 2, C_TEXT(),
 		right - pad - (area->x + margin + pad));
-
 	MosaicRect list = { area->x + margin, bar_y + bar_h + margin / 2, area->w - 2 * margin, 0 };
 	list.h = hints_y - margin / 2 - list.y;
+	return list;
+}
+
+static int checkRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
+	(void)data;
+	int scale = host->screen_scale();
+	int pad = 10 * scale;
+	int row_h = 30 * scale;
+	int hints_y = drawHints(screen);
+	int large_h = host->text_height(MOSAIC_FONT_LARGE);
+	int small_h = host->text_height(MOSAIC_FONT_SMALL);
+	MosaicRect list = drawTitle(screen, view, hints_y);
 	int fit = list.h / row_h;
 	if (fit < 1) return 0;
 	first = TG_window(selected, rowCount(), fit, first);
@@ -593,6 +705,90 @@ static int checkRender(MosaicSurface* screen, const MosaicScreenView* view, void
 			host->draw_text(screen, MOSAIC_FONT_LARGE, store.tags[i].name, x, r.y + (row_h - large_h) / 2,
 				on ? C_SELECTED() : C_TEXT(), name_w);
 		}
+	}
+	return 0;
+}
+
+///////////////////////////////////////
+// the status menu
+
+static int statusEnter(void* data) {
+	(void)data;
+	refreshFlags();
+	flag_selected = 0;
+	first = 0;
+	showing = 1;
+	char message[TG_PATH_LEN + 64];
+	snprintf(message, sizeof(message), "status for %s: %u", game, ST_flags(&flags, game));
+	say(message);
+	return 0;
+}
+
+static void statusExit(void* data) {
+	(void)data;
+	showing = 0;
+}
+
+static void toggleFlag(int flag) {
+	int on = !ST_has(&flags, flag, game);
+	if (ST_set(&flags, flag, game, on) < 0) {
+		toast(tr("Couldn't set that"));
+		return;
+	}
+	if (saveFlags() != 0) return;
+	announceFlag(flag);
+	char message[TG_PATH_LEN + 32];
+	snprintf(message, sizeof(message), on ? "set %s on %s" : "cleared %s on %s", ST_key(flag), game);
+	say(message);
+}
+
+static int statusInput(const MosaicInput* input, void* data) {
+	(void)data;
+	unsigned int pressed = input->pressed;
+	if (pressedBit(pressed, MOSAIC_BUTTON_B)) return MOSAIC_SCREEN_CLOSE;
+	int before = flag_selected;
+	if (pressedBit(input->repeated, MOSAIC_BUTTON_UP)) {
+		flag_selected = TG_move(flag_selected, ST_FLAGS, -1, pressedBit(pressed, MOSAIC_BUTTON_UP));
+	}
+	if (pressedBit(input->repeated, MOSAIC_BUTTON_DOWN)) {
+		flag_selected = TG_move(flag_selected, ST_FLAGS, 1, pressedBit(pressed, MOSAIC_BUTTON_DOWN));
+	}
+	if (flag_selected != before) host->request_redraw();
+	if (pressedBit(pressed, MOSAIC_BUTTON_A)) {
+		toggleFlag(flag_selected);
+		host->request_redraw();
+	}
+	return MOSAIC_SCREEN_STAY;
+}
+
+static int statusRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
+	(void)data;
+	int scale = host->screen_scale();
+	int pad = 10 * scale;
+	int row_h = 30 * scale;
+	int top = host->screen_height() - 40 * scale;
+	MosaicRect drawn;
+	MosaicHint back[] = { { MOSAIC_BUTTON_B, "BACK" } };
+	if (host->draw_hints(screen, MOSAIC_HINTS_LEFT, back, 1, &drawn) == 0) top = drawn.y;
+	MosaicHint a[] = { { MOSAIC_BUTTON_A, ST_has(&flags, flag_selected, game) ? "CLEAR" : "SET" } };
+	if (host->draw_hints(screen, MOSAIC_HINTS_RIGHT, a, 1, &drawn) == 0 && drawn.y < top) top = drawn.y;
+
+	int large_h = host->text_height(MOSAIC_FONT_LARGE);
+	MosaicRect list = drawTitle(screen, view, top);
+	int fit = list.h / row_h;
+	if (fit < 1) return 0;
+	first = TG_window(flag_selected, ST_FLAGS, fit, first);
+	int box_size = large_h * 2 / 3;
+	for (int i = first; i < ST_FLAGS && i < first + fit; i++) {
+		MosaicRect r = { list.x, list.y + (i - first) * row_h, list.w, row_h };
+		int on = i == flag_selected;
+		if (on) host->fill_round_rect(screen, &r, row_h / 2, C_MAIN());
+		int x = r.x + pad;
+		MosaicRect box = { x, r.y + (row_h - box_size) / 2, box_size, box_size };
+		drawBox(screen, &box, ST_has(&flags, i, game), on);
+		x += box_size + pad;
+		host->draw_text(screen, MOSAIC_FONT_LARGE, tr(ST_label(i)), x, r.y + (row_h - large_h) / 2, on ? C_SELECTED() : C_TEXT(),
+			r.x + r.w - pad - x);
 	}
 	return 0;
 }
@@ -688,6 +884,7 @@ static void addTiles(void) {
 
 static void postReturn(void) {
 	refresh();
+	refreshFlags();
 }
 
 // The live profile's tags.txt, and its folder.
@@ -698,6 +895,7 @@ static void storePaths(void) {
 	snprintf(state_dir, sizeof(state_dir), "%s", store_path);
 	char* slash = strrchr(state_dir, '/');
 	if (slash) *slash = '\0';
+	snprintf(status_path, sizeof(status_path), "%s/status.txt", state_dir);
 }
 
 // Another profile's tags: every tag that was or is now a set is announced.
@@ -712,7 +910,14 @@ static void profileChanged(const char* name, const char* payload, void* data) {
 	memset(&seen, 0, sizeof(seen));
 	seen.st_size = -1;
 	refresh();
+	memset(&flags_seen, 0, sizeof(flags_seen));
+	flags_seen.st_size = -1;
+	refreshFlags();
 	int announced = 0, dropped = 0;
+	for (int i = 0; i < ST_FLAGS; i++) {
+		if (announceFlag(i) == 0) announced++;
+		else dropped++;
+	}
 	for (int i = 0; i < before_count; i++) {
 		if (TG_find(&store, before[i]) >= 0) continue;
 		if (announceTag(before[i]) == 0) announced++;
@@ -733,6 +938,7 @@ static void profileChanged(const char* name, const char* payload, void* data) {
 
 static void quit(void) {
 	TG_free(&store);
+	TG_free(&flags);
 }
 
 static int setting(const char* key) {
@@ -746,7 +952,16 @@ static const struct {
 	{ "Y", MOSAIC_BUTTON_Y },
 	{ "L2", MOSAIC_BUTTON_L2 },
 	{ "R2", MOSAIC_BUTTON_R2 },
+	{ "SELECT", MOSAIC_BUTTON_SELECT },
 };
+
+// The button a setting names, or -1 for none.
+static int buttonOf(const char* name) {
+	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
+		if (!strcmp(name, buttons[i].name)) return buttons[i].button;
+	}
+	return -1;
+}
 
 static int init(const MosaicHost* h) {
 	host = h;
@@ -757,10 +972,16 @@ static int init(const MosaicHost* h) {
 	snprintf(folder_path, sizeof(folder_path), "%s/" FOLDER_NAME, host->sdcard_path);
 	storePaths();
 	TG_free(&store);
+	TG_free(&flags);
 	set_count = 0;
+	status_sets = 0;
 	memset(&seen, 0, sizeof(seen));
 	seen.st_size = -1; // so the first refresh reads the file
 	refresh();
+	memset(&flags_seen, 0, sizeof(flags_seen));
+	flags_seen.st_size = -1;
+	refreshFlags();
+	registerStatusSets();
 	root_on = setting("root");
 	root_logged = -1;
 	showing = 0;
@@ -776,15 +997,28 @@ static int init(const MosaicHost* h) {
 		say("couldn't register the checklist");
 		return -1;
 	}
-
-	const char* name = host->cfg_get("button", "Y");
-	int button = MOSAIC_BUTTON_Y;
-	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
-		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
+	MosaicScreenHooks status_hooks = {
+		.size = sizeof(MosaicScreenHooks),
+		.enter = statusEnter,
+		.exit = statusExit,
+		.input = statusInput,
+		.render = statusRender,
+	};
+	if (host->register_screen(STATUS_SCREEN_ID, &status_hooks) != 0) {
+		say("couldn't register the status menu");
+		return -1;
 	}
+
+	int button = buttonOf(host->cfg_get("button", "Y"));
+	if (button < 0 || button == MOSAIC_BUTTON_SELECT) button = MOSAIC_BUTTON_Y;
 	if (host->register_action("tags.edit", "TAGS", 0, canEdit, edit, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "tags.edit") != 0) {
 		say("couldn't bind a button; tags.edit can still go on an FN button");
+	}
+	int status_button = buttonOf(host->cfg_get("status_button", "none"));
+	if (host->register_action("tags.status", "STATUS", 0, canEdit, openStatus, NULL) != 0) say("couldn't add tags.status");
+	else if (status_button >= 0 && host->bind_button(MOSAIC_SCREEN_GAMELIST, status_button, MOSAIC_TRIGGER_PRESS, "tags.status") != 0) {
+		say("couldn't bind the status button; tags.status can still go on an FN button");
 	}
 	if (setting("tiles")) addTiles();
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("tags.copy", provideCopy) != 0) say("couldn't provide tags.copy");
@@ -793,6 +1027,9 @@ static int init(const MosaicHost* h) {
 
 	char message[96];
 	snprintf(message, sizeof(message), "%i tags, %i with games, root %s", store.count, tagsOnCard(), root_on ? "on" : "off");
+	say(message);
+	snprintf(message, sizeof(message), "status: %i completed, %i beaten, %i broken, %i backlog", ST_count(&flags, ST_COMPLETED),
+		ST_count(&flags, ST_BEATEN), ST_count(&flags, ST_BROKEN), ST_count(&flags, ST_BACKLOG));
 	say(message);
 	return 0;
 }

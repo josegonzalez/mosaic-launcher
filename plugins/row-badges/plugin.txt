@@ -2,8 +2,8 @@ id=row-badges
 name=Row badges
 api=1
 category=Looks
-summary=Adds dots after a game's name for unplayed, favorite and tagged games, games with a manual, and for tiers.
-description=Adds small dots after a game's name for games you haven't played, your favorites, games with a tag or a manual, and tiers.
+summary=Adds dots after a game's name for unplayed, favorite and tagged games, games with a manual, and for tiers, and icons for status flags and 100% achievements.
+description=Adds small dots after a game's name for games you haven't played, your favorites, games with a tag or a manual, and tiers, and icons for a game's status and for 100% of its achievements.
 # the games.played service: whether a game was played, the one definition of it
 provides=games.played
 # a dot on games that weren't played: not in recents, with no save, state or resume slot, and no session in the play history
@@ -16,3 +16,13 @@ setting.favorites=toggle|Favorite mark|off
 setting.tagged=toggle|Tag mark|off
 # a dot on games with a manual, from the manuals plugin
 setting.manual=toggle|Manual mark|off
+# a star on games tags marks Completed, from its Status menu
+setting.completed=toggle|Completed icon|off
+# a tick on games tags marks Beaten
+setting.beaten=toggle|Beaten icon|off
+# a cross on games tags marks Broken
+setting.broken=toggle|Broken icon|off
+# an hourglass on games tags marks Backlog
+setting.backlog=toggle|Backlog icon|off
+# a trophy on games with every RetroAchievement unlocked, from minarch's local progress
+setting.perfect=toggle|100% achievements trophy|off

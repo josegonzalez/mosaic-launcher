@@ -51,7 +51,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [layout-hero-rail](../plugins/layout-hero-rail/README.md) - Shows the game list as a row of cards under big art for the selected game.
 - [layout-shelf](../plugins/layout-shelf/README.md) - Shows the game list as cartridges standing on shelves.
 - [metadata-band](../plugins/metadata-band/README.md) - Shows a game's year, publisher and genre under its art.
-- [row-badges](../plugins/row-badges/README.md) - Adds dots after a game's name for unplayed, favorite and tagged games, games with a manual, and for tiers.
+- [row-badges](../plugins/row-badges/README.md) - Adds dots after a game's name for unplayed, favorite and tagged games, games with a manual, and for tiers, and icons for status flags and 100% achievements.
 - [switcher-plus](../plugins/switcher-plus/README.md) - Replaces the game switcher with your recent games in a choice of styles.
 - [theme-plus](../plugins/theme-plus/README.md) - Changes colours, fonts, text size and wallpapers from a theme.
 - [transitions](../plugins/transitions/README.md) - Picks how folders open and close and how the game switcher comes in.
@@ -79,7 +79,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [search](../plugins/search/README.md) - Finds games from every system by typing part of a name.
 - [smart-collections](../plugins/smart-collections/README.md) - Sorts your games into collections by franchise, play history, genre and decade.
 - [sort-modes](../plugins/sort-modes/README.md) - Sorts every game list by name, most played, last played, year, publisher or recently added.
-- [tags](../plugins/tags/README.md) - Lets you put your own tags on games, shown as folders.
+- [tags](../plugins/tags/README.md) - Lets you put your own tags on games, shown as folders, and mark games Completed, Beaten, Broken or Backlog.
 - [title-disambiguation](../plugins/title-disambiguation/README.md) - Adds what tells two same-named games apart, only when needed.
 
 ## Launching games

@@ -262,28 +262,97 @@ int RB_tier(const char* value) {
 
 int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, int marks, int tier,
 	MosaicRect* out) {
+	return RB_layout(rect, name, dot, dot, gap, marks, 0, tier, out);
+}
+
+int RB_layout(const MosaicRect* rect, const MosaicRect* name, int dot, int icon, int gap, int marks, int icons,
+	int tier, MosaicRect* out) {
 	if (!rect || dot <= 0 || gap < 0) return 0;
 	if (marks < 0) marks = 0;
 	if (marks > RB_MAX_MARKS) marks = RB_MAX_MARKS;
+	if (icons < 0 || icon <= 0) icons = 0;
+	if (icons > RB_ICONS) icons = RB_ICONS;
 	if (tier < 0) tier = 0;
 	if (tier > RB_MAX_TIER) tier = RB_MAX_TIER;
-	int count = marks + tier;
+	int count = marks + icons + tier;
 	if (!count) return 0;
-	int width = count * dot + (count - 1) * gap + (marks && tier ? gap : 0);
+	int groups = (marks > 0) + (icons > 0) + (tier > 0);
+	int width = (marks + tier) * dot + icons * icon + (count - 1) * gap + (groups - 1) * gap;
+	int height = icons && icon > dot ? icon : dot;
 	int margin = gap * 2;
 	int right = rect->x + rect->w - margin;
 	int x = name && name->w > 0 ? name->x + name->w + margin : right;
-	int y;
+	int top;
 	if (x + width <= right) {
-		y = name->y + (name->h - dot) / 2;
+		top = name->y + (name->h - height) / 2;
 	} else {
 		x = right - width;
-		y = rect->y + margin;
+		top = rect->y + margin;
 	}
-	if (x < rect->x || y < rect->y || y + dot > rect->y + rect->h) return 0;
+	if (x < rect->x || top < rect->y || top + height > rect->y + rect->h) return 0;
 	for (int i = 0; i < count; i++) {
-		out[i] = (MosaicRect){ x, y, dot, dot };
-		x += dot + gap + (marks && i == marks - 1 ? gap : 0);
+		int size = i >= marks && i < marks + icons ? icon : dot;
+		out[i] = (MosaicRect){ x, top + (height - size) / 2, size, size };
+		x += size + gap;
+		// twice the gap after the last of a group with another after it
+		if ((i == marks - 1 && icons + tier) || (icons && i == marks + icons - 1 && tier)) x += gap;
 	}
 	return count;
+}
+
+///////////////////////////////////////
+// status flags and the trophy
+
+static const char* const flag_sets[RB_FLAGS] = { "tags.status.completed", "tags.status.beaten", "tags.status.broken", "tags.status.backlog" };
+
+// each icon's picture, a row a string, # for a filled cell
+static const char* const pictures[RB_ICONS][RB_ICON_CELLS] = {
+	// Completed: a star
+	{ "...#...", "..###..", "#######", ".#####.", "..###..", ".##.##.", ".#...#." },
+	// Beaten: a tick
+	{ ".....##", "....###", "#..###.", "#####..", ".###...", "..#....", "......." },
+	// Broken: a cross
+	{ "##...##", "###.###", ".#####.", "..###..", ".#####.", "###.###", "##...##" },
+	// Backlog: an hourglass
+	{ "#######", ".#...#.", "..#.#..", "...#...", "..###..", ".#####.", "#######" },
+	// 100%: a trophy
+	{ "#.###.#", "#.###.#", ".#####.", "..###..", "...#...", "..###..", ".#####." },
+};
+
+const char* RB_flagSet(int icon) {
+	return icon >= 0 && icon < RB_FLAGS ? flag_sets[icon] : NULL;
+}
+
+int RB_flagOf(const char* set) {
+	if (!set) return -1;
+	for (int i = 0; i < RB_FLAGS; i++) {
+		if (!strcmp(flag_sets[i], set)) return i;
+	}
+	return -1;
+}
+
+int RB_iconCell(int icon, int x, int y) {
+	if (icon < 0 || icon >= RB_ICONS || x < 0 || y < 0 || x >= RB_ICON_CELLS || y >= RB_ICON_CELLS) return 0;
+	return pictures[icon][y][x] == '#';
+}
+
+int RB_iconRects(int icon, int x, int y, int unit, MosaicRect* out, int max) {
+	int count = 0;
+	if (unit <= 0) return 0;
+	for (int row = 0; row < RB_ICON_CELLS; row++) {
+		for (int col = 0; col < RB_ICON_CELLS; col++) {
+			if (!RB_iconCell(icon, col, row)) continue;
+			int run = col;
+			while (run < RB_ICON_CELLS && RB_iconCell(icon, run, row)) run++;
+			if (count >= max) return count;
+			out[count++] = (MosaicRect){ x + col * unit, y + row * unit, (run - col) * unit, unit };
+			col = run;
+		}
+	}
+	return count;
+}
+
+int RB_perfect(int rc, int total, int unlocked) {
+	if (rc == MOSAIC_ACHIEVEMENTS_UNKNOWN) return -1;
+	return rc == 1 && total > 0 && unlocked >= total;
 }

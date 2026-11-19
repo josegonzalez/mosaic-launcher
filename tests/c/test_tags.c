@@ -14,6 +14,7 @@
 #endif
 #define CARD TEST_SDCARD_PATH
 #define STORE CARD "/.userdata/desktop/launcher/tags.txt"
+#define STATUS CARD "/.userdata/desktop/launcher/status.txt"
 
 static void writeFile(const char* path, const char* text) {
 	char dir[1024];
@@ -259,8 +260,10 @@ static void fakeLog(const char* id, const char* m) {
 	snprintf(logged + strlen(logged), sizeof(logged) - strlen(logged), "%s\n", m);
 }
 static const char* cfg_root = "on";
+static const char* cfg_status_button = NULL;
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "root")) return cfg_root;
+	if (!strcmp(key, "status_button") && cfg_status_button) return cfg_status_button;
 	return fallback;
 }
 static MosaicEntry* fakeEntryNew(const char* path, int type, const char* name) {
@@ -324,10 +327,11 @@ static int findAction(const char* id) {
 	}
 	return -1;
 }
-static int bound_button = -1;
+static int bound_button = -1, bound_status = -1;
 static int fakeBind(int screen, int button, int trigger, const char* id) {
-	(void)screen; (void)trigger; (void)id;
-	bound_button = button;
+	(void)screen; (void)trigger;
+	if (!strcmp(id, "tags.status")) bound_status = button;
+	else bound_button = button;
 	return 0;
 }
 static char tile_ids[16][32];
@@ -344,15 +348,19 @@ static int fakeOpenPath(const char* path, int type) {
 	snprintf(opened, sizeof(opened), "%s", path);
 	return 1;
 }
-static MosaicScreenHooks registered;
+static MosaicScreenHooks registered, checklist_hooks, status_hooks;
 static int fakeRegisterScreen(const char* id, const MosaicScreenHooks* hooks) {
-	CHECK_STR(id, SCREEN_ID);
-	registered = *hooks;
+	if (!strcmp(id, SCREEN_ID)) checklist_hooks = *hooks;
+	else if (!strcmp(id, STATUS_SCREEN_ID)) status_hooks = *hooks;
+	else CHECK_STR(id, SCREEN_ID);
 	return 0;
 }
 static int screen_open = 0;
 static int fakeOpenScreen(const char* id) {
-	if (strcmp(id, SCREEN_ID) || screen_open) return -1;
+	if (screen_open) return -1;
+	if (!strcmp(id, SCREEN_ID)) registered = checklist_hooks;
+	else if (!strcmp(id, STATUS_SCREEN_ID)) registered = status_hooks;
+	else return -1;
 	if (registered.enter(registered.data) != 0) return -1;
 	screen_open = 1;
 	return 0;
@@ -434,6 +442,7 @@ static int press(int button) {
 
 static void start(void) {
 	logged[0] = '\0';
+	bound_status = -1;
 	action_count = 0;
 	tile_count = 0;
 	reloads = 0;
@@ -709,14 +718,146 @@ static void testMove(void) {
 	fake_provider_count = 0;
 	start();
 	fake_set_changed[0] = '\0';
-	CHECK_STR(move("from=" CARD "/Roms/PS/Game.m3u\nto=" CARD "/Roms/PS/Game/Game.m3u"), "tags=1");
+	CHECK_STR(move("from=" CARD "/Roms/PS/Game.m3u\nto=" CARD "/Roms/PS/Game/Game.m3u"), "tags=1\nstatus=0");
 	CHECK_STR(fakeSetList("tags:Puzzle"), CARD "/Roms/PS/Game/Game.m3u\n");
 	CHECK(strstr(fake_set_changed, "tags:Puzzle\n") != NULL);
-	CHECK_STR(move("from=" CARD "/Roms/PS/Game.m3u\nto=" CARD "/Roms/PS/Game/Game.m3u"), "tags=0");
+	CHECK_STR(move("from=" CARD "/Roms/PS/Game.m3u\nto=" CARD "/Roms/PS/Game/Game.m3u"), "tags=0\nstatus=0");
+	// the game's status flags move with it
+	writeFile(STATUS, "beaten\nbeaten\t/Roms/PS/Old.m3u\nbacklog\nbacklog\t/Roms/PS/Old.m3u\nbacklog\t/Roms/PS/Other.m3u\n");
+	fake_set_changed[0] = '\0';
+	CHECK_STR(move("from=" CARD "/Roms/PS/Old.m3u\nto=" CARD "/Roms/PS/New.m3u"), "tags=0\nstatus=2");
+	CHECK_STR(readText(STATUS), "backlog\nbacklog\t/Roms/PS/New.m3u\nbacklog\t/Roms/PS/Other.m3u\nbeaten\nbeaten\t/Roms/PS/New.m3u\n");
+	CHECK_STR(fake_set_changed, "tags.status.beaten\ntags.status.backlog\n");
+	CHECK(strstr(logged, "moved /Roms/PS/Old.m3u to /Roms/PS/New.m3u in 2 flags") != NULL);
+	unlink(STATUS);
 	CHECK_STR(move("from=/elsewhere/Game.m3u\nto=" CARD "/Roms/PS/Game.m3u"), "error=path");
 	char reply[64];
 	CHECK(fakeCall("tags.move", "from=" CARD "/Roms/PS/Game.m3u", reply, sizeof(reply)) == MOSAIC_CALL_FAILED);
 	quit();
+	fake_set_count = 0;
+	fake_provider_count = 0;
+}
+
+// The status flags on their own: each on or off by itself, kept in a store
+// of their own by key.
+static void testStatusModel(void) {
+	CHECK_STR(ST_key(ST_COMPLETED), "completed");
+	CHECK_STR(ST_key(ST_BACKLOG), "backlog");
+	CHECK(ST_key(ST_FLAGS) == NULL && ST_key(-1) == NULL && ST_label(9) == NULL);
+	CHECK_STR(ST_label(ST_BEATEN), "Beaten");
+	CHECK(ST_fromKey("broken") == ST_BROKEN && ST_fromKey("Broken") == -1 && ST_fromKey(NULL) == -1);
+	CHECK(ST_fromSet("tags.status.beaten") == ST_BEATEN && ST_fromSet("tags:beaten") == -1 && ST_fromSet("status:") == -1);
+
+	TGStore st;
+	TG_init(&st);
+	CHECK(ST_flags(&st, "/Roms/GB/Tetris.gb") == 0);
+	CHECK(ST_set(&st, ST_BEATEN, "/Roms/GB/Tetris.gb", 0) == 0);
+	CHECK(st.count == 0); // clearing a flag nobody has adds nothing
+	CHECK(ST_set(&st, ST_BEATEN, "/Roms/GB/Tetris.gb", 1) == 1);
+	CHECK(ST_set(&st, ST_COMPLETED, "/Roms/GB/Tetris.gb", 1) == 1);
+	CHECK(ST_set(&st, ST_COMPLETED, "/Roms/GB/Tetris.gb", 1) == 0);
+	CHECK(ST_set(&st, ST_BROKEN, "/Roms/GB/Zelda.gb", 1) == 1);
+	CHECK(ST_set(&st, ST_BACKLOG, "/Roms/GB/Zelda.gb", 1) == 1);
+	CHECK(ST_flags(&st, "/Roms/GB/Tetris.gb") == ((1u << ST_BEATEN) | (1u << ST_COMPLETED)));
+	CHECK(ST_flags(&st, "/Roms/GB/Zelda.gb") == ((1u << ST_BROKEN) | (1u << ST_BACKLOG)));
+	CHECK(ST_has(&st, ST_BEATEN, "/Roms/GB/Tetris.gb") && !ST_has(&st, ST_BEATEN, "/Roms/GB/Zelda.gb"));
+	CHECK(ST_count(&st, ST_COMPLETED) == 1 && ST_count(&st, ST_BACKLOG) == 1);
+	CHECK(ST_set(&st, ST_BEATEN, "/Roms/GB/Tetris.gb", 0) == 1);
+	CHECK(ST_flags(&st, "/Roms/GB/Tetris.gb") == (1u << ST_COMPLETED));
+	CHECK(ST_set(&st, ST_FLAGS, "/Roms/GB/Tetris.gb", 1) == -1);
+	CHECK(ST_set(&st, ST_BEATEN, "Roms/GB/Tetris.gb", 1) == -1);
+	char* text = TG_format(&st);
+	CHECK_STR(text, "backlog\nbacklog\t/Roms/GB/Zelda.gb\nbroken\nbroken\t/Roms/GB/Zelda.gb\ncompleted\ncompleted\t/Roms/GB/Tetris.gb\n");
+	free(text);
+	// a flag's line in another case still counts, and other names are kept
+	CHECK(TG_parse(&st, "Beaten\nBeaten\t/Roms/GB/A.gb\nplaying\nplaying\t/Roms/GB/A.gb\n") == 0);
+	CHECK(ST_flags(&st, "/Roms/GB/A.gb") == (1u << ST_BEATEN));
+	CHECK(ST_set(&st, ST_BEATEN, "/Roms/GB/B.gb", 1) == 1 && st.count == 2);
+	text = TG_format(&st);
+	CHECK_STR(text, "Beaten\nBeaten\t/Roms/GB/A.gb\nBeaten\t/Roms/GB/B.gb\nplaying\nplaying\t/Roms/GB/A.gb\n");
+	free(text);
+	TG_free(&st);
+}
+
+// The status menu: its own action and screen, a flag at a time, saved
+// apart from the tags, and a set per flag.
+static void testStatus(void) {
+	unlink(STATUS);
+	writeFile(STORE, "Puzzle\nPuzzle\t/Roms/GB/Tetris.gb\n");
+	writeFile(CARD "/Roms/GB/Tetris.gb", "");
+	fake_set_count = 0;
+	fake_provider_count = 0;
+	start();
+	CHECK(strstr(logged, "status: 0 completed, 0 beaten, 0 broken, 0 backlog") != NULL);
+	// no button by default
+	CHECK(bound_status == -1);
+	CHECK(fakeSetFind("tags.status.completed") >= 0 && fakeSetFind("tags.status.beaten") >= 0 && fakeSetFind("tags.status.broken") >= 0
+		&& fakeSetFind("tags.status.backlog") >= 0);
+	CHECK_STR(fakeSetList("tags.status.beaten"), "");
+	int at = findAction("tags.status");
+	CHECK(at >= 0 && !strcmp(actions[at].label, "STATUS"));
+	pick(CARD "/Roms/GB", MOSAIC_ENTRY_DIR, "GB");
+	CHECK(!actions[at].available(NULL, NULL));
+	pick(CARD "/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM, "Tetris");
+	CHECK(actions[at].available(NULL, NULL));
+	actions[at].run(NULL, NULL);
+	CHECK(screen_open);
+	CHECK(strstr(logged, "status for /Roms/GB/Tetris.gb: 0") != NULL);
+	CHECK(!actions[at].available(NULL, NULL));
+	CHECK(!actions[findAction("tags.edit")].available(NULL, NULL));
+
+	// rows: Completed, Beaten, Broken, Backlog; any combination
+	fake_set_changed[0] = '\0';
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(flag_selected == ST_BEATEN);
+	press(MOSAIC_BUTTON_A);
+	CHECK(strstr(logged, "set beaten on /Roms/GB/Tetris.gb") != NULL);
+	press(MOSAIC_BUTTON_UP);
+	press(MOSAIC_BUTTON_A);
+	press(MOSAIC_BUTTON_UP); // wraps to Backlog
+	CHECK(flag_selected == ST_BACKLOG);
+	press(MOSAIC_BUTTON_A);
+	press(MOSAIC_BUTTON_A);
+	CHECK(strstr(logged, "cleared backlog on /Roms/GB/Tetris.gb") != NULL);
+	CHECK_STR(fake_set_changed, "tags.status.beaten\ntags.status.completed\ntags.status.backlog\ntags.status.backlog\n");
+	CHECK_STR(readText(STATUS), "beaten\nbeaten\t/Roms/GB/Tetris.gb\ncompleted\ncompleted\t/Roms/GB/Tetris.gb\n");
+	CHECK_STR(fakeSetList("tags.status.beaten"), CARD "/Roms/GB/Tetris.gb\n");
+	CHECK_STR(fakeSetList("tags.status.backlog"), "");
+	CHECK(fakeSetHas("tags.status.completed", CARD "/Roms/GB/Tetris.gb") == 1);
+	CHECK(fakeSetHas("tags.status.broken", CARD "/Roms/GB/Tetris.gb") == 0);
+	CHECK(press(MOSAIC_BUTTON_B) == MOSAIC_SCREEN_CLOSE);
+	CHECK(!screen_open && actions[at].available(NULL, NULL));
+
+	// never a tag: the tags, their sets and the Tags folder don't change
+	CHECK_STR(readText(STORE), "Puzzle\nPuzzle\t/Roms/GB/Tetris.gb\n");
+	CHECK(fakeSetFind("tags:beaten") < 0 && fakeSetFind("tags:completed") < 0);
+	MosaicList* list = virtualDir(CARD "/Tags");
+	CHECK(list && list->count == 1);
+	listFree(list);
+	CHECK(store.count == 1);
+
+	// a file another process wrote is read again
+	writeFile(STATUS, "broken\nbroken\t/Roms/GB/Tetris.gb\n");
+	CHECK(fakeSetHas("tags.status.broken", CARD "/Roms/GB/Tetris.gb") == 1);
+	CHECK(fakeSetHas("tags.status.beaten", CARD "/Roms/GB/Tetris.gb") == 0);
+	quit();
+
+	// the button setting
+	cfg_status_button = "L2";
+	fake_set_count = 0;
+	fake_provider_count = 0;
+	start();
+	CHECK(bound_status == MOSAIC_BUTTON_L2);
+	CHECK(strstr(logged, "status: 0 completed, 0 beaten, 1 broken, 0 backlog") != NULL);
+	quit();
+	cfg_status_button = "SELECT";
+	fake_set_count = 0;
+	fake_provider_count = 0;
+	start();
+	CHECK(bound_status == MOSAIC_BUTTON_SELECT);
+	quit();
+	cfg_status_button = NULL;
+	unlink(STATUS);
 	fake_set_count = 0;
 	fake_provider_count = 0;
 }
@@ -731,5 +872,7 @@ int main(void) {
 	testPlugin();
 	testCopy();
 	testMove();
+	testStatusModel();
+	testStatus();
 	CHECK_DONE();
 }

@@ -115,4 +115,49 @@ int RB_tier(const char* value);
 int RB_place(const MosaicRect* rect, const MosaicRect* name, int dot, int gap, int marks, int tier,
 	MosaicRect* out);
 
+///////////////////////////////////////
+// status flags and the 100% trophy, as small icons
+
+// The icons, in the order they're drawn: tags' four status flags, then
+// the trophy for 100% of a game's RetroAchievements unlocked.
+enum RBIcon {
+	RB_ICON_COMPLETED,
+	RB_ICON_BEATEN,
+	RB_ICON_BROKEN,
+	RB_ICON_BACKLOG,
+	RB_ICON_TROPHY,
+	RB_ICONS,
+};
+#define RB_FLAGS RB_ICON_TROPHY // the icons that are status flags
+#define RB_ICON_CELLS 7          // each icon is a picture this many cells square
+#define RB_ICON_RECTS 28         // the most rects RB_iconRects gives for one
+#define RB_MAX_BADGES (RB_MAX_MARKS + RB_ICONS + RB_MAX_TIER)
+
+// The entry set tags keeps a status flag in, eg. "tags.status.beaten", or
+// NULL for an icon that isn't a flag.
+const char* RB_flagSet(int icon);
+// The flag an entry set's name names, or -1.
+int RB_flagOf(const char* set);
+
+// Whether cell (x, y) of the icon's picture is filled, from its top left.
+int RB_iconCell(int icon, int x, int y);
+// The icon's picture at x, y with cells unit pixels square, as one rect
+// for each run of filled cells in a row. Writes up to max and returns how
+// many.
+int RB_iconRects(int icon, int x, int y, int unit, MosaicRect* out, int max);
+
+// Whether host->achievements' answer (rc, with the game's total and
+// unlocked) is 100%: 1 when the game has achievements and every one is
+// unlocked, in either mode, 0 when not or when it has none, and -1 while
+// it's still MOSAIC_ACHIEVEMENTS_UNKNOWN.
+int RB_perfect(int rc, int total, int unlocked);
+
+// RB_place with icons too: marks one-dot marks, then icons icons, each
+// icon pixels square, then tier tier dots, a gap apart, with twice the gap
+// between the groups, each centred on the same line. Writes up to
+// RB_MAX_BADGES rects and returns how many, or 0 when there are none or
+// they don't fit in rect.
+int RB_layout(const MosaicRect* rect, const MosaicRect* name, int dot, int icon, int gap, int marks, int icons,
+	int tier, MosaicRect* out);
+
 #endif

@@ -22,8 +22,32 @@ msgid_plural "%i games"
 msgstr[0] ""
 msgstr[1] ""
 
+#: status_model.c
+msgid "Backlog"
+msgstr ""
+
+#: status_model.c
+msgid "Beaten"
+msgstr ""
+
+#: status_model.c
+msgid "Broken"
+msgstr ""
+
+#: status_model.c
+msgid "Completed"
+msgstr ""
+
 #: tags.c
 msgid "Couldn't save tags"
+msgstr ""
+
+#: tags.c
+msgid "Couldn't save the status"
+msgstr ""
+
+#: tags.c
+msgid "Couldn't set that"
 msgstr ""
 
 #: tags.c
@@ -44,7 +68,7 @@ msgid "L2"
 msgstr ""
 
 #: plugin.txt
-msgid "Lets you put your own tags on games, and shows each tag as a folder."
+msgid "Lets you put your own tags on games, and shows each tag as a folder. A Status menu marks games Completed, Beaten, Broken or Backlog."
 msgstr ""
 
 #: tags.c
@@ -57,6 +81,18 @@ msgstr ""
 
 #: plugin.txt
 msgid "R2"
+msgstr ""
+
+#: plugin.txt
+msgid "SELECT"
+msgstr ""
+
+#: tags.c
+msgid "STATUS"
+msgstr ""
+
+#: plugin.txt
+msgid "Status button"
 msgstr ""
 
 #: tags.c
@@ -89,6 +125,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Y"
+msgstr ""
+
+#: plugin.txt
+msgid "none"
 msgstr ""
 
 #: tags.c

@@ -15,7 +15,27 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: plugin.txt
-msgid "Adds small dots after a game's name for games you haven't played, your favorites, games with a tag or a manual, and tiers."
+msgid "100% achievements trophy"
+msgstr ""
+
+#: plugin.txt
+msgid "Adds small dots after a game's name for games you haven't played, your favorites, games with a tag or a manual, and tiers, and icons for a game's status and for 100% of its achievements."
+msgstr ""
+
+#: plugin.txt
+msgid "Backlog icon"
+msgstr ""
+
+#: plugin.txt
+msgid "Beaten icon"
+msgstr ""
+
+#: plugin.txt
+msgid "Broken icon"
+msgstr ""
+
+#: plugin.txt
+msgid "Completed icon"
 msgstr ""
 
 #: plugin.txt

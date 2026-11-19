@@ -10,7 +10,17 @@
 // main colour, games in the manual set the manuals plugin keeps (the
 // "manual" setting). The sets are read when the launcher builds a list,
 // back from a game and when one of them changes (launcher.set_changed),
-// never while drawing. All are off by default.
+// never while drawing.
+//
+// After the dots come small icons in its list text colour, on a square in
+// its background colour: one for each of tags' status flags, from its
+// tags.status.<key> sets (the "completed", "beaten", "broken" and "backlog"
+// settings), and a trophy on games with every RetroAchievement unlocked
+// (the "perfect" setting), from what minarch keeps on the card through the
+// host's achievements call. That's asked for each game in a list when the
+// launcher builds it, and again from tick for the games whose hash isn't
+// worked out yet, never while drawing, and only when the card has any
+// achievement sets cached. All are off by default.
 //
 // A game counts as played when it's in recents, when stock or minarch
 // left a file for it: a save in Saves/<tag>/, a state in
@@ -47,6 +57,14 @@ static RBSet played;
 static RBSet favorites; // the favorites set's paths, while its mark is on
 static RBSet tagged;    // every tags:<name> set's paths, while its mark is on
 static RBSet manual;    // the manual set's paths, while its mark is on
+static int show_flag[RB_FLAGS];
+static RBSet flagged[RB_FLAGS]; // each tags.status.<key> set's paths, while its icon is on
+static int show_perfect = 0;
+static RBSet perfect; // games with every achievement unlocked, as asked so far
+static char** waiting = NULL; // games whose achievements aren't known yet
+static int waiting_count = 0;
+static unsigned long waiting_asked = 0;
+#define WAIT_MS 500 // how often tick asks about them again
 
 static int isOn(const char* key) {
 	return !strcmp(host->cfg_get(key, "off"), "on");
@@ -130,6 +148,25 @@ static void readSets(void) {
 		host->set_names(addTagged, NULL);
 		RB_setFinish(&tagged);
 	}
+	int any_flag = 0;
+	for (int i = 0; i < RB_FLAGS; i++) {
+		if (!show_flag[i]) continue;
+		any_flag = 1;
+		RB_setFree(&flagged[i]);
+		host->set_list(RB_flagSet(i), addPath, &flagged[i]);
+		RB_setFinish(&flagged[i]);
+	}
+	if (any_flag) {
+		// logged when it changes, for tests and bug reports
+		static char logged_flags[128];
+		char message[128];
+		snprintf(message, sizeof(message), "status icons: completed %i, beaten %i, broken %i, backlog %i", flagged[0].count,
+			flagged[1].count, flagged[2].count, flagged[3].count);
+		if (strcmp(message, logged_flags) != 0) {
+			host->log(ID, message);
+			snprintf(logged_flags, sizeof(logged_flags), "%s", message);
+		}
+	}
 	if (show_manual) {
 		RB_setFree(&manual);
 		int count = host->set_list("manual", addPath, &manual);
@@ -159,8 +196,9 @@ static void setChanged(const char* name, const char* payload, void* data) {
 	(void)data;
 	char set[256];
 	if (host->event_value(payload, "name", set, sizeof(set)) < 0) return;
+	int flag = RB_flagOf(set);
 	if ((show_favorites && !strcmp(set, "favorites")) || (show_tagged && !strncmp(set, "tags:", 5))
-			|| (show_manual && !strcmp(set, "manual"))) {
+			|| (show_manual && !strcmp(set, "manual")) || (flag >= 0 && show_flag[flag])) {
 		readSets();
 		host->request_redraw();
 	}
@@ -184,14 +222,107 @@ static int providePlayed(const char* name, const char* args, char* out, size_t s
 	return RB_reply(RB_isPlayed(&played, roms, path, is_dir, inHistory, NULL), out, size);
 }
 
+///////////////////////////////////////
+// the trophy
+
+static void clearWaiting(void) {
+	for (int i = 0; i < waiting_count; i++) free(waiting[i]);
+	free(waiting);
+	waiting = NULL;
+	waiting_count = 0;
+}
+
+// Logged when it changes, for tests and bug reports.
+static void logPerfect(void) {
+	static int logged_count = -1, logged_waiting = -1;
+	if (perfect.count == logged_count && waiting_count == logged_waiting) return;
+	char message[96];
+	snprintf(message, sizeof(message), "100%% mark on %i games, %i waiting", perfect.count, waiting_count);
+	host->log(ID, message);
+	logged_count = perfect.count;
+	logged_waiting = waiting_count;
+}
+
+// Asks about a game: 1 when it's 100% and new, 0 when it isn't or was
+// known, -1 while its hash isn't worked out.
+static int askPerfect(const char* path) {
+	if (RB_pathsHas(&perfect, path)) return 0;
+	MosaicAchievements progress = { .size = sizeof(MosaicAchievements) };
+	int rc = host->achievements(path, &progress);
+	int full = RB_perfect(rc, progress.total, progress.unlocked);
+	if (full == 1 && RB_pathsAdd(&perfect, path) != 0) return 0;
+	return full;
+}
+
+// Every game in the list, as it's built.
+static void askList(const MosaicList* list) {
+	clearWaiting();
+	int count = list ? host->list_count(list) : 0;
+	int added = 0;
+	for (int i = 0; i < count; i++) {
+		const MosaicEntry* entry = host->list_get(list, i);
+		if (!entry || host->entry_type(entry) != MOSAIC_ENTRY_ROM) continue;
+		const char* path = host->entry_path(entry);
+		if (!path) continue;
+		int full = askPerfect(path);
+		if (full == 1) added = 1;
+		if (full >= 0) continue;
+		char** more = realloc(waiting, (size_t)(waiting_count + 1) * sizeof(char*));
+		if (!more) break;
+		waiting = more;
+		if (!(waiting[waiting_count] = strdup(path))) break;
+		waiting_count++;
+	}
+	if (added) RB_setFinish(&perfect);
+	logPerfect();
+}
+
+// The games that weren't known yet, every WAIT_MS until they are.
+static void tick(unsigned long now) {
+	if (!waiting_count || now - waiting_asked < WAIT_MS) return;
+	waiting_asked = now;
+	int added = 0, kept = 0;
+	for (int i = 0; i < waiting_count; i++) {
+		int full = askPerfect(waiting[i]);
+		if (full == 1) added = 1;
+		if (full < 0) waiting[kept++] = waiting[i];
+		else free(waiting[i]);
+	}
+	waiting_count = kept;
+	if (added) {
+		RB_setFinish(&perfect);
+		host->request_redraw();
+	}
+	logPerfect();
+}
+
+// Whether minarch left any achievement set on the card, so a card that
+// never had RetroAchievements on gets nothing hashed.
+static int anyCached(void) {
+	char dir[MAX_PATH_LEN];
+	snprintf(dir, sizeof(dir), "%s/.userdata/shared/.ra/offline/cache", host->sdcard_path);
+	DIR* dh = opendir(dir);
+	if (!dh) return 0;
+	struct dirent* dp;
+	int found = 0;
+	while (!found && (dp = readdir(dh)) != NULL) {
+		found = !strncmp(dp->d_name, "achievementsets_", 16) || !strncmp(dp->d_name, "patch_", 6);
+	}
+	closedir(dh);
+	return found;
+}
+
+static int ra_cached = 0;
+
 static void listReady(const MosaicList* list, const char* dir_path) {
-	(void)list;
 	(void)dir_path;
 	refresh();
+	if (show_perfect && ra_cached) askList(list);
 }
 
 static void postReturn(void) {
 	refresh();
+	if (show_perfect) ra_cached = anyCached();
 }
 
 static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const MosaicRow* row) {
@@ -206,27 +337,42 @@ static int decorateRow(MosaicSurface* screen, const MosaicEntry* entry, const Mo
 	if (show_favorites && RB_hasGame(&favorites, path, is_dir)) colors[marks++] = MOSAIC_COLOR_ACCENT2;
 	if (show_tagged && RB_hasGame(&tagged, path, is_dir)) colors[marks++] = MOSAIC_COLOR_HINT;
 	if (show_manual && RB_hasGame(&manual, path, is_dir)) colors[marks++] = MOSAIC_COLOR_MAIN;
+	int icons[RB_ICONS];
+	int icon_count = 0;
+	for (int i = 0; i < RB_FLAGS; i++) {
+		if (show_flag[i] && RB_hasGame(&flagged[i], path, is_dir)) icons[icon_count++] = i;
+	}
+	if (show_perfect && type == MOSAIC_ENTRY_ROM && RB_pathsHas(&perfect, path)) icons[icon_count++] = RB_ICON_TROPHY;
 	int tier = 0;
 	if (show_tiers) {
 		char value[16];
 		if (host->entry_info(entry, "tier", value, sizeof(value)) == 1) tier = RB_tier(value);
 	}
-	if (!marks && !tier) return 0;
+	if (!marks && !icon_count && !tier) return 0;
 
 	int scale = host->screen_scale();
 	if (scale < 1) scale = 1;
-	MosaicRect dots[RB_MAX_MARKS + RB_MAX_TIER];
-	int count = RB_place(&row->rect, &row->name, 4 * scale, 2 * scale, marks, tier, dots);
+	MosaicRect dots[RB_MAX_BADGES];
+	int count = RB_layout(&row->rect, &row->name, 4 * scale, RB_ICON_CELLS * scale, 2 * scale, marks, icon_count, tier, dots);
 	int text = host->theme_color(MOSAIC_COLOR_LIST_TEXT);
 	int background = host->theme_color(MOSAIC_COLOR_BACKGROUND);
+	if (text < 0) text = 0xFFFFFF;
 	if (background < 0) background = 0x000000;
+	MosaicColor back = mosaic_color((unsigned int)background, 255);
 	for (int i = 0; i < count; i++) {
-		int rgb = i < marks ? host->theme_color(colors[i]) : text;
-		if (rgb < 0) rgb = 0xFFFFFF;
 		// a ring in the background colour keeps the dot apart from a
 		// layout's selection or art drawn in the same colour
 		MosaicRect ring = { dots[i].x - scale, dots[i].y - scale, dots[i].w + 2 * scale, dots[i].h + 2 * scale };
-		host->fill_round_rect(screen, &ring, ring.w / 2, mosaic_color((unsigned int)background, 255));
+		if (i >= marks && i < marks + icon_count) {
+			host->fill_round_rect(screen, &ring, scale, back);
+			MosaicRect cells[RB_ICON_RECTS];
+			int n = RB_iconRects(icons[i - marks], dots[i].x, dots[i].y, scale, cells, RB_ICON_RECTS);
+			for (int c = 0; c < n; c++) host->fill_rect(screen, &cells[c], mosaic_color((unsigned int)text, 255));
+			continue;
+		}
+		int rgb = i < marks ? host->theme_color(colors[i]) : text;
+		if (rgb < 0) rgb = 0xFFFFFF;
+		host->fill_round_rect(screen, &ring, ring.w / 2, back);
 		host->fill_round_rect(screen, &dots[i], dots[i].w / 2, mosaic_color((unsigned int)rgb, 255));
 	}
 	return 0;
@@ -237,6 +383,9 @@ static void quit(void) {
 	RB_setFree(&favorites);
 	RB_setFree(&tagged);
 	RB_setFree(&manual);
+	for (int i = 0; i < RB_FLAGS; i++) RB_setFree(&flagged[i]);
+	RB_setFree(&perfect);
+	clearWaiting();
 	stale = 1;
 }
 
@@ -256,20 +405,36 @@ static int init(const MosaicHost* h) {
 	show_favorites = isOn("favorites");
 	show_tagged = isOn("tagged");
 	show_manual = isOn("manual");
-	if ((show_favorites || show_tagged || show_manual) && !MOSAIC_HOST_HAS(host, set_names)) {
-		host->log(ID, "this launcher has no entry sets, so the favorite, tag and manual marks are off");
-		show_favorites = show_tagged = show_manual = 0;
+	static const char* const flag_keys[RB_FLAGS] = { "completed", "beaten", "broken", "backlog" };
+	int any_flag = 0;
+	for (int i = 0; i < RB_FLAGS; i++) any_flag |= show_flag[i] = isOn(flag_keys[i]);
+	if ((show_favorites || show_tagged || show_manual || any_flag) && !MOSAIC_HOST_HAS(host, set_names)) {
+		host->log(ID, "this launcher has no entry sets, so the favorite, tag, manual and status marks are off");
+		show_favorites = show_tagged = show_manual = any_flag = 0;
+		memset(show_flag, 0, sizeof(show_flag));
 	}
+	show_perfect = isOn("perfect");
+	if (show_perfect && !MOSAIC_HOST_HAS(host, achievements)) {
+		host->log(ID, "this launcher can't read RetroAchievements progress, so the 100% mark is off");
+		show_perfect = 0;
+	}
+	ra_cached = show_perfect && anyCached();
 	RB_setInit(&played);
 	RB_setInit(&favorites);
 	RB_setInit(&tagged);
 	RB_setInit(&manual);
-	if (show_favorites || show_tagged || show_manual) host->subscribe("launcher.set_changed", setChanged, NULL);
+	for (int i = 0; i < RB_FLAGS; i++) RB_setInit(&flagged[i]);
+	RB_setInit(&perfect);
+	waiting_asked = 0;
+	if (show_favorites || show_tagged || show_manual || any_flag) host->subscribe("launcher.set_changed", setChanged, NULL);
 	refresh();
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("games.played", providePlayed) != 0) host->log(ID, "couldn't provide games.played");
-	char message[128];
-	snprintf(message, sizeof(message), "unplayed %s, tiers %s, favorites %s, tagged %s, manual %s", show_unplayed ? "on" : "off",
-		show_tiers ? "on" : "off", show_favorites ? "on" : "off", show_tagged ? "on" : "off", show_manual ? "on" : "off");
+	char message[256];
+	snprintf(message, sizeof(message),
+		"unplayed %s, tiers %s, favorites %s, tagged %s, manual %s, completed %s, beaten %s, broken %s, backlog %s, perfect %s",
+		show_unplayed ? "on" : "off", show_tiers ? "on" : "off", show_favorites ? "on" : "off", show_tagged ? "on" : "off",
+		show_manual ? "on" : "off", show_flag[RB_ICON_COMPLETED] ? "on" : "off", show_flag[RB_ICON_BEATEN] ? "on" : "off",
+		show_flag[RB_ICON_BROKEN] ? "on" : "off", show_flag[RB_ICON_BACKLOG] ? "on" : "off", show_perfect ? "on" : "off");
 	host->log(ID, message);
 	return 0;
 }
@@ -281,6 +446,7 @@ static MosaicPlugin plugin = {
 	.init = init,
 	.quit = quit,
 	.post_return = postReturn,
+	.tick = tick,
 	.list_ready = listReady,
 	.decorate_row = decorateRow,
 };

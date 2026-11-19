@@ -31,8 +31,8 @@ msgstr "¿Borrar la etiqueta %s?"
 msgid "L2"
 msgstr "L2"
 
-msgid "Lets you put your own tags on games, and shows each tag as a folder."
-msgstr "Te deja poner tus propias etiquetas a los juegos y muestra cada etiqueta como una carpeta."
+msgid "Lets you put your own tags on games, and shows each tag as a folder. A Status menu marks games Completed, Beaten, Broken or Backlog."
+msgstr "Te deja poner tus propias etiquetas a los juegos y muestra cada etiqueta como una carpeta. Un menú de estado marca los juegos como Completado, Terminado, Roto o Pendiente."
 
 msgid "New tag"
 msgstr "Nueva etiqueta"
@@ -69,3 +69,33 @@ msgstr "Y"
 
 msgid "unused"
 msgstr "sin usar"
+
+msgid "Backlog"
+msgstr "Pendiente"
+
+msgid "Beaten"
+msgstr "Terminado"
+
+msgid "Broken"
+msgstr "Roto"
+
+msgid "Completed"
+msgstr "Completado"
+
+msgid "Couldn't save the status"
+msgstr "No se pudo guardar el estado"
+
+msgid "Couldn't set that"
+msgstr "No se pudo marcar"
+
+msgid "SELECT"
+msgstr "SELECT"
+
+msgid "STATUS"
+msgstr "ESTADO"
+
+msgid "Status button"
+msgstr "Botón de estado"
+
+msgid "none"
+msgstr "ninguno"

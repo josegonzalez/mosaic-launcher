@@ -1,6 +1,6 @@
 # tags
 
-Lets you put your own tags on games, and shows each tag as a folder.
+Lets you put your own tags on games, and shows each tag as a folder. A Status menu marks games Completed, Beaten, Broken or Backlog.
 
 ## Turn it on
 
@@ -28,6 +28,17 @@ A game is tagged as stock records it in recents: a game folder or a disc of a mu
 
 Names are trimmed, up to 63 bytes, and can't have a slash or start with a dot or `#`.
 
+### Status
+
+The Status menu marks a game Completed, Beaten, Broken or Backlog. Each is on or off by itself, so a game can be Beaten and Completed, or Broken and Backlog. It has no button until you pick one with the Status button setting; the action is `tags.status`, so an [FN button](../../docs/glossary.md#fn-button) can open it too. It opens for the selected game, the same games as the tag checklist.
+
+| Button | What it does |
+|---|---|
+| **A** | Sets or clears a status |
+| **B** | Goes back |
+
+The statuses are kept apart from the tags: they never show as tags, in the Tags folder or as tiles. [`row-badges`](../row-badges/README.md) can show an icon for each.
+
 A [smart collection](../smart-collections/README.md) can become a tag too, with Save as tag on it, and [`search`](../search/README.md) finds a tag's games with `tag:<name>`.
 
 ## Screenshots
@@ -44,11 +55,16 @@ Each tag's tile on the quick menu.
 
 ![Each tag's tile on the quick menu](docs/tiles.png)
 
+A game's Status menu, with the Status button on Y beside the Tags button, which opens a menu of both, for a game marked Beaten and Completed.
+
+![A game's Status menu, with Beaten and Completed set](docs/status.png)
+
 ## Settings
 
 | Setting | Choices | Default | What it does |
 |---|---|---|---|
 | Tags button (`button`) | Y, L2, R2 | Y | The game list button that opens the selected game's tag checklist, shared with other plugins' actions on it |
+| Status button (`status_button`) | none, Y, L2, R2, SELECT | none | The game list button that opens the selected game's Status menu, shared with other plugins' actions on it |
 | Tags folder on the root (`root`) | on, off | on | A Tags folder on the first screen, with a folder per tag, shown while a tag has a game |
 | Tag tiles on the quick menu (`tiles`) | on, off | on | A quick menu tile per tag with games, as the launcher starts |
 
@@ -56,9 +72,11 @@ Each tag's tile on the quick menu.
 
 - Provides the `tags:<name>` entry sets (`provides=sets.tags`), with the name exactly as the tag has it. They're announced as changed (`launcher.set_changed`) each time a game is tagged or untagged with it, or it's deleted.
 - Provides the `tags.copy` service (`provides=tags.copy`), which makes a new tag from another set's games, once: the tag doesn't follow the set afterwards. Call it with `tag=<name>` and `set=<set name>`. It replies `tag=<the name as saved>` and `games=<how many>`, or `error=` with `exists` (a tag already has the name, ignoring case), `name` (not a name a tag can have), `set` (nobody registered the set), `empty` (no games in it), `full` (too many tags or games) or `save` (the file couldn't be written). smart-collections' Save as tag calls it.
-- Provides the `tags.move` service (`provides=tags.move`), which moves a game to its new path in every tag, such as after its files moved. Call it with `from=<full path>` and `to=<full path>`. Each tag keeps the game in its place; a tag that has `to` already just drops `from`. It replies `tags=<how many tags changed>`, or `error=path` (a path off the card) or `error=save`. [`multi-disc`](../multi-disc/README.md) calls it.
-- Registers the `tags.edit` action, which the `button` setting follows.
+- Provides the `tags.status.completed`, `tags.status.beaten`, `tags.status.broken` and `tags.status.backlog` entry sets (`provides=sets.status`), with the games that have each status, by the same paths as the tags. They're announced as changed each time a game's status is set or cleared. [`row-badges`](../row-badges/README.md) reads them for its status icons.
+- Provides the `tags.move` service (`provides=tags.move`), which moves a game to its new path in every tag and status, such as after its files moved. Call it with `from=<full path>` and `to=<full path>`. Each tag keeps the game in its place; a tag that has `to` already just drops `from`. It replies `tags=<how many tags changed>` and `status=<how many statuses changed>`, or `error=path` (a path off the card) or `error=save`. [`multi-disc`](../multi-disc/README.md) calls it.
+- Registers the `tags.edit` action, which the `button` setting follows, and the `tags.status` action, which the `status_button` setting follows.
 - The tags are in `.userdata/<platform>/launcher/tags.txt`: a tag's name on a line of its own, then a line for each of its games with the name, a tab and the game's card-relative path. It's written to a temporary file that replaces it, so a power cut leaves the old file or the new one, and read again whenever it changes. Games no longer on the card stay in the file in case the card comes back.
+- The statuses are in `status.txt` beside it, in the same format, with `completed`, `beaten`, `broken` or `backlog` as the name, written the same way. Other names in it are kept. Each [profile](../guest-profile/README.md) has a `tags.txt` and `status.txt` of its own.
 
 ## Credits
 

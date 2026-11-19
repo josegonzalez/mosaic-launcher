@@ -14,6 +14,11 @@ struct MosaicEntry {
 	int type;
 };
 
+struct MosaicList {
+	MosaicEntry* items[8];
+	int count;
+};
+
 #define CARD TEST_SDCARD_PATH
 #define ROMS CARD "/Roms"
 #define GB ROMS "/Game Boy (GB)"
@@ -22,8 +27,11 @@ struct MosaicEntry {
 static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 
 static char cfg_unplayed[8] = "off", cfg_tiers[8] = "off", cfg_favorites[8] = "off", cfg_tagged[8] = "off";
-static char cfg_manual[8] = "off";
+static char cfg_manual[8] = "off", cfg_beaten[8] = "off", cfg_broken[8] = "off", cfg_perfect[8] = "off";
 static const char* fakeCfgGet(const char* key, const char* fallback) {
+	if (!strcmp(key, "beaten")) return cfg_beaten;
+	if (!strcmp(key, "broken")) return cfg_broken;
+	if (!strcmp(key, "perfect")) return cfg_perfect;
 	if (!strcmp(key, "unplayed")) return cfg_unplayed;
 	if (!strcmp(key, "favorites")) return cfg_favorites;
 	if (!strcmp(key, "tagged")) return cfg_tagged;
@@ -65,9 +73,17 @@ static unsigned int drawn_rgb[8];
 static int drawn_count = 0;
 static MosaicRect rings[8];
 static int ring_count = 0;
+// the icons' squares, and the cells drawn in them
+static MosaicRect boxes[8];
+static int box_count = 0;
+static int cell_count = 0;
+static unsigned int cell_rgb = 0;
 static int fakeFillRound(MosaicSurface* s, const MosaicRect* r, int radius, MosaicColor c) {
 	(void)s;
-	(void)radius;
+	if ((c.r << 16 | c.g << 8 | c.b) == 0x123456 && radius == 2) {
+		if (box_count < 8) boxes[box_count++] = *r;
+		return 0;
+	}
 	if ((c.r << 16 | c.g << 8 | c.b) == 0x123456) {
 		if (ring_count < 8) rings[ring_count++] = *r;
 		return 0;
@@ -76,6 +92,13 @@ static int fakeFillRound(MosaicSurface* s, const MosaicRect* r, int radius, Mosa
 		drawn[drawn_count] = *r;
 		drawn_rgb[drawn_count++] = (unsigned int)(c.r << 16 | c.g << 8 | c.b);
 	}
+	return 0;
+}
+static int fakeFillRect(MosaicSurface* s, const MosaicRect* r, MosaicColor c) {
+	(void)s;
+	(void)r;
+	cell_count++;
+	cell_rgb = (unsigned int)(c.r << 16 | c.g << 8 | c.b);
 	return 0;
 }
 static int fakeDecorateCell(MosaicSurface* s, int i, const MosaicRect* r, const MosaicRect* n) {
@@ -124,6 +147,37 @@ static void manualList(const char* name, void (*add)(const char*, void*), void* 
 	add(GB "/Manual.gb", ctx);
 	if (manual_extra) add(manual_extra, ctx);
 }
+// tags' status sets
+static const char* beaten_extra = NULL;
+static void beatenList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Beaten.gb", ctx);
+	add(GB "/Both.gb", ctx);
+	add(PS "/Final Fantasy VII/Final Fantasy VII.m3u", ctx);
+	if (beaten_extra) add(beaten_extra, ctx);
+}
+static void brokenList(const char* name, void (*add)(const char*, void*), void* ctx) {
+	(void)name;
+	add(GB "/Both.gb", ctx);
+}
+
+// RetroAchievements: Perfect has all 3 unlocked, Partial 2 of 3, None has
+// a set with none, and Pending isn't known until pending_known
+static int pending_known = 0;
+static int ra_asks = 0;
+static int fakeAchievements(const char* path, MosaicAchievements* out) {
+	ra_asks++;
+	out->total = out->unlocked = 0;
+	if (strstr(path, "Pending") && !pending_known) return MOSAIC_ACHIEVEMENTS_UNKNOWN;
+	if (strstr(path, "Perfect") || strstr(path, "Pending")) out->total = out->unlocked = 3;
+	else if (strstr(path, "Partial")) out->total = 3, out->unlocked = 2;
+	else if (strstr(path, "None")) out->total = 3;
+	else return 0;
+	return 1;
+}
+static int fakeListCount(const MosaicList* l) { return l->count; }
+static MosaicEntry* fakeListGet(const MosaicList* l, int i) { return i >= 0 && i < l->count ? l->items[i] : NULL; }
+
 static int noHas(const char* name, const char* path) {
 	(void)name;
 	(void)path;
@@ -145,6 +199,10 @@ static MosaicHost fake = {
 	.theme_color = fakeThemeColor,
 	.screen_scale = fakeScale,
 	.fill_round_rect = fakeFillRound,
+	.fill_rect = fakeFillRect,
+	.list_count = fakeListCount,
+	.list_get = fakeListGet,
+	.achievements = fakeAchievements,
 	.decorate_cell = fakeDecorateCell,
 	.entry_info = fakeEntryInfo,
 	.play_time = fakePlayTime,
@@ -189,10 +247,27 @@ static int dots(const char* path, int type, const char* tier, int named) {
 	snprintf(e.tier, sizeof(e.tier), "%s", tier);
 	e.type = type;
 	MosaicRow row = { sizeof(MosaicRow), 0, 0, { 10, 20, 300, 60 }, { 10, 20, named ? 100 : 0, 60 } };
-	drawn_count = ring_count = 0;
+	drawn_count = ring_count = box_count = cell_count = 0;
 	CHECK(decorateRow(NULL, &e, &row) == 0);
 	CHECK(ring_count == drawn_count);
 	return drawn_count;
+}
+
+// The icons decorateRow drew on the row dots last decorated.
+static int icons(const char* path, int type) {
+	dots(path, type, "", 1);
+	return box_count;
+}
+
+// A list of ROMs, as list_ready gets it.
+static void listOf(MosaicList* list, MosaicEntry* entries, const char* const* paths, int count) {
+	list->count = count;
+	for (int i = 0; i < count; i++) {
+		snprintf(entries[i].path, sizeof(entries[i].path), "%s", paths[i]);
+		entries[i].tier[0] = '\0';
+		entries[i].type = MOSAIC_ENTRY_ROM;
+		list->items[i] = &entries[i];
+	}
 }
 
 static int hasKey(const char* tag, const char* file) {
@@ -360,6 +435,64 @@ int main(void) {
 	CHECK(at[0].x == 118 && at[1].x == 130 && at[2].x == 142 && at[3].x == 158 && at[4].x == 170);
 	CHECK(RB_place(&rect, &name, 8, 4, 9, 0, at) == RB_MAX_MARKS);
 	CHECK(RB_place(&rect, &name, 8, 4, -1, 0, at) == 0);
+	// icons between the marks and the tiers, centred on the same line
+	MosaicRect all[RB_MAX_BADGES];
+	CHECK(RB_layout(&rect, &name, 8, 14, 4, 1, 2, 1, all) == 4);
+	CHECK(all[0].x == 118 && all[0].y == 46 && all[0].w == 8);
+	CHECK(all[1].x == 118 + 8 + 8 && all[1].y == 43 && all[1].w == 14 && all[1].h == 14);
+	CHECK(all[2].x == all[1].x + 14 + 4 && all[2].w == 14);
+	CHECK(all[3].x == all[2].x + 14 + 8 && all[3].y == 46 && all[3].w == 8);
+	CHECK(RB_layout(&rect, &name, 8, 14, 4, 0, 1, 0, all) == 1);
+	CHECK(all[0].x == 118 && all[0].y == 43);
+	CHECK(RB_layout(&rect, &name, 8, 14, 4, 0, 9, 0, all) == RB_ICONS);
+	// in the corner, the line is as tall as the icons
+	CHECK(RB_layout(&rect, &none, 8, 14, 4, 1, 1, 0, all) == 2);
+	CHECK(all[1].x + all[1].w == 10 + 300 - 8 && all[1].y == 28 && all[0].y == 31);
+	// too tall for the row
+	MosaicRect thin = { 10, 20, 300, 12 }, thin_name = { 10, 20, 100, 12 };
+	CHECK(RB_layout(&thin, &thin_name, 8, 14, 4, 0, 1, 0, all) == 0);
+	CHECK(RB_layout(&thin, &thin_name, 8, 14, 4, 1, 0, 0, all) == 1); // a dot fits
+	// RB_place is RB_layout with no icons
+	CHECK(RB_layout(&rect, &name, 8, 14, 4, 3, 0, 2, all) == 5 && all[3].x == 158 && all[4].x == 170);
+
+	// the icons' pictures
+	CHECK(RB_iconCell(RB_ICON_COMPLETED, 3, 0) && !RB_iconCell(RB_ICON_COMPLETED, 0, 0));
+	CHECK(RB_iconCell(RB_ICON_BROKEN, 0, 0) && RB_iconCell(RB_ICON_BROKEN, 3, 3) && !RB_iconCell(RB_ICON_BROKEN, 3, 0));
+	CHECK(!RB_iconCell(RB_ICON_TROPHY, 7, 0) && !RB_iconCell(RB_ICON_TROPHY, -1, 0) && !RB_iconCell(RB_ICONS, 0, 0));
+	for (int icon = 0; icon < RB_ICONS; icon++) {
+		int cells = 0;
+		for (int y = 0; y < RB_ICON_CELLS; y++)
+			for (int x = 0; x < RB_ICON_CELLS; x++) cells += RB_iconCell(icon, x, y);
+		CHECK(cells >= 12); // each reads as a shape, not a dot
+		// the same picture as rects, a run a row
+		MosaicRect cell_rects[RB_ICON_RECTS];
+		int n = RB_iconRects(icon, 100, 200, 2, cell_rects, RB_ICON_RECTS);
+		int area = 0;
+		for (int i = 0; i < n; i++) {
+			area += cell_rects[i].w * cell_rects[i].h;
+			CHECK(cell_rects[i].x >= 100 && cell_rects[i].x + cell_rects[i].w <= 100 + 14);
+			CHECK(cell_rects[i].y >= 200 && cell_rects[i].y + cell_rects[i].h <= 200 + 14 && cell_rects[i].h == 2);
+		}
+		CHECK(area == cells * 4);
+	}
+	MosaicRect cross[RB_ICON_RECTS];
+	CHECK(RB_iconRects(RB_ICON_BROKEN, 0, 0, 1, cross, RB_ICON_RECTS) == 11);
+	CHECK(cross[0].x == 0 && cross[0].w == 2 && cross[1].x == 5 && cross[1].w == 2);
+	CHECK(RB_iconRects(RB_ICON_BROKEN, 0, 0, 1, cross, 3) == 3);
+	CHECK(RB_iconRects(RB_ICON_BROKEN, 0, 0, 0, cross, RB_ICON_RECTS) == 0);
+
+	// the flags' sets
+	CHECK_STR(RB_flagSet(RB_ICON_BEATEN), "tags.status.beaten");
+	CHECK(RB_flagSet(RB_ICON_TROPHY) == NULL && RB_flagSet(-1) == NULL);
+	CHECK(RB_flagOf("tags.status.backlog") == RB_ICON_BACKLOG && RB_flagOf("tags.status.other") == -1 && RB_flagOf(NULL) == -1);
+	CHECK(RB_flagOf("tags:beaten") == -1);
+
+	// 100%
+	CHECK(RB_perfect(1, 3, 3) == 1);
+	CHECK(RB_perfect(1, 3, 2) == 0);
+	CHECK(RB_perfect(1, 0, 0) == 0);
+	CHECK(RB_perfect(0, 0, 0) == 0);
+	CHECK(RB_perfect(MOSAIC_ACHIEVEMENTS_UNKNOWN, 0, 0) == -1);
 
 	// paths other plugins' sets hold
 	RBSet paths;
@@ -560,6 +693,127 @@ int main(void) {
 	manual_extra = NULL;
 	quit();
 	strcpy(cfg_manual, "off");
+	strcpy(cfg_favorites, "off");
+
+	// status icons, off by default, each by itself, after the dots
+	fake_set_count = 0;
+	fakeSetRegister("tags.status.beaten", noHas, beatenList);
+	fakeSetRegister("tags.status.broken", noHas, brokenList);
+	CHECK(init(&fake) == 0);
+	CHECK(icons(GB "/Both.gb", MOSAIC_ENTRY_ROM) == 0);
+	quit();
+	strcpy(cfg_beaten, "on");
+	set_changed_fn = NULL;
+	CHECK(init(&fake) == 0);
+	CHECK(set_changed_fn != NULL);
+	CHECK(icons(GB "/Both.gb", MOSAIC_ENTRY_ROM) == 1 && cell_rgb == 0xFFFFFF);
+	CHECK(boxes[0].w == 14 + 4 && boxes[0].x == 10 + 100 + 8 - 2);
+	CHECK(cell_count == 7); // the tick's rows
+	CHECK(icons(GB "/Fav.gb", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(icons(PS "/Final Fantasy VII", MOSAIC_ENTRY_DIR) == 1); // by its .m3u
+	strcpy(cfg_broken, "on");
+	quit();
+	CHECK(init(&fake) == 0);
+	CHECK(icons(GB "/Both.gb", MOSAIC_ENTRY_ROM) == 2);
+	CHECK(boxes[1].x == boxes[0].x + 14 + 4);
+	CHECK(icons(GB "/Beaten.gb", MOSAIC_ENTRY_ROM) == 1);
+	// with the favorite mark: the dot first, then the icons
+	quit();
+	strcpy(cfg_favorites, "on");
+	fakeSetRegister("favorites", noHas, favList);
+	CHECK(init(&fake) == 0);
+	CHECK(icons(GB "/Both.gb", MOSAIC_ENTRY_ROM) == 2 && drawn_count == 1);
+	CHECK(boxes[0].x == drawn[0].x + 8 + 8 - 2);
+	// a changed flag's set is read again
+	beaten_extra = GB "/Saved.gb";
+	redraws = 0;
+	CHECK(icons(GB "/Saved.gb", MOSAIC_ENTRY_ROM) == 0);
+	set_changed_fn("launcher.set_changed", "name=tags.status.completed", NULL);
+	CHECK(redraws == 0);
+	set_changed_fn("launcher.set_changed", "name=tags.status.beaten", NULL);
+	CHECK(redraws == 1 && icons(GB "/Saved.gb", MOSAIC_ENTRY_ROM) == 1);
+	beaten_extra = NULL;
+	quit();
+	strcpy(cfg_favorites, "off");
+	strcpy(cfg_beaten, "off");
+	strcpy(cfg_broken, "off");
+
+	// the trophy, off by default, from the games in a list as it's built
+	MosaicList ra_list;
+	MosaicEntry ra_entries[8];
+	const char* const ra_paths[] = { GB "/Perfect.gb", GB "/Partial.gb", GB "/None.gb", GB "/Pending.gb", GB "/Plain.gb" };
+	listOf(&ra_list, ra_entries, ra_paths, 5);
+	CHECK(system("mkdir -p '" CARD "/.userdata/shared/.ra/offline/cache'") == 0);
+	touch(CARD "/.userdata/shared/.ra/offline/cache/achievementsets_0123.bin");
+	ra_asks = 0;
+	CHECK(init(&fake) == 0);
+	listReady(&ra_list, GB);
+	CHECK(ra_asks == 0 && icons(GB "/Perfect.gb", MOSAIC_ENTRY_ROM) == 0);
+	quit();
+	strcpy(cfg_perfect, "on");
+	pending_known = 0;
+	CHECK(init(&fake) == 0);
+	CHECK(ra_asks == 0); // not at start, before a list
+	listReady(&ra_list, GB);
+	CHECK(ra_asks == 5 && perfect.count == 1 && waiting_count == 1);
+	ra_asks = 0;
+	CHECK(icons(GB "/Perfect.gb", MOSAIC_ENTRY_ROM) == 1 && cell_count == 11); // the trophy's runs
+	CHECK(icons(GB "/Partial.gb", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(icons(GB "/None.gb", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(icons(GB "/Pending.gb", MOSAIC_ENTRY_ROM) == 0);
+	CHECK(ra_asks == 0); // never while drawing
+	// tick asks about the unknown one again, every half second, until it's known
+	redraws = 0;
+	tick(1000);
+	CHECK(ra_asks == 1 && waiting_count == 1 && redraws == 0);
+	tick(1200);
+	CHECK(ra_asks == 1);
+	pending_known = 1;
+	tick(1600);
+	CHECK(ra_asks == 2 && waiting_count == 0 && redraws == 1);
+	CHECK(icons(GB "/Pending.gb", MOSAIC_ENTRY_ROM) == 1);
+	tick(3000);
+	CHECK(ra_asks == 2);
+	// the next list doesn't ask about what's known to be 100%
+	listReady(&ra_list, GB);
+	CHECK(ra_asks == 2 + 3 && perfect.count == 2);
+	// with a status icon: the flag first, then the trophy
+	quit();
+	strcpy(cfg_beaten, "on");
+	beaten_extra = GB "/Perfect.gb";
+	fake_set_count = 0;
+	fakeSetRegister("tags.status.beaten", noHas, beatenList);
+	CHECK(init(&fake) == 0);
+	listReady(&ra_list, GB);
+	CHECK(icons(GB "/Perfect.gb", MOSAIC_ENTRY_ROM) == 2 && cell_count == 7 + 11);
+	CHECK(icons(GB "/Beaten.gb", MOSAIC_ENTRY_ROM) == 1 && cell_count == 7);
+	beaten_extra = NULL;
+	quit();
+	strcpy(cfg_beaten, "off");
+	// a card with no achievement sets cached asks about nothing
+	unlink(CARD "/.userdata/shared/.ra/offline/cache/achievementsets_0123.bin");
+	listOf(&ra_list, ra_entries, ra_paths, 5);
+	ra_asks = 0;
+	CHECK(init(&fake) == 0);
+	listReady(&ra_list, GB);
+	CHECK(ra_asks == 0);
+	quit();
+	// nor a launcher that can't read the progress
+	touch(CARD "/.userdata/shared/.ra/offline/cache/patch_0123.bin");
+	fake.size = offsetof(MosaicHost, achievements);
+	CHECK(init(&fake) == 0);
+	CHECK(!show_perfect);
+	listReady(&ra_list, GB);
+	CHECK(ra_asks == 0);
+	quit();
+	fake.size = sizeof(MosaicHost);
+	CHECK(init(&fake) == 0);
+	listReady(&ra_list, GB);
+	CHECK(ra_asks == 5);
+	quit();
+	strcpy(cfg_perfect, "off");
+	fake_set_count = 0;
+
 	// a launcher without sets: no marks
 	fake.size = offsetof(MosaicHost, set_register);
 	strcpy(cfg_manual, "on");
