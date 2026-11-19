@@ -2,8 +2,8 @@ id=theme-plus
 name=Theme plus
 api=1
 category=Looks
-summary=Changes colours, fonts, text size and wallpapers from a theme.
-description=Changes how the launcher looks, its colours, font, text size, wallpapers and button hints, from a theme, without touching stock's settings.
+summary=Changes colours, fonts, text size, wallpapers and system icons from a theme.
+description=Changes how the launcher looks, its colours, font, text size, wallpapers, system icons and button hints, from a theme, or one that changes each start or each day, without touching stock's settings.
 slots=theme
 # the service first-run sets the theme through
 provides=theme-plus.setup
@@ -13,6 +13,14 @@ setting.theme=text|Theme|stock
 setting.tile=toggle|Quick menu tile|on
 # a game list button that lists the themes
 setting.button=choice|Theme button|none|none,Y,L2,R2,SELECT|button:theme-plus.pick
+# a random theme each time the launcher starts (start) or one a day (daily) in place of the theme setting's
+setting.rotate=choice|Rotate|off|off,start,daily
+# the themes a rotation picks from, separated by commas; empty picks from every theme the picker lists
+setting.rotate_between=text|Rotate between|
+# a folder in Wallpapers with a <system tag>.png for each system's list, over the theme's own; empty for the theme's
+setting.wallpaper_pack=text|Wallpaper pack|
+# a folder in Icons with a <system tag>.png for each system, over the theme's own; empty for the theme's
+setting.icon_pack=text|Icon pack|
 # the rest override the theme's values; theme keeps the theme's
 # the background colour as 0xRRGGBB
 setting.background=text|Background colour|theme

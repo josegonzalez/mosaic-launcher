@@ -7,6 +7,7 @@
 # font settings over stock's, and a theme name that isn't there, which
 # leaves stock's theme.
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" theme-plus >/dev/null || fail "building theme-plus"
+mkdir -p "$STATE"
 printf 'theme-plus=on\n' >"$STATE/plugins.txt"
 plugin=theme-plus
 TP_DIR="$CARD/Themes/Case"
@@ -38,7 +39,8 @@ tp_fallback() {
 }
 
 tp_run theme-plus-bundled 'theme=high-contrast\n' "plugin theme-plus: theme high-contrast (bundled)"
-tp_supplies "pill 30, button 20, padding 5, 7 rows, text step 2, font stock's"
+# a text step above 0 keeps a row free for hints on two rows
+tp_supplies "pill 30, button 20, padding 5, 6 rows, text step 2, font stock's"
 
 tp_run theme-plus-card 'theme=Case\n' "plugin theme-plus: theme Case (card, palette Case Palette)"
 tp_supplies "pill 36, button 24, padding 8, 5 rows, text step 0, font $(cd "$TP_DIR" && pwd -P)/font.ttf"
@@ -51,7 +53,7 @@ tp_run theme-plus-palette 'theme=case palette\n' "plugin theme-plus: theme Case 
 tp_supplies "pill 30, button 20, padding 5, 7 rows, text step 0, font stock's"
 
 tp_run theme-plus-ui 'theme=stock\nui_size=large\ntext_size=large\nfallback_font=ThemePlusFonts/glyphs.ttf\n' "plugin theme-plus: theme stock"
-tp_supplies "pill 36, button 24, padding 12, 5 rows, text step 2, font stock's"
+tp_supplies "pill 36, button 24, padding 12, 4 rows, text step 2, font stock's"
 tp_fallback "$(cd "$CARD/ThemePlusFonts" && pwd -P)/glyphs.ttf"
 grep -qF "so stock's is used" "$log" && fail "the launcher refused part of theme-plus's theme: $(grep "so stock's is used" "$log")"
 

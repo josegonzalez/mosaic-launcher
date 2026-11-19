@@ -12,11 +12,13 @@
 #define HINTS_MAX 2          // a group's hints, as stock's GFX_blitButtonGroup takes
 #define HINT_LABEL_MAX 64    // a label's bytes, its terminator included
 
-// stock's layout units, already scaled: PADDING, PILL_SIZE and BUTTON_MARGIN
+// stock's layout units, already scaled: PADDING, PILL_SIZE and BUTTON_MARGIN,
+// and the theme's text step (host->ui_size's MOSAIC_UI_TEXT_STEP), 0 for stock's
 typedef struct HintMetrics {
 	int padding;
 	int pill;
 	int margin;
+	int text_step;
 } HintMetrics;
 
 // The name stock draws for button, eg. "A", "MENU" or "POWER", or NULL
@@ -45,9 +47,16 @@ int Hints_primary(int group, int count);
 // out. Returns its length, or -1 for a bad argument or an empty line.
 int Hints_label(const char* text, char* out, size_t size);
 
-// The pill GFX_blitButtonGroup draws on a screen_w by screen_h screen for
-// hints of widths (each from GFX_getButtonWidth), into out. Returns 0, or
-// -1 for a bad argument.
+// 1 when GFX_blitButtonGroup draws a group's hints on two rows, each in a
+// pill of its own, the primary one at the bottom: only at a theme's text
+// step above 0, for two hints whose pill, w wide, is wider than its half
+// of a screen_w screen less padding. At stock's text size, never.
+int Hints_wrap(int text_step, int count, int w, int screen_w, int padding);
+
+// Where GFX_blitButtonGroup draws on a screen_w by screen_h screen for
+// hints of widths (each from GFX_getButtonWidth), into out: its pill, or
+// both rows' when they wrap (see Hints_wrap). Returns 0, or -1 for a bad
+// argument.
 int Hints_place(int group, int screen_w, int screen_h, const HintMetrics* m, const int* widths, int count, MosaicRect* out);
 
 // 1 when pill is inside the screen and clear of each of avoid, such as the

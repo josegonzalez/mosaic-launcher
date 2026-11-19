@@ -55,7 +55,7 @@ int UI_padding(void) {
 }
 
 int UI_rowCount(void) {
-	if (!sized()) return UI_stockRows();
+	if (!sized() && !(active && sizes.text_step > 0)) return UI_stockRows();
 	ThemeStock stock = stockNow();
 	return ThemeModel_rowsFor(&sizes, &stock);
 }

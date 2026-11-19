@@ -70,9 +70,9 @@ stock_colors=$(pal_colors)
 [ -n "$stock_colors" ] || fail "paletter logged no colours"
 settings_before=$(cat "$SETTINGS")
 
-# theme-plus's picker: Stock, its 5 bundled themes and Mixed, then the palettes;
-# the cursor starts on Stock, so the card's palette is 7 + its place down
-downs=$((7 + case_at))
+# theme-plus's picker: Stock, its 8 bundled themes and Mixed, then the palettes;
+# the cursor starts on Stock, so the card's palette is 10 + its place down
+downs=$((10 + case_at))
 keys="y"
 i=0
 while [ "$i" -lt "$downs" ]; do

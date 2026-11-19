@@ -91,9 +91,23 @@ int Hints_place(int group, int screen_w, int screen_h, const HintMetrics* m, con
 		if (widths[i] < 0) return -1;
 		w += m->margin + widths[i];
 	}
+	int rows = 1;
+	if (Hints_wrap(m->text_step, count, w, screen_w, m->padding)) {
+		// each row's pill is one hint's; the rect covers the widest and both rows
+		rows = 2;
+		w = 0;
+		for (int i = 0; i < count; i++) {
+			if (widths[i] + 2 * m->margin > w) w = widths[i] + 2 * m->margin;
+		}
+	}
+	int h = rows * m->pill + (rows - 1) * m->margin;
 	int x = group == MOSAIC_HINTS_RIGHT ? screen_w - m->padding - w : m->padding;
-	*out = (MosaicRect){ x, screen_h - (m->padding + m->pill), w, m->pill };
+	*out = (MosaicRect){ x, screen_h - (m->padding + h), w, h };
 	return 0;
+}
+
+int Hints_wrap(int text_step, int count, int w, int screen_w, int padding) {
+	return text_step > 0 && count == 2 && w > screen_w / 2 - padding;
 }
 
 static int overlaps(const MosaicRect* a, const MosaicRect* b) {

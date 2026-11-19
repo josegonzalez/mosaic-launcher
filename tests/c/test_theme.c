@@ -80,6 +80,13 @@ static void testResolve(void) {
 	ThemeSizes small = {24, 0, 0, 0};
 	CHECK(ThemeModel_paddingFor(&small, &desktop) == 5); // 256 % 24 = 16
 	CHECK(ThemeModel_rowsFor(&small, &desktop) == 9);
+	// a larger text size keeps a row free for hints on two rows, a smaller one doesn't
+	ThemeSizes larger = {0, 0, 0, 2};
+	CHECK(ThemeModel_rowsFor(&larger, &desktop) == 6);
+	ThemeSizes larger_pill = {40, 0, 0, 4};
+	CHECK(ThemeModel_rowsFor(&larger_pill, &desktop) == 4);
+	ThemeSizes smaller = {0, 0, 0, -2};
+	CHECK(ThemeModel_rowsFor(&smaller, &desktop) == 7);
 }
 
 static void testCheckSizes(void) {
@@ -103,7 +110,7 @@ static void testCheckSizes(void) {
 	sizes = ThemeModel_checkSizes(&theme, &desktop, &refused);
 	CHECK(refused.count == 0);
 	CHECK(sizes.pill == 36 && sizes.button == 24 && sizes.padding == 8 && sizes.text_step == 2);
-	CHECK(ThemeModel_rowsFor(&sizes, &desktop) == 5);
+	CHECK(ThemeModel_rowsFor(&sizes, &desktop) == 4); // 5, less one for hints on two rows
 
 	// out of range
 	theme = blank();

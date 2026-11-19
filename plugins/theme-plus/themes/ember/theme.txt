@@ -1,0 +1,9 @@
+version=1
+name=Ember
+color1=0xF08A4B
+color2=0x3A2620
+color3=0x241713
+color4=0xF3E3D3
+color5=0x1C120E
+color6=0xCFA98E
+color7=0x1C120E

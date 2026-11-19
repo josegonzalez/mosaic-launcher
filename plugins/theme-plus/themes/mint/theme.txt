@@ -1,0 +1,9 @@
+version=1
+name=Mint
+color1=0x2E8B6E
+color2=0xCFE8DE
+color3=0xF4FBF8
+color4=0x1F3B33
+color5=0xFFFFFF
+color6=0x1F3B33
+color7=0xF4FBF8

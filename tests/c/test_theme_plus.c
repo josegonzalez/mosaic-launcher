@@ -1,8 +1,10 @@
 // The theme-plus plugin: its model on its own (theme.txt, malformed ones
 // too, paths that try to leave a theme's folder, files on the card, the
 // list of themes with stock's palettes in the host's order and the merge
-// with the settings, the fallback font among them), then the plugin
-// against a fake host, on a card of its own under TEST_SDCARD_PATH.
+// with the settings, the fallback font among them), its packs model
+// (rotation, systems, which wallpaper or icon wins, the preview's colours
+// and the picker's cursor), then the plugin against a fake host, on a
+// card of its own under TEST_SDCARD_PATH.
 
 #define _GNU_SOURCE // dladdr, in theme_plus.c
 #include <limits.h>
@@ -713,6 +715,154 @@ static void testApply(void) {
 	CHECK_STR(t.fallback_font, "untouched");
 }
 
+static void testRotate(void) {
+	CHECK(TP_rotateMode("off") == TP_ROTATE_OFF);
+	CHECK(TP_rotateMode("start") == TP_ROTATE_START);
+	CHECK(TP_rotateMode("daily") == TP_ROTATE_DAILY);
+	CHECK(TP_rotateMode("weekly") == TP_ROTATE_OFF);
+	CHECK(TP_rotateMode(NULL) == TP_ROTATE_OFF);
+
+	static TPCatalog c;
+	memset(&c, 0, sizeof(c));
+	const char* ids[] = { "Night", "nord", "Catppuccin Mocha", "Mine" };
+	for (int i = 0; i < 4; i++) snprintf(c.themes[i].id, TP_NAME_MAX, "%s", ids[i]);
+	c.theme_count = 4;
+	int out[8];
+	CHECK(TP_rotateCandidates(&c, "", out, 8, NULL, NULL) == 4);
+	CHECK(out[0] == 0 && out[3] == 3);
+	CHECK(TP_rotateCandidates(&c, NULL, out, 2, NULL, NULL) == 2);
+	logCount = 0;
+	CHECK(TP_rotateCandidates(&c, " mine ,Gone,nord, NIGHT,mine,,", out, 8, capture, NULL) == 3);
+	CHECK(out[0] == 3 && out[1] == 1 && out[2] == 0);
+	CHECK(loggedLine("rotate_between: no theme or palette is called Gone, so it's left out"));
+	CHECK(TP_rotateCandidates(&c, "Gone", out, 8, NULL, NULL) == 0);
+
+	CHECK(TP_dayKey(2026, 11, 19) == 20261119);
+	// off or nothing to pick from picks nothing
+	CHECK(TP_rotatePick(TP_ROTATE_OFF, 4, 20261119, 7, -1) == -1);
+	CHECK(TP_rotatePick(TP_ROTATE_DAILY, 0, 20261119, 7, -1) == -1);
+	// daily: the same one all day, whatever random is, and not always the same one
+	int today = TP_rotatePick(TP_ROTATE_DAILY, 4, 20261119, 1, -1);
+	CHECK(today >= 0 && today < 4);
+	CHECK(TP_rotatePick(TP_ROTATE_DAILY, 4, 20261119, 99, 2) == today);
+	int differs = 0;
+	for (int d = 1; d <= 28; d++) {
+		int pick = TP_rotatePick(TP_ROTATE_DAILY, 4, TP_dayKey(2026, 12, d), 0, -1);
+		CHECK(pick >= 0 && pick < 4);
+		differs |= pick != today;
+	}
+	CHECK(differs);
+	// start: never the last one when there's another
+	for (unsigned long r = 0; r < 40; r++) {
+		int pick = TP_rotatePick(TP_ROTATE_START, 4, 0, r, 2);
+		CHECK(pick >= 0 && pick < 4 && pick != 2);
+	}
+	CHECK(TP_rotatePick(TP_ROTATE_START, 1, 0, 5, 0) == 0);
+	CHECK(TP_rotatePick(TP_ROTATE_START, 4, 0, 6, -1) == 2);
+}
+
+static void testSystems(void) {
+	char tag[TP_NAME_MAX];
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Game Boy (GB)", tag, sizeof(tag)) == 0);
+	CHECK_STR(tag, "GB");
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Game Boy (GB)/Tetris.gb", tag, sizeof(tag)) == 1);
+	CHECK_STR(tag, "GB");
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Arcade (US) (MAME)/sub/game.zip", tag, sizeof(tag)) == 1);
+	CHECK_STR(tag, "MAME");
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Game Boy (GB)/", tag, sizeof(tag)) == 0);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Homebrew", tag, sizeof(tag)) == -1);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Odd (GB) name", tag, sizeof(tag)) == -1);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Empty ()", tag, sizeof(tag)) == -1);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/.media", tag, sizeof(tag)) == -1);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Romsick (GB)", tag, sizeof(tag)) == -1);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Collections/Mine (GB)", tag, sizeof(tag)) == -1);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms", tag, sizeof(tag)) == -1);
+	CHECK(TP_systemOf(CARD "/Roms", CARD "/Roms/Dots (..)", tag, sizeof(tag)) == -1);
+
+	CHECK(TP_packNameOk("Pixel"));
+	CHECK(TP_packNameOk("My pack 2"));
+	CHECK(!TP_packNameOk(""));
+	CHECK(!TP_packNameOk(NULL));
+	CHECK(!TP_packNameOk(".."));
+	CHECK(!TP_packNameOk(".hidden"));
+	CHECK(!TP_packNameOk("a/b"));
+
+	char stock[2][TP_PATH_MAX];
+	CHECK(TP_stockArt(TP_ART_ICON, CARD, CARD "/Roms/Game Boy (GB)", stock, 2) == 1);
+	CHECK_STR(stock[0], CARD "/Roms/.media/Game Boy (GB).png");
+	CHECK(TP_stockArt(TP_ART_FOLDER_BG, CARD, CARD "/Roms/Game Boy (GB)", stock, 2) == 2);
+	CHECK_STR(stock[0], CARD "/Roms/Game Boy (GB)/.media/bg.png");
+	CHECK_STR(stock[1], CARD "/bg.png");
+	CHECK(TP_stockArt(TP_ART_LIST_BG, CARD, CARD "/Roms/Game Boy (GB)/Tetris.gb", stock, 2) == 2);
+	CHECK_STR(stock[0], CARD "/Roms/Game Boy (GB)/.media/bglist.png");
+	CHECK_STR(stock[1], CARD "/bg.png");
+	CHECK(TP_stockArt(9, CARD, CARD "/Roms/Game Boy (GB)", stock, 2) == 0);
+}
+
+static void testSystemArt(void) {
+	writeFile(CARD "/Wallpapers/Pack/GB.png", "png");
+	writeFile(CARD "/Themes/Night/wallpapers/GB.png", "png");
+	writeFile(CARD "/Themes/Night/wallpapers/NES.png", "png");
+	writeFile(CARD "/Wallpapers/Pack/GBC.png", "png");
+	CHECK(symlink("../../secret.png", CARD "/Wallpapers/Pack/SNES.png") == 0);
+	char stock[2][TP_PATH_MAX];
+	int n = TP_stockArt(TP_ART_FOLDER_BG, CARD, CARD "/Roms/Game Boy (GB)", stock, 2);
+	char out[TP_PATH_MAX], want[PATH_MAX];
+	// the pack's wins over the theme's
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", CARD "/Themes/Night/wallpapers", "GB", out, sizeof(out)) == 1);
+	real(CARD "/Wallpapers/Pack/GB.png", want);
+	CHECK_STR(out, want);
+	// the theme's where the pack has none
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", CARD "/Themes/Night/wallpapers", "NES", out, sizeof(out)) == 1);
+	real(CARD "/Themes/Night/wallpapers/NES.png", want);
+	CHECK_STR(out, want);
+	CHECK(TP_systemArt(stock, n, NULL, CARD "/Themes/Night/wallpapers", "GB", out, sizeof(out)) == 1);
+	real(CARD "/Themes/Night/wallpapers/GB.png", want);
+	CHECK_STR(out, want);
+	// neither has it, or no folder at all
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", CARD "/Themes/Night/wallpapers", "PS", out, sizeof(out)) == 0);
+	CHECK(out[0] == '\0');
+	CHECK(TP_systemArt(stock, n, NULL, NULL, "GB", out, sizeof(out)) == 0);
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Gone", "", "GBC", out, sizeof(out)) == 0);
+	// a pack's file can't lead off its folder
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", NULL, "SNES", out, sizeof(out)) == 0);
+	// stock's own on the card win over both: the folder's, then the card's bg.png
+	writeFile(CARD "/Roms/Game Boy (GB)/.media/bg.png", "png");
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", CARD "/Themes/Night/wallpapers", "GB", out, sizeof(out)) == 0);
+	CHECK(system("rm -rf '" CARD "/Roms/Game Boy (GB)/.media'") == 0);
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", NULL, "GB", out, sizeof(out)) == 1);
+	writeFile(CARD "/bg.png", "png");
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", NULL, "GB", out, sizeof(out)) == 0);
+	CHECK(unlink(CARD "/bg.png") == 0);
+	CHECK(TP_systemArt(stock, n, CARD "/Wallpapers/Pack", NULL, "", out, sizeof(out)) == 0);
+}
+
+static void testPreview(void) {
+	int base[MOSAIC_THEME_COLORS] = { 1, 2, 3, 4, 5, 6, 7 };
+	int out[MOSAIC_THEME_COLORS];
+	TP_previewColors(NULL, NULL, base, out);
+	CHECK(out[0] == 1 && out[6] == 7);
+	TPPalette palette = { "P", { 10, 20, 30, 40, 50, 60, 70 } };
+	TPTheme parsed;
+	CHECK(TP_parseTheme("color2=0x123456\n", &parsed, NULL, NULL) == 0);
+	TP_previewColors(&parsed, &palette, base, out);
+	CHECK(out[0] == 10 && out[1] == 0x123456 && out[6] == 70);
+	TP_previewColors(&parsed, NULL, base, out);
+	CHECK(out[0] == 1 && out[1] == 0x123456);
+
+	CHECK(TP_move(0, 5, -1, 0) == 0);
+	CHECK(TP_move(0, 5, -1, 1) == 4);
+	CHECK(TP_move(4, 5, 1, 1) == 0);
+	CHECK(TP_move(4, 5, 1, 0) == 4);
+	CHECK(TP_move(1, 5, 5, 0) == 4);
+	CHECK(TP_move(0, 0, 1, 1) == -1);
+	CHECK(TP_window(0, 10, 4, 0) == 0);
+	CHECK(TP_window(5, 10, 4, 0) == 2);
+	CHECK(TP_window(3, 10, 4, 2) == 2);
+	CHECK(TP_window(1, 10, 4, 2) == 1);
+	CHECK(TP_window(9, 3, 4, 2) == 0);
+}
+
 // a fake host
 static char cfgTheme[TP_NAME_MAX] = "stock";
 static const char* cfgValues[8][2];
@@ -733,8 +883,11 @@ static int hostLogged(const char* text) {
 	return 0;
 }
 
+static char cfgRotated[TP_NAME_MAX];
+
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "theme")) return cfgTheme;
+	if (!strcmp(key, "rotated")) return cfgRotated;
 	for (int i = 0; i < 8 && cfgValues[i][0]; i++) {
 		if (!strcmp(cfgValues[i][0], key)) return cfgValues[i][1];
 	}
@@ -743,6 +896,21 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 
 static void fakeCfgSet(const char* key, const char* value) {
 	if (!strcmp(key, "theme")) snprintf(cfgTheme, sizeof(cfgTheme), "%s", value);
+	if (!strcmp(key, "rotated")) snprintf(cfgRotated, sizeof(cfgRotated), "%s", value);
+}
+
+// entries for art_path
+struct MosaicEntry {
+	const char* path;
+	int type;
+};
+
+static const char* fakeEntryPath(const MosaicEntry* entry) {
+	return entry->path;
+}
+
+static int fakeEntryType(const MosaicEntry* entry) {
+	return entry->type;
 }
 
 static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
@@ -984,6 +1152,105 @@ static void testPlugin(void) {
 	fake.event_value = NULL;
 	snprintf(cfgTheme, sizeof(cfgTheme), "Mixed");
 
+	// rotation: daily shows the same theme all day, over the theme setting
+	cfgValues[0][0] = "rotate";
+	cfgValues[0][1] = "daily";
+	cfgValues[1][0] = "rotate_between";
+	cfgValues[1][1] = "nord, Night";
+	t = asked();
+	CHECK(hostLogged("rotate: "));
+	int nordShown = hostLogged("theme nord (bundled)");
+	CHECK(nordShown || hostLogged("theme Night (card"));
+	t = asked();
+	CHECK(nordShown ? hostLogged("theme nord (bundled)") : hostLogged("theme Night (card"));
+	// start picks once a run, never the one before
+	cfgValues[0][1] = "start";
+	snprintf(cfgRotated, sizeof(cfgRotated), "nord");
+	t = asked();
+	CHECK(hostLogged("rotate: Night, of 2"));
+	CHECK_STR(cfgRotated, "Night");
+	CHECK(hostLogged("theme Night (card"));
+	t = asked();
+	CHECK(!hostLogged("rotate: "));
+	CHECK(hostLogged("theme Night (card"));
+	// a pick while rotating shows until the launcher restarts
+	pick(NULL, NULL);
+	CHECK_STR(chooseLabels[chooseCursor], "Night");
+	if (chooseDone) chooseDone(0, NULL);
+	t = asked();
+	CHECK(hostLogged("theme stock"));
+	sessionPick[0] = '\0';
+	rotatedStart = 0;
+	// nothing to pick from leaves the theme setting's
+	cfgValues[1][1] = "Gone";
+	snprintf(cfgTheme, sizeof(cfgTheme), "nord");
+	t = asked();
+	CHECK(hostLogged("rotate_between: no theme or palette is called Gone"));
+	CHECK(hostLogged("rotate: no themes to pick from, so the theme setting's is used"));
+	CHECK(hostLogged("theme nord (bundled)"));
+	rotatedStart = 0;
+	cfgValues[0][0] = cfgValues[1][0] = NULL;
+
+	// art_path: a system's wallpaper and icon from the packs, over the theme's
+	fake.entry_path = fakeEntryPath;
+	fake.entry_type = fakeEntryType;
+	writeFile(CARD "/Icons/Round/GB.png", "png");
+	writeFile(CARD "/Themes/Night/icons/NES.png", "png");
+	MosaicEntry gb = { CARD "/Roms/Game Boy (GB)", MOSAIC_ENTRY_DIR };
+	MosaicEntry nes = { CARD "/Roms/Nintendo (NES)", MOSAIC_ENTRY_DIR };
+	MosaicEntry tetris = { CARD "/Roms/Game Boy (GB)/Tetris.gb", MOSAIC_ENTRY_ROM };
+	MosaicEntry other = { CARD "/Roms/Homebrew", MOSAIC_ENTRY_DIR };
+	char art[TP_PATH_MAX];
+	snprintf(cfgTheme, sizeof(cfgTheme), "stock");
+	t = asked();
+	CHECK(artPath(&gb, MOSAIC_ART_FOLDER_BG, art, sizeof(art)) == 0);
+	CHECK(artPath(&gb, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 0);
+	snprintf(cfgTheme, sizeof(cfgTheme), "Night");
+	t = asked();
+	CHECK(artPath(&gb, MOSAIC_ART_FOLDER_BG, art, sizeof(art)) == 1);
+	real(CARD "/Themes/Night/wallpapers/GB.png", want);
+	CHECK_STR(art, want);
+	CHECK(artPath(&tetris, MOSAIC_ART_LIST_BG, art, sizeof(art)) == 1);
+	CHECK_STR(art, want);
+	CHECK(artPath(&nes, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 1);
+	real(CARD "/Themes/Night/icons/NES.png", want);
+	CHECK_STR(art, want);
+	CHECK(artPath(&gb, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 0);
+	CHECK(artPath(&tetris, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 0);
+	CHECK(artPath(&tetris, MOSAIC_ART_FOLDER_BG, art, sizeof(art)) == 0);
+	CHECK(artPath(&other, MOSAIC_ART_FOLDER_BG, art, sizeof(art)) == 0);
+	CHECK(artPath(&gb, MOSAIC_ART_BOX, art, sizeof(art)) == 0);
+	cfgValues[0][0] = "wallpaper_pack";
+	cfgValues[0][1] = "Pack";
+	cfgValues[1][0] = "icon_pack";
+	cfgValues[1][1] = "Round";
+	t = asked();
+	CHECK(hostLogged("wallpaper_pack Pack"));
+	CHECK(hostLogged("icon_pack Round"));
+	CHECK(artPath(&gb, MOSAIC_ART_FOLDER_BG, art, sizeof(art)) == 1);
+	real(CARD "/Wallpapers/Pack/GB.png", want);
+	CHECK_STR(art, want);
+	CHECK(artPath(&gb, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 1);
+	real(CARD "/Icons/Round/GB.png", want);
+	CHECK_STR(art, want);
+	// the packs mix with any theme, stock's too
+	snprintf(cfgTheme, sizeof(cfgTheme), "stock");
+	t = asked();
+	CHECK(artPath(&gb, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 1);
+	CHECK(artPath(&nes, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 0);
+	// stock's own on the card win
+	writeFile(CARD "/Roms/.media/Game Boy (GB).png", "png");
+	CHECK(artPath(&gb, MOSAIC_ART_THUMBNAIL, art, sizeof(art)) == 0);
+	CHECK(unlink(CARD "/Roms/.media/Game Boy (GB).png") == 0);
+	cfgValues[0][1] = "../Themes";
+	cfgValues[1][1] = "Gone";
+	t = asked();
+	CHECK(hostLogged("wallpaper_pack ../Themes isn't a folder's name, so none is used"));
+	CHECK(hostLogged("icon_pack: " CARD "/Icons/Gone isn't a folder, so none is used"));
+	CHECK(artPath(&gb, MOSAIC_ART_FOLDER_BG, art, sizeof(art)) == 0);
+	cfgValues[0][0] = cfgValues[1][0] = NULL;
+	snprintf(cfgTheme, sizeof(cfgTheme), "Mixed");
+
 	// a launcher without the palette calls lists none
 	MosaicHost noPalettes = fake;
 	noPalettes.size = offsetof(MosaicHost, palettes_count);
@@ -1008,6 +1275,10 @@ int main(void) {
 	testCatalog();
 	testOverrides();
 	testApply();
+	testRotate();
+	testSystems();
+	testSystemArt();
+	testPreview();
 	testPlugin();
 	CHECK(system("rm -rf '" CARD "'") == 0);
 	CHECK_DONE();

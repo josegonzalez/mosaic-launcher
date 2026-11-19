@@ -1,6 +1,6 @@
 --- a/workspace/all/common/api.c
 +++ b/workspace/all/common/api.c
-@@ -24,6 +24,20 @@
+@@ -24,6 +24,23 @@
  
  extern pthread_mutex_t audio_mutex;
  
@@ -17,11 +17,14 @@
 +// the d-pad's names (launcher/hintmodel.c)
 +int Theme_hintStock(int stock);
 +int Hint_dpad(const char *glyph);
++// mosaic: hints on two rows at a theme's larger text (launcher/hintmodel.c)
++int Theme_uiSize(int which);
++int Hints_wrap(int text_step, int count, int w, int screen_w, int padding);
 +
  ///////////////////////////////
  
  void LOG_note(int level, const char *fmt, ...)
-@@ -368,6 +382,8 @@ int GFX_loadSystemFont(const char *fontPath)
+@@ -368,6 +385,8 @@ int GFX_loadSystemFont(const char *fontPath)
  	if (!TTF_WasInit())
  		TTF_Init();
  
@@ -30,7 +33,7 @@
  	TTF_CloseFont(font.large);
  	TTF_CloseFont(font.medium);
  	TTF_CloseFont(font.small);
-@@ -386,6 +402,8 @@ int GFX_loadSystemFont(const char *fontPath)
+@@ -386,6 +405,8 @@ int GFX_loadSystemFont(const char *fontPath)
  	TTF_SetFontStyle(font.tiny, CFG_getFontStyle());
  	TTF_SetFontStyle(font.micro, CFG_getFontStyle());
  
@@ -39,7 +42,7 @@
  	return 0;
  }
  
-@@ -393,18 +411,32 @@ int GFX_updateColors(void)
+@@ -393,18 +414,32 @@ int GFX_updateColors(void)
  {
  	// We are currently micro managing all of these screen-mapped colors,
  	// should just move this to the caller.
@@ -80,7 +83,7 @@
  SDL_Surface *GFX_init(int mode)
  {
  	// Platform init may use the active output to select panel rotation.
-@@ -520,6 +552,10 @@ SDL_Surface *GFX_init(int mode)
+@@ -520,6 +555,10 @@ SDL_Surface *GFX_init(int mode)
  		LOG_info("missing assets, you're about to segfault dummy!\n");
  	gfx.assets = IMG_Load(asset_path);
  
@@ -91,7 +94,7 @@
  	input_rects[INPUT_BUTTON_A] = (SDL_Rect){SCALE4(0, 0, BUTTON_SIZE, BUTTON_SIZE)};
  	input_rects[INPUT_BUTTON_B] = (SDL_Rect){SCALE4(20, 0, BUTTON_SIZE, BUTTON_SIZE)};
  	input_rects[INPUT_BUTTON_X] = (SDL_Rect){SCALE4(40, 0, BUTTON_SIZE, BUTTON_SIZE)};
-@@ -561,6 +597,7 @@ SDL_Surface *GFX_init(int mode)
+@@ -561,6 +600,7 @@ SDL_Surface *GFX_init(int mode)
  
  	input_rects[INPUT_BUTTON_HOME] = (SDL_Rect){SCALE4(0, 60, BUTTON_SIZE, BUTTON_SIZE)};
  	input_rects[INPUT_BUTTON_POWER] = (SDL_Rect){SCALE4(20, 60, BUTTON_SIZE, BUTTON_SIZE)};
@@ -99,7 +102,7 @@
  
  	char input_path[MAX_PATH];
  	sprintf(input_path, RES_PATH "/inputs@%ix.png", FIXED_SCALE);
-@@ -580,6 +617,8 @@ void GFX_quit(void)
+@@ -580,6 +620,8 @@ void GFX_quit(void)
  	TTF_CloseFont(font.small);
  	TTF_CloseFont(font.tiny);
  	TTF_CloseFont(font.micro);
@@ -108,7 +111,7 @@
  
  	SDL_FreeSurface(gfx.assets);
  	SDL_FreeSurface(gfx.inputs);
-@@ -1904,6 +1943,45 @@ static void GFX_fillRectBlend(SDL_Surface *dst, const SDL_Rect *rect, uint32_t m
+@@ -1904,6 +1946,45 @@ static void GFX_fillRectBlend(SDL_Surface *dst, const SDL_Rect *rect, uint32_t m
  	SDL_FreeSurface(tmp);
  }
  
@@ -154,7 +157,7 @@
  static int GFX_pillRectAsset(int asset)
  {
  	switch (asset)
-@@ -1938,7 +2016,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
+@@ -1938,7 +2019,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
  		w = h;
  	w -= h;
  
@@ -163,7 +166,7 @@
  	x += r;
  	if (w > 0)
  	{
-@@ -1948,7 +2026,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
+@@ -1948,7 +2029,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
  			uint32_t center_color = (fill_color != RGB_WHITE) ? fill_color : asset_color;
  			SDL_Rect src_rect = asset_rects[rect_asset];
  			SDL_Rect center_dst = {x, y, w, h};
@@ -172,7 +175,7 @@
  		}
  		else
  		{
-@@ -1957,7 +2035,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
+@@ -1957,7 +2038,7 @@ void GFX_blitPillColor(int asset, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t
  		}
  		x += w;
  	}
@@ -181,7 +184,7 @@
  }
  void GFX_blitPill(int asset, SDL_Surface *dst, SDL_Rect *dst_rect)
  {
-@@ -2038,10 +2116,17 @@ void GFX_blitBattery(SDL_Surface *dst, SDL_Rect *dst_rect)
+@@ -2038,10 +2119,17 @@ void GFX_blitBattery(SDL_Surface *dst, SDL_Rect *dst_rect)
  }
  
  static int HintToButton(char* hint) {
@@ -200,7 +203,7 @@
  	if (strcasecmp(hint, "A") == 0) {
  		return INPUT_BUTTON_A + style;
  	}
-@@ -2106,6 +2191,9 @@ int GFX_getButtonWidth(char *hint, char *button)
+@@ -2106,6 +2194,9 @@ int GFX_getButtonWidth(char *hint, char *button)
  	}
  	button_width += SCALE1(BUTTON_MARGIN);
  
@@ -210,7 +213,7 @@
  	TTF_SizeUTF8(font.small, hint, &width, NULL);
  	button_width += width + SCALE1(BUTTON_MARGIN);
  	return button_width;
-@@ -2122,12 +2210,12 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
+@@ -2122,12 +2213,12 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
  	// button
  	if (strlen(button) == 1 || input_asset >= 0)
  	{
@@ -225,7 +228,7 @@
  			ox += SCALE1(BUTTON_SIZE);
  		}
  		else {
-@@ -2143,8 +2231,8 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
+@@ -2143,8 +2234,8 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
  		// special case: if CFG_getInputPromptStyle() is anything but INPUT_STYLE_TEXT, we want to blit the prompt asset
  		if (input_asset >= 0)
  		{
@@ -236,7 +239,7 @@
  			ox += SCALE1(BUTTON_SIZE);
  		}
  		else {
-@@ -2162,6 +2250,9 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
+@@ -2162,6 +2253,9 @@ void GFX_blitButton(char *hint, char *button, SDL_Surface *dst, SDL_Rect *dst_re
  
  	ox += SCALE1(BUTTON_MARGIN);
  
@@ -246,7 +249,7 @@
  	// hint text
  	SDL_Color text_color = uintToColour(THEME_COLOR6_255);
  	text = TTF_RenderUTF8_Blended(font.small, hint, text_color);
-@@ -2213,7 +2304,7 @@ void GFX_blitMessage(TTF_Font *font, char *msg, SDL_Surface *dst, SDL_Rect *dst_
+@@ -2213,7 +2307,7 @@ void GFX_blitMessage(TTF_Font *font, char *msg, SDL_Surface *dst, SDL_Rect *dst_
  
  		if (len)
  		{
@@ -255,7 +258,7 @@
  			int x = dst_rect->x;
  			x += (dst_rect->w - text->w) / 2;
  			SDL_BlitSurface(text, NULL, dst, &(SDL_Rect){x, y});
-@@ -2223,6 +2314,47 @@ void GFX_blitMessage(TTF_Font *font, char *msg, SDL_Surface *dst, SDL_Rect *dst_
+@@ -2223,6 +2317,47 @@ void GFX_blitMessage(TTF_Font *font, char *msg, SDL_Surface *dst, SDL_Rect *dst_
  	}
  }
  
@@ -303,7 +306,7 @@
  void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
  {
  	SDL_Rect battery_rect = asset_rects[ASSET_BATTERY];
-@@ -2230,7 +2362,7 @@ void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
+@@ -2230,7 +2365,7 @@ void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
  	if (SDL_AtomicGet(&pwr.is_charging))
  	{
  		GFX_blitAssetColor(ASSET_BATTERY, NULL, dst, &(SDL_Rect){x, y}, THEME_COLOR6);
@@ -312,7 +315,7 @@
  	}
  	else
  	{
-@@ -2259,7 +2391,7 @@ void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
+@@ -2259,7 +2394,7 @@ void GFX_blitBatteryAtPosition(SDL_Surface *dst, int x, int y)
  				clip.x = fill_rect.w - clip.w;
  				clip.y = 0;
  				GFX_blitAssetColor(percent <= 20 ? ASSET_BATTERY_FILL_LOW : ASSET_BATTERY_FILL, &clip, dst,
@@ -321,7 +324,7 @@
  			}
  		}
  	}
-@@ -2495,6 +2627,9 @@ int GFX_blitHardwareGroup(SDL_Surface *dst, int show_setting)
+@@ -2495,6 +2630,9 @@ int GFX_blitHardwareGroup(SDL_Surface *dst, int show_setting)
  
  	return ow;
  }
@@ -331,3 +334,26 @@
  void GFX_blitHardwareHints(SDL_Surface *dst, int show_setting)
  {
  
+@@ -2544,6 +2682,22 @@ int GFX_blitButtonGroup(char **pairs, int primary, SDL_Surface *dst, int align_r
+ 	}
+ 
+ 	ow += SCALE1(BUTTON_MARGIN);
++	if (Hints_wrap(Theme_uiSize(5), h, ow, dst->w, SCALE1(PADDING))) // mosaic: MOSAIC_UI_TEXT_STEP
++	{
++		// mosaic: each hint in a pill of its own, the primary one at the bottom
++		int widest = 0;
++		for (int i = 0; i < h; i++)
++		{
++			int pw = hints[i].ow + SCALE1(BUTTON_MARGIN) * 2;
++			int px = align_right ? dst->w - SCALE1(PADDING) - pw : SCALE1(PADDING);
++			int py = oy - (i == primary ? 0 : SCALE1(PILL_SIZE + BUTTON_MARGIN));
++			GFX_blitPillColor(ASSET_WHITE_PILL, dst, &(SDL_Rect){px, py, pw, SCALE1(PILL_SIZE)}, THEME_COLOR2, RGB_WHITE);
++			GFX_blitButton(hints[i].hint, hints[i].button, dst, &(SDL_Rect){px + SCALE1(BUTTON_MARGIN), py + SCALE1(BUTTON_MARGIN)});
++			if (pw > widest)
++				widest = pw;
++		}
++		return widest;
++	}
+ 	if (align_right)
+ 		ox -= ow;
+ 	GFX_blitPillColor(ASSET_WHITE_PILL, dst, &(SDL_Rect){ox, oy, ow, SCALE1(PILL_SIZE)}, THEME_COLOR2, RGB_WHITE);

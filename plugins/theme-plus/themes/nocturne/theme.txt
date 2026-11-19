@@ -1,0 +1,9 @@
+version=1
+name=Nocturne
+color1=0x8E9EF0
+color2=0x262B44
+color3=0x161A2E
+color4=0xD6DAF0
+color5=0x0F1220
+color6=0xA9B1D6
+color7=0x0F1220

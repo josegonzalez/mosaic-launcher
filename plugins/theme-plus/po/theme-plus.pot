@@ -55,12 +55,16 @@ msgstr ""
 msgid "8"
 msgstr ""
 
+#: theme_plus.c
+msgid "BACK"
+msgstr ""
+
 #: plugin.txt
 msgid "Background colour"
 msgstr ""
 
 #: plugin.txt
-msgid "Changes how the launcher looks, its colours, font, text size, wallpapers and button hints, from a theme, without touching stock's settings."
+msgid "Changes how the launcher looks, its colours, font, text size, wallpapers, system icons and button hints, from a theme, or one that changes each start or each day, without touching stock's settings."
 msgstr ""
 
 #: plugin.txt
@@ -69,6 +73,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "Fallback font"
+msgstr ""
+
+#: plugin.txt
+msgid "Icon pack"
 msgstr ""
 
 #: plugin.txt
@@ -84,7 +92,19 @@ msgid "R2"
 msgstr ""
 
 #: plugin.txt
+msgid "Rotate"
+msgstr ""
+
+#: plugin.txt
+msgid "Rotate between"
+msgstr ""
+
+#: plugin.txt theme_plus.c
 msgid "SELECT"
+msgstr ""
+
+#: theme_plus.c
+msgid "Sample row"
 msgstr ""
 
 #: plugin.txt
@@ -116,6 +136,10 @@ msgid "UI size"
 msgstr ""
 
 #: plugin.txt
+msgid "Wallpaper pack"
+msgstr ""
+
+#: plugin.txt
 msgid "Y"
 msgstr ""
 
@@ -125,6 +149,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "compact"
+msgstr ""
+
+#: plugin.txt
+msgid "daily"
 msgstr ""
 
 #: plugin.txt
@@ -149,6 +177,10 @@ msgstr ""
 
 #: plugin.txt
 msgid "small"
+msgstr ""
+
+#: plugin.txt
+msgid "start"
 msgstr ""
 
 #: plugin.txt

@@ -10,6 +10,7 @@
 # on a reload, puts stock's theme back. Without slots=theme it's never
 # asked.
 build_plugin themer 'id=themer\nname=Themer\napi=1\nslots=theme,transition\n'
+mkdir -p "$STATE"
 printf 'themer=on\n' >"$STATE/plugins.txt"
 plugin=themer
 TH_DIR="$CARD/Themes/Themer"
@@ -66,9 +67,9 @@ grep -qF "row 90, other -1" "$log" || fail "stock's row isn't 90 high: $(grep "s
 
 # colours, font, text step and sizes
 th_run themer-good "mode=good\nfont=$TH_DIR/font.ttf\n"
-grep -qF "plugins: themer supplies the theme: pill 36, button 24, padding 8, 5 rows, text step 2, font $(cd "$TH_DIR" && pwd -P)/font.ttf" "$log" \
+grep -qF "plugins: themer supplies the theme: pill 36, button 24, padding 8, 4 rows, text step 2, font $(cd "$TH_DIR" && pwd -P)/font.ttf" "$log" \
 	|| fail "themer's theme wasn't put in place: $(grep "supplies the theme" "$log")"
-expect "start sizes pill 36 button 24 padding 8 rows 5 step 2"
+expect "start sizes pill 36 button 24 padding 8 rows 4 step 2"
 expect "start colors ABCDEF $(echo "$stock_colors" | cut -d' ' -f2-6) 123456"
 grep -qF "row 108," "$log" || fail "the theme's row isn't 108 high: $(grep "start colors" "$log")"
 [ "$(th_value text "$log")" -gt "$stock_text" ] || fail "the text step didn't make text taller"
@@ -107,7 +108,7 @@ expect "frame $stock_bg"
 th_run themer-bad-font "mode=good\nfont=$TH_DIR/text.ttf\n"
 grep -qF "plugins: themer's theme font ($(cd "$TH_DIR" && pwd -P)/text.ttf) won't open, so stock's is used" "$log" \
 	|| fail "a file that isn't a font was used"
-expect "start sizes pill 36 button 24 padding 8 rows 5 step 2"
+expect "start sizes pill 36 button 24 padding 8 rows 4 step 2"
 
 # an error puts stock's theme back, at the start and on a reload
 th_run themer-fail 'mode=fail\n'
@@ -116,7 +117,7 @@ expect "start sizes pill 30 button 20 padding 5 rows 7 step 0"
 expect "start colors $stock_colors"
 expect "frame $stock_bg"
 th_run themer-reload 'mode=reload\n'
-expect "start sizes pill 36 button 24 padding 8 rows 5 step 2"
+expect "start sizes pill 36 button 24 padding 8 rows 4 step 2"
 expect "asked 2, size matches"
 grep -qF "plugins: themer's theme failed (7)" "$log" || fail "themer's error on the reload wasn't logged"
 expect "reloaded sizes pill 30 button 20 padding 5 rows 7 step 0"

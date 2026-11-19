@@ -40,17 +40,23 @@ msgstr "7"
 msgid "8"
 msgstr "8"
 
+msgid "BACK"
+msgstr "ATRÁS"
+
 msgid "Background colour"
 msgstr "Color de fondo"
 
-msgid "Changes how the launcher looks, its colours, font, text size, wallpapers and button hints, from a theme, without touching stock's settings."
-msgstr "Cambia el aspecto del launcher, sus colores, fuente, tamaño del texto, fondos y botones de ayuda, desde un tema, sin tocar los ajustes de NextUI original."
+msgid "Changes how the launcher looks, its colours, font, text size, wallpapers, system icons and button hints, from a theme, or one that changes each start or each day, without touching stock's settings."
+msgstr "Cambia el aspecto del launcher, sus colores, fuente, tamaño del texto, fondos, iconos de sistemas y botones de ayuda, desde un tema, o uno que cambia en cada inicio o cada día, sin tocar los ajustes de NextUI original."
 
 msgid "Contrast"
 msgstr "Contraste"
 
 msgid "Fallback font"
 msgstr "Fuente alternativa"
+
+msgid "Icon pack"
+msgstr "Paquete de iconos"
 
 msgid "L2"
 msgstr "L2"
@@ -61,8 +67,17 @@ msgstr "Icono del menú rápido"
 msgid "R2"
 msgstr "R2"
 
+msgid "Rotate"
+msgstr "Rotar"
+
+msgid "Rotate between"
+msgstr "Rotar entre"
+
 msgid "SELECT"
 msgstr "SELECT"
+
+msgid "Sample row"
+msgstr "Fila de ejemplo"
 
 msgid "Screen margins"
 msgstr "Márgenes de la pantalla"
@@ -85,6 +100,9 @@ msgstr "Tema plus"
 msgid "UI size"
 msgstr "Tamaño de la interfaz"
 
+msgid "Wallpaper pack"
+msgstr "Paquete de fondos"
+
 msgid "Y"
 msgstr "Y"
 
@@ -93,6 +111,9 @@ msgstr "auto"
 
 msgid "compact"
 msgstr "compacto"
+
+msgid "daily"
+msgstr "diario"
 
 msgid "large"
 msgstr "grande"
@@ -111,6 +132,9 @@ msgstr "desactivado"
 
 msgid "small"
 msgstr "pequeño"
+
+msgid "start"
+msgstr "al iniciar"
 
 msgid "stock"
 msgstr "original"

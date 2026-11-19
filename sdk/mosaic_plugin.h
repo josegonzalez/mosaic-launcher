@@ -1309,8 +1309,11 @@ typedef struct MosaicHost {
 	// in a pill at the bottom left (MOSAIC_HINTS_LEFT) or bottom right
 	// (MOSAIC_HINTS_RIGHT) of screen, in stock's fonts and theme colours,
 	// with each label put through the launcher's translation. Only on the
-	// screen lent to a MosaicScreenHooks render, from inside it. When
-	// drawn isn't NULL it gets the pill's rect. Returns 0, or -1 for any
+	// screen lent to a MosaicScreenHooks render, from inside it. At a
+	// theme's text step above 0, two hints too wide for their half of the
+	// screen go on two rows, each in a pill of its own, as the built-in
+	// screens' do. When drawn isn't NULL it gets the pill's rect, or both
+	// rows' when they wrap. Returns 0, or -1 for any
 	// other surface or hook, a bad group, a count other than 1 or 2, a
 	// button stock has no hint for, a NULL or empty label, or a pill that
 	// wouldn't fit on the screen clear of the status pill, the header and

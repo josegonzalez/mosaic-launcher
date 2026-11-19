@@ -180,6 +180,31 @@ static void testPlace(void) {
 	CHECK(Hints_place(MOSAIC_HINTS_LEFT, 640, 480, &m, one, 1, NULL) == -1);
 	int negative[] = { -1 };
 	CHECK(Hints_place(MOSAIC_HINTS_LEFT, 640, 480, &m, negative, 1, &r) == -1);
+
+	// too wide for its half: at stock's text size it stays one pill, as stock draws it
+	int wide[] = { 160, 140 }; // a pill of 330, past 640 / 2 - 20
+	CHECK(Hints_place(MOSAIC_HINTS_RIGHT, 640, 480, &m, wide, 2, &r) == 0);
+	CHECK(r.x == 640 - 20 - 330 && r.y == 400 && r.w == 330 && r.h == 60);
+	// at a larger text step, two rows, as wide as the widest hint's pill
+	m.text_step = 2;
+	CHECK(Hints_place(MOSAIC_HINTS_RIGHT, 640, 480, &m, wide, 2, &r) == 0);
+	CHECK(r.x == 640 - 20 - 180 && r.y == 480 - 20 - 130 && r.w == 180 && r.h == 130);
+	CHECK(Hints_place(MOSAIC_HINTS_LEFT, 640, 480, &m, wide, 2, &r) == 0);
+	CHECK(r.x == 20 && r.w == 180 && r.h == 130);
+	// one that fits keeps one row
+	CHECK(Hints_place(MOSAIC_HINTS_RIGHT, 640, 480, &m, two, 2, &r) == 0);
+	CHECK(r.w == 210 && r.h == 60);
+}
+
+static void testWrap(void) {
+	// stock's text size never wraps, however wide
+	CHECK(Hints_wrap(0, 2, 1000, 640, 20) == 0);
+	CHECK(Hints_wrap(-2, 2, 1000, 640, 20) == 0);
+	// a larger one wraps two hints past their half
+	CHECK(Hints_wrap(2, 2, 301, 640, 20) == 1);
+	CHECK(Hints_wrap(2, 2, 300, 640, 20) == 0);
+	// one hint has nothing to wrap
+	CHECK(Hints_wrap(6, 1, 1000, 640, 20) == 0);
 }
 
 static void testClear(void) {
@@ -230,6 +255,7 @@ int main(void) {
 	testPrimary();
 	testLabel();
 	testPlace();
+	testWrap();
 	testClear();
 	CHECK_DONE();
 }

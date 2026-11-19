@@ -62,7 +62,8 @@ int ThemeModel_padding(int height, int pill);
 // stock's) and stock's: a set pill with no padding gets a worked out
 // padding, and the rows follow whatever pill and padding are used. With
 // neither set (or the pill set to stock's), padding and rows are stock's
-// own, which on some devices aren't what the formulas give.
+// own, which on some devices aren't what the formulas give. A text step
+// above 0 takes one row off, leaving room for button hints on two rows.
 int ThemeModel_pill(const ThemeSizes* sizes, const ThemeStock* stock);
 int ThemeModel_button(const ThemeSizes* sizes, const ThemeStock* stock);
 int ThemeModel_paddingFor(const ThemeSizes* sizes, const ThemeStock* stock);

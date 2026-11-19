@@ -53,7 +53,7 @@ int PluginScreen_drawHints(SDL_Surface* surface, const MosaicScreenView* view, i
 	pairs[count * 2] = NULL;
 	if (fontMutex) SDL_LockMutex(fontMutex);
 	for (int i = 0; i < count; i++) widths[i] = GFX_getButtonWidth(labels[i], (char*)glyphs[i]);
-	HintMetrics m = { SCALE1(PADDING), SCALE1(PILL_SIZE), SCALE1(BUTTON_MARGIN) };
+	HintMetrics m = { SCALE1(PADDING), SCALE1(PILL_SIZE), SCALE1(BUTTON_MARGIN), Theme_uiSize(MOSAIC_UI_TEXT_STEP) };
 	MosaicRect pill;
 	// clear of the header, and of the other group's pill this frame
 	MosaicRect avoid[2 + HINT_PILLS_MAX];

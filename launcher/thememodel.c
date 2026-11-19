@@ -40,8 +40,12 @@ int ThemeModel_paddingFor(const ThemeSizes* sizes, const ThemeStock* stock) {
 }
 
 int ThemeModel_rowsFor(const ThemeSizes* sizes, const ThemeStock* stock) {
-	if (!sizes->padding && !customPill(sizes, stock)) return stock->rows;
-	return ThemeModel_rows(stock->height, ThemeModel_pill(sizes, stock), ThemeModel_paddingFor(sizes, stock));
+	int rows = !sizes->padding && !customPill(sizes, stock)
+		? stock->rows
+		: ThemeModel_rows(stock->height, ThemeModel_pill(sizes, stock), ThemeModel_paddingFor(sizes, stock));
+	// above stock's text size, room for button hints on two rows (see Hints_wrap)
+	if (sizes->text_step > 0 && rows > 0) rows--;
+	return rows;
 }
 
 static void refuse(ThemeRefusals* refused, const char* format, ...) {

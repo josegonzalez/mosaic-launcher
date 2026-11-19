@@ -53,7 +53,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [metadata-band](../plugins/metadata-band/README.md) - Shows a game's year, publisher and genre under its art.
 - [row-badges](../plugins/row-badges/README.md) - Adds dots after a game's name for unplayed, favorite and tagged games, games with a manual, and for tiers, and icons for status flags and 100% achievements.
 - [switcher-plus](../plugins/switcher-plus/README.md) - Replaces the game switcher with your recent games in a choice of styles.
-- [theme-plus](../plugins/theme-plus/README.md) - Changes colours, fonts, text size and wallpapers from a theme.
+- [theme-plus](../plugins/theme-plus/README.md) - Changes colours, fonts, text size, wallpapers and system icons from a theme.
 - [transitions](../plugins/transitions/README.md) - Picks how folders open and close and how the game switcher comes in.
 - [video-previews](../plugins/video-previews/README.md) - Plays a short clip of the selected game in place of its thumbnail.
 
