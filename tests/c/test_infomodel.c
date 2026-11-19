@@ -85,7 +85,7 @@ static void testCaps(void) {
 	CHECK(info != NULL);
 	free(info);
 	CHECK(Info_parse(big, INFO_FILE_MAX + 1, &why) == NULL);
-	CHECK_STR(why, "it's over 4096 bytes");
+	CHECK_STR(why, "it's over 8192 bytes");
 
 	// INFO_KEYS_MAX keys, with later new keys left out but known ones still changing
 	char many[2048] = "";
@@ -103,18 +103,53 @@ static void testCaps(void) {
 	free(info);
 
 	// values are cut to INFO_VALUE_MAX bytes, between characters
-	char value[600] = "description=";
+	char value[600] = "summary=";
 	size_t n = strlen(value);
 	memset(value + n, 'a', INFO_VALUE_MAX + 50);
 	value[n + INFO_VALUE_MAX + 50] = '\0';
 	info = parse(value, &why);
-	CHECK(info && strlen(Info_get(info, "description")) == INFO_VALUE_MAX);
+	CHECK(info && strlen(Info_get(info, "summary")) == INFO_VALUE_MAX);
 	free(info);
 	// a 2 byte character across the cut is left out whole
 	memset(value + n, 'a', INFO_VALUE_MAX - 1);
 	strcpy(value + n + INFO_VALUE_MAX - 1, "\xc3\xa9zz");
 	info = parse(value, &why);
-	CHECK(info && strlen(Info_get(info, "description")) == INFO_VALUE_MAX - 1);
+	CHECK(info && strlen(Info_get(info, "summary")) == INFO_VALUE_MAX - 1);
+	free(info);
+
+	// the description key keeps up to INFO_DESCRIPTION_MAX bytes, whatever its case,
+	// and other keys beside it are still cut to INFO_VALUE_MAX
+	static char long_desc[INFO_FILE_MAX];
+	strcpy(long_desc, "notes=");
+	n = strlen(long_desc);
+	memset(long_desc + n, 'b', 300);
+	n += 300;
+	strcpy(long_desc + n, "\nDescription=");
+	n = strlen(long_desc);
+	memset(long_desc + n, 'c', 3000);
+	long_desc[n + 3000] = '\0';
+	info = parse(long_desc, &why);
+	CHECK(info && strlen(Info_get(info, "description")) == 3000);
+	CHECK(strlen(Info_get(info, "notes")) == INFO_VALUE_MAX);
+	free(info);
+	memset(long_desc + n, 'c', INFO_DESCRIPTION_MAX + 100);
+	long_desc[n + INFO_DESCRIPTION_MAX + 100] = '\0';
+	info = parse(long_desc, &why);
+	CHECK(info && strlen(Info_get(info, "description")) == INFO_DESCRIPTION_MAX);
+	free(info);
+	// cut between characters there too
+	memset(long_desc + n, 'c', INFO_DESCRIPTION_MAX - 1);
+	strcpy(long_desc + n + INFO_DESCRIPTION_MAX - 1, "\xc3\xa9zz");
+	info = parse(long_desc, &why);
+	CHECK(info && strlen(Info_get(info, "description")) == INFO_DESCRIPTION_MAX - 1);
+	free(info);
+	// a key that only starts with description is cut as any other
+	strcpy(long_desc, "descriptions=");
+	n = strlen(long_desc);
+	memset(long_desc + n, 'd', 300);
+	long_desc[n + 300] = '\0';
+	info = parse(long_desc, &why);
+	CHECK(info && strlen(Info_get(info, "descriptions")) == INFO_VALUE_MAX);
 	free(info);
 
 	// control characters are spaces; UTF-8 is kept

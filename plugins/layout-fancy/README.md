@@ -60,7 +60,7 @@ Description on: a game's description under its art.
 - Owns the `layout` slot (`slots=layout`).
 - Row decorators draw on each row, and art decorators under the panel's art, except while a description shows, as it takes that space.
 - A plugin's `art_replace` surface takes the box's place in the panel. The save state's preview never stands in for it: with `prefer_preview` off the preview goes under it.
-- Reads the save state files named above, and with `description` on, the `description` key of the selected game's `.info` sidecar through `entry_info` (cut to 255 bytes, as the launcher keeps values).
+- Reads the save state files named above, and with `description` on, the `description` key of the selected game's `.info` sidecar through `entry_info` (up to 4095 bytes, which the launcher keeps of that key).
 
 ## Credits
 

@@ -313,6 +313,19 @@ int FL_scrollParts(const MosaicRect* view, int content_h, int gap, int offset, M
 	return count;
 }
 
+int FL_pages(int y, int h, int page_h, FLPiece* out, int max) {
+	if (y < 0 || h <= 0 || page_h <= 0) return 0;
+	int count = 0;
+	while (h > 0 && count < max) {
+		int page = y / page_h, in = y - page * page_h;
+		int part = page_h - in < h ? page_h - in : h;
+		out[count++] = (FLPiece){ page, in, part };
+		y += part;
+		h -= part;
+	}
+	return count;
+}
+
 ///////////////////////////////////////
 // save states
 

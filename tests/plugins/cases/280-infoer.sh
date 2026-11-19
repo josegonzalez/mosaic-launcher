@@ -8,7 +8,7 @@ mkdir -p "$INFO_DIR/.media/Delta.info" "$STATE"
 for game in Alpha Bravo Charlie Delta Echo; do : >"$INFO_DIR/$game.gb"; done
 printf '# scraped\r\nname=Alpha Prime\r\nyear=1990\r\ngenre=Platformer\r\n' >"$INFO_DIR/.media/Alpha.info"
 printf 'YEAR = 1985 \ngenre=Puzzle\nbroken line\n' >"$INFO_DIR/.media/Bravo.info"
-{ echo "year=1999"; head -c 5000 /dev/zero | tr '\0' '#'; } >"$INFO_DIR/.media/Charlie.info"
+{ echo "year=1999"; head -c 9000 /dev/zero | tr '\0' '#'; } >"$INFO_DIR/.media/Charlie.info"
 printf 'infoer=on\n' >"$STATE/plugins.txt"
 build_plugin infoer 'id=infoer\nname=Infoer\napi=1\n'
 run_launcher "$WORK/infoer.log" "plugin infoer: done" || fail "the launcher exited early with infoer loaded"
@@ -25,7 +25,7 @@ expect "bad args -1 -1 -1 -1"
 expect 'cut 1 "Alp"'
 expect "kept 1990"
 expect "fresh 2000"
-grep -qF "plugins: ignoring $INFO_DIR/.media/Charlie.info: it's over 4096 bytes" "$log" || fail "the oversized sidecar wasn't logged"
+grep -qF "plugins: ignoring $INFO_DIR/.media/Charlie.info: it's over 8192 bytes" "$log" || fail "the oversized sidecar wasn't logged"
 grep -qF "plugins: ignoring $INFO_DIR/.media/Delta.info: it isn't a regular file" "$log" || fail "the folder sidecar wasn't logged"
 grep -qF "Echo.info" "$log" && fail "a missing sidecar was logged"
 rm -rf "$WORK/plugins/infoer.plugin" "$INFO_DIR" "$STATE/plugins.txt"

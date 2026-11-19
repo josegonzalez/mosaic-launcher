@@ -219,6 +219,24 @@ static void testScroll(void) {
 	CHECK(FL_scrollParts(&empty, 300, 48, 0, src, dst) == 0);
 }
 
+static void testPages(void) {
+	FLPiece p[3];
+	// inside one page
+	CHECK(FL_pages(10, 100, 240, p, 3) == 1);
+	CHECK(p[0].page == 0 && p[0].y == 10 && p[0].h == 100);
+	// across two
+	CHECK(FL_pages(200, 100, 240, p, 3) == 2);
+	CHECK(p[0].page == 0 && p[0].y == 200 && p[0].h == 40);
+	CHECK(p[1].page == 1 && p[1].y == 0 && p[1].h == 60);
+	CHECK(FL_pages(480, 240, 240, p, 3) == 1);
+	CHECK(p[0].page == 2 && p[0].y == 0 && p[0].h == 240);
+	// up to max
+	CHECK(FL_pages(0, 1000, 240, p, 3) == 3);
+	CHECK(FL_pages(0, 0, 240, p, 3) == 0);
+	CHECK(FL_pages(0, 10, 0, p, 3) == 0);
+	CHECK(FL_pages(-1, 10, 240, p, 3) == 0);
+}
+
 static void testWindow(void) {
 	CHECK(FL_window(0, 0, 10, 7) == 0);
 	CHECK(FL_window(0, 6, 10, 7) == 0);
@@ -479,7 +497,9 @@ static MosaicSurface* fakeSurfaceNew(const char* id, int w, int h) {
 	*s = (MosaicSurface){ w, h, 1, &desc_origin };
 	return s;
 }
-// Mario's description is long, Tetris's short, and the rest have none
+// Mario's description is long, Tetris's short, Game0's longer still (400
+// words, four to a line), and the rest have none
+static char long_desc[2001];
 static const char* mario_desc = "Mario runs and jumps through the Mushroom Kingdom to save the princess from "
 	"Bowser, across land, sea and sky, with mushrooms, flowers and stars to help him on his way.";
 static int fakeEntryInfo(const MosaicEntry* e, const char* key, char* out, size_t size) {
@@ -487,6 +507,7 @@ static int fakeEntryInfo(const MosaicEntry* e, const char* key, char* out, size_
 	const char* value = NULL;
 	if (!strcmp(key, "description") && !strcmp(e->name, "Mario")) value = mario_desc;
 	if (!strcmp(key, "description") && !strcmp(e->name, "Tetris")) value = "Blocks fall.";
+	if (!strcmp(key, "description") && !strcmp(e->name, "Game0")) value = long_desc;
 	snprintf(out, size, "%s", value ? value : "");
 	return value ? 1 : 0;
 }
@@ -688,6 +709,8 @@ static void testPositionRender(void) {
 
 static void testDescription(void) {
 	setUp();
+	for (int i = 0; i < 400; i++) memcpy(long_desc + i * 5, "word ", 5);
+	long_desc[1999] = '\0';
 	makeCard();
 	fake_host.decorate_art = fakeDecorateArt;
 	fake_host.entry_info = fakeEntryInfo;
@@ -778,6 +801,31 @@ static void testDescription(void) {
 	CHECK(blits_desc == 0);
 	p->tick(40000);
 	CHECK(redraws == 0);
+	p->quit();
+	CHECK(frees == copy_count);
+
+	// Game0's, with no art, fills the panel: 100 lines, drawn a page of 21 at a time as they come into view
+	desc_cfg = "on";
+	CHECK(p->init(&fake_host) == 0);
+	copy_count = frees = 0;
+	resetCounts();
+	p->tick(100000);
+	v = makeView(4);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(desc_surfaces == 1 && blits_desc == 1 && copies[0].h == 21 * 24);
+	CHECK(rectIs(desc_src, 0, 0, 460, 483) && rectIs(desc_dst, 519, 150, 460, 483));
+	// 300 up: the end of the first page and the start of the second
+	resetCounts();
+	p->tick(100000 + 12000);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(desc_surfaces == 1 && blits_desc == 2);
+	CHECK(rectIs(desc_src, 0, 0, 460, 279) && rectIs(desc_dst, 519, 354, 460, 279));
+	// 2300 up: its last page, then the gap, then its first page again, still kept
+	resetCounts();
+	p->tick(100000 + 2000 + 76667);
+	CHECK(p->layout_render(&screen_surface, &v) == 0);
+	CHECK(desc_surfaces == 1 && blits_desc == 2);
+	CHECK(rectIs(desc_src, 0, 0, 460, 335) && rectIs(desc_dst, 519, 298, 460, 335));
 	p->quit();
 	CHECK(frees == copy_count);
 
@@ -1020,6 +1068,7 @@ int main(void) {
 	testDescParts();
 	testWrap();
 	testScroll();
+	testPages();
 	testWindow();
 	testPanel();
 	testStatePaths();

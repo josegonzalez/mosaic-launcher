@@ -39,8 +39,10 @@
 // whose .info sidecar has a description shows it wrapped in the panel:
 // the art in the panel's top half (its left half at the top), pinned to
 // that half's top (left), and the description in what's left under (beside)
-// it. Its lines are drawn once a selection into a surface of the plugin's
-// own, which each frame blits the part in view of. Once the selection has
+// it. It's wrapped once a selection, and its lines drawn a page (a line
+// more than its place holds) at a time into surfaces of the plugin's own,
+// as each page comes into view, the last few kept; each frame blits the
+// part in view of them. Once the selection has
 // stayed put FL_DESC_WAIT_MS, a description taller than its place scrolls
 // up and loops, and only then does tick ask for a frame each frame, while
 // the layout is still drawn. Art decorators don't run while a description
@@ -191,22 +193,39 @@ static void drawImage(MosaicSurface* screen, const char* key, const MosaicSurfac
 }
 
 ///////////////////////////////////////
-// the selected game's description, drawn once into a surface of its own
+// the selected game's description, wrapped once a selection and drawn a
+// page at a time into surfaces of its own as its pages come into view
 
 #define DESC_FONT MOSAIC_FONT_SMALL
+#define DESC_PAGES 4 // pages kept: up to two each of the end and the start again, while it loops
+
+typedef struct DescPage {
+	int page;               // which, from 0
+	MosaicSurface* surface; // its lines; NULL for a free slot
+	unsigned long used;
+} DescPage;
 
 static char desc_for[MAX_PATH_LEN]; // the entry path it's for; "" for none yet
-static char desc_text[512];         // its description, or "" for none
-static MosaicSurface* desc_surface; // its lines, desc_w wide and desc_h tall; NULL before they're drawn
-static int desc_w = 0, desc_h = 0, desc_lines = 0;
+static char desc_text[4096];        // its description, or "" for none
+static FLLine desc_line[FL_DESC_LINES];
+static int desc_w = 0, desc_h = 0, desc_lines = 0, desc_line_h = 0; // desc_w 0 before it's wrapped
+static int page_lines = 0;          // lines in a page
+static DescPage pages[DESC_PAGES];
+static MosaicColor desc_color;
 static unsigned long desc_since = 0; // when the selection moved to it
 static int scrolling = 0;            // the description is taller than its place, so it scrolls once settled
 static int drawn = 0;                // layout_render ran since tick last asked for a frame
 static int scroll_logged = 0;
 
+static void pagesFree(void) {
+	for (int i = 0; i < DESC_PAGES; i++) {
+		if (pages[i].surface) host->surface_free(ID, pages[i].surface);
+		memset(&pages[i], 0, sizeof(pages[i]));
+	}
+}
+
 static void descFree(void) {
-	if (desc_surface) host->surface_free(ID, desc_surface);
-	desc_surface = NULL;
+	pagesFree();
 	desc_w = desc_h = desc_lines = 0;
 }
 
@@ -243,25 +262,45 @@ static int measure(const char* text, int len, void* ctx) {
 	return w < 0 ? 1 << 30 : w;
 }
 
-// draws the description's lines, w wide, into desc_surface
-static void descDraw(int w, MosaicColor color) {
+// wraps the description to w
+static void descWrap(int w) {
 	descFree();
-	int line_h = host->text_height(DESC_FONT);
-	if (w <= 0 || line_h <= 0) return;
-	FLLine lines[FL_DESC_LINES];
-	int count = FL_wrap(desc_text, w, measure, NULL, lines, FL_DESC_LINES);
-	if (count * line_h > 4096) count = 4096 / line_h;
-	if (count <= 0) return;
-	desc_surface = host->surface_new(ID, w, count * line_h);
-	if (!desc_surface) return;
-	for (int i = 0; i < count; i++) {
-		char part[sizeof(desc_text)];
-		snprintf(part, sizeof(part), "%.*s", lines[i].len, desc_text + lines[i].start);
-		host->draw_text(desc_surface, DESC_FONT, part, 0, i * line_h, color, w);
-	}
+	desc_line_h = host->text_height(DESC_FONT);
+	if (w <= 0 || desc_line_h <= 0) return;
+	desc_lines = FL_wrap(desc_text, w, measure, NULL, desc_line, FL_DESC_LINES);
+	if (desc_lines <= 0) return;
 	desc_w = w;
-	desc_h = count * line_h;
-	desc_lines = count;
+	desc_h = desc_lines * desc_line_h;
+}
+
+// page p's surface, drawing it when it isn't kept, in place of the least recently used
+static MosaicSurface* pageGet(int p) {
+	DescPage* slot = NULL; // a free one, else the least recently used
+	for (int i = 0; i < DESC_PAGES; i++) {
+		DescPage* d = &pages[i];
+		if (d->surface && d->page == p) {
+			d->used = frame;
+			return d->surface;
+		}
+		if (!slot || (slot->surface && (!d->surface || d->used < slot->used))) slot = d;
+	}
+	int first = p * page_lines, count = desc_lines - first;
+	if (count > page_lines) count = page_lines;
+	if (count <= 0) return NULL;
+	if (slot->surface) host->surface_free(ID, slot->surface);
+	memset(slot, 0, sizeof(*slot));
+	MosaicSurface* s = host->surface_new(ID, desc_w, count * desc_line_h);
+	if (!s) return NULL;
+	for (int i = 0; i < count; i++) {
+		const FLLine* line = &desc_line[first + i];
+		char part[sizeof(desc_text)];
+		snprintf(part, sizeof(part), "%.*s", line->len, desc_text + line->start);
+		host->draw_text(s, DESC_FONT, part, 0, i * desc_line_h, desc_color, desc_w);
+	}
+	slot->page = p;
+	slot->surface = s;
+	slot->used = frame;
+	return s;
 }
 
 // the gap between the art and the description, and between a description's end and its start again
@@ -273,15 +312,22 @@ static int descGap(void) {
 // selection settled.
 static void drawDesc(MosaicSurface* screen, const MosaicRect* rect, MosaicColor color) {
 	if (rect->w <= 0 || rect->h <= 0) return;
-	if (!desc_surface || desc_w != rect->w) {
-		descDraw(rect->w, color);
-		if (!desc_surface) return;
+	if (!desc_w || desc_w != rect->w) {
+		descWrap(rect->w);
+		if (!desc_w) return;
 		char message[160];
 		snprintf(message, sizeof(message), "description %i line%s, %i tall in %ix%i at %i,%i", desc_lines,
 			desc_lines == 1 ? "" : "s", desc_h, rect->w, rect->h, rect->x, rect->y);
 		host->log(ID, message);
 	}
-	int gap = 2 * host->text_height(DESC_FONT);
+	// a page a line taller than the place, so what's in view is on at most two
+	int lines = rect->h / desc_line_h + 1;
+	if (lines != page_lines || memcmp(&color, &desc_color, sizeof(color)) != 0) {
+		pagesFree();
+		page_lines = lines;
+		desc_color = color;
+	}
+	int gap = 2 * desc_line_h;
 	scrolling = desc_h > rect->h;
 	int offset = FL_scrollOffset((long)(now_ms - desc_since), desc_h, rect->h, gap,
 		FL_DESC_SPEED * host->screen_scale());
@@ -291,7 +337,17 @@ static void drawDesc(MosaicSurface* screen, const MosaicRect* rect, MosaicColor 
 	}
 	MosaicRect src[2], dst[2];
 	int parts = FL_scrollParts(rect, desc_h, gap, offset, src, dst);
-	for (int i = 0; i < parts; i++) host->blit(screen, desc_surface, &src[i], &dst[i]);
+	for (int i = 0; i < parts; i++) {
+		FLPiece pieces[3];
+		int n = FL_pages(src[i].y, src[i].h, page_lines * desc_line_h, pieces, 3);
+		int y = dst[i].y;
+		for (int j = 0; j < n; j++) {
+			MosaicSurface* s = pageGet(pieces[j].page);
+			MosaicRect from = { 0, pieces[j].y, desc_w, pieces[j].h }, to = { dst[i].x, y, desc_w, pieces[j].h };
+			if (s) host->blit(screen, s, &from, &to);
+			y += pieces[j].h;
+		}
+	}
 }
 
 ///////////////////////////////////////
@@ -490,7 +546,7 @@ static int init(const MosaicHost* h) {
 	show_desc = strcmp(host->cfg_get("description", "off"), "on") == 0;
 	state_for[0] = '\0';
 	preview[0] = '\0';
-	desc_surface = NULL;
+	memset(pages, 0, sizeof(pages));
 	descReset();
 	drawn = 0;
 	char message[96];

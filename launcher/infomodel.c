@@ -40,7 +40,7 @@ InfoFile* Info_parse(const char* data, size_t len, const char** why) {
 		return NULL;
 	}
 	if (len > INFO_FILE_MAX) {
-		*why = "it's over 4096 bytes";
+		*why = "it's over 8192 bytes";
 		return NULL;
 	}
 	if (memchr(data, '\0', len)) {
@@ -71,7 +71,8 @@ InfoFile* Info_parse(const char* data, size_t len, const char** why) {
 		int ok = 1;
 		for (const char* c = s.key; c < s.key_end && ok; c++) ok = keyChar(*c);
 		if (!ok) continue;
-		s.value_end = s.value + fit(s.value, (size_t)(s.value_end - s.value), INFO_VALUE_MAX);
+		size_t max = key_len == 11 && !strncasecmp(s.key, "description", 11) ? INFO_DESCRIPTION_MAX : INFO_VALUE_MAX;
+		s.value_end = s.value + fit(s.value, (size_t)(s.value_end - s.value), max);
 
 		int i = 0;
 		while (i < count && !((size_t)(spans[i].key_end - spans[i].key) == key_len

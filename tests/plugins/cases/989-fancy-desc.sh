@@ -5,7 +5,8 @@
 # the left, the rows on the right, and Beta's green thumbnail in the panel
 # a quarter of the way across. Top: the panel across the top half, the
 # thumbnail in its middle. Description on, on the right: Alpha's long
-# .info description is drawn under its art, and it scrolls only once the
+# .info description, over the 255 bytes other keys keep, is drawn whole
+# under its art, and it scrolls only once the
 # selection has stayed put two seconds, so not while glancer moves on
 # after a second and a half, and it does when glancer waits longer.
 make -s -C "$ROOT/plugins" ARCH="$ARCH" OUT="$WORK/plugins" CC="$CC" layout-fancy >/dev/null || fail "building layout-fancy"
@@ -16,7 +17,9 @@ cp "$ROOT/tests/plugins/peeker/art.png" "$GLANCE_DIR/.media/Alpha.png"
 cp "$ROOT/tests/plugins/peeker/art.png" "$GLANCE_DIR/.media/Beta.png"
 printf 'description=%s\n' "Alpha is a game about the first letter, which sets out across a long road of words to find \
 the rest of the alphabet, meeting vowels, consonants and the odd accent on the way, and learning that every line \
-has to end somewhere before the next one can begin." >"$GLANCE_DIR/.media/Alpha.info"
+has to end somewhere before the next one can begin. It keeps going past the 255 bytes other keys are cut to, as a \
+description may, through a second paragraph's worth of words about the road, the letters met along it, and the \
+long way round to the end of the alphabet." >"$GLANCE_DIR/.media/Alpha.info"
 printf 'description=Beta comes second.\n' >"$GLANCE_DIR/.media/Beta.info"
 printf 'layout-fancy=on\nglancer=on\nslot.layout=layout-fancy\n' >"$STATE/plugins.txt"
 plugin=glancer
@@ -50,6 +53,9 @@ run_launcher "$log" "plugin glancer: done" || fail "the launcher exited early wi
 grep -qF "plugin layout-fancy: art right, description on" "$log" || fail "layout-fancy's description setting wasn't read"
 grep -qE "plugin layout-fancy: description [0-9]+ lines?, [0-9]+ tall in 460x[0-9]+ at 519," "$log" \
 	|| fail "layout-fancy didn't draw Alpha's description under its art: $(grep "plugin layout-fancy: description" "$log")"
+# all of its 500 or so bytes, which take more than 15 lines; cut to 255 they'd take 11
+grep -qE "plugin layout-fancy: description (1[6-9]|[2-9][0-9]) lines, " "$log" \
+	|| fail "Alpha's description was cut: $(grep "plugin layout-fancy: description" "$log")"
 alpha=$(grep "plugin glancer: panel Alpha" "$log" | tail -n 1)
 echo "$alpha" | grep -qE "panel Alpha runs 00FF00:[0-9]+-[0-9]+$" || fail "Alpha's thumbnail isn't in the panel with its description: $alpha"
 grep -qF "plugin layout-fancy: description scrolling" "$log" && fail "Alpha's description scrolled before the selection settled two seconds"

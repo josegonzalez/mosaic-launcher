@@ -112,7 +112,7 @@ int FL_nameShown(int show_names, int hidden, int show_art, int selected, int has
 
 #define FL_DESC_WAIT_MS 2000 // how long the selection stays put before the description scrolls
 #define FL_DESC_SPEED 10     // how fast it scrolls, in units of stock's layout a second
-#define FL_DESC_LINES 64     // lines kept of a description
+#define FL_DESC_LINES 1024   // lines kept of a description
 
 // Where the art and the description go in the panel while there's a
 // description: the art in the top half and the description in the bottom
@@ -152,6 +152,14 @@ int FL_scrollOffset(long since_ms, int content_h, int view_h, int gap, int speed
 // again from its top once it's taller than view. Writes each part's rect
 // in the text (src, from 0,0) and on the screen (dst) and returns how many.
 int FL_scrollParts(const MosaicRect* view, int content_h, int gap, int offset, MosaicRect src[2], MosaicRect dst[2]);
+
+// Where the text from y to y + h is, drawn in pages page_h tall each from
+// 0: up to max pieces, each a page, where in it the piece starts, and how
+// tall it is, top to bottom. Returns how many.
+typedef struct FLPiece {
+	int page, y, h;
+} FLPiece;
+int FL_pages(int y, int h, int page_h, FLPiece* out, int max);
 
 ///////////////////////////////////////
 // save states, where stock looks for them

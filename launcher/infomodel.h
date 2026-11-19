@@ -8,15 +8,16 @@
 // lines without an =, an empty key or a key with anything but letters,
 // digits, _, - and . in it. Keys are matched without case, and a key given
 // twice keeps its last value. Values are trimmed, have control characters
-// (tabs too) turned to spaces, and are cut to INFO_VALUE_MAX bytes,
-// between characters.
+// (tabs too) turned to spaces, and are cut to INFO_VALUE_MAX bytes, or
+// INFO_DESCRIPTION_MAX for the description key, between characters.
 
 #include <stddef.h>
 
-#define INFO_FILE_MAX 4096 // bytes; a bigger file is ignored
+#define INFO_FILE_MAX 8192 // bytes; a bigger file is ignored
 #define INFO_KEYS_MAX 32   // keys kept; later new keys are left out
 #define INFO_KEY_MAX 31    // bytes of a key; a longer one skips its line
 #define INFO_VALUE_MAX 255 // bytes kept of a value
+#define INFO_DESCRIPTION_MAX 4095 // bytes kept of the description key's value
 
 typedef struct InfoFile {
 	int count;
