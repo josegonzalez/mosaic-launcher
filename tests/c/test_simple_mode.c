@@ -7,6 +7,7 @@
 
 struct MosaicEntry {
 	char path[256];
+	int type;
 };
 
 #define CARD "/sd"
@@ -15,6 +16,8 @@ struct MosaicEntry {
 static char cfg_on[8] = "";
 static char cfg_settings[8] = "";
 static char cfg_pin[SIMPLE_PIN_LEN] = "";
+static char cfg_kid[64] = "";
+static char cfg_kiosk[8] = "";
 static int has_pin = 0;
 static char last_action[64], last_label[64];
 static void (*action_run)(const char*, void*) = NULL;
@@ -32,6 +35,8 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "on") && cfg_on[0]) return cfg_on;
 	if (!strcmp(key, "settings") && cfg_settings[0]) return cfg_settings;
 	if (!strcmp(key, "pin") && has_pin) return cfg_pin;
+	if (!strcmp(key, "kid") && cfg_kid[0]) return cfg_kid;
+	if (!strcmp(key, "kiosk") && cfg_kiosk[0]) return cfg_kiosk;
 	return fallback;
 }
 static void fakeCfgSet(const char* key, const char* value) {
@@ -40,6 +45,7 @@ static void fakeCfgSet(const char* key, const char* value) {
 	else CHECK(0);
 }
 static const char* fakeEntryPath(const MosaicEntry* e) { return e->path; }
+static int fakeEntryType(const MosaicEntry* e) { return e->type; }
 static void fakeRedraw(void) {}
 static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
 	(void)flags;
@@ -92,6 +98,41 @@ static void fakeAskPin(const char* title, void (*on_done)(int, void*), void* dat
 	else pin_done = on_done;
 }
 
+// the tags plugin's sets, one tag at most, and the recents
+static char set_name[64] = "";
+static const char* set_games[8];
+static int set_games_count = 0;
+static int set_lists = 0;
+static int fakeSetList(const char* name, void (*each)(const char*, void*), void* data) {
+	set_lists++;
+	if (!set_name[0] || strcmp(name, set_name) != 0) return -1;
+	for (int i = 0; i < set_games_count; i++) if (each) each(set_games[i], data);
+	return set_games_count;
+}
+static int fakeSetNames(void (*each)(const char*, void*), void* data) {
+	if (!set_name[0]) return 0;
+	if (each) each(set_name, data);
+	return 1;
+}
+static int fakeIsFiltered(const char* path) { (void)path; return 0; }
+static void (*set_changed)(const char*, const char*, void*) = NULL;
+static int fakeSubscribe(const char* name, void (*on_event)(const char*, const char*, void*), void* data) {
+	(void)data;
+	CHECK_STR(name, "launcher.set_changed");
+	set_changed = on_event;
+	return 0;
+}
+static int fakeEventValue(const char* payload, const char* key, char* out, size_t size) {
+	size_t len = strlen(key);
+	if (!payload || strncmp(payload, key, len) != 0 || payload[len] != '=') return -1;
+	snprintf(out, size, "%s", payload + len + 1);
+	return (int)strlen(payload + len + 1);
+}
+static const char* recents[4];
+static int recents_n = 0;
+static int fakeRecentsCount(void) { return recents_n; }
+static const char* fakeRecentPath(int i) { return i >= 0 && i < recents_n ? recents[i] : NULL; }
+
 static const MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -102,6 +143,7 @@ static const MosaicHost fake = {
 	.cfg_get = fakeCfgGet,
 	.cfg_set = fakeCfgSet,
 	.entry_path = fakeEntryPath,
+	.entry_type = fakeEntryType,
 	.request_redraw = fakeRedraw,
 	.register_action = fakeRegister,
 	.toast = fakeToast,
@@ -160,6 +202,61 @@ static void testModel(void) {
 	CHECK(!Simple_pinMatches("1234", NULL));
 	CHECK(!Simple_pinMatches("", ""));
 	CHECK(!Simple_pinMatches(NULL, "1234"));
+
+	// the kid tag's games
+	KidList kid = { 0 };
+	CHECK(Kid_add(&kid, "/sd/Roms/Game Boy (GB)/Tetris.gb") == 0);
+	CHECK(Kid_add(&kid, "/sd/Roms/Sony PlayStation (PS)/Final Fantasy VII/Final Fantasy VII.m3u") == 0);
+	CHECK(Kid_add(&kid, "/sd/Roms/Ports (PORTS)/Doom.pak") == 0);
+	CHECK(Kid_allows(&kid, "/sd/Roms/Game Boy (GB)/Tetris.gb"));
+	CHECK(!Kid_allows(&kid, "/sd/Roms/Game Boy (GB)/Tetris 2.gb"));
+	CHECK(!Kid_allows(&kid, "/sd/Roms/Game Boy (GB)/Tetris.g"));
+	// the folders it's in, but not a folder whose name only starts the same
+	CHECK(Kid_allows(&kid, "/sd/Roms/Game Boy (GB)"));
+	CHECK(Kid_allows(&kid, "/sd/Roms"));
+	CHECK(!Kid_allows(&kid, "/sd/Roms/Game Boy"));
+	CHECK(!Kid_allows(&kid, "/sd/Roms/Game Boy Color (GBC)"));
+	// a multi-disc game: its folder, its .m3u and its discs
+	CHECK(Kid_allows(&kid, "/sd/Roms/Sony PlayStation (PS)/Final Fantasy VII"));
+	CHECK(Kid_allows(&kid, "/sd/Roms/Sony PlayStation (PS)/Final Fantasy VII/Final Fantasy VII (Disc 2).cue"));
+	CHECK(!Kid_allows(&kid, "/sd/Roms/Sony PlayStation (PS)/Crash.cue"));
+	CHECK(Kid_allows(&kid, "/sd/Roms/Ports (PORTS)/Doom.pak"));
+	CHECK(!Kid_allows(&kid, NULL) && !Kid_allows(&kid, ""));
+	// a .m3u loose in a system folder isn't a game folder's
+	KidList loose = { 0 };
+	CHECK(Kid_add(&loose, "/sd/Roms/Sony PlayStation (PS)/Crash.m3u") == 0);
+	CHECK(!Kid_allows(&loose, "/sd/Roms/Sony PlayStation (PS)/Spyro.cue"));
+	Kid_free(&loose);
+
+	CHECK(Kid_place("/sd/Roms/Game Boy (GB)", MOSAIC_ENTRY_DIR, "/sd") == KID_GAME);
+	CHECK(Kid_place("/sd/Roms/Game Boy (GB)/Tetris.gb", MOSAIC_ENTRY_ROM, "/sd") == KID_GAME);
+	CHECK(Kid_place("/sd/Roms/Ports (PORTS)/Doom.pak", MOSAIC_ENTRY_PAK, "/sd") == KID_GAME);
+	CHECK(Kid_place("/sd/Recently Played", MOSAIC_ENTRY_DIR, "/sd") == KID_RECENTS);
+	CHECK(Kid_place("/sd/Collections", MOSAIC_ENTRY_DIR, "/sd") == KID_COLLECTIONS);
+	CHECK(Kid_place("/sd/Collections/Mario.txt", MOSAIC_ENTRY_DIR, "/sd") == KID_COLLECTION);
+	CHECK(Kid_place("/sd/Collections/map.cfg", MOSAIC_ENTRY_DIR, "/sd") == KID_KEEP);
+	CHECK(Kid_place("/sd/Tags", MOSAIC_ENTRY_DIR, "/sd") == KID_KEEP);
+	CHECK(Kid_place("/sd/Romsx", MOSAIC_ENTRY_DIR, "/sd") == KID_KEEP);
+	CHECK(Kid_place("/sd/Roms", MOSAIC_ENTRY_TOGGLE, "/sd") == KID_KEEP);
+
+	CHECK(Kid_collectionAllows(&kid, "/Roms/Game Boy (GB)/Dr. Mario.gb\n/Roms/Game Boy (GB)/Tetris.gb\r\n", "/sd"));
+	CHECK(!Kid_collectionAllows(&kid, "/Roms/Game Boy (GB)/Dr. Mario.gb\n\n", "/sd"));
+	CHECK(!Kid_collectionAllows(&kid, "", "/sd"));
+	Kid_clear(&kid);
+	CHECK(kid.count == 0 && !Kid_allows(&kid, "/sd/Roms"));
+	Kid_free(&kid);
+
+	char tag[16];
+	CHECK(Kid_tag("  Kids \n", tag, sizeof(tag)) && !strcmp(tag, "Kids"));
+	CHECK(!Kid_tag("   ", tag, sizeof(tag)) && !tag[0]);
+	CHECK(!Kid_tag(NULL, tag, sizeof(tag)));
+
+	// kiosk
+	CHECK(Kiosk_gate(1, 1, MOSAIC_ACTION_EDITS, 1) == MOSAIC_GATE_PIN);
+	CHECK(Kiosk_gate(1, 1, MOSAIC_ACTION_EDITS | MOSAIC_ACTION_PATH, 0) == MOSAIC_GATE_REFUSE);
+	CHECK(Kiosk_gate(1, 1, MOSAIC_ACTION_PATH, 1) == MOSAIC_GATE_RUN);
+	CHECK(Kiosk_gate(1, 0, MOSAIC_ACTION_EDITS, 1) == MOSAIC_GATE_RUN);
+	CHECK(Kiosk_gate(0, 1, MOSAIC_ACTION_EDITS, 1) == MOSAIC_GATE_RUN);
 }
 
 ///////////////////////////////////////
@@ -288,9 +385,124 @@ static void testHostPin(void) {
 	has_pin = 0;
 }
 
+static MosaicEntry typed(const char* path, int type) {
+	MosaicEntry e = entry(path);
+	e.type = type;
+	return e;
+}
+
+// The kid tag, against the tags plugin's set.
+static void testKid(void) {
+	MosaicHost with_sets = fake;
+	with_sets.set_list = fakeSetList;
+	with_sets.set_names = fakeSetNames;
+	with_sets.is_filtered = fakeIsFiltered;
+	with_sets.subscribe = fakeSubscribe;
+	with_sets.event_value = fakeEventValue;
+	with_sets.recents_count = fakeRecentsCount;
+	with_sets.recent_path = fakeRecentPath;
+	const MosaicPlugin* p = mosaic_plugin_get(&with_sets);
+	snprintf(cfg_on, sizeof(cfg_on), "on");
+	CHECK(p->init(&with_sets) == 0);
+	CHECK(set_changed != NULL);
+
+	MosaicEntry gb = typed(CARD "/Roms/Game Boy (GB)", MOSAIC_ENTRY_DIR);
+	MosaicEntry nes = typed(CARD "/Roms/Nintendo (FC)", MOSAIC_ENTRY_DIR);
+	MosaicEntry tetris = typed(CARD "/Roms/Game Boy (GB)/Tetris.gb", MOSAIC_ENTRY_ROM);
+	MosaicEntry mario = typed(CARD "/Roms/Game Boy (GB)/Dr. Mario.gb", MOSAIC_ENTRY_ROM);
+	MosaicEntry recent = typed(CARD "/Recently Played", MOSAIC_ENTRY_DIR);
+	MosaicEntry tags = typed(CARD "/Tags", MOSAIC_ENTRY_DIR);
+
+	// no kid tag: everything but Tools, as before
+	CHECK(p->filter(&nes, CARD) == 1 && p->filter(&mario, CARD) == 1);
+	CHECK(set_lists == 0);
+
+	// a kid tag: only its games, and the folders they're in
+	snprintf(cfg_kid, sizeof(cfg_kid), " Kids ");
+	snprintf(set_name, sizeof(set_name), "tags:Kids");
+	set_games[0] = CARD "/Roms/Game Boy (GB)/Tetris.gb";
+	set_games_count = 1;
+	CHECK(p->filter(&gb, CARD) == 1);
+	CHECK(p->filter(&nes, CARD) == 0);
+	CHECK(p->filter(&tetris, CARD "/Roms/Game Boy (GB)") == 1);
+	CHECK(p->filter(&mario, CARD "/Roms/Game Boy (GB)") == 0);
+	CHECK(p->filter(&tags, CARD) == 1);
+	CHECK(set_lists == 1); // read once, not per entry
+	recents_n = 0;
+	CHECK(p->filter(&recent, CARD) == 0);
+	recents[0] = CARD "/Roms/Game Boy (GB)/Dr. Mario.gb";
+	recents_n = 1;
+	CHECK(p->filter(&recent, CARD) == 0);
+	recents[1] = CARD "/Roms/Game Boy (GB)/Tetris.gb";
+	recents_n = 2;
+	CHECK(p->filter(&recent, CARD) == 1);
+
+	// the switcher can't start a game without the tag
+	MosaicLaunch other = { CARD "/Roms/Game Boy (GB)/Dr. Mario.gb", MOSAIC_ENTRY_ROM };
+	MosaicLaunch allowed = { CARD "/Roms/Game Boy (GB)/Tetris.gb", MOSAIC_ENTRY_ROM };
+	CHECK(p->pre_launch(&other) == MOSAIC_LAUNCH_CANCEL);
+	CHECK_STR(toasted, "That game is off in simple mode");
+	CHECK(p->pre_launch(&allowed) == MOSAIC_LAUNCH_CONTINUE);
+
+	// tagged again: read on the set's change, not before
+	set_games[1] = CARD "/Roms/Game Boy (GB)/Dr. Mario.gb";
+	set_games_count = 2;
+	CHECK(p->filter(&mario, CARD "/Roms/Game Boy (GB)") == 0);
+	set_changed("launcher.set_changed", "name=favorites", NULL);
+	CHECK(p->filter(&mario, CARD "/Roms/Game Boy (GB)") == 0);
+	set_changed("launcher.set_changed", "name=tags:Kids", NULL);
+	CHECK(p->filter(&mario, CARD "/Roms/Game Boy (GB)") == 1);
+
+	// a tag named the same but for case
+	snprintf(cfg_kid, sizeof(cfg_kid), "kids");
+	CHECK(p->filter(&mario, CARD "/Roms/Game Boy (GB)") == 1);
+	// no such tag: no games at all
+	snprintf(cfg_kid, sizeof(cfg_kid), "Other");
+	CHECK(p->filter(&tetris, CARD "/Roms/Game Boy (GB)") == 0);
+	CHECK(p->filter(&gb, CARD) == 0);
+
+	// simple mode off: everything, whatever the tag
+	snprintf(cfg_on, sizeof(cfg_on), "off");
+	CHECK(p->filter(&nes, CARD) == 1);
+	CHECK(p->pre_launch(&other) == MOSAIC_LAUNCH_CONTINUE);
+	p->quit();
+	cfg_kid[0] = '\0';
+	set_name[0] = '\0';
+	recents_n = 0;
+}
+
+// Kiosk: editing actions behind the PIN, and refused without one.
+static void testKiosk(void) {
+	MosaicHost with_pin = fake;
+	with_pin.has_pin = fakeHasPin;
+	with_pin.ask_pin = fakeAskPin;
+	const MosaicPlugin* p = mosaic_plugin_get(&with_pin);
+	snprintf(cfg_on, sizeof(cfg_on), "on");
+	CHECK(p->init(&with_pin) == 0);
+	CHECK(p->action_gate != NULL);
+
+	// off by default
+	CHECK(p->action_gate("tags.edit", MOSAIC_ACTION_EDITS) == MOSAIC_GATE_RUN);
+	snprintf(cfg_kiosk, sizeof(cfg_kiosk), "on");
+	host_pin = 1;
+	CHECK(p->action_gate("tags.edit", MOSAIC_ACTION_EDITS) == MOSAIC_GATE_PIN);
+	CHECK(p->action_gate("manuals.open", MOSAIC_ACTION_PATH) == MOSAIC_GATE_RUN);
+	CHECK(p->action_gate("simple-mode.toggle", 0) == MOSAIC_GATE_RUN);
+	host_pin = 0;
+	toasted[0] = '\0';
+	CHECK(p->action_gate("favorites.toggle", MOSAIC_ACTION_EDITS) == MOSAIC_GATE_REFUSE);
+	CHECK_STR(toasted, "Set a PIN to make changes in kiosk mode");
+	// with simple mode off, kiosk is too
+	snprintf(cfg_on, sizeof(cfg_on), "off");
+	CHECK(p->action_gate("favorites.toggle", MOSAIC_ACTION_EDITS) == MOSAIC_GATE_RUN);
+	cfg_kiosk[0] = '\0';
+}
+
 int main(void) {
 	testModel();
 	testPlugin();
 	testHostPin();
+	testKid();
+	testKiosk();
 	CHECK_DONE();
 }

@@ -537,6 +537,75 @@ static void test_shared_overflow(void) {
 	pressed_button = -1;
 }
 
+// The gate Action_run asks first: what it says runs, waits for the PIN or
+// is refused, from a button too, and stock's run with no gate.
+static int gate_answer = ACTION_GATE_RUN;
+static int gate_asked = 0;
+static const Action* gate_action = NULL;
+static char gate_path[64];
+static int testGate(const Action* action, const char* path) {
+	gate_asked++;
+	gate_action = action;
+	snprintf(gate_path, sizeof(gate_path), "%s", path ? path : "(null)");
+	return gate_answer;
+}
+
+static void test_gate(void) {
+	static const Action editAction = { "test.edit", "EDIT", canPath, runPath, NULL, "tags", 1, 1 };
+	CHECK(ActionGate_stricter(ACTION_GATE_RUN, ACTION_GATE_PIN) == ACTION_GATE_PIN);
+	CHECK(ActionGate_stricter(ACTION_GATE_REFUSE, ACTION_GATE_PIN) == ACTION_GATE_REFUSE);
+	CHECK(ActionGate_stricter(ACTION_GATE_RUN, ACTION_GATE_RUN) == ACTION_GATE_RUN);
+
+	Actions_setGate(testGate);
+	// it runs, with the gate asked once with its path
+	ran = NULL;
+	CHECK(Action_run(&editAction, "/Roms/A.gb") == 0);
+	CHECK_STR(ran ? ran : "", "path");
+	CHECK(gate_asked == 1 && gate_action == &editAction);
+	CHECK_STR(gate_path, "/Roms/A.gb");
+
+	// held for the PIN: not run yet, then run without asking again
+	gate_answer = ACTION_GATE_PIN;
+	ran = NULL;
+	CHECK(Action_run(&editAction, "/Roms/B.gb") == 0);
+	CHECK(ran == NULL && gate_asked == 2);
+	CHECK(Action_runUngated(&editAction, "/Roms/B.gb") == 0);
+	CHECK_STR(ran ? ran : "", "path");
+	CHECK_STR(got_path, "/Roms/B.gb");
+	CHECK(gate_asked == 2);
+
+	// refused, from a button too, and the gate isn't asked about an action
+	// that can't run anyway
+	gate_answer = ACTION_GATE_REFUSE;
+	ran = NULL;
+	CHECK(Action_run(&editAction, "/Roms/C.gb") == -1);
+	CHECK(ran == NULL);
+	CHECK(Action_run(&editAction, NULL) == -1);
+	CHECK(gate_asked == 3);
+	Actions_setSelected(selectedNow);
+	selected = "/Roms/Selected.gb";
+	const Binding bound[] = { { BTN_Y, TRIGGER_PRESS, "Y", &editAction } };
+	press(BTN_Y);
+	CHECK(Bindings_dispatch(bound, 1) == 1); // it fired, so the button is used
+	CHECK(ran == NULL && gate_asked == 4);
+	CHECK_STR(gate_path, "/Roms/Selected.gb");
+	// its hint still shows: the gate only decides as it runs
+	const Binding* order[] = { &bound[0] };
+	char* pairs[3];
+	CHECK(Bindings_hints(order, 1, pairs) == 1);
+	CHECK(gate_asked == 4);
+
+	// with no gate, as before
+	Actions_setGate(NULL);
+	press(BTN_Y);
+	CHECK(Bindings_dispatch(bound, 1) == 1);
+	CHECK_STR(ran ? ran : "", "path");
+	CHECK(gate_asked == 4);
+	selected = NULL;
+	Actions_setSelected(NULL);
+	gate_answer = ACTION_GATE_RUN;
+}
+
 int main(void) {
 	// dispatch: the fired, available binding runs
 	press(BTN_A);
@@ -640,6 +709,7 @@ int main(void) {
 	test_paths();
 	test_binding_list();
 	test_shared_overflow();
+	test_gate();
 
 	CHECK_DONE();
 }

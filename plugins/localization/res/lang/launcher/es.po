@@ -143,6 +143,9 @@ msgstr ""
 "PIN establecido.\n"
 "El modo simple y los ajustes protegidos lo piden."
 
+msgid "PIN to make changes"
+msgstr "PIN para hacer cambios"
+
 msgid "PREVIOUS"
 msgstr "ANTERIOR"
 

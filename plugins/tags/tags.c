@@ -1011,12 +1011,12 @@ static int init(const MosaicHost* h) {
 
 	int button = buttonOf(host->cfg_get("button", "Y"));
 	if (button < 0 || button == MOSAIC_BUTTON_SELECT) button = MOSAIC_BUTTON_Y;
-	if (host->register_action("tags.edit", "TAGS", 0, canEdit, edit, NULL) != 0
+	if (host->register_action("tags.edit", "TAGS", MOSAIC_ACTION_EDITS, canEdit, edit, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "tags.edit") != 0) {
 		say("couldn't bind a button; tags.edit can still go on an FN button");
 	}
 	int status_button = buttonOf(host->cfg_get("status_button", "none"));
-	if (host->register_action("tags.status", "STATUS", 0, canEdit, openStatus, NULL) != 0) say("couldn't add tags.status");
+	if (host->register_action("tags.status", "STATUS", MOSAIC_ACTION_EDITS, canEdit, openStatus, NULL) != 0) say("couldn't add tags.status");
 	else if (status_button >= 0 && host->bind_button(MOSAIC_SCREEN_GAMELIST, status_button, MOSAIC_TRIGGER_PRESS, "tags.status") != 0) {
 		say("couldn't bind the status button; tags.status can still go on an FN button");
 	}

@@ -278,7 +278,7 @@ static int init(const MosaicHost* h) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 	if (MOSAIC_HOST_HAS(host, call) && host->provide("emulator.choice", provideChoice) != 0) say("couldn't provide emulator.choice");
-	if (host->register_action(ID ".choose", "EMULATOR", 0, canChoose, choose, NULL) != 0
+	if (host->register_action(ID ".choose", "EMULATOR", MOSAIC_ACTION_EDITS, canChoose, choose, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, ID ".choose") != 0) {
 		say("couldn't bind " ID ".choose");
 	}

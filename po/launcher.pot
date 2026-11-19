@@ -379,6 +379,10 @@ msgid ""
 "Simple mode and protected settings ask for it."
 msgstr ""
 
+#: launcher/plugins.c
+msgid "PIN to make changes"
+msgstr ""
+
 #: launcher/screen_gamelist.c
 msgid "PREVIOUS"
 msgstr ""
@@ -568,7 +572,7 @@ msgstr ""
 msgid "Wifi"
 msgstr ""
 
-#: launcher/settings.c
+#: launcher/plugins.c launcher/settings.c
 msgid "Wrong PIN"
 msgstr ""
 

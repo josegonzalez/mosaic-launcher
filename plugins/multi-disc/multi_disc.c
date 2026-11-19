@@ -700,7 +700,7 @@ static int init(const MosaicHost* h) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 	if (!MOSAIC_HOST_HAS(host, confirm)) say("this launcher has no confirm dialog; Combine discs is off");
-	else if (host->register_action(ID ".combine", TR_MARK("MERGE"), 0, canCombine, combineAsk, NULL) != 0
+	else if (host->register_action(ID ".combine", TR_MARK("MERGE"), MOSAIC_ACTION_EDITS, canCombine, combineAsk, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, ID ".combine") != 0) {
 		say("couldn't bind Combine discs");
 	}

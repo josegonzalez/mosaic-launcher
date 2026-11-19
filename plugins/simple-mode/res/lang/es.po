@@ -15,6 +15,12 @@ msgstr "Un modo simple para niños o un dispositivo compartido: oculta las herra
 msgid "Hide settings tiles"
 msgstr "Ocultar iconos de ajustes"
 
+msgid "Kid tag"
+msgstr "Etiqueta infantil"
+
+msgid "Kiosk mode"
+msgstr "Modo quiosco"
+
 msgid "LEAVE"
 msgstr "SALIR"
 
@@ -24,6 +30,9 @@ msgstr "¿Salir del modo simple?"
 msgid "PIN to leave simple mode"
 msgstr "PIN para salir del modo simple"
 
+msgid "Set a PIN to make changes in kiosk mode"
+msgstr "Pon un PIN para hacer cambios en el modo quiosco"
+
 msgid "Simple mode"
 msgstr "Modo simple"
 
@@ -32,6 +41,9 @@ msgstr "Modo simple desactivado"
 
 msgid "Simple mode on"
 msgstr "Modo simple activado"
+
+msgid "That game is off in simple mode"
+msgstr "Ese juego no está en el modo simple"
 
 msgid "Tools are off in simple mode"
 msgstr "Las herramientas no están en el modo simple"

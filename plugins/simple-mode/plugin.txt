@@ -7,3 +7,7 @@ description=A simple mode for kids or a shared device: it hides Tools and the se
 # hides Tools and its tiles, and with settings on, Settings, Wifi, Bluetooth and Reboot; the Simple mode tile on the quick menu turns it off, after the launcher's PIN when one is set (the PIN row on the Plugins page)
 setting.on=toggle|Simple mode on|on
 setting.settings=toggle|Hide settings tiles|on
+# while simple mode is on, every list shows only the games with this tag (systems, Recently Played and collections without one are hidden); empty for off
+setting.kid=text|Kid tag|||protected
+# while simple mode is on, actions that change things (tags, status, favorites, hide, rename, delete, sort, collections) ask for the launcher's PIN first; with no PIN set they're refused
+setting.kiosk=toggle|Kiosk mode|off||protected

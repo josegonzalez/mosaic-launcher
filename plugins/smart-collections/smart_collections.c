@@ -883,15 +883,15 @@ static int init(const MosaicHost* h) {
 		host->index_count(NULL); // starts reading the card, so it's ready by the first listing
 	}
 
-	if (host->register_action("smart-collections.dismiss", "DISMISS", 0, canDismiss, dismiss, NULL) != 0
+	if (host->register_action("smart-collections.dismiss", "DISMISS", MOSAIC_ACTION_EDITS, canDismiss, dismiss, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.dismiss") != 0) {
 		say("couldn't bind Y; collections can't be dismissed");
 	}
-	if (host->register_action("smart-collections.restore", "RESTORE", 0, canRestore, restore, NULL) != 0
+	if (host->register_action("smart-collections.restore", "RESTORE", MOSAIC_ACTION_EDITS, canRestore, restore, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.restore") != 0) {
 		say("couldn't bind Y; dismissed collections can't be brought back");
 	}
-	if (host->register_action("smart-collections.save_tag", "SAVE AS TAG", 0, canSave, saveAsTag, NULL) != 0
+	if (host->register_action("smart-collections.save_tag", "SAVE AS TAG", MOSAIC_ACTION_EDITS, canSave, saveAsTag, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "smart-collections.save_tag") != 0) {
 		say("couldn't bind Y; collections can't be saved as tags");
 	}

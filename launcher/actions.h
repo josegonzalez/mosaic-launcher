@@ -16,15 +16,38 @@ typedef struct Action {
 	void* data;              // passed to both, eg. a plugin's own state
 	const char* plugin_id;   // whose label it is: NULL for the launcher's own, the plugin's id for a plugin's
 	int takes_path;          // it acts on an entry, and gets its full path; any other gets NULL
+	int edits;               // it changes what the user keeps (MOSAIC_ACTION_EDITS), which plugins' action_gate can hold back
 } Action;
 
 // True when the action exists and may run now on path, an entry's full
 // path for an action that takes one, which isn't available without one.
 int Action_available(const Action* action, const char* path);
 
-// Runs the action on path, as Action_available takes it. Returns 0, or -1
-// for no action, or one that takes a path given none, which is logged.
+// Runs the action on path, as Action_available takes it, once the gate
+// (see Actions_setGate) lets it. Returns 0, also when the gate asked for
+// the PIN first, or -1 for no action, one that takes a path given none,
+// which is logged, or one the gate refused.
 int Action_run(const Action* action, const char* path);
+
+// What a gate says about an action about to run, as MosaicGate's values
+// in the SDK, from least to most strict.
+enum ActionGate {
+	ACTION_GATE_RUN = 0,    // it runs now
+	ACTION_GATE_PIN = 1,    // the gate asked for the PIN, and runs it with Action_runUngated after
+	ACTION_GATE_REFUSE = 2, // it doesn't run
+};
+
+// The stricter of two gates' answers.
+int ActionGate_stricter(int a, int b);
+
+// What Action_run asks before each action runs, such as the plugins'
+// action_gate, with the action and its path as Action_run gives it; NULL,
+// as at the start, lets every action run.
+void Actions_setGate(int (*gate)(const Action* action, const char* path));
+
+// Runs the action as Action_run does, without asking the gate, such as
+// once the PIN a gate asked for is typed.
+int Action_runUngated(const Action* action, const char* path);
 
 // What a button gives the action: the selected entry's path while the
 // game list shows, for an action that takes a path, else NULL.

@@ -141,7 +141,7 @@ Plugins listed there load first, in that order, and then the rest, each moved af
 
 ### The PIN
 
-The PIN row at the end of the Plugins page sets the launcher's one PIN, which simple mode asks for to leave and the page asks for before protected settings. Changing it needs the current PIN first; typing nothing removes it. The PIN is kept in `.userdata/<platform>/launcher/pin.txt`, a file of the launcher's own rather than a plugin's cfg, so no plugin can read it with `cfg_get`; plugins only ask the launcher to check what the user types (`has_pin` and `ask_pin`). It's never logged, and while it's typed to check it the keyboard shows a `*` for each character. The right PIN unlocks every protected setting until the user leaves the Launcher pak. A wrong one only says so, and there's no lockout: the PIN keeps a child or another user out of the settings, not someone with the card. A PIN simple mode kept in its own cfg (its old `pin` setting) becomes the launcher's PIN the next time the launcher or the Launcher pak starts, unless one is already set, and is blanked there.
+The PIN row at the end of the Plugins page sets the launcher's one PIN, which simple mode asks for to leave and before editing actions in its kiosk mode, and the page asks for before protected settings. Changing it needs the current PIN first; typing nothing removes it. The PIN is kept in `.userdata/<platform>/launcher/pin.txt`, a file of the launcher's own rather than a plugin's cfg, so no plugin can read it with `cfg_get`; plugins only ask the launcher to check what the user types (`has_pin` and `ask_pin`). It's never logged, and while it's typed to check it the keyboard shows a `*` for each character. The right PIN unlocks every protected setting until the user leaves the Launcher pak. A wrong one only says so, and there's no lockout: the PIN keeps a child or another user out of the settings, not someone with the card. A PIN simple mode kept in its own cfg (its old `pin` setting) becomes the launcher's PIN the next time the launcher or the Launcher pak starts, unless one is already set, and is blanked there.
 
 A forgotten PIN is cleared off the device: put the card in a computer and delete `.userdata/<platform>/launcher/pin.txt`. Protected settings then behave like any other, and simple mode leaves after a confirm. Simple mode can also be left by setting `on=off` in `simple-mode.cfg` or `simple-mode=off` in `plugins.txt`.
 
@@ -1060,6 +1060,17 @@ The quick menu's tiles are built at start and again whenever the lists reload, w
   .screen_tint = screenTint,
   ```
 - `entry_free(entry)` frees an entry the plugin made with `entry_new` and never pushed into a list, such as one made only to ask `art_find` about a game, so a plugin that looks up many games' art doesn't keep an entry for each; a `NULL` entry does nothing. Never free an entry a list owns or one the launcher handed over. Check for it with `MOSAIC_HOST_HAS(host, entry_free)`. The bundled `screensaver` frees each random game's entry with it.
+- Editing actions and a say over every action: `register_action`'s `MOSAIC_ACTION_EDITS` flag marks an action that changes what the user keeps, such as a game's tags, favorites, name or files, a collection or a list's order, rather than only showing something. `action_gate(action_id, flags)` in `MosaicPlugin` is asked before every action runs, however it's run: a game list button, the shared button's menu, a quick menu tile, an FN button, `run_action` (so `button-remap` too) and the lock screen. Every plugin's `action_gate` is asked, in load order, with the action's id and its flags, and the strictest answer wins: `MOSAIC_GATE_REFUSE` (it doesn't run) over `MOSAIC_GATE_PIN` (the launcher asks for its PIN, titled "PIN to make changes", and runs the action once the right one is typed, if it's still registered and available; a wrong one says so, and with no PIN set it runs straight away) over `MOSAIC_GATE_RUN`. A refusing plugin says why itself, such as with a toast. Hints and tiles still show: the gate only decides as the action runs, and an action that can't run anyway, such as one that takes a path given none, isn't asked about. It only answers; anything else is an error the launcher logs once per plugin and counts as `MOSAIC_GATE_RUN`. With no plugin's `action_gate`, or every one saying `MOSAIC_GATE_RUN`, actions run as before. `action_flags(action_id)` returns the flags an action was registered with, or -1 for none by that id; the game list's own have none. Check for both with `MOSAIC_HOST_HAS(host, action_flags)`. The bundled `simple-mode` asks for the PIN for editing actions in its kiosk mode, and the bundled plugins mark theirs (see [simple-mode](../plugins/simple-mode/README.md#kiosk-mode)).
+
+  ```c
+  static int actionGate(const char* action_id, int flags) {
+      return locked && (flags & MOSAIC_ACTION_EDITS) ? MOSAIC_GATE_PIN : MOSAIC_GATE_RUN;
+  }
+  // in init
+  host->register_action("notes.clear", "CLEAR", MOSAIC_ACTION_EDITS, NULL, clearNotes, NULL);
+  // in MosaicPlugin, with MOSAIC_HOST_HAS(host, action_flags) checked in init
+  .action_gate = actionGate,
+  ```
 
 ## Without writing C
 

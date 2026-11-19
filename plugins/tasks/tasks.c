@@ -430,7 +430,7 @@ static void registerGameTasks(void) {
 				break;
 			}
 		}
-		if (host->register_action(id, game.items[i].name, MOSAIC_ACTION_PATH, gameTaskAvailable, gameTaskRun, &game.items[i]) != 0
+		if (host->register_action(id, game.items[i].name, MOSAIC_ACTION_PATH | MOSAIC_ACTION_EDITS, gameTaskAvailable, gameTaskRun, &game.items[i]) != 0
 				|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, id) != 0) {
 			sayf("couldn't put %s on Y", id);
 			continue;

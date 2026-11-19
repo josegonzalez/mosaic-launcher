@@ -232,7 +232,7 @@ static int init(const MosaicHost* h) {
 	}
 	findBundled();
 	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".setup", provideSetup) != 0) say("couldn't provide " ID ".setup");
-	if (host->register_action(ACTION_ID, "Theme", 0, NULL, pick, NULL) != 0) {
+	if (host->register_action(ACTION_ID, "Theme", MOSAIC_ACTION_EDITS, NULL, pick, NULL) != 0) {
 		say("couldn't register " ACTION_ID);
 		return 0;
 	}

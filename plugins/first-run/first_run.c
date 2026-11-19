@@ -768,7 +768,7 @@ static int init(const MosaicHost* h) {
 		say("can't register the wizard's screens");
 		return 1;
 	}
-	if (host->register_action(ACTION_ID, "First run", 0, NULL, openWizard, NULL) != 0
+	if (host->register_action(ACTION_ID, "First run", MOSAIC_ACTION_EDITS, NULL, openWizard, NULL) != 0
 		|| host->register_action(BUTTONS_ACTION_ID, "Buttons", 0, NULL, openButtons, NULL) != 0) {
 		say("couldn't register " ACTION_ID " or " BUTTONS_ACTION_ID);
 		return 1;

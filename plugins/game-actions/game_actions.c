@@ -375,7 +375,7 @@ static const struct {
 };
 
 static void add(const char* id, const char* label, int (*available)(const char*, void*), void (*run)(const char*, void*), int button) {
-	if (host->register_action(id, label, 0, available, run, NULL) != 0
+	if (host->register_action(id, label, MOSAIC_ACTION_EDITS, available, run, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, id) != 0) {
 		char message[128];
 		snprintf(message, sizeof(message), "couldn't bind %s", id);

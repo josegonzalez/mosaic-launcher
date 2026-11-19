@@ -232,7 +232,7 @@ static void askRebootToStock(const char* path, void* data) {
 // hooks
 
 static void addTile(const char* id, const char* label, int (*available)(const char*, void*), void (*run)(const char*, void*), int (*is_on)(void*), void* data) {
-	if (host->register_action(id, label, 0, available, run, data) != 0
+	if (host->register_action(id, label, strcmp(id, ID ".stock") ? 0 : MOSAIC_ACTION_EDITS, available, run, data) != 0
 			|| host->quick_tile(id, MOSAIC_QUICK_TOP, NULL, NULL, is_on) != 0) {
 		char message[200];
 		snprintf(message, sizeof(message), "couldn't add the %s tile", label);

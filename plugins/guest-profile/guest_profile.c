@@ -150,7 +150,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't register " TOGGLE_ID);
 		return 1;
 	}
-	if (host->register_action(CLEAR_ID, "Clear guest", 0, always, clearData, NULL) != 0) say("couldn't register " CLEAR_ID);
+	if (host->register_action(CLEAR_ID, "Clear guest", MOSAIC_ACTION_EDITS, always, clearData, NULL) != 0) say("couldn't register " CLEAR_ID);
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
 			&& host->quick_tile(TOGGLE_ID, MOSAIC_QUICK_TOP, NULL, NULL, isOn) != 0) {
 		say("couldn't add the Guest tile");

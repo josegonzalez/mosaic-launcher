@@ -79,6 +79,7 @@ typedef struct LoadedPlugin {
 	int lock_text_off;   // its lock_text failed, so its lines are left off the lock screen
 	int note_off;        // its settings_note failed, so its notes are left off the Launcher pak's pages
 	int tint_off;        // its screen_tint failed, so its tint is left out
+	int gate_logged;     // its action_gate gave an answer it can't, which was logged
 } LoadedPlugin;
 
 // The plugins loaded, with room for every one deciding to load (start), so
@@ -332,6 +333,15 @@ static const char* hostEntryName(const MosaicEntry* e) { return e ? ((const Entr
 static int hostEntryType(const MosaicEntry* e) { return e ? ((const Entry*)e)->type : -1; }
 static void hostEntryFree(MosaicEntry* e) { Entry_free((Entry*)e); }
 
+static int actionFlags(const Action* action) {
+	return (action->takes_path ? MOSAIC_ACTION_PATH : 0) | (action->edits ? MOSAIC_ACTION_EDITS : 0);
+}
+
+static int hostActionFlags(const char* action_id) {
+	const Action* action = Actions_find(action_id);
+	return action ? actionFlags(action) : -1;
+}
+
 // An entry's .info sidecar, or NULL when it has none or it's ignored: only
 // a regular file, opened without blocking, of up to INFO_FILE_MAX bytes.
 static InfoFile* loadInfo(const char* entry_path) {
@@ -402,6 +412,7 @@ static int hostRegisterAction(const char* id, const char* label, int flags,
 		return -1;
 	}
 	action->takes_path = (flags & MOSAIC_ACTION_PATH) != 0;
+	action->edits = (flags & MOSAIC_ACTION_EDITS) != 0;
 	action->id = strdup(id);
 	action->label = strdup(label ? label : id);
 	action->available = available;
@@ -783,6 +794,63 @@ static void hostAskPin(const char* title, void (*on_done)(int result, void* data
 	pin_done = on_done;
 	pin_data = data;
 	Modal_keyboardHidden(title && title[0] ? title : TR("PIN"), pinTyped, NULL);
+}
+
+_Static_assert(ACTION_GATE_RUN == MOSAIC_GATE_RUN && ACTION_GATE_PIN == MOSAIC_GATE_PIN
+	&& ACTION_GATE_REFUSE == MOSAIC_GATE_REFUSE, "gates' answers differ from the SDK's");
+
+// The action a plugin's action_gate held back for the PIN, by id, as it
+// can be gone by the time the PIN is typed.
+static char gated_id[256];
+static char gated_path[MAX_PATH * 2];
+static int gated_has_path = 0;
+
+static void gatePinDone(int result, void* data) {
+	(void)data;
+	if (result == MOSAIC_PIN_WRONG) Toast_show(TR("Wrong PIN"));
+	if (result != MOSAIC_PIN_RIGHT || !gated_id[0]) return;
+	const Action* action = Actions_find(gated_id);
+	const char* path = gated_has_path ? gated_path : NULL;
+	gated_id[0] = '\0';
+	if (!action || !Action_available(action, path)) {
+		LOG_info("plugins: not running the action the PIN was asked for: it's gone or not available now\n");
+		return;
+	}
+	Action_runUngated(action, path);
+}
+
+// Every plugin's action_gate, the strictest answer winning (see
+// action_gate in mosaic_plugin.h).
+static int gateAction(const Action* action, const char* path) {
+	int answer = ACTION_GATE_RUN;
+	int flags = actionFlags(action);
+	for (int i = 0; i < loaded_count; i++) {
+		const MosaicPlugin* p = loaded[i].plugin;
+		if (!Plugin_has(p, action_gate) || !p->action_gate) continue;
+		int rc = MOSAIC_GATE_RUN;
+		AS_PLUGIN(i) rc = p->action_gate(action->id, flags);
+		if (rc != MOSAIC_GATE_RUN && rc != MOSAIC_GATE_PIN && rc != MOSAIC_GATE_REFUSE) {
+			if (!loaded[i].gate_logged) LOG_warn("plugins: %s's action_gate returned %i for %s, counted as a run\n", loaded[i].id, rc, action->id);
+			loaded[i].gate_logged = 1;
+			continue;
+		}
+		answer = ActionGate_stricter(answer, rc);
+	}
+	if (answer == ACTION_GATE_REFUSE) {
+		LOG_info("plugins: %s was refused by a plugin's action_gate\n", action->id);
+		return answer;
+	}
+	if (answer != ACTION_GATE_PIN) return ACTION_GATE_RUN;
+	if (strlen(action->id) >= sizeof(gated_id) || (path && strlen(path) >= sizeof(gated_path))) {
+		LOG_warn("plugins: can't ask the PIN for %s: its id or path is too long\n", action->id);
+		return ACTION_GATE_REFUSE;
+	}
+	LOG_info("plugins: asking the PIN before %s\n", action->id);
+	strcpy(gated_id, action->id);
+	gated_has_path = path != NULL;
+	if (path) strcpy(gated_path, path);
+	hostAskPin(TR("PIN to make changes"), gatePinDone, NULL);
+	return ACTION_GATE_PIN;
 }
 
 void Plugins_adoptPin(void) {
@@ -2248,6 +2316,7 @@ static const MosaicHost host = {
 	.bug_report = hostBugReport,
 	.tint_shown = Tint_shown,
 	.entry_free = hostEntryFree,
+	.action_flags = hostActionFlags,
 };
 
 ///////////////////////////////////////
@@ -2732,6 +2801,7 @@ static void start(void) {
 }
 
 void Plugins_init(void) {
+	Actions_setGate(gateAction);
 	// before any plugin's init, and whether or not any loads
 	profileRead();
 	start();

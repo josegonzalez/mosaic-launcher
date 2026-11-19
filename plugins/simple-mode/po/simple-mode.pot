@@ -22,6 +22,14 @@ msgstr ""
 msgid "Hide settings tiles"
 msgstr ""
 
+#: plugin.txt
+msgid "Kid tag"
+msgstr ""
+
+#: plugin.txt
+msgid "Kiosk mode"
+msgstr ""
+
 #: simple_mode.c
 msgid "LEAVE"
 msgstr ""
@@ -34,6 +42,10 @@ msgstr ""
 msgid "PIN to leave simple mode"
 msgstr ""
 
+#: simple_mode.c
+msgid "Set a PIN to make changes in kiosk mode"
+msgstr ""
+
 #: plugin.txt simple_mode.c
 msgid "Simple mode"
 msgstr ""
@@ -44,6 +56,10 @@ msgstr ""
 
 #: plugin.txt simple_mode.c
 msgid "Simple mode on"
+msgstr ""
+
+#: simple_mode.c
+msgid "That game is off in simple mode"
 msgstr ""
 
 #: simple_mode.c

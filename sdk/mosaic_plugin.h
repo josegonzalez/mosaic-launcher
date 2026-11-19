@@ -374,6 +374,18 @@ enum MosaicActionFlag {
 	// It acts on an entry, such as a game: its available and run get the
 	// entry's full path, and it's refused without one.
 	MOSAIC_ACTION_PATH = 1 << 0,
+	// It changes what the user keeps, such as a game's tags, favorites,
+	// name or files, a collection or a list's order, rather than only
+	// showing something. A plugin's action_gate can ask for the launcher's
+	// PIN first, as simple mode's kiosk setting does.
+	MOSAIC_ACTION_EDITS = 1 << 1,
+};
+
+// What a plugin's action_gate answers about an action about to run.
+enum MosaicGate {
+	MOSAIC_GATE_RUN = 0,    // it runs, unless another plugin says otherwise
+	MOSAIC_GATE_PIN = 1,    // it runs only after the launcher's PIN is typed
+	MOSAIC_GATE_REFUSE = 2, // it doesn't run
 };
 
 // Where an action's binding comes from, for MosaicActionBinding.
@@ -1858,6 +1870,12 @@ typedef struct MosaicHost {
 	// launcher handed over. Check for it with
 	// MOSAIC_HOST_HAS(host, entry_free).
 	void (*entry_free)(MosaicEntry* entry);
+
+	// The enum MosaicActionFlag bits an action was registered with, such as
+	// MOSAIC_ACTION_EDITS, or -1 for no such action. The game list's own
+	// actions have none. Check for it, and for action_gate in MosaicPlugin,
+	// with MOSAIC_HOST_HAS(host, action_flags).
+	int (*action_flags)(const char* action_id);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.
@@ -2332,6 +2350,23 @@ typedef struct MosaicPlugin {
 	// which the launcher logs it and leaves this plugin's tint out until it
 	// restarts. Check for it with MOSAIC_HOST_HAS(host, tint_shown).
 	int (*screen_tint)(MosaicColor* tint);
+
+	// A say over every action before it runs, however it's run: a button,
+	// the shared button's menu, a quick menu tile, an FN button,
+	// run_action (button-remap's too) or the lock screen. Every plugin's
+	// action_gate is asked, in load order, with the action's id and its
+	// enum MosaicActionFlag bits, such as MOSAIC_ACTION_EDITS, and the
+	// strictest answer wins: MOSAIC_GATE_REFUSE over MOSAIC_GATE_PIN over
+	// MOSAIC_GATE_RUN. With MOSAIC_GATE_PIN the launcher asks for its PIN
+	// (see has_pin) and runs the action once the right one is typed, if
+	// it's still there and available; with no PIN set it runs straight
+	// away. With MOSAIC_GATE_REFUSE it doesn't run, and the plugin says why
+	// itself, such as with a toast. It only answers: anything but those
+	// three is an error, which the launcher logs once and counts as
+	// MOSAIC_GATE_RUN. With no plugin's action_gate, or every one saying
+	// MOSAIC_GATE_RUN, actions run as before. Check for it with
+	// MOSAIC_HOST_HAS(host, action_flags).
+	int (*action_gate)(const char* action_id, int flags);
 } MosaicPlugin;
 
 #define MOSAIC_PLUGIN_ENTRY "mosaic_plugin_get"

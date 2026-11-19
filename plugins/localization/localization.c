@@ -751,7 +751,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't subscribe to launcher.theme_changed");
 	}
 
-	if (host->register_action(MAP_ACTION, "Write map.txt names", 0, mapAvailable, runMap, NULL) != 0) {
+	if (host->register_action(MAP_ACTION, "Write map.txt names", MOSAIC_ACTION_EDITS, mapAvailable, runMap, NULL) != 0) {
 		say("couldn't register " MAP_ACTION);
 		return 0;
 	}

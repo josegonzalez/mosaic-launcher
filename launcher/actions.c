@@ -125,7 +125,17 @@ int Action_available(const Action* action, const char* path) {
 
 #define ACTION_PATH_MAX 1024
 
-int Action_run(const Action* action, const char* path) {
+static int (*runGate)(const Action* action, const char* path) = NULL;
+
+void Actions_setGate(int (*gate)(const Action* action, const char* path)) {
+	runGate = gate;
+}
+
+int ActionGate_stricter(int a, int b) {
+	return a > b ? a : b;
+}
+
+static int run(const Action* action, const char* path, int gated) {
 	if (!action) return -1;
 	path = pathFor(action, path);
 	if (action->takes_path && !path) {
@@ -142,8 +152,21 @@ int Action_run(const Action* action, const char* path) {
 		strcpy(copy, path);
 		path = copy;
 	}
+	if (gated && runGate) {
+		int answer = runGate(action, path);
+		if (answer == ACTION_GATE_REFUSE) return -1;
+		if (answer != ACTION_GATE_RUN) return 0;
+	}
 	if (action->run) AS_CALLER(action->plugin_id) action->run(path, action->data);
 	return 0;
+}
+
+int Action_run(const Action* action, const char* path) {
+	return run(action, path, 1);
+}
+
+int Action_runUngated(const Action* action, const char* path) {
+	return run(action, path, 0);
 }
 
 // A binding's action, on what a button gives it.

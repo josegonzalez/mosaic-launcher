@@ -303,8 +303,8 @@ static int init(const MosaicHost* h) {
 		if (!strcmp(name, buttons[i].name)) button = buttons[i].button;
 	}
 
-	if (host->register_action("hidden.hide", "HIDE", 0, canHide, hide, NULL) != 0
-			|| host->register_action("hidden.unhide", "UNHIDE", 0, canUnhide, unhide, NULL) != 0
+	if (host->register_action("hidden.hide", "HIDE", MOSAIC_ACTION_EDITS, canHide, hide, NULL) != 0
+			|| host->register_action("hidden.unhide", "UNHIDE", MOSAIC_ACTION_EDITS, canUnhide, unhide, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "hidden.hide") != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, button, MOSAIC_TRIGGER_PRESS, "hidden.unhide") != 0) {
 		say("couldn't bind a button; games can't be hidden from the game list");

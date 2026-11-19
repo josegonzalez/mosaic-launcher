@@ -608,12 +608,12 @@ static int init(const MosaicHost* h) {
 		host->subscribe("launcher.index_ready", indexReady, NULL);
 		host->index_count(NULL); // starts reading the card, for genres and players
 	}
-	if (host->register_action(PREV_ID, "FILTER", 0, canStep, prev, NULL) != 0
-			|| host->register_action(NEXT_ID, "FILTER", 0, canStep, next, NULL) != 0) {
+	if (host->register_action(PREV_ID, "FILTER", MOSAIC_ACTION_EDITS, canStep, prev, NULL) != 0
+			|| host->register_action(NEXT_ID, "FILTER", MOSAIC_ACTION_EDITS, canStep, next, NULL) != 0) {
 		say("couldn't register the filter actions");
 		return 1;
 	}
-	if (host->register_action(PICK_ID, "Filter", 0, canPick, pick, NULL) != 0) say("couldn't register " PICK_ID);
+	if (host->register_action(PICK_ID, "Filter", MOSAIC_ACTION_EDITS, canPick, pick, NULL) != 0) say("couldn't register " PICK_ID);
 	else if (strcmp(host->cfg_get("tile", "on"), "off") != 0
 			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(PICK_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
 		say("couldn't add the Filter tile");

@@ -513,7 +513,7 @@ static int init(const MosaicHost* h) {
 	if (MOSAIC_HOST_HAS(host, call) && host->provide(ID ".move", provideMove) != 0) say("couldn't provide " ID ".move");
 	if (MOSAIC_HOST_HAS(host, profile_path)) host->subscribe("launcher.profile_changed", profileChanged, NULL);
 
-	if (host->register_action("favorites.toggle", "FAVORITE", 0, canToggle, toggle, NULL) != 0
+	if (host->register_action("favorites.toggle", "FAVORITE", MOSAIC_ACTION_EDITS, canToggle, toggle, NULL) != 0
 			|| host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, "favorites.toggle") != 0) {
 		say("couldn't bind Y; favorites can't be changed from the game list");
 	}

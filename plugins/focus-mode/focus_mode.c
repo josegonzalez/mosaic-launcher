@@ -171,7 +171,7 @@ static const struct {
 
 static int init(const MosaicHost* h) {
 	host = h;
-	if (host->register_action("focus-mode.toggle", "Focus", 0, always, toggle, NULL) != 0
+	if (host->register_action("focus-mode.toggle", "Focus", MOSAIC_ACTION_EDITS, always, toggle, NULL) != 0
 			|| !MOSAIC_HOST_HAS(host, quick_tile)
 			|| host->quick_tile("focus-mode.toggle", MOSAIC_QUICK_TOP, NULL, NULL, isOn) != 0) {
 		host->log(ID, "couldn't add the Focus tile; turn focus mode off from the Launcher pak");
@@ -181,7 +181,7 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 	host->subscribe("launcher.set_changed", setChanged, NULL);
-	if (host->register_action(PICK_ID, "Focus on", 0, canPick, pick, NULL) != 0) {
+	if (host->register_action(PICK_ID, "Focus on", MOSAIC_ACTION_EDITS, canPick, pick, NULL) != 0) {
 		host->log(ID, "couldn't register " PICK_ID);
 		return 0;
 	}

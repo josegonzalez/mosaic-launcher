@@ -2,9 +2,11 @@
 #define SIMPLE_MODEL_H
 
 #include <stddef.h>
+#include "mosaic_plugin.h"
 
-// What simple mode hides and how it's left. No SDL and no host here, so
-// the host tests can check it on its own.
+// What simple mode hides and how it's left, and what its kid tag and
+// kiosk settings let through. No SDL and no host here, so the host tests
+// can check it on its own.
 
 #define SIMPLE_PIN_LEN 64
 #define SIMPLE_TILES_MAX 8
@@ -34,5 +36,54 @@ int Simple_leaveStep(const char* pin);
 // 1 when typed is the PIN, both trimmed. An empty PIN never matches, and
 // a NULL typed (the keyboard was cancelled) never does either.
 int Simple_pinMatches(const char* pin, const char* typed);
+
+///////////////////////////////////////
+// the kid tag: while it's set, lists show only the games with it
+
+// The games with the kid tag, by full path.
+typedef struct KidList {
+	char** paths;
+	int count;
+	int room;
+} KidList;
+
+// Adds a copy of path. 0, or -1 when out of memory, adding nothing.
+int Kid_add(KidList* list, const char* path);
+// Empties the list, keeping its room.
+void Kid_clear(KidList* list);
+void Kid_free(KidList* list);
+
+// 1 when path is one of the games, a folder holding one (a system, a
+// subfolder or a game folder), or a disc beside a game's .m3u or .cue in
+// a folder named after it, as tags records a multi-disc game.
+int Kid_allows(const KidList* list, const char* path);
+
+// What deciding on an entry takes, by where it is.
+enum KidPlace {
+	KID_KEEP,        // shown as it is: a folder of a plugin's own, or a toggle
+	KID_GAME,        // shown when Kid_allows it: a game, or a folder in Roms
+	KID_RECENTS,     // Recently Played: shown when a recent is allowed
+	KID_COLLECTIONS, // the Collections folder: shown when a collection has an allowed game
+	KID_COLLECTION,  // one collection, a .txt in Collections: shown when it has an allowed game
+};
+// type is an enum MosaicEntryType.
+int Kid_place(const char* path, int type, const char* sdcard);
+
+// 1 when a collection's text, a card-relative game path on each line, has
+// a game Kid_allows.
+int Kid_collectionAllows(const KidList* list, const char* text, const char* sdcard);
+
+// The kid tag setting, trimmed, into out. Returns 1 when one is set.
+int Kid_tag(const char* setting, char* out, size_t size);
+
+///////////////////////////////////////
+// kiosk: editing actions behind the PIN
+
+// The answer to an action about to run (an enum MosaicGate), for simple
+// mode on or off, the kiosk setting, the action's enum MosaicActionFlag
+// bits and whether the launcher has a PIN: while both are on, an action
+// that edits asks for the PIN, or with none set is refused; anything else
+// runs.
+int Kiosk_gate(int simple_on, int kiosk_on, int flags, int has_pin);
 
 #endif
