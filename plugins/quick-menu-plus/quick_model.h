@@ -51,6 +51,17 @@ const QmpToggle* Qmp_toggleFor(const char* word);
 // in out.
 int Qmp_parseToggles(const char* setting, const QmpToggle** out, int max, int* skipped);
 
+// Which quick menu rows the top_row and bottom_row settings hide, 1 each
+// for a row to hide. Both can't go, so with both off the bottom row, with
+// Settings, Sleep and Power off, stays, and refused says so.
+typedef struct QmpRows {
+	int hide_top;
+	int hide_bottom;
+	int refused; // both rows were turned off; the bottom one stays
+} QmpRows;
+
+QmpRows Qmp_rows(int top_on, int bottom_on);
+
 // The pak a launcher binary at <pak>/bin/<platform>/nextui.elf belongs
 // to. Returns 1 and writes it, or 0 for a path that isn't laid out so.
 int Qmp_pakFromExe(const char* exe, char* out, size_t size);

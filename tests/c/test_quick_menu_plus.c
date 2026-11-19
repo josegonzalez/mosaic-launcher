@@ -14,8 +14,12 @@ static const char* hide_setting = NULL;
 static const char* awake_setting = NULL;
 static const char* stock_setting = NULL;
 static const char* toggles_setting = "";
+// the layout and restart settings, as key=value pairs, NULL-ended
+static const char* const* extra_settings = NULL;
+static int rows_hidden[2], labels_hidden = 0, restarts = 0, resets = 0;
 
 #define MAX_ACTIONS 12
+static int action_flags[MAX_ACTIONS];
 static int action_count = 0;
 static char action_id[MAX_ACTIONS][64];
 static char action_label[MAX_ACTIONS][64];
@@ -46,11 +50,14 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (awake_setting && !strcmp(key, "awake_tile")) return awake_setting;
 	if (stock_setting && !strcmp(key, "stock_tile")) return stock_setting;
 	if (toggles_setting && !strcmp(key, "toggles")) return toggles_setting;
+	for (int i = 0; extra_settings && extra_settings[i]; i += 2) {
+		if (!strcmp(extra_settings[i], key)) return extra_settings[i + 1];
+	}
 	return fallback;
 }
 static int fakeRegister(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
-	(void)flags;
 	if (action_count >= MAX_ACTIONS) return -1;
+	action_flags[action_count] = flags;
 	action_data[action_count] = data;
 	snprintf(action_id[action_count], sizeof(action_id[0]), "%s", id);
 	snprintf(action_label[action_count], sizeof(action_label[0]), "%s", label);
@@ -88,6 +95,14 @@ static void fakeConfirm(const char* message, const char* yes, void (*on_yes)(voi
 	pending_yes = on_yes;
 }
 static void fakePowerOff(int reboot) { power_offs++; last_reboot = reboot; }
+static int fakeHideRow(int row, int on) {
+	if (row != MOSAIC_QUICK_TOP && row != MOSAIC_QUICK_BOTTOM) return -1;
+	rows_hidden[row] = on;
+	return 0;
+}
+static int fakeHideLabels(int on) { labels_hidden = on; return 0; }
+static void fakeRestart(void) { restarts++; }
+static void fakeResetSettings(void) { resets++; }
 
 // the fake's stock settings; haptics is one this launcher doesn't know
 static const char* stock_names[] = { "notify_manual_save", "notify_load", "notify_screenshot", "notify_adjustments", "show_clock", "show_battery_percent" };
@@ -130,6 +145,10 @@ static MosaicHost fake = {
 	.power_off = fakePowerOff,
 	.stock_toggle_get = fakeStockGet,
 	.stock_toggle_set = fakeStockSet,
+	.hide_quick_row = fakeHideRow,
+	.hide_quick_labels = fakeHideLabels,
+	.restart = fakeRestart,
+	.reset_settings = fakeResetSettings,
 };
 
 static int find(const char* id) {
@@ -142,6 +161,7 @@ static int find(const char* id) {
 static void reset(void) {
 	action_count = tile_count = rename_count = hidden_count = 0;
 	inhibit_calls = power_offs = 0;
+	rows_hidden[0] = rows_hidden[1] = labels_hidden = restarts = resets = 0;
 	last_reboot = -1;
 	pending_yes = NULL;
 	toasted[0] = asked[0] = '\0';
@@ -249,6 +269,16 @@ static void testModel(void) {
 	CHECK(picked[1] == Qmp_toggleFor("save"));
 	CHECK(picked[2] == Qmp_toggleFor("haptics"));
 	CHECK(Qmp_parseToggles("save, load, clock", picked, 2, NULL) == 2);
+
+	// rows: both shown by default, and never both hidden
+	QmpRows rows = Qmp_rows(1, 1);
+	CHECK(!rows.hide_top && !rows.hide_bottom && !rows.refused);
+	rows = Qmp_rows(0, 1);
+	CHECK(rows.hide_top && !rows.hide_bottom && !rows.refused);
+	rows = Qmp_rows(1, 0);
+	CHECK(!rows.hide_top && rows.hide_bottom && !rows.refused);
+	rows = Qmp_rows(0, 0);
+	CHECK(rows.hide_top && !rows.hide_bottom && rows.refused);
 }
 
 int main(void) {
@@ -417,6 +447,74 @@ int main(void) {
 	CHECK(p->init(&fake) == 0);
 	CHECK(tile_count == 2 && find("quick-menu-plus.toggle.clock") < 0);
 	fake.size = sizeof(MosaicHost);
+
+	// by default no row or label is hidden and there's no Restart or Reset tile
+	reset();
+	toggles_setting = "";
+	awake_setting = stock_setting = "off";
+	CHECK(p->init(&fake) == 0);
+	CHECK(!rows_hidden[0] && !rows_hidden[1] && !labels_hidden);
+	CHECK(action_count == 0 && tile_count == 0);
+
+	// the settings hide a row or the labels
+	reset();
+	static const char* const top_off[] = { "top_row", "off", "tile_labels", "off", NULL };
+	extra_settings = top_off;
+	CHECK(p->init(&fake) == 0);
+	CHECK(rows_hidden[MOSAIC_QUICK_TOP] && !rows_hidden[MOSAIC_QUICK_BOTTOM] && labels_hidden);
+	reset();
+	static const char* const bottom_off[] = { "bottom_row", "off", NULL };
+	extra_settings = bottom_off;
+	CHECK(p->init(&fake) == 0);
+	CHECK(!rows_hidden[MOSAIC_QUICK_TOP] && rows_hidden[MOSAIC_QUICK_BOTTOM] && !labels_hidden);
+	// both off: the bottom row stays
+	reset();
+	static const char* const both_off[] = { "top_row", "off", "bottom_row", "off", NULL };
+	extra_settings = both_off;
+	CHECK(p->init(&fake) == 0);
+	CHECK(rows_hidden[MOSAIC_QUICK_TOP] && !rows_hidden[MOSAIC_QUICK_BOTTOM]);
+	// a launcher without hide_quick_row hides nothing, and loads
+	reset();
+	fake.size = offsetof(MosaicHost, hide_quick_row);
+	CHECK(p->init(&fake) == 0);
+	CHECK(!rows_hidden[0] && !rows_hidden[1]);
+	fake.size = sizeof(MosaicHost);
+
+	// Restart launcher restarts at once, without asking
+	reset();
+	static const char* const tiles_on[] = { "restart_tile", "on", "reset_tile", "on", NULL };
+	extra_settings = tiles_on;
+	CHECK(p->init(&fake) == 0);
+	int restart = find("quick-menu-plus.restart"), resetTile = find("quick-menu-plus.reset");
+	CHECK(restart >= 0 && resetTile >= 0 && tile_count == 2);
+	if (restart < 0 || resetTile < 0) CHECK_DONE();
+	CHECK_STR(action_label[restart], "Restart launcher");
+	CHECK(tile_row[0] == MOSAIC_QUICK_TOP && tile_is_on[0] == NULL);
+	CHECK(action_flags[restart] == 0);
+	CHECK(action_available[restart](NULL, NULL));
+	action_run[restart](NULL, NULL);
+	CHECK(restarts == 1 && pending_yes == NULL);
+
+	// Reset launcher settings is an editing action that asks first
+	CHECK_STR(action_label[resetTile], "Reset launcher settings");
+	CHECK(action_flags[resetTile] == MOSAIC_ACTION_EDITS);
+	action_run[resetTile](NULL, NULL);
+	CHECK(pending_yes != NULL && resets == 0);
+	CHECK_STR(asked, "Reset launcher settings?\nPlugins go back to how they ship.\nThe PIN, tags and favorites stay.");
+	CHECK_STR(yes_label, "RESET");
+	answer(0);
+	CHECK(resets == 0 && restarts == 1);
+	action_run[resetTile](NULL, NULL);
+	answer(1);
+	CHECK(resets == 1 && restarts == 1);
+
+	// a launcher that can't restart: neither tile
+	reset();
+	fake.size = offsetof(MosaicHost, restart);
+	CHECK(p->init(&fake) == 0);
+	CHECK(find("quick-menu-plus.restart") < 0 && find("quick-menu-plus.reset") < 0);
+	fake.size = sizeof(MosaicHost);
+	extra_settings = NULL;
 
 	unlink(QMP_AWAKE_FILE);
 	CHECK_DONE();

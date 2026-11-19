@@ -311,11 +311,14 @@ void QuickMenu_render(void) {
 				GFX_blitSurfaceColor(bmp, NULL, screen, &destRect, icon_color);
 			}
 
-			int w, h;
-			char* text = tileText(item);
-			GFX_sizeText(font.tiny, text, SCALE1(FONT_TINY), &w, &h);
-			SDL_Rect text_rect = {item_rect.x + (item_size - w) / 2, item_rect.y + item_size - h - SCALE1(BUTTON_MARGIN), w, h};
-			GFX_blitText(font.tiny, text, SCALE1(FONT_TINY), text_color, screen, &text_rect);
+			// a plugin can hide the labels, leaving the icons
+			if (!QuickTiles_labelsHidden()) {
+				int w, h;
+				char* text = tileText(item);
+				GFX_sizeText(font.tiny, text, SCALE1(FONT_TINY), &w, &h);
+				SDL_Rect text_rect = {item_rect.x + (item_size - w) / 2, item_rect.y + item_size - h - SCALE1(BUTTON_MARGIN), w, h};
+				GFX_blitText(font.tiny, text, SCALE1(FONT_TINY), text_color, screen, &text_rect);
+			}
 
 			ox += item_rect.w + SCALE1(MENU_ITEM_MARGIN);
 		}

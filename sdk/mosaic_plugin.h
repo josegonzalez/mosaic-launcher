@@ -1996,6 +1996,32 @@ typedef struct MosaicHost {
 	// tracker again afterwards. Check for it with
 	// MOSAIC_HOST_HAS(host, play_move_paths).
 	int (*play_move_paths)(const char* const* from, const char* const* to, int count);
+
+	// The quick menu's layout. hide_quick_row hides every tile in row (an
+	// enum MosaicQuickRow), built-in and plugins' alike, while hidden is 1,
+	// and shows them again with 0; with both rows hidden the quick menu
+	// shows no tiles, and B and MENU still close it. hide_quick_labels
+	// hides the top row's tile labels, leaving their icons, while hidden is
+	// 1. Both take effect when the tiles are next built, as hide_quick_tile
+	// does, and return 0, or -1 for a bad argument. Check for them with
+	// MOSAIC_HOST_HAS(host, hide_quick_row).
+	int (*hide_quick_row)(int row, int hidden);
+	int (*hide_quick_labels)(int hidden);
+
+	// Restarting the launcher. restart quits it on the next frame, the
+	// way stock's does after an HDMI change: it saves where the game list
+	// is, runs every plugin's quit, and exits cleanly, so NextUI starts it
+	// again. reset_settings does the same and, after every plugin's quit,
+	// resets the launcher's plugin settings to their defaults: it removes
+	// plugins.txt, so each plugin is back on or off as it ships, and from
+	// each installed plugin's <id>.cfg the keys its plugin.txt lists as
+	// settings, apart from secret ones. Everything else stays: the PIN,
+	// the Launcher page's own settings, what plugins keep in their cfgs
+	// that isn't a setting, their other files, such as tags, favorites and
+	// profiles, and stock's settings. On desktop both quit the launcher.
+	// Check for them with MOSAIC_HOST_HAS(host, restart).
+	void (*restart)(void);
+	void (*reset_settings)(void);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

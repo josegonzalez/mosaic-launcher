@@ -170,6 +170,15 @@ int Qmp_parseToggles(const char* setting, const QmpToggle** out, int max, int* s
 	return s.count;
 }
 
+QmpRows Qmp_rows(int top_on, int bottom_on) {
+	QmpRows rows = { !top_on, !bottom_on, 0 };
+	if (rows.hide_top && rows.hide_bottom) {
+		rows.hide_bottom = 0;
+		rows.refused = 1;
+	}
+	return rows;
+}
+
 int Qmp_pakFromExe(const char* exe, char* out, size_t size) {
 	if (!exe || exe[0] != '/') return 0;
 	char path[1024];

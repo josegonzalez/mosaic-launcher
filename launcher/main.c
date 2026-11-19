@@ -179,6 +179,15 @@ int main (int argc, char *argv[]) {
 			state.power_off = 0;
 			QuickItem_powerOff(reboot);
 		}
+		// a plugin asked to restart (host->restart, host->reset_settings),
+		// leaving as an HDMI change does, so NextUI starts it again
+		if (state.restart && !state.quit) {
+			char* last = state.top->entries->count > 0 ? ((Entry*)state.top->entries->items[state.top->selected])->path : state.top->path;
+			LOG_info("restarting for a plugin... (%s)\n", last);
+			saveLast(last);
+			Plugins_homeLeaving();
+			state.quit = 1;
+		}
 		Toast_tick(now);
 		Awake_tick(now);
 		StatusPill_tick(now);
@@ -450,6 +459,8 @@ int main (int argc, char *argv[]) {
 
 	Plugins_started(); // a clean exit isn't a crash either
 	Plugins_quit();
+	// after every plugin's quit, so none writes its old settings back
+	if (state.restart == 2) Plugins_resetSettings();
 	Menu_quit();
 	PWR_quit();
 	PAD_quit();

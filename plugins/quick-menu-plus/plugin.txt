@@ -2,8 +2,8 @@ id=quick-menu-plus
 name=Quick menu plus
 api=1
 category=Controls and setup
-summary=Renames or hides quick menu tiles and adds tiles that flip settings.
-description=Changes the quick menu: renames or hides its tiles, and adds tiles that flip stock's settings.
+summary=Renames or hides quick menu tiles and rows, and adds tiles that flip settings or restart the launcher.
+description=Changes the quick menu: renames or hides its tiles, rows and labels, and adds tiles that flip stock's settings or restart the launcher.
 # new labels for the top row's built-in tiles, as name=label pairs, eg. Recents=Played, Games=Library
 setting.labels=text|Tile labels (Recents=Played, ...)|
 # tiles to hide, by name or a plugin tile's action id, eg. Pak Store, Bluetooth
@@ -14,3 +14,13 @@ setting.toggles=text|Toggle tiles (save, load, clock, ...)|save, load, screensho
 setting.awake_tile=toggle|Stay awake tile on the quick menu|on
 # a Reboot to stock tile that turns the launcher off and reboots into stock NextUI
 setting.stock_tile=toggle|Reboot to stock tile on the quick menu|on
+# the quick menu's top row of large tiles; it and the bottom row can't both be off, so the bottom row stays
+setting.top_row=toggle|Top row of tiles|on
+# the quick menu's bottom row of small icons (Settings, Wifi, Sleep, Power off)
+setting.bottom_row=toggle|Bottom row of icons|on
+# the labels on the top row's tiles; off leaves only their icons
+setting.tile_labels=toggle|Labels on the top row's tiles|on
+# a Restart launcher tile that restarts the launcher at once
+setting.restart_tile=toggle|Restart launcher tile on the quick menu|off
+# a Reset launcher settings tile that asks first, then resets plugins.txt and every plugin's settings to their defaults
+setting.reset_tile=toggle|Reset launcher settings tile on the quick menu|off

@@ -368,6 +368,10 @@ void Plugins_frameShown(void);
 // screens use this to list them.
 int Plugins_discover(const PluginManifest** out);
 
+// After Plugins_quit, for host->reset_settings: removes plugins.txt and
+// the settings in every discovered plugin's cfg (resetmodel.h).
+void Plugins_resetSettings(void);
+
 // Launcher.pak's directory, from where this binary runs, or
 // MOSAIC_LAUNCHER_PAK_DIR when set. Returns 0 if it can't tell.
 int Plugins_pakDir(char* out, size_t size);

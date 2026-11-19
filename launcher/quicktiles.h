@@ -28,6 +28,16 @@ int QuickTiles_add(const char* action_id, int row, const char* icon, const char*
 // Hides a built-in tile by name, or a plugin tile by its action id.
 int QuickTiles_hide(const char* name, int hidden);
 
+// Hides every tile in a row (an enum QuickRow), built-in and plugin ones,
+// while hide is 1, and shows them again with 0. Returns 0, or -1 for
+// another row or value.
+int QuickTiles_hideRow(int row, int hide);
+int QuickTiles_rowHidden(int row);
+
+// Hides the top row's tile labels, leaving their icons, while hide is 1.
+void QuickTiles_hideLabels(int hide);
+int QuickTiles_labelsHidden(void);
+
 // Relabels a built-in top row tile (Recents, Collections, Games, Tools), or
 // restores it with NULL or "". Returns 0, or -1 for any other name.
 int QuickTiles_rename(const char* name, const char* label);

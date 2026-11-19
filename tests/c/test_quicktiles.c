@@ -62,7 +62,67 @@ static void testIcon(void) {
 	CHECK(QuickTiles_icon("test.icon", out, sizeof(out)) == -1);
 }
 
+// A row of built-in tiles by name, as the quick menu lists them.
+static Array* builtins(const char* first, const char* second) {
+	Array* row = Array_new();
+	Array_push(row, Entry_newNamed("/quick/first", ENTRY_DIP, (char*)first));
+	Array_push(row, Entry_newNamed("/quick/second", ENTRY_DIP, (char*)second));
+	return row;
+}
+
+static void freeRow(Array* row) {
+	for (int i = 0; i < row->count; i++) Entry_free(row->items[i]);
+	Array_free(row);
+}
+
+// Whole rows and the top row's labels, as hide_quick_row and
+// hide_quick_labels set them.
+static void testRows(void) {
+	QuickTiles_reset();
+	CHECK(QuickTiles_add("test.plain", QUICK_ROW_TOP, NULL, NULL, NULL) == 0);
+	CHECK(QuickTiles_add("test.toggle", QUICK_ROW_BOTTOM, NULL, NULL, isOn) == 0);
+	CHECK(!QuickTiles_rowHidden(QUICK_ROW_TOP) && !QuickTiles_rowHidden(QUICK_ROW_BOTTOM) && !QuickTiles_labelsHidden());
+
+	// shown: the built-in tiles, then the plugin's
+	Array* top = builtins("Recents", "Games");
+	QuickTiles_apply(top, QUICK_ROW_TOP);
+	CHECK(top->count == 3);
+	freeRow(top);
+
+	// the top row hidden: none of its tiles, plugins' too; the bottom row stays
+	CHECK(QuickTiles_hideRow(QUICK_ROW_TOP, 1) == 0);
+	CHECK(QuickTiles_rowHidden(QUICK_ROW_TOP));
+	top = builtins("Recents", "Games");
+	QuickTiles_apply(top, QUICK_ROW_TOP);
+	CHECK(top->count == 0);
+	freeRow(top);
+	Array* bottom = builtins("Settings", "Sleep");
+	QuickTiles_apply(bottom, QUICK_ROW_BOTTOM);
+	CHECK(bottom->count == 3);
+	freeRow(bottom);
+
+	// saved and put back with the rest, and shown again with 0
+	QuickTilesSaved* saved = QuickTiles_save();
+	CHECK(QuickTiles_hideRow(QUICK_ROW_TOP, 0) == 0);
+	CHECK(!QuickTiles_rowHidden(QUICK_ROW_TOP));
+	QuickTiles_restore(saved);
+	CHECK(QuickTiles_rowHidden(QUICK_ROW_TOP));
+
+	// bad rows and values
+	CHECK(QuickTiles_hideRow(2, 1) == -1);
+	CHECK(QuickTiles_hideRow(-1, 1) == -1);
+	CHECK(QuickTiles_hideRow(QUICK_ROW_BOTTOM, 2) == -1);
+	CHECK(!QuickTiles_rowHidden(2));
+
+	QuickTiles_hideLabels(1);
+	CHECK(QuickTiles_labelsHidden());
+	// a reset shows everything again
+	QuickTiles_reset();
+	CHECK(!QuickTiles_rowHidden(QUICK_ROW_TOP) && !QuickTiles_labelsHidden());
+}
+
 int main(void) {
 	testIcon();
+	testRows();
 	CHECK_DONE();
 }

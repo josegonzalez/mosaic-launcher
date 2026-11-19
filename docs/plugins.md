@@ -116,7 +116,7 @@ The Ambient screens page, with the charging screen and screensaver plugins on.
 - [first-run](../plugins/first-run/README.md) - A short setup wizard the first time the launcher starts.
 - [localization](../plugins/localization/README.md) - Translates the launcher and plugins from language packs.
 - [platform-jump](../plugins/platform-jump/README.md) - Makes L1 and R1 jump between systems instead of letters.
-- [quick-menu-plus](../plugins/quick-menu-plus/README.md) - Renames or hides quick menu tiles and adds tiles that flip settings.
+- [quick-menu-plus](../plugins/quick-menu-plus/README.md) - Renames or hides quick menu tiles and rows, and adds tiles that flip settings or restart the launcher.
 - [simple-mode](../plugins/simple-mode/README.md) - Hides Tools and settings for kids or a shared device.
 
 ## Extras

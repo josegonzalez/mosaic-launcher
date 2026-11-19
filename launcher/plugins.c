@@ -20,6 +20,7 @@
 #include "raprogress.h"
 #include "inputmodel.h"
 #include "pin.h"
+#include "resetmodel.h"
 #include "audiomodel.h"
 #include "screenmodel.h"
 #include "caller.h"
@@ -735,6 +736,21 @@ static int hostHideQuickTile(const char* name, int hidden) {
 	state.rebuild_quick = 1;
 	return 0;
 }
+static int hostHideQuickRow(int row, int hidden) {
+	int quick_row;
+	if (row == MOSAIC_QUICK_TOP) quick_row = QUICK_ROW_TOP;
+	else if (row == MOSAIC_QUICK_BOTTOM) quick_row = QUICK_ROW_BOTTOM;
+	else return -1;
+	if (QuickTiles_hideRow(quick_row, hidden) != 0) return -1;
+	state.rebuild_quick = 1;
+	return 0;
+}
+static int hostHideQuickLabels(int hidden) {
+	if (hidden != 0 && hidden != 1) return -1;
+	QuickTiles_hideLabels(hidden);
+	state.dirty = 1;
+	return 0;
+}
 static int hostRecentSet(int index, const char* path) {
 	return Recents_set(index, path);
 }
@@ -952,6 +968,17 @@ static void hostPowerOff(int reboot) {
 	// on the next frame, from the main loop, as the quick menu's tiles do
 	state.power_off = reboot == 1 ? 2 : 1;
 	LOG_info("plugins: a plugin asked to %s\n", reboot == 1 ? "reboot" : "power off");
+}
+
+static void hostRestart(void) {
+	// on the next frame, from the main loop, as power_off is
+	if (state.restart < 1) state.restart = 1;
+	LOG_info("plugins: a plugin asked to restart the launcher\n");
+}
+
+static void hostResetSettings(void) {
+	state.restart = 2;
+	LOG_info("plugins: a plugin asked to reset plugin settings and restart the launcher\n");
 }
 
 static int hostShowRecents(void) {
@@ -2400,6 +2427,10 @@ static const MosaicHost host = {
 	.draw_ring = PluginDraw_drawRing,
 	.quick_tile_icon = hostQuickTileIcon,
 	.play_move_paths = hostPlayMovePaths,
+	.hide_quick_row = hostHideQuickRow,
+	.hide_quick_labels = hostHideQuickLabels,
+	.restart = hostRestart,
+	.reset_settings = hostResetSettings,
 };
 
 ///////////////////////////////////////
@@ -2504,6 +2535,7 @@ static void load(const PluginManifest* m) {
 	saveBindings(bindings);
 	int rebuild_quick = state.rebuild_quick;
 	int power_off = state.power_off;
+	int restart = state.restart;
 
 	initializing = loaded_count - 1;
 	int declined = 0;
@@ -2531,6 +2563,7 @@ static void load(const PluginManifest* m) {
 		free(actions);
 		state.rebuild_quick = rebuild_quick;
 		state.power_off = power_off;
+		state.restart = restart;
 		hostInhibitSleep(m->id, 0);
 		hostLedClear(m->id);
 		// none can be open: open_screen refuses from init
@@ -2976,6 +3009,19 @@ void Plugins_quit(void) {
 	viewed_with = -1;
 	settingsExit();
 	// the manifests go last, as the loaded plugins pointed at them
+	ManifestList_free(&manifest_list);
+	discovered = 0;
+}
+
+static void resetLog(const char* message) {
+	LOG_info("plugins: reset: %s\n", message);
+}
+
+void Plugins_resetSettings(void) {
+	discover();
+	int changed = Reset_apply(PLUGIN_STATE_DIR, manifest_list.items, manifest_list.count, resetLog);
+	if (changed < 0) LOG_warn("plugins: couldn't reset every plugin setting\n");
+	else LOG_info("plugins: reset plugin settings to their defaults, %i file(s) changed\n", changed);
 	ManifestList_free(&manifest_list);
 	discovered = 0;
 }

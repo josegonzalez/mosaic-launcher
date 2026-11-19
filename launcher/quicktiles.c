@@ -8,6 +8,9 @@ static QuickTile tiles[MAX_TILES];
 static int tile_count = 0;
 static char* hidden[MAX_HIDDEN];
 static int hidden_count = 0;
+// whole rows plugins hide, by enum QuickRow, and the top row's labels
+static int rows_hidden[2];
+static int labels_hidden = 0;
 
 // The top row's built-in tiles, and the labels plugins gave them.
 static const char* const renamable[] = { TR_MARK("Recents"), TR_MARK("Collections"), TR_MARK("Games"), TR_MARK("Tools") };
@@ -83,8 +86,26 @@ const char* QuickTiles_label(const Entry* entry) {
 	return at >= 0 && labels[at] ? labels[at] : entry->name;
 }
 
+int QuickTiles_hideRow(int row, int hide) {
+	if ((row != QUICK_ROW_TOP && row != QUICK_ROW_BOTTOM) || (hide != 0 && hide != 1)) return -1;
+	rows_hidden[row] = hide;
+	return 0;
+}
+
+int QuickTiles_rowHidden(int row) {
+	return (row == QUICK_ROW_TOP || row == QUICK_ROW_BOTTOM) && rows_hidden[row];
+}
+
+void QuickTiles_hideLabels(int hide) {
+	labels_hidden = hide ? 1 : 0;
+}
+
+int QuickTiles_labelsHidden(void) {
+	return labels_hidden;
+}
+
 int QuickTiles_any(void) {
-	if (tile_count > 0 || hidden_count > 0) return 1;
+	if (tile_count > 0 || hidden_count > 0 || rows_hidden[0] || rows_hidden[1]) return 1;
 	for (int i = 0; i < RENAMABLE_COUNT; i++) {
 		if (labels[i]) return 1;
 	}
@@ -124,12 +145,14 @@ int QuickTiles_icon(const char* action_id, char* out, size_t size) {
 
 void QuickTiles_apply(Array* entries, int row) {
 	if (!QuickTiles_any()) return;
+	int whole = QuickTiles_rowHidden(row);
 	for (int i = entries->count - 1; i >= 0; i--) {
 		Entry* entry = entries->items[i];
-		if (hiddenAt(entry->name) < 0) continue;
+		if (!whole && hiddenAt(entry->name) < 0) continue;
 		Array_remove(entries, entry);
 		Entry_free(entry);
 	}
+	if (whole) return;
 	for (int i = 0; i < tile_count; i++) {
 		const QuickTile* tile = &tiles[i];
 		if (tile->row != row || hiddenAt(tile->action->id) >= 0 || !Action_available(tile->action, Action_buttonPath(tile->action))) continue;
@@ -151,6 +174,8 @@ void QuickTiles_reset(void) {
 		free(labels[i]);
 		labels[i] = NULL;
 	}
+	rows_hidden[0] = rows_hidden[1] = 0;
+	labels_hidden = 0;
 }
 
 struct QuickTilesSaved {
@@ -159,6 +184,8 @@ struct QuickTilesSaved {
 	char* hidden[MAX_HIDDEN];
 	int hidden_count;
 	char* labels[RENAMABLE_COUNT];
+	int rows_hidden[2];
+	int labels_hidden;
 };
 
 static char* copyExact(const char* s) {
@@ -176,6 +203,9 @@ QuickTilesSaved* QuickTiles_save(void) {
 	for (int i = 0; i < hidden_count; i++) saved->hidden[i] = strdup(hidden[i]);
 	saved->hidden_count = hidden_count;
 	for (int i = 0; i < RENAMABLE_COUNT; i++) saved->labels[i] = copyExact(labels[i]);
+	saved->rows_hidden[0] = rows_hidden[0];
+	saved->rows_hidden[1] = rows_hidden[1];
+	saved->labels_hidden = labels_hidden;
 	return saved;
 }
 
@@ -188,6 +218,9 @@ void QuickTiles_restore(QuickTilesSaved* saved) {
 	for (int i = 0; i < saved->hidden_count; i++) hidden[i] = saved->hidden[i];
 	hidden_count = saved->hidden_count;
 	for (int i = 0; i < RENAMABLE_COUNT; i++) labels[i] = saved->labels[i];
+	rows_hidden[0] = saved->rows_hidden[0];
+	rows_hidden[1] = saved->rows_hidden[1];
+	labels_hidden = saved->labels_hidden;
 	free(saved);
 }
 

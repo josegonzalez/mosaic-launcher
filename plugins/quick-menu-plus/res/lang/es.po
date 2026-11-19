@@ -23,8 +23,8 @@ msgstr "Avisos de ajustes"
 msgid "Battery %"
 msgstr "Batería %"
 
-msgid "Changes the quick menu: renames or hides its tiles, and adds tiles that flip stock's settings."
-msgstr "Cambia el menú rápido: renombra u oculta sus iconos y añade iconos que cambian ajustes de NextUI original."
+msgid "Changes the quick menu: renames or hides its tiles, rows and labels, and adds tiles that flip stock's settings or restart the launcher."
+msgstr "Cambia el menú rápido: renombra u oculta sus iconos, filas y nombres, y añade iconos que cambian ajustes de NextUI original o reinician el launcher."
 
 msgid "Clock"
 msgstr "Reloj"
@@ -83,3 +83,30 @@ msgstr "Nombres de iconos (Recents=Played, ...)"
 
 msgid "Toggle tiles (save, load, clock, ...)"
 msgstr "Iconos de interruptores (guardar, cargar, reloj, ...)"
+
+msgid "Bottom row of icons"
+msgstr "Fila inferior de iconos"
+
+msgid "Labels on the top row's tiles"
+msgstr "Nombres en los iconos de la fila superior"
+
+msgid "RESET"
+msgstr "RESTABLECER"
+
+msgid "Reset launcher settings"
+msgstr "Restablecer ajustes del launcher"
+
+msgid "Reset launcher settings tile on the quick menu"
+msgstr "Icono de restablecer ajustes del launcher en el menú rápido"
+
+msgid "Reset launcher settings?\nPlugins go back to how they ship.\nThe PIN, tags and favorites stay."
+msgstr "¿Restablecer ajustes del launcher?\nLos plugins vuelven a como vienen.\nEl PIN, las etiquetas y los favoritos se quedan."
+
+msgid "Restart launcher"
+msgstr "Reiniciar launcher"
+
+msgid "Restart launcher tile on the quick menu"
+msgstr "Icono de reiniciar launcher en el menú rápido"
+
+msgid "Top row of tiles"
+msgstr "Fila superior de iconos"

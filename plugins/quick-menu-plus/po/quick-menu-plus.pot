@@ -33,7 +33,11 @@ msgid "Battery %"
 msgstr ""
 
 #: plugin.txt
-msgid "Changes the quick menu: renames or hides its tiles, and adds tiles that flip stock's settings."
+msgid "Bottom row of icons"
+msgstr ""
+
+#: plugin.txt
+msgid "Changes the quick menu: renames or hides its tiles, rows and labels, and adds tiles that flip stock's settings or restart the launcher."
 msgstr ""
 
 #: quick_model.c
@@ -57,6 +61,10 @@ msgstr ""
 msgid "Hidden tiles (Pak Store, ...)"
 msgstr ""
 
+#: plugin.txt
+msgid "Labels on the top row's tiles"
+msgstr ""
+
 #: quick_model.c
 msgid "Load notices"
 msgstr ""
@@ -70,6 +78,10 @@ msgid "REBOOT"
 msgstr ""
 
 #: quick_menu_plus.c
+msgid "RESET"
+msgstr ""
+
+#: quick_menu_plus.c
 msgid "Reboot to stock"
 msgstr ""
 
@@ -79,6 +91,26 @@ msgstr ""
 
 #: plugin.txt
 msgid "Reboot to stock tile on the quick menu"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Reset launcher settings"
+msgstr ""
+
+#: plugin.txt
+msgid "Reset launcher settings tile on the quick menu"
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Reset launcher settings?\nPlugins go back to how they ship.\nThe PIN, tags and favorites stay."
+msgstr ""
+
+#: quick_menu_plus.c
+msgid "Restart launcher"
+msgstr ""
+
+#: plugin.txt
+msgid "Restart launcher tile on the quick menu"
 msgstr ""
 
 #: quick_model.c
@@ -111,4 +143,8 @@ msgstr ""
 
 #: plugin.txt
 msgid "Toggle tiles (save, load, clock, ...)"
+msgstr ""
+
+#: plugin.txt
+msgid "Top row of tiles"
 msgstr ""

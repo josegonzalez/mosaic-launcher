@@ -16,6 +16,13 @@
 // Reboot to stock turns the launcher off with the pak's manage.sh, then
 // reboots, so the device comes back on stock NextUI's launcher. It asks
 // first, and shows only when manage.sh is found.
+//
+// The top_row, bottom_row and tile_labels settings hide the quick menu's
+// rows and the top row's labels; both rows can't go, so the bottom one
+// stays. Restart launcher restarts it at once, and Reset launcher
+// settings asks first (and the PIN in kiosk mode, as an editing action),
+// then has the launcher reset plugins.txt and the plugins' settings and
+// restart.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,6 +107,23 @@ static void applyHidden(void) {
 			say(message);
 		}
 	}
+}
+
+///////////////////////////////////////
+// rows and labels
+
+static void applyLayout(void) {
+	QmpRows rows = Qmp_rows(isOn("top_row", "on"), isOn("bottom_row", "on"));
+	int hide_labels = !isOn("tile_labels", "on");
+	if (rows.refused) say("the top and bottom rows can't both be hidden, so the bottom row stays");
+	if (!rows.hide_top && !rows.hide_bottom && !hide_labels) return;
+	if (!MOSAIC_HOST_HAS(host, hide_quick_labels)) {
+		say("this launcher can't hide quick menu rows or labels");
+		return;
+	}
+	if (rows.hide_top && host->hide_quick_row(MOSAIC_QUICK_TOP, 1) != 0) say("couldn't hide the top row");
+	if (rows.hide_bottom && host->hide_quick_row(MOSAIC_QUICK_BOTTOM, 1) != 0) say("couldn't hide the bottom row");
+	if (hide_labels && host->hide_quick_labels(1) != 0) say("couldn't hide the top row's labels");
 }
 
 ///////////////////////////////////////
@@ -229,10 +253,32 @@ static void askRebootToStock(const char* path, void* data) {
 }
 
 ///////////////////////////////////////
+// restart and reset
+
+static void restartNow(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	say("restarting the launcher");
+	host->restart();
+}
+
+static void resetSettings(void* data) {
+	(void)data;
+	say("resetting the launcher's settings, then restarting");
+	host->reset_settings();
+}
+
+static void askReset(const char* path, void* data) {
+	(void)path;
+	(void)data;
+	host->confirm(tr("Reset launcher settings?\nPlugins go back to how they ship.\nThe PIN, tags and favorites stay."), tr("RESET"), resetSettings, NULL);
+}
+
+///////////////////////////////////////
 // hooks
 
-static void addTile(const char* id, const char* label, int (*available)(const char*, void*), void (*run)(const char*, void*), int (*is_on)(void*), void* data) {
-	if (host->register_action(id, label, strcmp(id, ID ".stock") ? 0 : MOSAIC_ACTION_EDITS, available, run, data) != 0
+static void addTile(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), int (*is_on)(void*), void* data) {
+	if (host->register_action(id, label, flags, available, run, data) != 0
 			|| host->quick_tile(id, MOSAIC_QUICK_TOP, NULL, NULL, is_on) != 0) {
 		char message[200];
 		snprintf(message, sizeof(message), "couldn't add the %s tile", label);
@@ -264,7 +310,7 @@ static void addStockToggles(void) {
 		}
 		char id[QMP_NAME_LEN + 32];
 		snprintf(id, sizeof(id), ID ".toggle.%s", toggles[i]->word);
-		addTile(id, toggles[i]->label, always, flipStock, stockOn, (void*)toggles[i]);
+		addTile(id, toggles[i]->label, 0, always, flipStock, stockOn, (void*)toggles[i]);
 	}
 }
 
@@ -273,6 +319,7 @@ static int init(const MosaicHost* h) {
 	awake = 0;
 	applyLabels();
 	applyHidden();
+	applyLayout();
 
 	if (!MOSAIC_HOST_HAS(host, quick_tile)) {
 		say("this launcher can't add quick menu tiles");
@@ -284,7 +331,7 @@ static int init(const MosaicHost* h) {
 	if (isOn("awake_tile", "on")) {
 		if (!MOSAIC_HOST_HAS(host, inhibit_sleep)) say("this launcher can't hold off sleep; no Stay awake tile");
 		else {
-			addTile(ID ".awake", TR_MARK("Stay awake"), always, toggleAwake, awakeOn, NULL);
+			addTile(ID ".awake", TR_MARK("Stay awake"), 0, always, toggleAwake, awakeOn, NULL);
 			if (access(QMP_AWAKE_FILE, F_OK) == 0) setAwake(1);
 		}
 	}
@@ -296,8 +343,19 @@ static int init(const MosaicHost* h) {
 		else {
 			findPak();
 			if (!pak[0]) say("manage.sh not found; no Reboot to stock tile");
-			addTile(ID ".stock", TR_MARK("Reboot to stock"), canRebootToStock, askRebootToStock, NULL, NULL);
+			addTile(ID ".stock", TR_MARK("Reboot to stock"), MOSAIC_ACTION_EDITS, canRebootToStock, askRebootToStock, NULL, NULL);
 		}
+	}
+
+	if (isOn("restart_tile", "off")) {
+		if (!MOSAIC_HOST_HAS(host, restart)) say("this launcher can't restart for plugins; no Restart launcher tile");
+		else addTile(ID ".restart", TR_MARK("Restart launcher"), 0, always, restartNow, NULL, NULL);
+	}
+	if (isOn("reset_tile", "off")) {
+		if (!MOSAIC_HOST_HAS(host, reset_settings) || !MOSAIC_HOST_HAS(host, confirm)) {
+			say("this launcher can't reset its settings for plugins; no Reset launcher settings tile");
+		}
+		else addTile(ID ".reset", TR_MARK("Reset launcher settings"), MOSAIC_ACTION_EDITS, always, askReset, NULL, NULL);
 	}
 	return 0;
 }
