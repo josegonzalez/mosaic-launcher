@@ -86,9 +86,10 @@ drew "Langue"
 drew "Diseur"
 grep -qxF "Plugins" "$texts" && fail "the title was drawn in English with a translation for it"
 [ "$(so_background)" = "123456" ] || fail "the background wasn't themer's: $(so_background)"
-# themer's rows are 108 high, so four list rows fit under the title
+# themer's rows are 108 high, so four list rows fit under the title, less
+# one its text step keeps for hints on two rows
 got=$(so_rows "Langue|Diseur|Theme|Themer|Other plugins|Hello|PIN")
-[ "$got" = "Langue,Diseur,Theme,Themer" ] || fail "the rows drawn were $got"
+[ "$got" = "Langue,Diseur,Theme" ] || fail "the rows drawn were $got"
 [ -e "$SO_MARKER" ] && fail "the settings left their crash marker after closing"
 
 # sayer's own page and its choice: its name, label and options in its
