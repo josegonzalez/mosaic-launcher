@@ -914,9 +914,9 @@ static void profileChanged(const char* name, const char* payload, void* data) {
 	flags_seen.st_size = -1;
 	refreshFlags();
 	int announced = 0, dropped = 0;
+	// the flags' sets too, though only the tags are counted as announced
 	for (int i = 0; i < ST_FLAGS; i++) {
-		if (announceFlag(i) == 0) announced++;
-		else dropped++;
+		if (announceFlag(i) != 0) dropped++;
 	}
 	for (int i = 0; i < before_count; i++) {
 		if (TG_find(&store, before[i]) >= 0) continue;
