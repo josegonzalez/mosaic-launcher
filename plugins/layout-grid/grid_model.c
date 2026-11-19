@@ -96,7 +96,7 @@ int LG_window(int first, int selected, int count, int cols, int rows) {
 	return first;
 }
 
-int LG_move(int selected, int count, int cols, int dir, int fresh) {
+int LG_move(int selected, int count, int cols, int dir, int fresh, int wrap) {
 	if (count <= 1 || cols < 1 || selected < 0 || selected >= count) return selected;
 	int col = selected % cols;
 	int last_row = (count - 1) / cols;
@@ -109,12 +109,25 @@ int LG_move(int selected, int count, int cols, int dir, int fresh) {
 		return fresh ? 0 : selected;
 	case MOSAIC_BUTTON_UP: {
 		if (selected >= cols) return selected - cols;
+		if (wrap) {
+			// the bottom of the column before, or the last column's from the first
+			int prev = col > 0 ? col - 1 : (cols < count ? cols : count) - 1;
+			if (col == 0 && !fresh) return selected;
+			int to = last_row * cols + prev;
+			return to < count ? to : to - cols;
+		}
 		if (!fresh) return selected;
 		int target = last_row * cols + col;
 		return target < count ? target : target - cols;
 	}
 	case MOSAIC_BUTTON_DOWN:
 		if (selected + cols < count) return selected + cols;
+		if (wrap) {
+			// the top of the next column, or the first entry from the last column
+			int last_col = (cols < count ? cols : count) - 1;
+			if (col < last_col) return col + 1;
+			return fresh ? 0 : selected;
+		}
 		if (selected / cols < last_row) return count - 1;
 		return fresh ? col : selected;
 	}

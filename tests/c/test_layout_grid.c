@@ -124,36 +124,72 @@ static void testWindow(void) {
 static void testMove(void) {
 	// 10 entries in rows 0-3, 4-7 and 8-9
 	const int U = MOSAIC_BUTTON_UP, D = MOSAIC_BUTTON_DOWN, L = MOSAIC_BUTTON_LEFT, R = MOSAIC_BUTTON_RIGHT;
-	CHECK(LG_move(5, 10, 4, L, 1) == 4);
-	CHECK(LG_move(4, 10, 4, L, 0) == 3); // left steps back a row
-	CHECK(LG_move(0, 10, 4, L, 1) == 9);
-	CHECK(LG_move(0, 10, 4, L, 0) == 0);
-	CHECK(LG_move(3, 10, 4, R, 0) == 4);
-	CHECK(LG_move(9, 10, 4, R, 1) == 0);
-	CHECK(LG_move(9, 10, 4, R, 0) == 9);
+	CHECK(LG_move(5, 10, 4, L, 1, 0) == 4);
+	CHECK(LG_move(4, 10, 4, L, 0, 0) == 3); // left steps back a row
+	CHECK(LG_move(0, 10, 4, L, 1, 0) == 9);
+	CHECK(LG_move(0, 10, 4, L, 0, 0) == 0);
+	CHECK(LG_move(3, 10, 4, R, 0, 0) == 4);
+	CHECK(LG_move(9, 10, 4, R, 1, 0) == 0);
+	CHECK(LG_move(9, 10, 4, R, 0, 0) == 9);
 
-	CHECK(LG_move(5, 10, 4, U, 0) == 1);
-	CHECK(LG_move(1, 10, 4, U, 1) == 9); // the column's lowest
-	CHECK(LG_move(2, 10, 4, U, 1) == 6); // the last row is short there
-	CHECK(LG_move(2, 10, 4, U, 0) == 2);
+	CHECK(LG_move(5, 10, 4, U, 0, 0) == 1);
+	CHECK(LG_move(1, 10, 4, U, 1, 0) == 9); // the column's lowest
+	CHECK(LG_move(2, 10, 4, U, 1, 0) == 6); // the last row is short there
+	CHECK(LG_move(2, 10, 4, U, 0, 0) == 2);
 
-	CHECK(LG_move(1, 10, 4, D, 0) == 5);
-	CHECK(LG_move(5, 10, 4, D, 0) == 9);
-	CHECK(LG_move(6, 10, 4, D, 0) == 9); // nothing below: the last entry
-	CHECK(LG_move(7, 10, 4, D, 1) == 9);
-	CHECK(LG_move(8, 10, 4, D, 1) == 0);
-	CHECK(LG_move(9, 10, 4, D, 1) == 1);
-	CHECK(LG_move(9, 10, 4, D, 0) == 9);
+	CHECK(LG_move(1, 10, 4, D, 0, 0) == 5);
+	CHECK(LG_move(5, 10, 4, D, 0, 0) == 9);
+	CHECK(LG_move(6, 10, 4, D, 0, 0) == 9); // nothing below: the last entry
+	CHECK(LG_move(7, 10, 4, D, 1, 0) == 9);
+	CHECK(LG_move(8, 10, 4, D, 1, 0) == 0);
+	CHECK(LG_move(9, 10, 4, D, 1, 0) == 1);
+	CHECK(LG_move(9, 10, 4, D, 0, 0) == 9);
 
 	// one row, and one entry
-	CHECK(LG_move(1, 3, 4, U, 1) == 1);
-	CHECK(LG_move(1, 3, 4, D, 1) == 1);
-	CHECK(LG_move(2, 3, 4, R, 1) == 0);
-	CHECK(LG_move(0, 1, 4, R, 1) == 0);
+	CHECK(LG_move(1, 3, 4, U, 1, 0) == 1);
+	CHECK(LG_move(1, 3, 4, D, 1, 0) == 1);
+	CHECK(LG_move(2, 3, 4, R, 1, 0) == 0);
+	CHECK(LG_move(0, 1, 4, R, 1, 0) == 0);
+	// wrap on: up and down carry on into the next column
+	CHECK(LG_move(8, 10, 4, D, 1, 1) == 1);  // the bottom of column 0 to the top of column 1
+	CHECK(LG_move(8, 10, 4, D, 0, 1) == 1);  // a held repeat carries on too
+	CHECK(LG_move(9, 10, 4, D, 1, 1) == 2);
+	CHECK(LG_move(6, 10, 4, D, 1, 1) == 3);  // column 2 ends a row above, the last row is short
+	CHECK(LG_move(7, 10, 4, D, 0, 1) == 7);  // the last column's bottom: a held repeat stops
+	CHECK(LG_move(7, 10, 4, D, 1, 1) == 0);
+	CHECK(LG_move(3, 10, 4, D, 0, 1) == 7);  // inside a column, down is a row
+	CHECK(LG_move(3, 10, 4, D, 1, 1) == 7);
+	CHECK(LG_move(1, 10, 4, U, 1, 1) == 8);  // the top of column 1 to the bottom of column 0
+	CHECK(LG_move(1, 10, 4, U, 0, 1) == 8);
+	CHECK(LG_move(2, 10, 4, U, 1, 1) == 9);
+	CHECK(LG_move(3, 10, 4, U, 1, 1) == 6);  // the bottom of column 2 is a row up
+	CHECK(LG_move(0, 10, 4, U, 1, 1) == 7);  // the first entry to the last column's bottom
+	CHECK(LG_move(0, 10, 4, U, 0, 1) == 0);  // held, it stops
+	CHECK(LG_move(5, 10, 4, U, 0, 1) == 1);
+	CHECK(LG_move(4, 10, 4, L, 1, 1) == 3);  // left and right don't change
+	CHECK(LG_move(0, 10, 4, L, 1, 1) == 9);
+	CHECK(LG_move(9, 10, 4, R, 1, 1) == 0);
+	CHECK(LG_move(9, 10, 4, R, 0, 1) == 9);
+	// an even grid: 8 entries in 4 columns
+	CHECK(LG_move(7, 8, 4, D, 1, 1) == 0);
+	CHECK(LG_move(4, 8, 4, D, 1, 1) == 1);
+	CHECK(LG_move(0, 8, 4, U, 1, 1) == 7);
+	// one row: down steps right, up steps left, and the ends wrap on a press
+	CHECK(LG_move(0, 3, 4, D, 1, 1) == 1);
+	CHECK(LG_move(1, 3, 4, U, 1, 1) == 0);
+	CHECK(LG_move(2, 3, 4, D, 1, 1) == 0);
+	CHECK(LG_move(2, 3, 4, D, 0, 1) == 2);
+	CHECK(LG_move(0, 3, 4, U, 1, 1) == 2);
+	// one column: the ends wrap as without
+	CHECK(LG_move(2, 3, 1, D, 1, 1) == 0);
+	CHECK(LG_move(2, 3, 1, D, 0, 1) == 2);
+	CHECK(LG_move(0, 3, 1, U, 1, 1) == 2);
+	CHECK(LG_move(0, 3, 1, U, 0, 1) == 0);
+	CHECK(LG_move(0, 1, 4, D, 1, 1) == 0);
 	// anything else stays
-	CHECK(LG_move(3, 10, 4, MOSAIC_BUTTON_A, 1) == 3);
-	CHECK(LG_move(12, 10, 4, R, 1) == 12);
-	CHECK(LG_move(3, 10, 0, R, 1) == 3);
+	CHECK(LG_move(3, 10, 4, MOSAIC_BUTTON_A, 1, 0) == 3);
+	CHECK(LG_move(12, 10, 4, R, 1, 0) == 12);
+	CHECK(LG_move(3, 10, 0, R, 1, 0) == 3);
 }
 
 static void testLetter(void) {
@@ -230,6 +266,7 @@ static char names_drawn[128]; // the names under the tiles, each followed by a c
 static int blits = 0, blits_of_image = 0;
 static const char* columns_cfg = "auto";
 static const char* rows_cfg = NULL;
+static const char* wrap_cfg = NULL;
 static const char* theme_columns = NULL; // the theme's layout-grid.columns
 static const char* theme_rows = NULL;
 static void (*onThemeChanged)(const char*, const char*, void*);
@@ -242,6 +279,7 @@ static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (!strcmp(key, "columns")) return columns_cfg;
 	if (!strcmp(key, "rows") && rows_cfg) return rows_cfg;
+	if (!strcmp(key, "wrap") && wrap_cfg) return wrap_cfg;
 	return fallback;
 }
 static const char* fakeThemeValue(const char* key, const char* fallback) {
@@ -464,6 +502,29 @@ static void testPlugin(void) {
 	in.pressed = in.repeated = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_LEFT);
 	CHECK(p->layout_input(&in, &v, &consumed) == 0);
 	CHECK(selects == 1 && selected_to == 9);
+
+	// the Wrap setting, off by default: down from the bottom of the column
+	// stays in it, and on it carries on to the next column's top
+	CHECK(wrap_setting == 0);
+	resetCounts();
+	v = makeView(8);
+	in.pressed = in.repeated = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_DOWN);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(selects == 1 && selected_to == 0);
+	wrap_cfg = "on";
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(wrap_setting == 1);
+	resetCounts();
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(selects == 1 && selected_to == 1);
+	resetCounts();
+	v = makeView(1);
+	in.pressed = in.repeated = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_UP);
+	CHECK(p->layout_input(&in, &v, &consumed) == 0);
+	CHECK(selects == 1 && selected_to == 8);
+	wrap_cfg = NULL;
+	CHECK(p->init(&fake_host) == 0);
+	CHECK(wrap_setting == 0);
 
 	// a frame: 4x2 cells, all decorated inside the area and below the pill,
 	// Apple's thumbnail copied, Date's box copied, and letter tiles for

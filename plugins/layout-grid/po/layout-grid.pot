@@ -63,6 +63,10 @@ msgid "Shows the game list as a grid of tiles instead of the built-in list."
 msgstr ""
 
 #: plugin.txt
+msgid "Wrap columns"
+msgstr ""
+
+#: plugin.txt
 msgid "auto"
 msgstr ""
 

@@ -10,3 +10,5 @@ slots=layout
 setting.columns=choice|Columns|theme|theme,auto,2,3,4,5,6,7,8
 # rows of tiles in view; auto keeps the tiles about square; theme: the theme's layout-grid.rows, or auto without one
 setting.rows=choice|Rows|theme|theme,auto,1,2,3,4,5,6
+# down from the bottom of a column goes to the top of the next, and up from the top to the bottom of the one before
+setting.wrap=toggle|Wrap columns|off

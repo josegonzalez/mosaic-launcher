@@ -16,7 +16,8 @@
 // launcher.theme_changed.
 //
 // The d-pad moves the selection through the grid with select_index (see
-// LG_move for where it wraps); everything else, A, B, X, the shoulders and
+// LG_move for where it wraps, and the wrap setting for carrying on into the
+// next column); everything else, A, B, X, the shoulders and
 // the letter jumps, stays the launcher's. The rows in view follow the
 // selection, moving only as far as it takes to show it.
 //
@@ -44,6 +45,7 @@
 static const MosaicHost* host;
 static int columns_setting = 0; // 0 for auto
 static int rows_setting = 0;
+static int wrap_setting = 0; // down and up carry on into the next column
 static char columns_value[16]; // the settings as set, theme for the theme's
 static char rows_value[16];
 static int themed = 0; // 0 until the theme's keys are read, and again when the theme changes
@@ -262,7 +264,8 @@ static int layoutInput(const MosaicInput* input, const MosaicListView* view, uns
 	for (int i = 0; i < 4; i++) {
 		unsigned int bit = MOSAIC_BUTTON_BIT(dirs[i]);
 		if (!(input->repeated & bit)) continue;
-		int to = LG_move(view->selected, view->count, grid.cols, dirs[i], (input->pressed & bit) != 0);
+		int to = LG_move(view->selected, view->count, grid.cols, dirs[i], (input->pressed & bit) != 0,
+			wrap_setting);
 		if (to != view->selected) host->select_index(to);
 		break; // one direction a frame
 	}
@@ -328,6 +331,7 @@ static int init(const MosaicHost* h) {
 	}
 	snprintf(columns_value, sizeof(columns_value), "%s", host->cfg_get("columns", "theme"));
 	snprintf(rows_value, sizeof(rows_value), "%s", host->cfg_get("rows", "theme"));
+	wrap_setting = !strcmp(host->cfg_get("wrap", "off"), "on");
 	themed = 0;
 	if (MOSAIC_HOST_HAS(host, subscribe) && host->subscribe("launcher.theme_changed", themeChanged, NULL) != 0) {
 		host->log(ID, "couldn't follow theme changes");

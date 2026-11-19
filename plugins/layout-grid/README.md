@@ -20,7 +20,9 @@ The d-pad moves through the grid: left and right step through the entries in ord
 - left from the first entry goes to the last, and right from the last goes to the first
 - up from the top row goes to the column's lowest entry, and down from the last row goes to the column's top one
 
-Holding the direction stops at the end instead. Down where the column has nothing below goes to the last entry. **A**, **B**, **X**, the shoulders and the letter jumps stay the launcher's.
+Holding the direction stops at the end instead. Down where the column has nothing below goes to the last entry.
+
+With **Wrap columns** on, up and down carry on into the next column instead. Down from the bottom of a column goes to the top of the next column, and up from the top goes to the bottom of the previous one, and the grid scrolls to follow. A column's bottom is its lowest entry, so in a last row that stops short, the columns without an entry there end a row higher. Down from the last column's bottom goes to the first entry, and up from the first entry goes to the last column's bottom, on a press; holding the direction stops there. Left and right move as before. **A**, **B**, **X**, the shoulders and the letter jumps stay the launcher's.
 
 ## Screenshots
 
@@ -38,6 +40,7 @@ Columns set to 4.
 |---|---|---|---|
 | Columns (`columns`) | theme, auto, 2 to 8 | theme | Tiles across the screen. `auto` fits the screen: 3 at 640 wide, 4 at 1024, 5 at 1280. `theme` uses the theme's `layout-grid.columns` key, `auto` or a number, or `auto` without one |
 | Rows (`rows`) | theme, auto, 1 to 6 | theme | Rows of tiles in view. `auto` keeps the tiles about square (2 on each of those screens). `theme` uses the theme's `layout-grid.rows` key, or `auto` without one |
+| Wrap columns (`wrap`) | on, off | off | Carries up and down on into the next column instead of wrapping within the column |
 
 A new theme's keys are followed at once.
 

@@ -73,8 +73,18 @@ int LG_window(int first, int selected, int count, int cols, int rows);
 //   down from the last row goes to the column's top entry, and down from
 //     a row whose column has nothing below, as the last row is shorter,
 //     goes to the last entry, press or repeat.
+// With wrap (the Wrap setting), up and down carry on into the next column
+// instead:
+//   down from the bottom of a column (the last row's entry, or the one
+//     above where the last row is short) goes to the top of the next
+//     column, and up from the top goes to the bottom of the one before,
+//     which in a short last row is the entry above it;
+//   down from the last column's bottom goes to the first entry, and up
+//     from the first entry to the last column's bottom, on a press only;
+//     a held repeat stops there;
+//   left and right don't change.
 // Returns the new index, or selected when it doesn't move.
-int LG_move(int selected, int count, int cols, int dir, int fresh);
+int LG_move(int selected, int count, int cols, int dir, int fresh, int wrap);
 
 // The letter a tile shows for a name: its first letter or digit, upper
 // case, or first character that isn't ASCII (a whole UTF-8 sequence), or
