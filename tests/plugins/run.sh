@@ -466,6 +466,9 @@ if [ "$JOBS" -gt 1 ]; then
 		done_worker "$k" $? "alone, after the workers"
 	fi
 else
+	# the card from the skeleton when there isn't one, before the folders
+	# below make it look prepared to upstream's script, which then skips it
+	bash "$ROOT/vendor/NextUI/workspace/desktop/prepare_fake_sd_root.sh" >/dev/null || fail "preparing the fake card"
 	for case_name in $run_cases; do
 		case_started=$(now_ms)
 		# where the cases write the shared settings and recents, which only a
