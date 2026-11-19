@@ -44,10 +44,12 @@ qo_cfg() {
 	for qo_line in "$@"; do printf '%s\n' "$qo_line" >>"$QO_CFG"; done
 }
 
-# qo_run <name> <keys> [line]: starts on the game list and presses keys;
-# what was drawn goes to $WORK/<name>.texts. With a line, waits for it as
-# well as presser's; without, runs until the launcher exits, and qo_status
-# is 1 when it exited on its own
+# qo_run <name> <keys> [exits]: starts on the game list and presses keys,
+# which start with a wait, as on a slow start the first press can come
+# before the game list takes it; what was drawn goes to
+# $WORK/<name>.texts. Without exits, waits for presser's last line; with
+# it, runs until the launcher exits, and qo_status is 1 when it exited on
+# its own
 qo_run() {
 	printf '%s' "$CARD/Roms" >/tmp/last.txt
 	texts="$WORK/$1.texts"
@@ -95,14 +97,14 @@ not_shown "Restart launcher"
 
 # labels hidden: the tiles are there, without their names
 qo_cfg tile_labels=off restart_tile=on
-qo_run qo-labels "menu left a" exits
+qo_run qo-labels "wait menu left a" exits
 grep -qxF "[INFO] quick menu: top row Games,Tools,Restart launcher" "$log" || fail "the top row's tiles went with their labels"
 not_shown "Restart launcher"
 [ "$qo_status" = 1 ] || fail "Restart launcher, unlabelled, didn't restart"
 
 # Restart launcher restarts at once
 qo_cfg restart_tile=on
-qo_run qo-restart "menu left a" exits
+qo_run qo-restart "wait menu left a" exits
 shown "Restart launcher"
 [ "$qo_status" = 1 ] || fail "the launcher didn't exit for Restart launcher"
 grep -qF "plugins: a plugin asked to restart the launcher" "$log" || fail "Restart launcher didn't ask to restart"
@@ -114,13 +116,13 @@ printf '4826\n' >"$QO_PIN"
 printf 'lock_chord=off\n' >"$STATE/settings.txt"
 printf 'Kids\n' >"$STATE/tags.txt"
 qo_cfg reset_tile=on top_row=on kept=yes
-qo_run qo-reset-no "menu left a b"
+qo_run qo-reset-no "wait menu left a b"
 shown "Reset launcher settings?"
 grep -qF "reset plugin settings" "$log" && fail "backing out of Reset launcher settings reset them"
 [ -f "$STATE/plugins.txt" ] || fail "backing out of Reset launcher settings removed plugins.txt"
 
 # A resets: plugins.txt and the settings go, the rest stays
-qo_run qo-reset "menu left a a" exits
+qo_run qo-reset "wait menu left a a" exits
 [ "$qo_status" = 1 ] || fail "the launcher didn't exit for Reset launcher settings"
 grep -qF "plugins: a plugin asked to reset plugin settings and restart the launcher" "$log" || fail "Reset launcher settings didn't ask"
 grep -qF "plugins: reset plugin settings to their defaults" "$log" || fail "the settings weren't reset"
@@ -134,7 +136,7 @@ grep -qF "plugins: reset plugin settings to their defaults" "$log" || fail "the 
 qo_plugins simple-mode
 printf 'on=on\nkiosk=on\n' >"$STATE/simple-mode.cfg"
 qo_cfg reset_tile=on
-qo_run qo-kiosk "menu left a b"
+qo_run qo-kiosk "wait menu left a b"
 grep -qF "plugins: asking the PIN before quick-menu-plus.reset" "$log" || fail "kiosk mode didn't ask for the PIN"
 not_shown "Reset launcher settings?"
 [ -f "$STATE/plugins.txt" ] || fail "cancelling the PIN removed plugins.txt"
