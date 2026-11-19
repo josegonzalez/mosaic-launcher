@@ -9,8 +9,23 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-msgid "Browses the screenshots you took in games, newest first, on a screen of its own."
-msgstr "Explora las capturas de pantalla que hiciste en los juegos, las más nuevas primero, en una pantalla propia."
+msgid "Browses the screenshots you took in games, newest first, on a screen of its own. Y on a game shows every image it has and its clip, one at a time."
+msgstr "Explora las capturas de pantalla que hiciste en los juegos, las más nuevas primero, en una pantalla propia. Y en un juego muestra todas sus imágenes y su vídeo, una a una."
+
+msgid "Can't play this clip"
+msgstr "No se puede reproducir este vídeo"
+
+msgid "Can't show this image"
+msgstr "No se puede mostrar esta imagen"
+
+msgid "Media"
+msgstr "Multimedia"
+
+msgid "Media button"
+msgstr "Botón de multimedia"
+
+msgid "No media"
+msgstr "No hay multimedia"
 
 msgid "Can't show this screenshot"
 msgstr "No se puede mostrar esta captura"

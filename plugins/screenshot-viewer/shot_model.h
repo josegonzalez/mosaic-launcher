@@ -106,11 +106,12 @@ int SV_afterRemove(int selected, int count);
 // grid scrolls only as far as it takes to show the selected shot's row.
 int SV_firstRow(int first, int selected, int count, int cols, int rows);
 
-// The grid's hints, or the full view's (full 1): B BACK on the left and
-// Y DELETE (when can_delete) and A VIEW (not in the full view) on the
-// right; with no shots, B BACK alone on the right.
-void SV_hints(int count, int full, int can_delete, MosaicHint left[2], int* left_count, MosaicHint right[2],
-	int* right_count);
+// The grid's hints, or the full view's (full 1): B BACK and X MEDIA (when
+// can_media, not in the full view) on the left and Y DELETE (when
+// can_delete) and A VIEW (not in the full view) on the right; with no
+// shots, B BACK alone on the right.
+void SV_hints(int count, int full, int can_delete, int can_media, MosaicHint left[2], int* left_count,
+	MosaicHint right[2], int* right_count);
 
 ///////////////////////////////////////
 // layout
@@ -161,7 +162,7 @@ MosaicRect SV_cell(const SVGrid* grid, int slot);
 // scaled copies, the least recently used going first
 
 typedef struct SVCopy {
-	char file[SV_NAME_MAX];
+	char file[SV_PATH_MAX]; // a screenshot's name, or a game's media's full path
 	int w, h;
 	MosaicSurface* surface; // NULL for a free slot
 	unsigned long used;

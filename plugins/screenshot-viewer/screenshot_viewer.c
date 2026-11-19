@@ -28,16 +28,33 @@
 // small pools (thumbnails and full views) where the least recently drawn
 // goes first, and are freed when the screen closes. Everything is drawn
 // around the status pill and header widgets, which stay clear.
+//
+// The screenshot-viewer.media action, on Y on the game list (and the
+// "media_button" setting's button), opens the game's media on a screen of
+// its own: every image it has beside it and in the screenshots folder,
+// then its clip, in media_model.h's order, left and right stepping through
+// them and B going back, with the file each one is on the title pill. X on
+// a shot in the grid opens its game's media, the game found by the name
+// the shot has. The images use the full views' pool. The clip plays
+// through video-previews' video.play service, on that plugin's own full
+// screen over this one, while it's there; without it clips are left out.
+// While the clip shows, input_filter takes left, right and B, as that
+// screen takes no buttons, and the file it is shows as a toast.
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "mosaic_plugin.h"
+#include "media_model.h"
 #include "shot_model.h"
 
 #define ID "screenshot-viewer"
 #define SCREEN_ID ID ".main"
 #define ACTION_ID ID ".open"
 #define CAPTURE_ID ID ".capture"
+#define MEDIA_ID ID ".media"
+#define MEDIA_SCREEN_ID ID ".media-view"
+#define CLIP_SCREEN_ID "video-previews.saver"
 #define THUMB_COPIES 40
 #define FULL_COPIES 3
 
@@ -52,6 +69,23 @@ static int full = 0; // 1 in the full view
 static int viewing = 0; // 1 while the screen is open
 static char pending[SV_NAME_MAX]; // the file the confirm is about
 static char shown[SV_NAME_MAX + 128];
+
+// a game's media
+static SMList media;
+static int media_selected = 0;
+static int media_open = 0;
+static char media_rom[SV_PATH_MAX]; // the game, or "" for a shot's name without one
+static char media_game[SV_NAME_MAX]; // the name its screenshots have
+static char media_shown[SV_PATH_MAX + 64];
+static int clips = -1;     // 1 when video.play answers, -1 before it's asked
+static int clip_due = 0;   // the selected clip plays on the next tick
+static int clip_on = 0;    // it shows, on video-previews' screen over this one
+static int clip_failed = 0;
+// what the Media action's available said last, for the path it was asked about
+static char available_path[SV_PATH_MAX];
+static int available_said = -1;
+static void forgetAvailable(void);
+static void openShotMedia(const SVShot* shot);
 
 static void say(const char* message) {
 	host->log(ID, message);
@@ -108,19 +142,18 @@ static void pathOf(const char* file, char* out, size_t size) {
 	snprintf(out, size, "%s/%s", dir, file);
 }
 
-// Draws the shot's image fitted inside box, around hole, from a copy in
-// copies made for a box this size, or else from the art cache, copying it.
-// Returns 1 when it's drawn, 0 while it loads, -1 when it can't be.
-static int drawShot(MosaicSurface* screen, const SVShot* shot, const MosaicRect* box, const MosaicRect* hole,
-		SVCopy* copies, int count) {
+// Draws the image at path fitted inside box, around hole, from a copy in
+// copies, by key, made for a box this size, or else from the art cache,
+// copying it. Returns 1 when it's drawn, 0 while it loads, -1 when it
+// can't be.
+static int drawImage(MosaicSurface* screen, const char* key, const char* path, const MosaicRect* box,
+		const MosaicRect* hole, SVCopy* copies, int count) {
 	const MosaicSurface* src = NULL;
-	SVCopy* copy = SV_copyFind(copies, count, shot->file, box->w, box->h);
+	SVCopy* copy = SV_copyFind(copies, count, key, box->w, box->h);
 	if (copy) {
 		copy->used = frame;
 		src = copy->surface;
 	} else {
-		char path[SV_PATH_MAX];
-		pathOf(shot->file, path, sizeof(path));
 		const MosaicSurface* image = NULL;
 		int state = host->art_load(path, &image);
 		if (state == MOSAIC_ART_LOADING) return 0;
@@ -133,7 +166,7 @@ static int drawShot(MosaicSurface* screen, const SVShot* shot, const MosaicRect*
 		if (scaled) {
 			SVCopy* slot = SV_copyPick(copies, count);
 			if (slot->surface) host->surface_free(ID, slot->surface);
-			snprintf(slot->file, sizeof(slot->file), "%s", shot->file);
+			snprintf(slot->file, sizeof(slot->file), "%s", key);
 			slot->w = box->w;
 			slot->h = box->h;
 			slot->surface = scaled;
@@ -151,6 +184,13 @@ static int drawShot(MosaicSurface* screen, const SVShot* shot, const MosaicRect*
 		host->blit(screen, src, &from, &parts[i]);
 	}
 	return 1;
+}
+
+static int drawShot(MosaicSurface* screen, const SVShot* shot, const MosaicRect* box, const MosaicRect* hole,
+		SVCopy* copies, int count) {
+	char path[SV_PATH_MAX];
+	pathOf(shot->file, path, sizeof(path));
+	return drawImage(screen, shot->file, path, box, hole, copies, count);
 }
 
 // asks the art cache for a shot so it's in by the time it's stepped to
@@ -226,7 +266,7 @@ static int renderGrid(MosaicSurface* screen, const MosaicScreenView* view, const
 static void hints(MosaicSurface* screen) {
 	MosaicHint left[2], right[2];
 	int left_count = 0, right_count = 0;
-	SV_hints(list.count, full, can_delete, left, &left_count, right, &right_count);
+	SV_hints(list.count, full, can_delete, 1, left, &left_count, right, &right_count);
 	if (left_count) host->draw_hints(screen, MOSAIC_HINTS_LEFT, left, left_count, NULL);
 	if (right_count) host->draw_hints(screen, MOSAIC_HINTS_RIGHT, right, right_count, NULL);
 }
@@ -271,6 +311,7 @@ static void deleteConfirmed(void* data) {
 	}
 	copiesFree(thumbs, THUMB_COPIES, pending);
 	copiesFree(fulls, FULL_COPIES, pending);
+	forgetAvailable();
 	selected = SV_afterRemove(at, list.count);
 	if (list.count == 0) full = 0;
 	snprintf(message, sizeof(message), "deleted %s, %i left", pending, list.count);
@@ -294,6 +335,8 @@ static void askDelete(void) {
 static int enter(void* data) {
 	(void)data;
 	int count = SV_scan(dir, &list);
+	// the card index is read once a plugin asks: X finds a shot's game in it
+	if (MOSAIC_HOST_HAS(host, index_refresh)) host->index_count(NULL);
 	viewing = 1;
 	selected = 0;
 	first_row = 0;
@@ -315,7 +358,7 @@ static void leave(void* data) {
 static int input(const MosaicInput* in, void* data) {
 	(void)data;
 	unsigned int bit_a = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_A), bit_b = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B);
-	unsigned int bit_y = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_Y);
+	unsigned int bit_y = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_Y), bit_x = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_X);
 	int count = list.count;
 	int before = selected, was_full = full;
 
@@ -326,6 +369,9 @@ static int input(const MosaicInput* in, void* data) {
 		full = 1;
 	} else if (count > 0 && can_delete && (in->pressed & bit_y)) {
 		askDelete();
+		return MOSAIC_SCREEN_STAY;
+	} else if (count > 0 && !full && (in->pressed & bit_x)) {
+		openShotMedia(&list.shots[selected]);
 		return MOSAIC_SCREEN_STAY;
 	} else {
 		static const struct {
@@ -368,6 +414,274 @@ static int render(MosaicSurface* screen, const MosaicScreenView* view, void* dat
 	hints(screen);
 	logShown(got, is_full);
 	return 0;
+}
+
+///////////////////////////////////////
+// a game's media
+
+static int isScreen(const char* id) {
+	const char* now = host->current_screen();
+	return now && strcmp(now, id) == 0;
+}
+
+// 1 when video.play answers, asked once (not from init, as video-previews
+// may load after this plugin) and not over its own screen, which a call
+// without a game closes
+static int clipsPlay(void) {
+	if (clips >= 0) return clips;
+	if (!MOSAIC_HOST_HAS(host, call) || !host->has_capability("video.play")) return clips = 0;
+	if (isScreen(CLIP_SCREEN_ID)) return 0;
+	char reply[MOSAIC_CALL_MAX];
+	clips = host->call("video.play", NULL, reply, sizeof(reply)) >= 0;
+	return clips;
+}
+
+static int isDir(const char* path) {
+	struct stat st;
+	return path && path[0] && lstat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+// the name the game list shows the game at path by, as its screenshots
+// have it
+static void gameName(const char* path, char* out, size_t size) {
+	out[0] = '\0';
+	if (MOSAIC_HOST_HAS(host, index_refresh)) {
+		MosaicIndexEntry entry = { .size = sizeof(entry) };
+		if (host->index_find(path, &entry) >= 0 && entry.name && entry.name[0]) {
+			snprintf(out, size, "%s", entry.name);
+			return;
+		}
+	}
+	SM_listName(path, isDir(path), out, size);
+}
+
+// the game the index shows as name, into out, or "" when there's none
+static void gameNamed(const char* name, char* out, size_t size) {
+	out[0] = '\0';
+	if (!MOSAIC_HOST_HAS(host, index_refresh)) return;
+	int count = host->index_count(NULL);
+	for (int i = 0; i < count; i++) {
+		MosaicIndexEntry entry = { .size = sizeof(entry) };
+		if (host->index_entry(NULL, i, &entry) != 0 || entry.kind != MOSAIC_INDEX_GAME) continue;
+		if (entry.name && entry.path && strcmp(entry.name, name) == 0) {
+			snprintf(out, size, "%s", entry.path);
+			return;
+		}
+	}
+}
+
+static void forgetAvailable(void) {
+	available_path[0] = '\0';
+	available_said = -1;
+}
+
+// Opens the media of the game at rom ("" for none) with screenshots named
+// game.
+static void openMedia(const char* rom, const char* game) {
+	snprintf(media_rom, sizeof(media_rom), "%s", rom ? rom : "");
+	snprintf(media_game, sizeof(media_game), "%s", game ? game : "");
+	if (host->open_screen(MEDIA_SCREEN_ID) != 0) say("couldn't open the media screen");
+}
+
+static const SMItem* mediaItem(void) {
+	return media_selected >= 0 && media_selected < media.count ? &media.items[media_selected] : NULL;
+}
+
+// selected moved: its clip plays when it's one
+static void mediaMoved(void) {
+	const SMItem* item = mediaItem();
+	clip_failed = 0;
+	clip_due = item && item->kind == SM_CLIP;
+	host->request_redraw();
+}
+
+// closes video-previews' screen, when the clip shows on it
+static void stopClip(void) {
+	if (!clip_on) return;
+	clip_on = 0;
+	char reply[MOSAIC_CALL_MAX];
+	if (isScreen(CLIP_SCREEN_ID)) host->call("video.play", NULL, reply, sizeof(reply));
+}
+
+static void playClip(void) {
+	clip_due = 0;
+	const SMItem* item = mediaItem();
+	if (!item || item->kind != SM_CLIP) return;
+	char args[SV_PATH_MAX + 32], reply[MOSAIC_CALL_MAX], playing[8] = "";
+	snprintf(args, sizeof(args), "path=%s\nclock=off\n", media_rom);
+	if (host->call("video.play", args, reply, sizeof(reply)) >= 0) host->event_value(reply, "playing", playing, sizeof(playing));
+	char message[SV_PATH_MAX + 64];
+	if (strcmp(playing, "1") != 0) {
+		clip_failed = 1;
+		snprintf(message, sizeof(message), "can't play %s", SM_label(item));
+		say(message);
+		host->request_redraw();
+		return;
+	}
+	clip_on = 1;
+	snprintf(message, sizeof(message), "media %i of %i: %s, clip playing", media_selected, media.count, SM_label(item));
+	say(message);
+	if (MOSAIC_HOST_HAS(host, toast)) host->toast(SM_label(item));
+}
+
+static int mediaEnter(void* data) {
+	(void)data;
+	int count = SM_find(media_rom, isDir(media_rom), media_game, dir, clipsPlay(), &media);
+	media_open = 1;
+	media_selected = 0;
+	clip_on = clip_failed = 0;
+	media_shown[0] = '\0';
+	mediaMoved();
+	char message[SV_PATH_MAX + SV_NAME_MAX + 64];
+	snprintf(message, sizeof(message), "%i media for %s (%s)", count, media_game[0] ? media_game : "?",
+		media_rom[0] ? media_rom : "no game");
+	say(message);
+	return 0;
+}
+
+static void mediaLeave(void* data) {
+	(void)data;
+	// video-previews' screen, over this one, closed with it
+	clip_on = clip_due = 0;
+	media_open = 0;
+	copiesFree(fulls, FULL_COPIES, NULL);
+	SM_listFree(&media);
+	forgetAvailable();
+}
+
+// one step left or right, wrapping on a press; 1 when it moved
+static int mediaStep(const MosaicInput* in) {
+	unsigned int left = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_LEFT), right = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_RIGHT);
+	int before = media_selected;
+	if (in->repeated & left) media_selected = SV_step(media_selected, media.count, -1, (in->pressed & left) != 0);
+	else if (in->repeated & right) media_selected = SV_step(media_selected, media.count, 1, (in->pressed & right) != 0);
+	return media_selected != before;
+}
+
+static int mediaInput(const MosaicInput* in, void* data) {
+	(void)data;
+	if (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B)) return MOSAIC_SCREEN_CLOSE;
+	const SMItem* item = mediaItem();
+	if (item && item->kind == SM_CLIP && (in->pressed & MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_A))) {
+		mediaMoved();
+		return MOSAIC_SCREEN_STAY;
+	}
+	if (mediaStep(in)) mediaMoved();
+	return MOSAIC_SCREEN_STAY;
+}
+
+static void mediaLog(int got) {
+	char line[sizeof(media_shown)];
+	const SMItem* item = mediaItem();
+	if (!item) snprintf(line, sizeof(line), "no media");
+	else if (item->kind == SM_CLIP) {
+		snprintf(line, sizeof(line), "media %i of %i: %s, clip %s", media_selected, media.count, SM_label(item),
+			clip_failed ? "can't play" : "due");
+	} else {
+		snprintf(line, sizeof(line), "media %i of %i: %s, image %s", media_selected, media.count, SM_label(item),
+			got > 0 ? "drawn" : got == 0 ? "loading" : "none");
+	}
+	if (strcmp(line, media_shown) == 0) return;
+	snprintf(media_shown, sizeof(media_shown), "%s", line);
+	say(line);
+}
+
+static int mediaRender(MosaicSurface* screen, const MosaicScreenView* view, void* data) {
+	(void)data;
+	frame++;
+	MosaicRect hole = SV_hole(&view->status, &view->header);
+	fillAround(screen, &view->area, &hole, mosaic_color(0x000000, 255));
+	const SMItem* item = mediaItem();
+	int got = -1;
+	MosaicColor ink = mosaic_color(0xFFFFFF, 255);
+	if (!item) {
+		title(screen, view, &hole, tr("Media"));
+		centred(screen, MOSAIC_FONT_LARGE, tr("No media"), &view->area, themeColor(MOSAIC_COLOR_LIST_TEXT, 0xFFFFFF));
+	} else {
+		if (item->kind == SM_IMAGE) {
+			got = drawImage(screen, item->path, item->path, &view->area, &hole, fulls, FULL_COPIES);
+			if (got < 0) centred(screen, MOSAIC_FONT_LARGE, tr("Can't show this image"), &view->area, ink);
+			// the next and previous, so they're in by the time they're stepped to
+			for (int by = -1; by <= 1; by += 2) {
+				int at = SV_step(media_selected, media.count, by, 1);
+				if (at == media_selected || media.items[at].kind != SM_IMAGE) continue;
+				if (SV_copyFind(fulls, FULL_COPIES, media.items[at].path, view->area.w, view->area.h)) continue;
+				const MosaicSurface* image = NULL;
+				host->art_load(media.items[at].path, &image);
+			}
+		} else if (clip_failed) {
+			centred(screen, MOSAIC_FONT_LARGE, tr("Can't play this clip"), &view->area, ink);
+		}
+		char text[SV_PATH_MAX + 32];
+		SM_title(&media, media_selected, text, sizeof(text));
+		title(screen, view, &hole, text);
+	}
+	MosaicHint left[1], right[1];
+	int left_count = 0, right_count = 0;
+	SM_hints(&media, media_selected, left, &left_count, right, &right_count);
+	host->draw_hints(screen, MOSAIC_HINTS_LEFT, left, left_count, NULL);
+	if (right_count) host->draw_hints(screen, MOSAIC_HINTS_RIGHT, right, right_count, NULL);
+	mediaLog(got);
+	return 0;
+}
+
+static void tick(unsigned long now) {
+	(void)now;
+	if (!media_open) return;
+	if (clip_on && isScreen(MEDIA_SCREEN_ID)) {
+		// video-previews closed its screen: the clip couldn't play
+		clip_on = 0;
+		clip_failed = 1;
+		host->request_redraw();
+	}
+	if (clip_due && isScreen(MEDIA_SCREEN_ID)) playClip();
+}
+
+// video-previews' screen takes no buttons, so these are taken while the
+// clip shows on it: B goes back, and left and right step on
+static int inputFilter(const MosaicInput* in, unsigned int* consumed) {
+	if (!clip_on || !isScreen(CLIP_SCREEN_ID)) return 0;
+	unsigned int bit_b = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B);
+	unsigned int steps = MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_LEFT) | MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_RIGHT);
+	if (in->pressed & bit_b) {
+		*consumed = bit_b;
+		clip_on = 0;
+		host->close_screen(MEDIA_SCREEN_ID);
+		return 0;
+	}
+	if (!(in->repeated & steps)) return 0;
+	*consumed = in->repeated & steps;
+	if (mediaStep(in)) {
+		stopClip();
+		mediaMoved();
+	}
+	return 0;
+}
+
+static int canMedia(const char* path, void* data) {
+	(void)data;
+	if (!path || !path[0]) return 0;
+	if (available_said >= 0 && strcmp(path, available_path) == 0) return available_said;
+	char game[SV_NAME_MAX];
+	gameName(path, game, sizeof(game));
+	snprintf(available_path, sizeof(available_path), "%s", path);
+	available_said = SM_any(path, isDir(path), game, dir, clipsPlay());
+	return available_said;
+}
+
+static void runMedia(const char* path, void* data) {
+	(void)data;
+	if (!path || !path[0]) return;
+	char game[SV_NAME_MAX];
+	gameName(path, game, sizeof(game));
+	openMedia(path, game);
+}
+
+// X on a shot in the grid: its game's media, the game found by its name
+static void openShotMedia(const SVShot* shot) {
+	char rom[SV_PATH_MAX];
+	gameNamed(shot->game, rom, sizeof(rom));
+	openMedia(rom, shot->game);
 }
 
 ///////////////////////////////////////
@@ -414,6 +728,10 @@ static int init(const MosaicHost* h) {
 	host = h;
 	snprintf(dir, sizeof(dir), "%s/Screenshots", host->sdcard_path);
 	SV_listInit(&list);
+	SM_listInit(&media);
+	media_open = clip_on = clip_due = clip_failed = 0;
+	clips = -1;
+	forgetAvailable();
 	memset(thumbs, 0, sizeof(thumbs));
 	memset(fulls, 0, sizeof(fulls));
 	if (!MOSAIC_HOST_HAS(host, draw_hints) || !MOSAIC_HOST_HAS(host, art_get) || !MOSAIC_HOST_HAS(host, open_screen)) {
@@ -436,6 +754,22 @@ static int init(const MosaicHost* h) {
 		say("couldn't register " ACTION_ID);
 		return 1;
 	}
+	static const MosaicScreenHooks media_hooks = {
+		.size = sizeof(MosaicScreenHooks),
+		.enter = mediaEnter,
+		.exit = mediaLeave,
+		.input = mediaInput,
+		.render = mediaRender,
+	};
+	if (host->register_screen(MEDIA_SCREEN_ID, &media_hooks) != 0
+			|| host->register_action(MEDIA_ID, "Media", MOSAIC_ACTION_PATH, canMedia, runMedia, NULL) != 0) {
+		say("couldn't register " MEDIA_ID);
+		return 1;
+	}
+	// on Y, shared with other plugins' actions there
+	if (host->bind_button(MOSAIC_SCREEN_GAMELIST, MOSAIC_BUTTON_Y, MOSAIC_TRIGGER_PRESS, MEDIA_ID) != 0) {
+		say("couldn't bind the media to Y");
+	}
 	if (MOSAIC_HOST_HAS(host, save_screenshot)
 			&& host->register_action(CAPTURE_ID, "Take screenshot", 0, NULL, capture, NULL) != 0) {
 		say("couldn't register " CAPTURE_ID);
@@ -454,10 +788,16 @@ static int init(const MosaicHost* h) {
 		{ "SELECT", MOSAIC_BUTTON_SELECT },
 	};
 	const char* name = host->cfg_get("button", "none");
+	const char* media_name = host->cfg_get("media_button", "none");
 	for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
-		if (strcmp(name, buttons[i].name) != 0) continue;
-		if (host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, ACTION_ID) != 0) {
+		if (strcmp(name, buttons[i].name) == 0
+				&& host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, ACTION_ID) != 0) {
 			say("couldn't bind the screenshots button");
+		}
+		// Y has it already
+		if (buttons[i].button != MOSAIC_BUTTON_Y && strcmp(media_name, buttons[i].name) == 0
+				&& host->bind_button(MOSAIC_SCREEN_GAMELIST, buttons[i].button, MOSAIC_TRIGGER_PRESS, MEDIA_ID) != 0) {
+			say("couldn't bind the media button");
 		}
 	}
 	return 0;
@@ -466,6 +806,8 @@ static int init(const MosaicHost* h) {
 static void quit(void) {
 	copiesClear();
 	SV_listFree(&list);
+	SM_listFree(&media);
+	media_open = clip_on = clip_due = 0;
 }
 
 static const MosaicPlugin plugin = {
@@ -474,6 +816,8 @@ static const MosaicPlugin plugin = {
 	.id = ID,
 	.init = init,
 	.quit = quit,
+	.tick = tick,
+	.input_filter = inputFilter,
 };
 
 const MosaicPlugin* mosaic_plugin_get(const MosaicHost* h) {

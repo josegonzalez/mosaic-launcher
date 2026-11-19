@@ -237,19 +237,22 @@ static void testMoves(void) {
 static void testHints(void) {
 	MosaicHint left[2], right[2];
 	int lc = -1, rc = -1;
-	SV_hints(0, 0, 1, left, &lc, right, &rc);
+	SV_hints(0, 0, 1, 1, left, &lc, right, &rc);
 	CHECK(lc == 0 && rc == 1 && right[0].button == MOSAIC_BUTTON_B);
-	SV_hints(3, 0, 1, left, &lc, right, &rc);
+	SV_hints(3, 0, 1, 0, left, &lc, right, &rc);
 	CHECK(lc == 1 && left[0].button == MOSAIC_BUTTON_B);
 	CHECK_STR(left[0].label, "BACK");
 	CHECK(rc == 2 && right[0].button == MOSAIC_BUTTON_Y && right[1].button == MOSAIC_BUTTON_A);
 	CHECK_STR(right[0].label, "DELETE");
 	CHECK_STR(right[1].label, "VIEW");
-	SV_hints(3, 1, 1, left, &lc, right, &rc);
+	SV_hints(3, 0, 1, 1, left, &lc, right, &rc);
+	CHECK(lc == 2 && left[0].button == MOSAIC_BUTTON_B && left[1].button == MOSAIC_BUTTON_X);
+	CHECK_STR(left[1].label, "MEDIA");
+	SV_hints(3, 1, 1, 1, left, &lc, right, &rc);
 	CHECK(lc == 1 && rc == 1 && right[0].button == MOSAIC_BUTTON_Y);
-	SV_hints(3, 0, 0, left, &lc, right, &rc);
+	SV_hints(3, 0, 0, 0, left, &lc, right, &rc);
 	CHECK(rc == 1 && right[0].button == MOSAIC_BUTTON_A);
-	SV_hints(3, 1, 0, left, &lc, right, &rc);
+	SV_hints(3, 1, 0, 0, left, &lc, right, &rc);
 	CHECK(lc == 1 && rc == 0);
 }
 
@@ -328,6 +331,131 @@ static void testCopies(void) {
 }
 
 ///////////////////////////////////////
+// a game's media
+
+#define ROMS CARD "/Roms/Game Boy (GB)"
+#define TETRIS ROMS "/Tetris (USA).gb"
+
+static void makeMedia(void) {
+	makeCard();
+	CHECK(system("mkdir -p '" ROMS "/.media/boxart' '" ROMS "/.media/boxart2d' '" ROMS "/.media/mix' '" ROMS
+		"/.media/wheel' '" ROMS "/Imgs' '" ROMS "/.videos' '" OUTSIDE "/screenshot'") == 0);
+	touch(TETRIS, 0);
+	touch(ROMS "/Nothing.gb", 0);
+	touch(ROMS "/.media/Tetris (USA).png", 0);
+	touch(ROMS "/.media/boxart/Tetris (USA).jpg", 0);
+	touch(ROMS "/.media/boxart/Tetris (USA).png", 0);
+	touch(ROMS "/.media/boxart/Tetris (USA).webp", 0); // the art cache can't decode it
+	touch(ROMS "/.media/boxart2d/Tetris (USA).png", 0);
+	touch(ROMS "/.media/mix/Tetris (USA).jpeg", 0);
+	touch(ROMS "/.media/wheel/._Tetris (USA).png", 0);
+	mkdir(ROMS "/.media/wheel/Tetris (USA).png", 0755); // a folder, not a file
+	touch(ROMS "/Imgs/Tetris (USA).png", 0);
+	touch(ROMS "/Imgs/Tetris (USA).jpg", 0); // Imgs has .png only
+	touch(ROMS "/.videos/Tetris (USA).mp4", 0);
+	// links are left out: a linked folder, and a link to a file
+	touch(OUTSIDE "/screenshot/Tetris (USA).png", 0);
+	CHECK(symlink(OUTSIDE "/screenshot", ROMS "/.media/screenshot") == 0);
+	CHECK(symlink(OUTSIDE "/Secret.png", ROMS "/.media/boxart2d/Tetris (USA).jpg") == 0);
+	touch(SHOTS "/Tetris.2026-11-10-10-00-00.png", 0);
+	touch(SHOTS "/Tetris (USA).2026-11-10-11-00-00.png", 0); // another name
+}
+
+static void testMediaNames(void) {
+	char name[64];
+	CHECK(SM_artName("/r/Tetris (USA).gb", 0, name, sizeof(name)) && strcmp(name, "Tetris (USA)") == 0);
+	CHECK(SM_artName("/r/Dr. Mario.zip", 0, name, sizeof(name)) && strcmp(name, "Dr. Mario") == 0);
+	CHECK(SM_artName("/r/Final.Fantasy", 1, name, sizeof(name)) && strcmp(name, "Final.Fantasy") == 0);
+	CHECK(!SM_artName("Tetris.gb", 0, name, sizeof(name)) && strcmp(name, "") == 0);
+	CHECK(!SM_artName("/r/", 0, name, sizeof(name)));
+	CHECK(!SM_artName("/r/.gb", 0, name, sizeof(name)) || strcmp(name, ".gb") == 0);
+	CHECK(!SM_artName("/r/Tetris.gb", 0, name, 4));
+	CHECK(SM_listName("/r/Tetris (USA) [!].gb", 0, name, sizeof(name)) && strcmp(name, "Tetris") == 0);
+	CHECK(SM_listName("/r/Tetris (World) (Rev 1).gb", 0, name, sizeof(name)) && strcmp(name, "Tetris") == 0);
+	CHECK(SM_listName("/r/Dr. Mario.gb", 0, name, sizeof(name)) && strcmp(name, "Dr. Mario") == 0);
+	CHECK(SM_listName("/r/(USA).gb", 0, name, sizeof(name)) && strcmp(name, "(USA)") == 0);
+	CHECK(SM_listName("/r/Golf (Disc 1)", 1, name, sizeof(name)) && strcmp(name, "Golf") == 0);
+}
+
+static void testMediaFind(void) {
+	makeMedia();
+	SMList found;
+	SM_listInit(&found);
+	static const char* want[] = {
+		".media/Tetris (USA).png",
+		".media/boxart/Tetris (USA).png",
+		".media/boxart/Tetris (USA).jpg",
+		".media/boxart2d/Tetris (USA).png",
+		".media/mix/Tetris (USA).jpeg",
+		"Imgs/Tetris (USA).png",
+		"Screenshots/Tetris.2026-11-10-10-00-00.png",
+		"Screenshots/Tetris.2026-11-08-14-03-05.png",
+		".videos/Tetris (USA).mp4",
+	};
+	int n = (int)(sizeof(want) / sizeof(want[0]));
+	CHECK(SM_find(TETRIS, 0, "Tetris", SHOTS, 1, &found) == n);
+	CHECK(found.count == n);
+	for (int i = 0; i < found.count && i < n; i++) {
+		CHECK_STR(SM_label(&found.items[i]), want[i]);
+		CHECK(found.items[i].kind == (i == n - 1 ? SM_CLIP : SM_IMAGE));
+	}
+	CHECK_STR(found.items[0].path, ROMS "/.media/Tetris (USA).png");
+	CHECK_STR(found.items[6].path, SHOTS "/Tetris.2026-11-10-10-00-00.png");
+
+	char text[SV_PATH_MAX + 32];
+	SM_title(&found, 1, text, sizeof(text));
+	CHECK_STR(text, "2/9 \xc2\xb7 .media/boxart/Tetris (USA).png");
+	SM_title(&found, 9, text, sizeof(text));
+	CHECK_STR(text, "");
+
+	MosaicHint left[1], right[1];
+	int lc = -1, rc = -1;
+	SM_hints(&found, 0, left, &lc, right, &rc);
+	CHECK(lc == 1 && left[0].button == MOSAIC_BUTTON_B && rc == 0);
+	SM_hints(&found, n - 1, left, &lc, right, &rc);
+	CHECK(rc == 1 && right[0].button == MOSAIC_BUTTON_A);
+	CHECK_STR(right[0].label, "PLAY");
+
+	// without clips, without the screenshots, and the screenshots alone
+	CHECK(SM_find(TETRIS, 0, "Tetris", SHOTS, 0, &found) == n - 1);
+	CHECK(SM_find(TETRIS, 0, NULL, SHOTS, 1, &found) == n - 2);
+	CHECK(SM_find(NULL, 0, "Tetris", SHOTS, 1, &found) == 2);
+	CHECK(SM_find("", 0, "Tetris", SHOTS, 1, &found) == 2);
+	CHECK_STR(SM_label(&found.items[0]), "Screenshots/Tetris.2026-11-10-10-00-00.png");
+	CHECK(SM_find(ROMS "/Nothing.gb", 0, "Nothing", SHOTS, 1, &found) == 0);
+	CHECK(SM_any(TETRIS, 0, "Tetris", SHOTS, 1));
+	CHECK(SM_any(TETRIS, 0, NULL, NULL, 0));
+	CHECK(!SM_any(ROMS "/Nothing.gb", 0, "Nothing", SHOTS, 1));
+	CHECK(SM_any(ROMS "/Nothing.gb", 0, "Tetris", SHOTS, 1));
+	// a game whose only media is its clip
+	touch(ROMS "/.videos/Nothing.mp4", 0);
+	CHECK(SM_any(ROMS "/Nothing.gb", 0, "Nothing", SHOTS, 1));
+	CHECK(!SM_any(ROMS "/Nothing.gb", 0, "Nothing", SHOTS, 0));
+
+	// a linked .media is left out whole
+	CHECK(system("mv '" ROMS "/.media' '" OUTSIDE "/media' && ln -s '" OUTSIDE "/media' '" ROMS "/.media'") == 0);
+	CHECK(SM_find(TETRIS, 0, NULL, SHOTS, 0, &found) == 1);
+	CHECK_STR(SM_label(&found.items[0]), "Imgs/Tetris (USA).png");
+	SM_listFree(&found);
+	CHECK(found.count == 0 && found.items == NULL);
+}
+
+// more media than the list holds: the rest are left out
+static void testMediaBounded(void) {
+	makeCard();
+	for (int i = 0; i < SM_MAX_ITEMS + 10; i++) {
+		char path[256];
+		snprintf(path, sizeof(path), SHOTS "/Many.2026-10-01-%02d-%02d-%02d.png", i / 3600, i / 60 % 60, i % 60);
+		touch(path, 0);
+	}
+	SMList found;
+	SM_listInit(&found);
+	CHECK(SM_find(NULL, 0, "Many", SHOTS, 0, &found) == SM_MAX_ITEMS);
+	CHECK(found.count == SM_MAX_ITEMS);
+	SM_listFree(&found);
+}
+
+///////////////////////////////////////
 // the plugin against a fake host
 
 struct MosaicSurface {
@@ -339,12 +467,18 @@ static MosaicSurface screen_surface = { 1024, 768, 0 };
 static MosaicSurface image_surface = { 1024, 768, 0 };
 
 static MosaicHost fake_host;
-static MosaicScreenHooks registered;
-static char registered_id[64];
+static MosaicScreenHooks registered, registered_media;
+static char registered_id[64], registered_media_id[64];
 static char action_id[64], action_label[64], tile_id[64];
 static int (*action_available)(const char*, void*);
 static void (*action_run)(const char*, void*);
+static char media_action_id[64], media_action_label[64];
+static int media_action_flags = -1;
+static int (*media_available)(const char*, void*);
+static void (*media_run)(const char*, void*);
 static int bound_button = -1;
+static int media_buttons[4];
+static int media_button_count = 0;
 static char last_log[512];
 static int redraws = 0, live = 0, peak = 0, scales = 0;
 static int blits_into_hole = 0, fills_into_hole = 0;
@@ -360,6 +494,7 @@ static char toast_text[64];
 static const char* tile_setting = "on";
 static const char* button_setting = "none";
 static const char* delete_setting = "on";
+static const char* media_button_setting = "none";
 static MosaicRect hole_now;
 
 static void fakeLog(const char* id, const char* message) {
@@ -370,6 +505,7 @@ static const char* fakeCfgGet(const char* key, const char* fallback) {
 	if (strcmp(key, "tile") == 0) return tile_setting;
 	if (strcmp(key, "button") == 0) return button_setting;
 	if (strcmp(key, "delete") == 0) return delete_setting;
+	if (strcmp(key, "media_button") == 0) return media_button_setting;
 	return fallback;
 }
 
@@ -378,14 +514,27 @@ static void fakeRedraw(void) {
 }
 
 static int fakeRegister(const char* id, const MosaicScreenHooks* hooks) {
+	if (strcmp(id, "screenshot-viewer.media-view") == 0) {
+		snprintf(registered_media_id, sizeof(registered_media_id), "%s", id);
+		registered_media = *hooks;
+		return 0;
+	}
 	snprintf(registered_id, sizeof(registered_id), "%s", id);
 	registered = *hooks;
 	return 0;
 }
 
 static int fakeAction(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), void* data) {
-	(void)flags;
 	(void)data;
+	if (strcmp(id, "screenshot-viewer.media") == 0) {
+		snprintf(media_action_id, sizeof(media_action_id), "%s", id);
+		snprintf(media_action_label, sizeof(media_action_label), "%s", label);
+		media_action_flags = flags;
+		media_available = available;
+		media_run = run;
+		return 0;
+	}
+	if (strcmp(id, "screenshot-viewer.open") != 0) return 0;
 	snprintf(action_id, sizeof(action_id), "%s", id);
 	snprintf(action_label, sizeof(action_label), "%s", label);
 	action_available = available;
@@ -405,6 +554,10 @@ static int fakeTile(const char* id, int row, const char* icon, const char* icon_
 static int fakeBind(int screen, int button, int trigger, const char* id) {
 	(void)screen;
 	(void)trigger;
+	if (strcmp(id, "screenshot-viewer.media") == 0) {
+		if (media_button_count < 4) media_buttons[media_button_count++] = button;
+		return 0;
+	}
 	bound_button = button;
 	return 0;
 }
@@ -530,6 +683,84 @@ static int fakeDrawHints(MosaicSurface* screen, int group, const MosaicHint* hin
 	return 0;
 }
 
+static char current[64] = "gamelist";
+static const char* fakeCurrentScreen(void) {
+	return current;
+}
+static int closed_count = 0;
+static char closed_screen[64];
+static int fakeCloseScreen(const char* id) {
+	snprintf(closed_screen, sizeof(closed_screen), "%s", id);
+	closed_count++;
+	return 0;
+}
+
+// video.play, as video-previews answers it: playing=1 for a game with a
+// clip, its screen then on top
+static int video_play = 1; // 1 to answer, 0 for nobody providing it
+static int video_calls = 0;
+static char video_args[1100];
+static int fakeHasCapability(const char* name) {
+	return strcmp(name, "video.play") == 0 && video_play;
+}
+static int fakeCall(const char* name, const char* args, char* out, size_t size) {
+	if (strcmp(name, "video.play") != 0 || !video_play) {
+		out[0] = '\0';
+		return MOSAIC_CALL_UNKNOWN;
+	}
+	video_calls++;
+	snprintf(video_args, sizeof(video_args), "%s", args ? args : "");
+	int playing = args && strstr(args, "path=/") != NULL;
+	snprintf(current, sizeof(current), "%s", playing ? "video-previews.saver" : "screenshot-viewer.media-view");
+	return snprintf(out, size, "playing=%i\n", playing);
+}
+static int fakeEventValue(const char* payload, const char* key, char* out, size_t size) {
+	char want[64];
+	snprintf(want, sizeof(want), "%s=", key);
+	const char* at = payload ? strstr(payload, want) : NULL;
+	if (!at) {
+		out[0] = '\0';
+		return -1;
+	}
+	at += strlen(want);
+	size_t n = strcspn(at, "\n");
+	if (n >= size) n = size - 1;
+	memcpy(out, at, n);
+	out[n] = '\0';
+	return (int)n;
+}
+
+// the index: the games it has, by path and the name the list shows
+static const char* index_paths[4];
+static const char* index_names[4];
+static int index_size = 0;
+static int fakeIndexCount(const char* system) {
+	(void)system;
+	return index_size;
+}
+static int fakeIndexEntry(const char* system, int index, MosaicIndexEntry* out) {
+	(void)system;
+	if (index < 0 || index >= index_size) return -1;
+	memset(out, 0, sizeof(*out));
+	out->size = sizeof(*out);
+	out->kind = MOSAIC_INDEX_GAME;
+	out->path = index_paths[index];
+	out->name = index_names[index];
+	return 0;
+}
+static int fakeIndexFind(const char* path, MosaicIndexEntry* out) {
+	for (int i = 0; i < index_size; i++) {
+		if (strcmp(index_paths[i], path) == 0) {
+			fakeIndexEntry(NULL, i, out);
+			return i;
+		}
+	}
+	return -1;
+}
+static int fakeIndexRefresh(void) {
+	return 0;
+}
+
 static void setupHost(void) {
 	memset(&fake_host, 0, sizeof(fake_host));
 	fake_host.size = sizeof(MosaicHost);
@@ -562,12 +793,22 @@ static void setupHost(void) {
 	fake_host.art_get = fakeArtGet;
 	fake_host.art_load = fakeArtLoad;
 	fake_host.draw_hints = fakeDrawHints;
+	fake_host.current_screen = fakeCurrentScreen;
+	fake_host.close_screen = fakeCloseScreen;
+	fake_host.has_capability = fakeHasCapability;
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
+	fake_host.index_count = fakeIndexCount;
+	fake_host.index_entry = fakeIndexEntry;
+	fake_host.index_find = fakeIndexFind;
+	fake_host.index_refresh = fakeIndexRefresh;
 }
 
 static const MosaicPlugin* start(void) {
 	setupHost();
 	tile_id[0] = '\0';
 	bound_button = -1;
+	media_button_count = 0;
 	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
 	CHECK(p->init(&fake_host) == 0);
 	return p;
@@ -605,14 +846,23 @@ static void testInit(void) {
 	CHECK_STR(action_label, "Screenshots");
 	CHECK_STR(tile_id, "screenshot-viewer.open");
 	CHECK(bound_button == -1);
+	CHECK_STR(registered_media_id, "screenshot-viewer.media-view");
+	CHECK(registered_media.flags == 0);
+	CHECK_STR(media_action_id, "screenshot-viewer.media");
+	CHECK_STR(media_action_label, "Media");
+	CHECK(media_action_flags == MOSAIC_ACTION_PATH);
+	CHECK(media_button_count == 1 && media_buttons[0] == MOSAIC_BUTTON_Y);
 
 	tile_setting = "off";
 	button_setting = "L2";
+	media_button_setting = "R2";
 	start();
 	CHECK_STR(tile_id, "");
 	CHECK(bound_button == MOSAIC_BUTTON_L2);
+	CHECK(media_button_count == 2 && media_buttons[0] == MOSAIC_BUTTON_Y && media_buttons[1] == MOSAIC_BUTTON_R2);
 	tile_setting = "on";
 	button_setting = "none";
+	media_button_setting = "none";
 
 	// an older launcher
 	setupHost();
@@ -748,6 +998,183 @@ static void testEmptyAndNoDelete(void) {
 	CHECK(live == 0);
 }
 
+static int drawMedia(void) {
+	MosaicScreenView v;
+	memset(&v, 0, sizeof(v));
+	v.size = sizeof(v);
+	v.area = AREA;
+	v.status = STATUS;
+	v.screen = "screenshot-viewer.media-view";
+	hole_now = STATUS;
+	hints_right_count = 0;
+	return registered_media.render(&screen_surface, &v, registered_media.data);
+}
+
+static int pressMedia(int button) {
+	MosaicInput in = { sizeof(MosaicInput), MOSAIC_BUTTON_BIT(button), MOSAIC_BUTTON_BIT(button), 0,
+		MOSAIC_BUTTON_BIT(button) };
+	return registered_media.input(&in, registered_media.data);
+}
+
+// what input_filter takes for a press
+static unsigned int filter(int button) {
+	MosaicInput in = { sizeof(MosaicInput), MOSAIC_BUTTON_BIT(button), MOSAIC_BUTTON_BIT(button), 0,
+		MOSAIC_BUTTON_BIT(button) };
+	unsigned int consumed = 0;
+	CHECK(inputFilter(&in, &consumed) == 0);
+	return consumed;
+}
+
+static void useIndex(void) {
+	index_paths[0] = ROMS "/Nothing.gb";
+	index_names[0] = "Nothing";
+	index_paths[1] = TETRIS;
+	index_names[1] = "Tetris";
+	index_size = 2;
+}
+
+static void testMedia(void) {
+	makeMedia();
+	useIndex();
+	video_play = 1;
+	start();
+	snprintf(current, sizeof(current), "gamelist");
+	CHECK(media_available(TETRIS, NULL) == 1);
+	CHECK(media_available(ROMS "/Nothing.gb", NULL) == 0);
+	CHECK(media_available(NULL, NULL) == 0);
+	media_run(TETRIS, NULL);
+	CHECK_STR(opened_screen, "screenshot-viewer.media-view");
+	snprintf(current, sizeof(current), "screenshot-viewer.media-view");
+	CHECK(registered_media.enter(registered_media.data) == 0);
+	CHECK_STR(last_log, "9 media for Tetris (" TETRIS ")");
+
+	CHECK(drawMedia() == 0);
+	CHECK_STR(last_log, "media 0 of 9: .media/Tetris (USA).png, image drawn");
+	CHECK(hints_right_count == 0);
+	CHECK(fills_into_hole == 0 && blits_into_hole == 0);
+	pressMedia(MOSAIC_BUTTON_RIGHT);
+	drawMedia();
+	CHECK_STR(last_log, "media 1 of 9: .media/boxart/Tetris (USA).png, image drawn");
+	CHECK(live <= FULL_COPIES);
+
+	// left from the first wraps to the clip, which plays on the next tick
+	pressMedia(MOSAIC_BUTTON_LEFT);
+	pressMedia(MOSAIC_BUTTON_LEFT);
+	drawMedia();
+	CHECK_STR(last_log, "media 8 of 9: .videos/Tetris (USA).mp4, clip due");
+	CHECK(hints_right_count == 1 && hints_right[0].button == MOSAIC_BUTTON_A);
+	video_calls = 0;
+	tick(0);
+	CHECK(video_calls == 1);
+	CHECK_STR(video_args, "path=" TETRIS "\nclock=off\n");
+	CHECK_STR(current, "video-previews.saver");
+	CHECK_STR(last_log, "media 8 of 9: .videos/Tetris (USA).mp4, clip playing");
+	CHECK_STR(toast_text, ".videos/Tetris (USA).mp4");
+	tick(0);
+	CHECK(video_calls == 1);
+
+	// over the clip, input_filter takes left, right and B
+	CHECK(filter(MOSAIC_BUTTON_A) == 0);
+	CHECK(filter(MOSAIC_BUTTON_RIGHT) == MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_RIGHT));
+	CHECK(video_calls == 2); // a call without a game closes its screen
+	CHECK_STR(video_args, "");
+	CHECK_STR(current, "screenshot-viewer.media-view");
+	drawMedia();
+	CHECK_STR(last_log, "media 0 of 9: .media/Tetris (USA).png, image drawn");
+	CHECK(filter(MOSAIC_BUTTON_LEFT) == 0); // not over the clip
+	pressMedia(MOSAIC_BUTTON_LEFT);
+	tick(0);
+	CHECK_STR(current, "video-previews.saver");
+	closed_count = 0;
+	CHECK(filter(MOSAIC_BUTTON_B) == MOSAIC_BUTTON_BIT(MOSAIC_BUTTON_B));
+	CHECK(closed_count == 1);
+	CHECK_STR(closed_screen, "screenshot-viewer.media-view");
+	registered_media.exit(registered_media.data);
+	CHECK(live == 0);
+
+	// video-previews closes its screen when the clip can't play; A tries again
+	snprintf(current, sizeof(current), "screenshot-viewer.media-view");
+	registered_media.enter(registered_media.data);
+	pressMedia(MOSAIC_BUTTON_LEFT);
+	tick(0);
+	CHECK_STR(current, "video-previews.saver");
+	snprintf(current, sizeof(current), "screenshot-viewer.media-view");
+	tick(0);
+	drawMedia();
+	CHECK_STR(last_log, "media 8 of 9: .videos/Tetris (USA).mp4, clip can't play");
+	CHECK(pressMedia(MOSAIC_BUTTON_A) == MOSAIC_SCREEN_STAY);
+	tick(0);
+	CHECK_STR(current, "video-previews.saver");
+	snprintf(current, sizeof(current), "screenshot-viewer.media-view");
+	CHECK(pressMedia(MOSAIC_BUTTON_B) == MOSAIC_SCREEN_CLOSE);
+	registered_media.exit(registered_media.data);
+	CHECK(live == 0);
+
+	// without video-previews the clip is left out
+	video_play = 0;
+	start();
+	snprintf(current, sizeof(current), "screenshot-viewer.media-view");
+	media_run(TETRIS, NULL);
+	registered_media.enter(registered_media.data);
+	CHECK_STR(last_log, "8 media for Tetris (" TETRIS ")");
+	pressMedia(MOSAIC_BUTTON_LEFT);
+	drawMedia();
+	CHECK_STR(last_log, "media 7 of 8: Screenshots/Tetris.2026-11-08-14-03-05.png, image drawn");
+	registered_media.exit(registered_media.data);
+	video_play = 1;
+
+	// a game with none
+	media_run(ROMS "/Nothing.gb", NULL);
+	registered_media.enter(registered_media.data);
+	CHECK_STR(last_log, "0 media for Nothing (" ROMS "/Nothing.gb)");
+	drawMedia();
+	CHECK_STR(last_log, "no media");
+	CHECK(pressMedia(MOSAIC_BUTTON_RIGHT) == MOSAIC_SCREEN_STAY);
+	CHECK(pressMedia(MOSAIC_BUTTON_B) == MOSAIC_SCREEN_CLOSE);
+	registered_media.exit(registered_media.data);
+	CHECK(live == 0);
+	index_size = 0;
+}
+
+// X on a shot in the grid opens its game's media
+static void testShotMedia(void) {
+	makeMedia();
+	useIndex();
+	start();
+	snprintf(current, sizeof(current), "screenshot-viewer.main");
+	registered.enter(registered.data);
+	draw();
+	CHECK_STR(last_log, "grid 0 of 6: Tetris (USA), 2026-11-10 11:00, 4 columns");
+	press(MOSAIC_BUTTON_RIGHT);
+	draw();
+	CHECK_STR(last_log, "grid 1 of 6: Tetris, 2026-11-10 10:00, 4 columns");
+	opened_screen[0] = '\0';
+	CHECK(press(MOSAIC_BUTTON_X) == MOSAIC_SCREEN_STAY);
+	CHECK_STR(opened_screen, "screenshot-viewer.media-view");
+	snprintf(current, sizeof(current), "screenshot-viewer.media-view");
+	registered_media.enter(registered_media.data);
+	CHECK_STR(last_log, "9 media for Tetris (" TETRIS ")");
+	registered_media.exit(registered_media.data);
+
+	// a shot whose name no game has: its screenshots alone
+	press(MOSAIC_BUTTON_LEFT);
+	press(MOSAIC_BUTTON_X);
+	registered_media.enter(registered_media.data);
+	CHECK_STR(last_log, "1 media for Tetris (USA) (no game)");
+	drawMedia();
+	CHECK_STR(last_log, "media 0 of 1: Screenshots/Tetris (USA).2026-11-10-11-00-00.png, image drawn");
+	registered_media.exit(registered_media.data);
+
+	// not in the full view
+	opened_screen[0] = '\0';
+	press(MOSAIC_BUTTON_A);
+	press(MOSAIC_BUTTON_X);
+	CHECK_STR(opened_screen, "");
+	registered.exit(registered.data);
+	CHECK(live == 0);
+	index_size = 0;
+}
+
 // more shots than the thumbnail pool holds: copies stay bounded
 static void testBounded(void) {
 	makeCard();
@@ -783,6 +1210,11 @@ int main(void) {
 	testScreen();
 	testEmptyAndNoDelete();
 	testBounded();
+	testMediaNames();
+	testMediaFind();
+	testMediaBounded();
+	testMedia();
+	testShotMedia();
 	system("rm -rf '" CARD "'");
 	CHECK_DONE();
 }

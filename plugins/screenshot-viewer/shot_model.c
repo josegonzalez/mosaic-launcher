@@ -237,8 +237,8 @@ int SV_firstRow(int first, int selected, int count, int cols, int rows) {
 	return first < 0 ? 0 : first;
 }
 
-void SV_hints(int count, int full, int can_delete, MosaicHint left[2], int* left_count, MosaicHint right[2],
-		int* right_count) {
+void SV_hints(int count, int full, int can_delete, int can_media, MosaicHint left[2], int* left_count,
+		MosaicHint right[2], int* right_count) {
 	*left_count = 0;
 	*right_count = 0;
 	if (count <= 0) {
@@ -248,6 +248,7 @@ void SV_hints(int count, int full, int can_delete, MosaicHint left[2], int* left
 	}
 	left[0] = (MosaicHint){ MOSAIC_BUTTON_B, "BACK" };
 	*left_count = 1;
+	if (can_media && !full) left[(*left_count)++] = (MosaicHint){ MOSAIC_BUTTON_X, "MEDIA" };
 	if (can_delete) right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_Y, "DELETE" };
 	if (!full) right[(*right_count)++] = (MosaicHint){ MOSAIC_BUTTON_A, "VIEW" };
 }

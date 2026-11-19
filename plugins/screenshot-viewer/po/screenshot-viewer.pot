@@ -15,7 +15,15 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: plugin.txt
-msgid "Browses the screenshots you took in games, newest first, on a screen of its own."
+msgid "Browses the screenshots you took in games, newest first, on a screen of its own. Y on a game shows every image it has and its clip, one at a time."
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "Can't play this clip"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "Can't show this image"
 msgstr ""
 
 #: screenshot_viewer.c
@@ -45,6 +53,18 @@ msgstr ""
 
 #: plugin.txt
 msgid "L2"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "Media"
+msgstr ""
+
+#: plugin.txt
+msgid "Media button"
+msgstr ""
+
+#: screenshot_viewer.c
+msgid "No media"
 msgstr ""
 
 #: screenshot_viewer.c
