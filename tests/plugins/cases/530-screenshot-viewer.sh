@@ -9,7 +9,7 @@
 SV_SHOTS="$CARD/Screenshots"
 SV_OUTSIDE="$CARD/Screenshot Outside"
 [ -e "$SV_SHOTS" ] && mv "$SV_SHOTS" "$WORK/screenshots.saved"
-mkdir -p "$SV_SHOTS" "$SV_OUTSIDE"
+mkdir -p "$SV_SHOTS" "$SV_OUTSIDE" "$STATE"
 cp "$ROOT/tests/plugins/peeker/art.png" "$SV_SHOTS/Newest Game.2026-11-09-08-30-00.png"
 cp "$ROOT/tests/plugins/peeker/art.png" "$SV_SHOTS/Dr. Middle.2026-11-08-14-03-05.png"
 cp "$ROOT/tests/plugins/peeker/art.png" "$SV_SHOTS/Oldest.png"
