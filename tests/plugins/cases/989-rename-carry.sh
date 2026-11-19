@@ -109,9 +109,12 @@ run_launcher "$log" "presser: done" "plugin game-actions: not renaming" || fail 
 unset PRESSER_KEYS SMOKE_PRELOAD
 expect "not renaming $RC_REL/Bravo.gb: /Saves/RNC/Bravoq.gb.sav is there already"
 grep -qF "plugin game-actions: moving" "$log" && fail "a refused rename moved something"
-[ -f "$RC_ROMS/Bravo.gb" ] && [ ! -e "$RC_ROMS/Bravoq.gb" ] || fail "the refused rename moved Bravo"
-[ "$(cat "$RC_SAVES/Bravo.gb.sav")" = "bravo save" ] && [ "$(cat "$RC_SAVES/Bravoq.gb.sav")" = "theirs" ] \
-	|| fail "the refused rename changed a save"
+if ! { [ -f "$RC_ROMS/Bravo.gb" ] && [ ! -e "$RC_ROMS/Bravoq.gb" ]; }; then
+	fail "the refused rename moved Bravo"
+fi
+if ! { [ "$(cat "$RC_SAVES/Bravo.gb.sav")" = "bravo save" ] && [ "$(cat "$RC_SAVES/Bravoq.gb.sav")" = "theirs" ]; }; then
+	fail "the refused rename changed a save"
+fi
 [ "$(rc_rows)" = "$rows" ] || fail "the refused rename changed the play history: $(rc_rows)"
 grep -qF "$RC_REL/Bravo.gb" "$RC_COLLECTION" || fail "the refused rename changed the collection"
 
