@@ -571,20 +571,20 @@ static void drawFace(MosaicSurface* screen, const MosaicRect* area) {
 		MosaicRect disc = { cx - r, cy - r, 2 * r, 2 * r };
 		host->fill_round_rect(screen, &disc, r, mosaic_color(0x000000, FACE_ALPHA));
 	}
-	MosaicColor main = themeColor(MOSAIC_COLOR_MAIN, 255);
+	MosaicColor ink = themeColor(MOSAIC_COLOR_MAIN, 255);
 	for (int m = 0; m < 60; m++) {
 		int hour = m % 5 == 0, size = (hour ? 4 : 2) * scale, dx, dy;
 		SS_handPoint(m * 6, r - size - 2 * scale, &dx, &dy);
 		MosaicRect mark = { cx + dx - size / 2, cy + dy - size / 2, size, size };
-		host->fill_round_rect(screen, &mark, size / 2, hour ? main : themeColor(MOSAIC_COLOR_MAIN, 140));
+		host->fill_round_rect(screen, &mark, size / 2, hour ? ink : themeColor(MOSAIC_COLOR_MAIN, 140));
 	}
 	time_t t = time(NULL);
 	struct tm local;
 	if (!localtime_r(&t, &local)) return;
 	int hd, md, sd;
 	SS_handAngles(local.tm_hour, local.tm_min, local.tm_sec, &hd, &md, &sd);
-	drawHand(screen, cx, cy, hd, r / 2, 5 * scale, main);
-	drawHand(screen, cx, cy, md, r * 4 / 5, 3 * scale, main);
+	drawHand(screen, cx, cy, hd, r / 2, 5 * scale, ink);
+	drawHand(screen, cx, cy, md, r * 4 / 5, 3 * scale, ink);
 	drawHand(screen, cx, cy, sd, r * 9 / 10, 2 * scale, themeColor(MOSAIC_COLOR_ACCENT, 255));
 	MosaicRect hub = { cx - 4 * scale, cy - 4 * scale, 8 * scale, 8 * scale };
 	host->fill_round_rect(screen, &hub, 4 * scale, themeColor(MOSAIC_COLOR_ACCENT, 255));
