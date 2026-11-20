@@ -15,7 +15,7 @@ optional=favorites
 setting.mode=choice|Home mode|dashboard|dashboard,minui,retroachievements,pico8,minimal,consoles
 # the rows under the continue card
 setting.shelf=toggle|Top shelf|on
-# the rows under the continue card, in order: continue, recent, added, played, random and shortcuts
+# the rows under the continue card, in order: continue, recent, added, played, random, shortcuts and missions
 setting.rows=text|Home rows|continue, recent
 # the actions the shortcuts row runs, by action or plugin id
 setting.shortcuts=text|Shortcuts|search, random-game, activity-stats, system-info

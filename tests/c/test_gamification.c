@@ -493,6 +493,39 @@ static void testWords(void) {
 	CHECK_STR(out, "Best 1 day \xc2\xb7 1 quest done");
 }
 
+// quests.cards: the running quests as cards, the ones done last
+static void testCardsReply(void) {
+	GMProgress progress[GM_QUESTS];
+	memset(progress, 0, sizeof(progress));
+	progress[GM_Q_PLAY] = (GMProgress){ 45, 30, 1 };
+	progress[GM_Q_GAMES] = (GMProgress){ 1, 3, 0 };
+	progress[GM_Q_WEEK_HOURS] = (GMProgress){ 125, 300, 0 };
+	int running[] = { GM_Q_PLAY, GM_Q_GAMES, GM_Q_WEEK_HOURS };
+	char out[2048], value[160];
+	CHECK(GM_cardsReply(running, 3, progress, &TARGETS, out, sizeof(out)) == (int)strlen(out));
+	CHECK(fakeEventValue(out, "count", value, sizeof(value)) > 0 && !strcmp(value, "3"));
+	CHECK(fakeEventValue(out, "id.0", value, sizeof(value)) > 0 && !strcmp(value, "games"));
+	CHECK(fakeEventValue(out, "title.0", value, sizeof(value)) > 0 && !strcmp(value, "Play 3 different games today"));
+	CHECK(fakeEventValue(out, "progress.0", value, sizeof(value)) > 0 && !strcmp(value, "1 / 3"));
+	CHECK(fakeEventValue(out, "value.0", value, sizeof(value)) > 0 && !strcmp(value, "1"));
+	CHECK(fakeEventValue(out, "target.0", value, sizeof(value)) > 0 && !strcmp(value, "3"));
+	CHECK(fakeEventValue(out, "done.0", value, sizeof(value)) > 0 && !strcmp(value, "0"));
+	CHECK(fakeEventValue(out, "reward.0", value, sizeof(value)) > 0 && !strcmp(value, "+1 quest done"));
+	CHECK(fakeEventValue(out, "id.1", value, sizeof(value)) > 0 && !strcmp(value, "week_hours"));
+	CHECK(fakeEventValue(out, "progress.1", value, sizeof(value)) > 0 && !strcmp(value, "2h 5m / 5h"));
+	// the one done comes last
+	CHECK(fakeEventValue(out, "id.2", value, sizeof(value)) > 0 && !strcmp(value, "play"));
+	CHECK(fakeEventValue(out, "progress.2", value, sizeof(value)) > 0 && !strcmp(value, "Done"));
+	CHECK(fakeEventValue(out, "done.2", value, sizeof(value)) > 0 && !strcmp(value, "1"));
+	CHECK(fakeEventValue(out, "id.3", value, sizeof(value)) < 0);
+	// none running, and a reply that doesn't fit
+	CHECK(GM_cardsReply(running, 0, progress, &TARGETS, out, sizeof(out)) > 0 && !strcmp(out, "count=0\n"));
+	CHECK(GM_cardsReply(running, 3, progress, &TARGETS, out, 64) == -1);
+	CHECK(GM_cardsReply(running, 3, progress, &TARGETS, out, 0) == -1);
+	GM_reward(GM_Q_WEEK_DAYS, value, sizeof(value));
+	CHECK_STR(value, "+1 quest done");
+}
+
 static void testLayout(void) {
 	CHECK(GM_scroll(0, -1, 3, 6) == 0);
 	CHECK(GM_scroll(0, 1, 3, 6) == 1);
@@ -743,6 +776,7 @@ static void setupHost(void) {
 	fake_host.play_time = fakePlayTime;
 	fake_host.play_count = fakeCount;
 	fake_host.last_played = fakeLast;
+	fake_host.provide = fakeProvide;
 	mono_now = fakeMono;
 	wall_now = fakeWall;
 }
@@ -1095,6 +1129,44 @@ static void testRomm(void) {
 	fake_provider_count = 0;
 }
 
+// the plugin's quests.cards: today's quests, worked out as it's called
+static const MosaicPlugin* startWithCalls(void) {
+	setupHost();
+	fake_host.call = fakeCall;
+	fake_host.event_value = fakeEventValue;
+	logs[0] = '\0';
+	const MosaicPlugin* p = mosaic_plugin_get(&fake_host);
+	CHECK(p->init(&fake_host) == 0);
+	return p;
+}
+
+static void testCards(void) {
+	reset();
+	fake_wall = 1704880800;
+	fake_provider_count = 0;
+	const MosaicPlugin* p = startWithCalls();
+	char out[MOSAIC_CALL_MAX], value[160];
+	CHECK(fakeCall("quests.cards", NULL, out, sizeof(out)) > 0);
+	// the RomM quest isn't offered without romm
+	CHECK(fakeEventValue(out, "count", value, sizeof(value)) > 0 && !strcmp(value, "6"));
+	CHECK(fakeEventValue(out, "title.0", value, sizeof(value)) > 0 && !strcmp(value, "Play for 20 minutes today"));
+	CHECK(fakeEventValue(out, "progress.0", value, sizeof(value)) > 0 && !strcmp(value, "0m / 20m"));
+	CHECK(fakeEventValue(out, "id.5", value, sizeof(value)) > 0 && !strcmp(value, "week_hours"));
+	// a game played since: its progress the next time it's asked
+	MosaicLaunch rom = { "/card/Roms/GB/Tetris.gb", MOSAIC_ENTRY_ROM };
+	CHECK(p->pre_launch(&rom) == MOSAIC_LAUNCH_CONTINUE);
+	fake_mono += 1500;
+	fake_wall += 1500;
+	p = startWithCalls();
+	p->post_return();
+	CHECK(fakeCall("quests.cards", NULL, out, sizeof(out)) > 0);
+	CHECK(fakeEventValue(out, "id.0", value, sizeof(value)) > 0 && !strcmp(value, "games"));
+	CHECK(fakeEventValue(out, "progress.0", value, sizeof(value)) > 0 && !strcmp(value, "1 / 3"));
+	CHECK(fakeEventValue(out, "id.5", value, sizeof(value)) > 0 && !strcmp(value, "fresh"));
+	CHECK(fakeEventValue(out, "done.5", value, sizeof(value)) > 0 && !strcmp(value, "1"));
+	fake_provider_count = 0;
+}
+
 static void testScroll(void) {
 	reset();
 	fake_wall = 1704880800;
@@ -1131,12 +1203,14 @@ int main(void) {
 	testPickQuests();
 	testText();
 	testWords();
+	testCardsReply();
 	testLayout();
 	testInit();
 	testLaunches();
 	testNoTracker();
 	testServices();
 	testRomm();
+	testCards();
 	testScroll();
 	CHECK_DONE();
 }

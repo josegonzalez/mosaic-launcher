@@ -44,6 +44,10 @@ msgstr ""
 msgid "%lldm"
 msgstr ""
 
+#: gamification_model.c
+msgid "+1 quest done"
+msgstr ""
+
 #: plugin.txt
 msgid "1"
 msgstr ""

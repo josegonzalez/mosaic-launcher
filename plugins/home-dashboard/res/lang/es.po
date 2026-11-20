@@ -171,6 +171,9 @@ msgstr "No hay juegos en la tarjeta"
 msgid "RANDOM"
 msgstr "AL AZAR"
 
+msgid "MISSIONS"
+msgstr "MISIONES"
+
 msgid "NEWLY ADDED"
 msgstr "NUEVOS"
 

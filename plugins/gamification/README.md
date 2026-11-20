@@ -43,6 +43,10 @@ Open the Quests screen from the Quests tile on the [quick menu](../../docs/gloss
 
 When a game's return completes a quest, or else extends the streak (once a day), a toast says so.
 
+### On the home screen
+
+With [`home-dashboard`](../home-dashboard/README.md) on and `missions` in its Home rows setting, the home screen has a row of the quests running now as cards, each with its title, a progress bar and its reward (+1 quest done), the ones still to do first. **A** on a card opens the Quests screen.
+
 ## Screenshots
 
 The Quests screen, with the default settings.
@@ -80,6 +84,7 @@ With romm set up: the RomM quest, done today, scrolled down to it.
 - Works from the launch and return hooks, and reads stock's play tracker.
 - Asks `row-badges`' `games.played` service whether a launch is of a game never played, falling back to the play tracker without it, and `playtime-limit`'s `limit.left` service for the time left when it picks the quests. Without `limit.left` every quest runs.
 - Subscribes to `romm`'s `romm.download_done` event for the RomM quest, which it offers while `romm`'s `romm.synced` service answers `server=1`.
+- Provides the `quests.cards` service (`provides=quests.cards`), which `home-dashboard`'s missions row draws its cards from. With no arguments it gives the quests running now, worked out as it's called, the ones done last: `count=<n>` and for each from 0 `id.<i>` (such as `play`), `title.<i>`, `progress.<i>` (such as `12m / 30m` or `Done`), `value.<i>` and `target.<i>` (minutes for the play time quests, else counts), `done.<i>` (1 or 0) and `reward.<i>` (`+1 quest done`), the text in the user's language. See [providers](../../docs/plugin-api.md#features-added-since-the-first-api).
 - Keeps its state in `.userdata/<platform>/launcher/gamification/state.txt`.
 
 ## Credits

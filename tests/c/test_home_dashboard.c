@@ -139,6 +139,69 @@ static void testRows(void) {
 	CHECK(HD_recentPick(HD_ROW_RECENT, resume, available, 1, out, 4) == 0);
 }
 
+// the missions row's cards: quests.cards's reply, their layout and bar
+static void testMissions(void) {
+	int rows[HD_ROW_KINDS];
+	char unknown[64];
+	CHECK(HD_parseRows("Missions, recent", rows, HD_ROW_KINDS, unknown, sizeof(unknown)) == 2);
+	CHECK(rows[0] == HD_ROW_MISSIONS && !unknown[0]);
+	CHECK_STR(HD_rowName(HD_ROW_MISSIONS), "missions");
+	CHECK_STR(HD_rowLabel(HD_ROW_MISSIONS), "MISSIONS");
+
+	HDMission m[HD_MISSIONS_MAX];
+	const char* reply = "count=3\nid.0=games\ntitle.0=Play 3 different games today\nprogress.0=1 / 3\nvalue.0=1\n"
+		"target.0=3\ndone.0=0\nreward.0=+1 quest done\nid.1=bad\nprogress.1=1 / 3\n"
+		"id.2=play\ntitle.2=Play for 30 minutes today\nprogress.2=Done\nvalue.2=45\ntarget.2=30\ndone.2=1\n";
+	CHECK(HD_parseMissions(reply, fakeEventValue, m, HD_MISSIONS_MAX) == 2); // the one without a title left out
+	CHECK_STR(m[0].id, "games");
+	CHECK_STR(m[0].title, "Play 3 different games today");
+	CHECK_STR(m[0].progress, "1 / 3");
+	CHECK_STR(m[0].reward, "+1 quest done");
+	CHECK(m[0].value == 1 && m[0].target == 3 && !m[0].done);
+	CHECK_STR(m[1].id, "play");
+	CHECK(m[1].value == 45 && m[1].target == 30 && m[1].done && !m[1].reward[0]);
+	CHECK(HD_parseMissions(reply, fakeEventValue, m, 1) == 1);
+	CHECK(HD_parseMissions("", fakeEventValue, m, HD_MISSIONS_MAX) == 0);
+	CHECK(HD_parseMissions(NULL, fakeEventValue, m, HD_MISSIONS_MAX) == 0);
+	CHECK(HD_parseMissions("count=0\n", fakeEventValue, m, HD_MISSIONS_MAX) == 0);
+	CHECK(HD_parseMissions(reply, NULL, m, HD_MISSIONS_MAX) == 0);
+
+	// cards across: as many as are HD_MISSION_MIN_W wide, at least one
+	int w;
+	CHECK(HD_missionCards(620, 1, 10, &w) == 2 && w == 305);
+	CHECK(HD_missionCards(740, 1, 10, &w) == 3 && w == 240);
+	CHECK(HD_missionCards(1000, 2, 20, &w) == 2 && w == 490);
+	CHECK(HD_missionCards(150, 1, 10, &w) == 1 && w == 150);
+	CHECK(HD_missionCards(0, 1, 10, &w) == 0 && w == 0);
+
+	// a card's parts: title, bar, then progress and reward, centred down it
+	HDMissionLayout parts;
+	MosaicRect card = { 10, 100, 300, 120 };
+	CHECK(HD_missionLayout(&card, 1, 32, 24, 100, &parts) == 0);
+	// 32 + 4 + 4 + 4 + 24 = 68 tall, from 100 + (120 - 68) / 2
+	CHECK(parts.title.x == 18 && parts.title.y == 126 && parts.title.w == 284 && parts.title.h == 32);
+	CHECK(parts.bar.y == 162 && parts.bar.h == 4 && parts.bar.w == 284);
+	CHECK(parts.reward.x == 202 && parts.reward.y == 170 && parts.reward.w == 100 && parts.reward.h == 24);
+	CHECK(parts.progress.x == 18 && parts.progress.w == 176);
+	// a long reward gets half, none leaves the progress the width
+	CHECK(HD_missionLayout(&card, 1, 32, 24, 900, &parts) == 0 && parts.reward.w == 142);
+	CHECK(HD_missionLayout(&card, 1, 32, 24, 0, &parts) == 0 && parts.reward.w == 0 && parts.progress.w == 284);
+	// too small
+	MosaicRect fits = { 0, 0, 300, 68 };
+	CHECK(HD_missionLayout(&fits, 1, 32, 24, 0, &parts) == 0 && parts.title.y == 0 && parts.progress.y == 44);
+	MosaicRect small = { 0, 0, 300, 67 };
+	CHECK(HD_missionLayout(&small, 1, 32, 24, 0, &parts) == -1);
+	MosaicRect thin = { 0, 0, 16, 200 };
+	CHECK(HD_missionLayout(&thin, 1, 32, 24, 0, &parts) == -1);
+
+	CHECK(HD_barWidth(0, 30, 100) == 0);
+	CHECK(HD_barWidth(15, 30, 100) == 50);
+	CHECK(HD_barWidth(1, 1000, 100) == 1);
+	CHECK(HD_barWidth(45, 30, 100) == 100);
+	CHECK(HD_barWidth(5, 0, 100) == 0);
+	CHECK(HD_barWidth(5, 10, 0) == 0);
+}
+
 static void testPicks(void) {
 	// the newest kept, ties in the order added
 	long long keys[3];
@@ -1150,6 +1213,71 @@ static void testRowsAndModes(void) {
 	fake_index_on_ready = NULL;
 }
 
+// the missions row: gamification's quests.cards, asked as the home opens
+static int cards_asked = 0;
+static int fakeCards(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	cards_asked++;
+	snprintf(out, size, "count=2\nid.0=games\ntitle.0=Play 3 different games today\nprogress.0=1 / 3\nvalue.0=1\n"
+		"target.0=3\ndone.0=0\nreward.0=+1 quest done\nid.1=play\ntitle.1=Play for 30 minutes today\n"
+		"progress.1=Done\nvalue.1=45\ntarget.1=30\ndone.1=1\nreward.1=+1 quest done\n");
+	return 0;
+}
+
+static void testMissionsRow(void) {
+	fake_provider_count = 0;
+	fake.call = fakeCall;
+	fake.event_value = fakeEventValue;
+	fake_loaded = "home-dashboard";
+	fake_set_count = 0;
+	// off unless the row is named: not asked
+	cfg_rows = NULL;
+	cards_asked = 0;
+	fakeProvide("quests.cards", fakeCards);
+	reset("dashboard");
+	CHECK(cards_asked == 0 && mission_count == 0);
+
+	// without gamification the row has nothing, and is left out
+	fake_provider_count = 0;
+	cfg_rows = "missions, recent";
+	reset("dashboard");
+	CHECK(strstr(logged, "missions: none") != NULL);
+	CHECK(strstr(logged, "rows: recent 2") != NULL);
+
+	// with it, a card per quest, asked once as the home opens
+	fakeProvide("quests.cards", fakeCards);
+	cards_asked = 0;
+	reset("dashboard");
+	CHECK(cards_asked == 1);
+	CHECK(strstr(logged, "missions: games 1/3, play 45/30 done") != NULL);
+	CHECK(strstr(logged, "rows: missions 2 recent 2") != NULL);
+	CHECK(home_rows[0].kind == HD_ROW_MISSIONS && home_rows[0].count == 2);
+	// down to it, right to the second card, and A opens the Quests screen
+	press(MOSAIC_BUTTON_DOWN);
+	CHECK(focus.row == 0 && focus.col == 0);
+	CHECK_STR(openLabel(), "OPEN");
+	press(MOSAIC_BUTTON_RIGHT);
+	CHECK(focus.col == 1);
+	press(MOSAIC_BUTTON_A);
+	CHECK_STR(ran, "gamification.open");
+	CHECK(strstr(logged, "mission play 0") != NULL);
+	// back from the Quests screen (or a game), asked again, logged only
+	// when the cards change
+	logged[0] = '\0';
+	CHECK(registered.enter(registered.data) == 0);
+	CHECK(cards_asked == 2);
+	CHECK(strstr(logged, "missions:") == NULL);
+	// not in the other modes
+	reset("minui");
+	CHECK(cards_asked == 2 && mission_count == 0);
+
+	cfg_rows = NULL;
+	fake_provider_count = 0;
+	fake.call = NULL;
+	fake.event_value = NULL;
+}
+
 // home-dashboard.setup: a mode it has is saved, any other refused
 static void fakeCfgSetMode(const char* key, const char* value) {
 	CHECK_STR(key, "mode");
@@ -1205,6 +1333,7 @@ int main(void) {
 	testTabs();
 	testRowsMove();
 	testRows();
+	testMissions();
 	testPicks();
 	testConsoles();
 	testWrap();
@@ -1222,5 +1351,6 @@ int main(void) {
 	testDownloads();
 	testSetup();
 	testRowsAndModes();
+	testMissionsRow();
 	CHECK_DONE();
 }

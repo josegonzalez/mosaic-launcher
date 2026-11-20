@@ -34,6 +34,7 @@ The Home mode setting picks the home.
     - `played`: the most played games: the [`activity-stats`](../activity-stats/README.md) plugin's Most Played games while it's on, else the play history's.
     - `random`: games picked at random, again each time the launcher starts.
     - `shortcuts`: tiles that run the actions the Shortcuts setting names, each with its plugin's quick menu tile icon (or its label's first letter) and label. A name is an action's id, such as `search.open`, or a plugin's id, such as `random-game`, for its quick menu tile's action, else its first one. A name that isn't there, or whose action can't run now, is left out and noted once in the log.
+    - `missions`: a card for each quest [`gamification`](../gamification/README.md) runs now, with its title, a bar of how far along it is, its progress and its reward, the quests still to do first. **A** on a card opens the Quests screen. The row shows only while gamification is on, and its cards are read as the home opens, after a game too, not as it draws.
   - Pinned: favorites' games in the favorites collection's order, shown while the [`favorites`](../favorites/README.md) plugin is loaded (the Pinned tab setting).
   - Stats: today's play time, the time left today while [`playtime-limit`](../playtime-limit/README.md) has a daily limit set (such as "35m of 1h 0m", of today's limit with any extra time), the recently played games' total and the five most played of the recent and pinned games (the Stats tab setting). While [`romm`](../romm/README.md) is on and has downloaded games still on the card, a Recently downloaded section lists the last three, with the day each came. When they don't all fit, up and down scroll the tab, and the Most played and Recently downloaded headings only show with a game under them. The launcher has no call for the whole play history, so Stats covers only the games the dashboard knows about. With no play history (no database yet, or no sqlite) it says so rather than showing numbers.
 - **minui:** a plain list of the recently played games, then Games, which goes on to the game list.
@@ -70,6 +71,10 @@ The shortcuts row, with search, random-game, activity-stats and system-info on.
 
 ![The shortcuts row, with search, random-game, activity-stats and system-info on](docs/shortcuts.png)
 
+Home rows set to `missions, recent`, with gamification on, on the missions row.
+
+![Home rows set to missions, recent, with gamification on, on the missions row](docs/missions-with-gamification.png)
+
 Home mode set to minimal.
 
 ![Home mode set to minimal](docs/mode-minimal.png)
@@ -100,7 +105,7 @@ With romm and two games it downloaded: the Stats tab scrolled down to Recently d
 |---|---|---|---|
 | Home mode (`mode`) | dashboard, minui, retroachievements, pico8, minimal, consoles | dashboard | Which home to show, as above |
 | Top shelf (`shelf`) | on, off | on | The rows under the continue card |
-| Home rows (`rows`) | text | `continue, recent` | The rows under the continue card, in order: `continue`, `recent`, `added`, `played`, `random` and `shortcuts` |
+| Home rows (`rows`) | text | `continue, recent` | The rows under the continue card, in order: `continue`, `recent`, `added`, `played`, `random`, `shortcuts` and `missions` |
 | Shortcuts (`shortcuts`) | text | `search, random-game, activity-stats, system-info` | The actions the shortcuts row runs, by action or plugin id |
 | Minimal clock (`clock`) | 24h, 12h | 24h | The minimal mode's clock |
 | Pinned tab (`pinned`) | on, off | on | Favorites' games, while favorites is on |
@@ -117,6 +122,7 @@ With romm and two games it downloaded: the Stats tab scrolled down to Recently d
 - Reads `activity-stats`' `activity-stats.most-played` entry set for the played row while activity-stats is on.
 - Finds the shortcuts with `action_info`, checks them with `action_available`, draws each tile's icon from `quick_tile_icon` and runs them with `run_action`.
 - Asks `playtime-captions`' `captions.text` service for the continue card's caption, and `playtime-limit`'s `limit.left` service for the Stats tab's time left. Without them it shows the play time on the card and no time left.
+- Asks `gamification`'s `quests.cards` service for the missions row's cards as the screen opens and when the card index or a set changes, only while the Home rows setting names `missions`. Without it the row has nothing in it and is left out.
 - Asks `romm`'s `romm.downloads` service for the Stats tab's Recently downloaded section as the screen opens. Without it there's no section.
 
 ## Credits

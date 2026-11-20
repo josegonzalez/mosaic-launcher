@@ -72,6 +72,7 @@ enum HDRow {
 	HD_ROW_PLAYED,    // played: the most played games
 	HD_ROW_RANDOM,    // random: games picked at random
 	HD_ROW_SHORTCUTS, // shortcuts: tiles that run the actions the "shortcuts" setting names
+	HD_ROW_MISSIONS,  // missions: gamification's quests running now, as cards
 	HD_ROW_KINDS,
 };
 
@@ -266,5 +267,48 @@ int HD_fit(int src_w, int src_h, const MosaicRect* box, MosaicRect* out);
 // How many cells of size cell with gap between them fit across width,
 // at least 0.
 int HD_cellsFit(int width, int cell, int gap);
+
+// A card in the missions row: one of gamification's quests running now,
+// from its quests.cards service.
+#define HD_MISSIONS_MAX 8
+typedef struct HDMission {
+	char id[32];        // the quest's id, such as "play"
+	char title[160];    // "Play for 30 minutes today"
+	char progress[64];  // "12m / 30m", "Done"
+	char reward[64];    // "+1 quest done"
+	long long value, target;
+	int done;
+} HDMission;
+
+// The cards in quests.cards's reply, read with value (as the host's
+// event_value reads a key): count=<n>, then for each from 0 id.<i>,
+// title.<i>, progress.<i>, value.<i>, target.<i>, done.<i> and
+// reward.<i>. A card without a title is left out. Returns how many, up to
+// max, 0 for a NULL or empty reply.
+int HD_parseMissions(const char* reply, int (*value)(const char* payload, const char* key, char* out, size_t size),
+	HDMission* out, int max);
+
+// How many missions cards fit across width, gap apart, each at least
+// HD_MISSION_MIN_W (times scale) wide, and at least 1 while width is;
+// writes their width to card_w. 0 for no width.
+#define HD_MISSION_MIN_W 240
+int HD_missionCards(int width, int scale, int gap, int* card_w);
+
+// Where a missions card's parts go: its title of title_h, a bar under it,
+// and under that its progress at the left and its reward, reward_w wide
+// (at most half), at the right, in lines of small_h; padded in from the
+// card's sides and centred down it.
+typedef struct HDMissionLayout {
+	MosaicRect title;
+	MosaicRect bar;
+	MosaicRect progress;
+	MosaicRect reward;
+} HDMissionLayout;
+// Returns 0, or -1 when they don't fit in card.
+int HD_missionLayout(const MosaicRect* card, int scale, int title_h, int small_h, int reward_w, HDMissionLayout* out);
+
+// The part of a bar w wide that value of target fills: 0 for none, w when
+// done or over, and at least 1 for any progress.
+int HD_barWidth(long long value, long long target, int w);
 
 #endif

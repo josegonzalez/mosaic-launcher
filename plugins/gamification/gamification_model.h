@@ -257,4 +257,19 @@ MosaicRect GM_room(const MosaicRect* area, const MosaicRect* hole, int scale);
 // done or over.
 int GM_barWidth(long long value, long long target, int w);
 
+///////////////////////////////////////
+// the quests.cards service
+
+// What a quest gives when it's done, for its card: "+1 quest done", the
+// one it adds to the quests done in all.
+void GM_reward(int quest, char* out, size_t size);
+
+// quests.cards's reply for the count quests running lists, in its order
+// with the ones done after the rest: count=<n>, then for each card from 0
+// id.<i> (as GM_questId), title.<i> (GM_title), progress.<i> (GM_value),
+// value.<i> and target.<i> (GMProgress's), done.<i> (0 or 1) and
+// reward.<i> (GM_reward). Returns its length, or -1 when it doesn't fit.
+int GM_cardsReply(const int* running, int count, const GMProgress* progress, const GMTargets* targets, char* out,
+	size_t size);
+
 #endif

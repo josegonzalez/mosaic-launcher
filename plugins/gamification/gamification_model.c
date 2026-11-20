@@ -564,3 +564,41 @@ int GM_barWidth(long long value, long long target, int w) {
 	int part = (int)(value * w / target);
 	return part < 1 ? 1 : part;
 }
+
+///////////////////////////////////////
+// the quests.cards service
+
+void GM_reward(int quest, char* out, size_t size) {
+	(void)quest; // every quest adds one to the quests done
+	snprintf(out, size, "%s", tr("+1 quest done"));
+}
+
+int GM_cardsReply(const int* running, int count, const GMProgress* progress, const GMTargets* targets, char* out,
+		size_t size) {
+	if (!size) return -1;
+	size_t used = 0;
+	int n = snprintf(out, size, "count=%i\n", count < 0 ? 0 : count);
+	if (n < 0 || (size_t)n >= size) return -1;
+	used = (size_t)n;
+	int card = 0;
+	// the ones still to do first, then the ones done
+	for (int pass = 0; pass < 2; pass++) {
+		for (int i = 0; i < count; i++) {
+			int quest = running[i];
+			if (quest < 0 || quest >= GM_QUESTS || (progress[quest].done != 0) != pass) continue;
+			const GMProgress* p = &progress[quest];
+			char title[256], value[128], reward[128];
+			GM_title(quest, targets, title, sizeof(title));
+			GM_value(quest, p, value, sizeof(value));
+			GM_reward(quest, reward, sizeof(reward));
+			n = snprintf(out + used, size - used,
+				"id.%i=%s\ntitle.%i=%s\nprogress.%i=%s\nvalue.%i=%lld\ntarget.%i=%lld\ndone.%i=%i\nreward.%i=%s\n", card,
+				GM_questId(quest), card, title, card, value, card, p->value, card, p->target, card, p->done ? 1 : 0, card,
+				reward);
+			if (n < 0 || (size_t)n >= size - used) return -1;
+			used += (size_t)n;
+			card++;
+		}
+	}
+	return (int)used;
+}

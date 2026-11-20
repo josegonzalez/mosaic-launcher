@@ -4,6 +4,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
@@ -142,7 +143,8 @@ int HD_listNext(const char** p, char* out, size_t size) {
 	}
 }
 
-static const char* const row_names[HD_ROW_KINDS] = { "continue", "recent", "added", "played", "random", "shortcuts" };
+static const char* const row_names[HD_ROW_KINDS] = { "continue", "recent", "added", "played", "random", "shortcuts",
+	"missions" };
 
 int HD_parseRows(const char* text, int* out, int max, char* unknown, size_t size) {
 	if (size) unknown[0] = '\0';
@@ -178,6 +180,7 @@ const char* HD_rowLabel(int row) {
 		case HD_ROW_PLAYED: return TR_MARK("MOST PLAYED");
 		case HD_ROW_RANDOM: return TR_MARK("RANDOM");
 		case HD_ROW_SHORTCUTS: return TR_MARK("SHORTCUTS");
+		case HD_ROW_MISSIONS: return TR_MARK("MISSIONS");
 	}
 	return "";
 }
@@ -590,4 +593,72 @@ int HD_fit(int src_w, int src_h, const MosaicRect* box, MosaicRect* out) {
 	if (h < 1) h = 1;
 	*out = (MosaicRect){ box->x + (box->w - w) / 2, box->y + (box->h - h) / 2, w, h };
 	return 0;
+}
+
+int HD_parseMissions(const char* reply, int (*value)(const char* payload, const char* key, char* out, size_t size),
+		HDMission* out, int max) {
+	if (!reply || !reply[0] || !value || max <= 0) return 0;
+	char text[32], key[32];
+	if (value(reply, "count", text, sizeof(text)) <= 0) return 0;
+	int count = atoi(text);
+	int n = 0;
+	for (int i = 0; i < count && n < max; i++) {
+		HDMission* m = &out[n];
+		memset(m, 0, sizeof(*m));
+		snprintf(key, sizeof(key), "title.%i", i);
+		if (value(reply, key, m->title, sizeof(m->title)) <= 0) continue;
+		snprintf(key, sizeof(key), "id.%i", i);
+		value(reply, key, m->id, sizeof(m->id));
+		snprintf(key, sizeof(key), "progress.%i", i);
+		value(reply, key, m->progress, sizeof(m->progress));
+		snprintf(key, sizeof(key), "reward.%i", i);
+		value(reply, key, m->reward, sizeof(m->reward));
+		snprintf(key, sizeof(key), "value.%i", i);
+		if (value(reply, key, text, sizeof(text)) > 0) m->value = atoll(text);
+		snprintf(key, sizeof(key), "target.%i", i);
+		if (value(reply, key, text, sizeof(text)) > 0) m->target = atoll(text);
+		snprintf(key, sizeof(key), "done.%i", i);
+		m->done = value(reply, key, text, sizeof(text)) > 0 && !strcmp(text, "1");
+		n++;
+	}
+	return n;
+}
+
+int HD_missionCards(int width, int scale, int gap, int* card_w) {
+	*card_w = 0;
+	if (width <= 0) return 0;
+	if (scale < 1) scale = 1;
+	if (gap < 0) gap = 0;
+	int cards = (width + gap) / (HD_MISSION_MIN_W * scale + gap);
+	if (cards < 1) cards = 1;
+	*card_w = (width - (cards - 1) * gap) / cards;
+	return cards;
+}
+
+int HD_missionLayout(const MosaicRect* card, int scale, int title_h, int small_h, int reward_w, HDMissionLayout* out) {
+	memset(out, 0, sizeof(*out));
+	if (scale < 1) scale = 1;
+	int pad = 8 * scale, space = 4 * scale, bar_h = 4 * scale;
+	int inner_w = card->w - 2 * pad;
+	int need = title_h + space + bar_h + space + small_h;
+	if (inner_w <= 0 || title_h <= 0 || small_h <= 0 || card->h < need) return -1;
+	int x = card->x + pad;
+	int y = card->y + (card->h - need) / 2;
+	out->title = (MosaicRect){ x, y, inner_w, title_h };
+	y += title_h + space;
+	out->bar = (MosaicRect){ x, y, inner_w, bar_h };
+	y += bar_h + space;
+	if (reward_w > inner_w / 2) reward_w = inner_w / 2;
+	if (reward_w < 0) reward_w = 0;
+	out->reward = (MosaicRect){ x + inner_w - reward_w, y, reward_w, small_h };
+	int progress_w = inner_w - (reward_w ? reward_w + pad : 0);
+	out->progress = (MosaicRect){ x, y, progress_w > 0 ? progress_w : 0, small_h };
+	return 0;
+}
+
+int HD_barWidth(long long value, long long target, int w) {
+	if (w <= 0 || value <= 0 || target <= 0) return 0;
+	if (value >= target) return w;
+	int part = (int)(value * w / target);
+	return part < 1 ? 1 : part;
 }

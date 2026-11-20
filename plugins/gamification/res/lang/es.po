@@ -21,6 +21,9 @@ msgid_plural "%i quests done"
 msgstr[0] "%i misión cumplida"
 msgstr[1] "%i misiones cumplidas"
 
+msgid "+1 quest done"
+msgstr "+1 misión cumplida"
+
 #, c-format
 msgid "%lldh"
 msgstr "%lld h"

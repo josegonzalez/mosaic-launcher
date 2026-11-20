@@ -122,6 +122,10 @@ msgstr ""
 msgid "Its emulator isn't installed"
 msgstr ""
 
+#: home_model.c
+msgid "MISSIONS"
+msgstr ""
+
 #: home_dashboard.c home_model.c
 msgid "MOST PLAYED"
 msgstr ""

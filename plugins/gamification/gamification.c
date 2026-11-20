@@ -46,6 +46,11 @@
 // setting), or button-remap or an FN button (action:gamification.open).
 // It shows the streak and the quests with their progress; up and down
 // scroll when they don't fit, and B closes it.
+//
+// The quests.cards service gives the quests running now as cards, for
+// home-dashboard's missions row: each one's title, progress and reward,
+// worked out afresh on each call, which home-dashboard makes as its home
+// opens rather than as it draws.
 
 #include <errno.h>
 #include <stdio.h>
@@ -551,6 +556,16 @@ static void openQuests(const char* path, void* data) {
 	if (host->open_screen(SCREEN_ID) != 0) say("couldn't open the quests screen");
 }
 
+///////////////////////////////////////
+// the quests.cards service
+
+static int provideCards(const char* name, const char* args, char* out, size_t size) {
+	(void)name;
+	(void)args;
+	refresh();
+	return GM_cardsReply(running, running_count, progress, &targets, out, size) < 0;
+}
+
 // The live profile's state file, and its folder.
 static void statePaths(void) {
 	if (!MOSAIC_HOST_HAS(host, profile_path) || host->profile_path(ID "/state.txt", state_path, sizeof(state_path)) != 0) {
@@ -623,6 +638,7 @@ static int init(const MosaicHost* h) {
 	if (MOSAIC_HOST_HAS(host, profile_path) && host->subscribe("launcher.profile_changed", profileChanged, NULL) != 0) {
 		say("couldn't subscribe to launcher.profile_changed");
 	}
+	if (MOSAIC_HOST_HAS(host, call) && host->provide("quests.cards", provideCards) != 0) say("couldn't provide quests.cards");
 	char message[160];
 	snprintf(message, sizeof(message), "quests: play %i minutes, %i games, %i days and %i hours a week; streak at %lld minutes",
 		targets.daily_minutes, targets.daily_games, targets.week_days, targets.week_hours, targets.streak_seconds / 60);

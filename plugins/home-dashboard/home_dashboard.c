@@ -21,11 +21,16 @@
 // games put on the card last), played (activity-stats' most played set
 // while it's on, else the play history's most played), random and
 // shortcuts (tiles that run the actions the "shortcuts" setting names,
-// with their quick menu tile's icon and label). Rows with nothing in
+// with their quick menu tile's icon and label) and missions (a card per
+// quest gamification runs now, with its title, a progress bar and its
+// reward, which A opens the Quests screen from). Rows with nothing in
 // them are left out, and one shows at a time, down and up moving between
 // them, with its heading while there's more than one. The rows from the
 // card index (added, random) and the consoles are built when the index or
-// a set changes, not as the screen draws.
+// a set changes, not as the screen draws. The missions come from
+// gamification's quests.cards service, asked as the screen opens (after a
+// game too) and when the index or a set changes, and drawn from what it
+// said; without gamification the row has nothing in it.
 //
 // X closes the home screen on to the game list (the launcher's root list),
 // MENU opens the quick menu and SELECT the game switcher, as on the root
@@ -158,6 +163,9 @@ static int shortcut_count = 0;
 static HDConsole consoles[CONSOLES_MAX];
 static const MosaicEntry* console_entries[CONSOLES_MAX];
 static int console_count = 0;
+
+static HDMission missions[HD_MISSIONS_MAX]; // gamification's, from quests.cards
+static int mission_count = 0;
 
 static int card_dirty = 1; // the card index or a set changed since the rows were built
 
@@ -523,6 +531,7 @@ static void loadRows(void) {
 			case HD_ROW_PLAYED: own = played_items; own_count = played_count; break;
 			case HD_ROW_RANDOM: own = random_items; own_count = random_count; break;
 			case HD_ROW_SHORTCUTS: row->count = shortcut_count; break;
+			case HD_ROW_MISSIONS: row->count = mission_count; break;
 		}
 		for (int i = 0; i < own_count; i++) row->items[row->count++] = &own[i];
 		if (row->count) home_row_count++;
@@ -568,6 +577,30 @@ static void loadDownloads(void) {
 		snprintf(key, sizeof(key), "at.%i", i);
 		downloaded_at[download_count] = replyNumber(reply, key, 0);
 		download_count++;
+	}
+}
+
+// The missions row's cards, from gamification's quests.cards service,
+// logged when they change.
+static void loadMissions(void) {
+	static char logged_missions[512];
+	if (mode != HD_MODE_DASHBOARD || !wantsRow(HD_ROW_MISSIONS)) {
+		mission_count = 0;
+		return;
+	}
+	static char reply[MOSAIC_CALL_MAX];
+	mission_count = ask("quests.cards", NULL, reply, sizeof(reply))
+		? HD_parseMissions(reply, host->event_value, missions, HD_MISSIONS_MAX) : 0;
+	char message[sizeof(logged_missions)];
+	int used = snprintf(message, sizeof(message), "missions:");
+	for (int i = 0; i < mission_count && used < (int)sizeof(message); i++) {
+		used += snprintf(message + used, sizeof(message) - used, "%s %s %lld/%lld%s", i ? "," : "", missions[i].id,
+			missions[i].value, missions[i].target, missions[i].done ? " done" : "");
+	}
+	if (!mission_count && used < (int)sizeof(message)) snprintf(message + used, sizeof(message) - used, " none");
+	if (strcmp(message, logged_missions) != 0) {
+		snprintf(logged_missions, sizeof(logged_missions), "%s", message);
+		say(message);
 	}
 }
 
@@ -863,6 +896,42 @@ static void drawShortcut(MosaicSurface* screen, const Shortcut* shortcut, const 
 	drawLetter(screen, box, shortcut->label, radius);
 }
 
+// A missions card: its title, a bar of how far along it is, and its
+// progress and reward under that, filled while selected.
+static void drawMission(MosaicSurface* screen, const HDMission* m, const MosaicRect* card, int selected, int radius) {
+	int scale = host->screen_scale();
+	host->fill_round_rect(screen, card, radius, selected ? C_MAIN() : dimCard());
+	MosaicColor text = selected ? C_SELECTED() : C_TEXT();
+	MosaicColor muted = selected ? C_SELECTED() : C_HINT();
+	int reward_w = m->reward[0] ? host->text_width(MOSAIC_FONT_SMALL, m->reward) : 0;
+	int small_h = host->text_height(MOSAIC_FONT_SMALL);
+	// the title in the large font, or the small one where that doesn't fit
+	HDMissionLayout parts;
+	int title_font = MOSAIC_FONT_LARGE;
+	if (HD_missionLayout(card, scale, host->text_height(title_font), small_h, reward_w, &parts) != 0) {
+		title_font = MOSAIC_FONT_SMALL;
+		if (HD_missionLayout(card, scale, small_h, small_h, reward_w, &parts) != 0) {
+			host->draw_text(screen, MOSAIC_FONT_SMALL, m->title, card->x + 4 * scale, card->y, text, card->w - 8 * scale);
+			return;
+		}
+	}
+	char cut[sizeof(m->title)];
+	if (host->text_truncate(title_font, m->title, parts.title.w, cut, sizeof(cut)) >= 0) {
+		host->draw_text(screen, title_font, cut, parts.title.x, parts.title.y, text, parts.title.w);
+	}
+	host->fill_round_rect(screen, &parts.bar, parts.bar.h / 2,
+		themeColor(selected ? MOSAIC_COLOR_LIST_TEXT_SELECTED : MOSAIC_COLOR_HINT, selected ? 0x000000 : 0x999999, 64));
+	MosaicRect bar = parts.bar;
+	bar.w = HD_barWidth(m->value, m->target, parts.bar.w);
+	if (bar.w > 0) host->fill_round_rect(screen, &bar, bar.h / 2, selected ? C_SELECTED() : m->done ? C_ACCENT() : C_MAIN());
+	if (m->progress[0] && parts.progress.w > 0) {
+		host->draw_text(screen, MOSAIC_FONT_SMALL, m->progress, parts.progress.x, parts.progress.y, muted, parts.progress.w);
+	}
+	if (parts.reward.w > 0) {
+		host->draw_text(screen, MOSAIC_FONT_SMALL, m->reward, parts.reward.x, parts.reward.y, muted, parts.reward.w);
+	}
+}
+
 // The home tab: the continue card, and under it the row in focus (or the
 // first), with its heading while there's more than one.
 static void drawHome(MosaicSurface* screen, const HDLayout* given) {
@@ -903,6 +972,18 @@ static void drawHome(MosaicSurface* screen, const HDLayout* given) {
 		}
 	}
 	int on = focus.row >= 0;
+	if (row->kind == HD_ROW_MISSIONS) {
+		int card_w;
+		int cards = HD_missionCards(layout.shelf.w, scale, layout.gap, &card_w);
+		shelf_first = HD_window(on ? focus.col : shelf_first, row->count, cards, shelf_first);
+		for (int k = 0; k < cards && shelf_first + k < row->count; k++) {
+			int index = shelf_first + k;
+			MosaicRect card = { layout.shelf.x + k * (card_w + layout.gap), layout.shelf.y + 2 * scale, card_w,
+				layout.shelf.h - 4 * scale };
+			drawMission(screen, &missions[index], &card, on && index == focus.col, radius);
+		}
+		return;
+	}
 	shelf_first = HD_window(on ? focus.col : shelf_first, row->count, layout.cells, shelf_first);
 	for (int k = 0; k < layout.cells && shelf_first + k < row->count; k++) {
 		int index = shelf_first + k;
@@ -1182,7 +1263,8 @@ static const char* openLabel(void) {
 			if (tab == HD_TAB_HOME) {
 				if (focus.row == HD_FOCUS_CONTINUE) item = recent_count ? &recents[0] : NULL;
 				else if (focus.row < home_row_count && focus.col < home_rows[focus.row].count) {
-					if (home_rows[focus.row].kind == HD_ROW_SHORTCUTS) return "OPEN";
+					int kind = home_rows[focus.row].kind;
+					if (kind == HD_ROW_SHORTCUTS || kind == HD_ROW_MISSIONS) return "OPEN";
 					item = home_rows[focus.row].items[focus.col];
 				}
 			}
@@ -1279,6 +1361,13 @@ static void openHome(void) {
 	}
 	if (focus.row >= home_row_count || focus.col >= home_rows[focus.row].count) return;
 	HomeRow* row = &home_rows[focus.row];
+	if (row->kind == HD_ROW_MISSIONS) {
+		int ran = host->run_action("gamification.open", NULL);
+		char message[96];
+		snprintf(message, sizeof(message), "mission %s %i", missions[focus.col].id, ran);
+		say(message);
+		return;
+	}
 	if (row->kind != HD_ROW_SHORTCUTS) {
 		openItem(row->items[focus.col]);
 		return;
@@ -1420,6 +1509,7 @@ static void cardChanged(const char* name, const char* payload, void* data) {
 	card_dirty = 1;
 	if (!showing) return;
 	loadCard();
+	loadMissions(); // none outside the dashboard
 	if (mode == HD_MODE_DASHBOARD) {
 		loadShortcuts();
 		loadRows();
@@ -1438,6 +1528,7 @@ static int enter(void* data) {
 	download_count = 0;
 	if (mode == HD_MODE_DASHBOARD && stats_on) loadDownloads();
 	if (card_dirty) loadCard();
+	loadMissions(); // none outside the dashboard
 	if (mode == HD_MODE_DASHBOARD) {
 		loadShortcuts();
 		loadRows();

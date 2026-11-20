@@ -33,6 +33,13 @@ cfg home-dashboard "rows=recent, shortcuts"
 press "down down"
 shot shortcuts
 
+# gamification's quests as cards, down on the missions row
+begin
+on gamification home-dashboard
+cfg home-dashboard "rows=missions, recent"
+press "down"
+shot missions-with-gamification
+
 begin
 on home-dashboard
 cfg home-dashboard mode=minimal
