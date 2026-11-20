@@ -213,5 +213,6 @@ for saved in "$RECENTS" "$MD_FAVORITES" "$PLAY_DB" "$STATE/tags.txt" /tmp/last.t
 done
 rm -rf "$WORK/plugins/multi-disc.plugin" "$WORK/plugins/seeker.plugin" "$WORK/plugins/looker.plugin" \
 	"$STATE/seeker.cfg" "$STATE/looker.cfg" "$STATE/plugins.txt" "$STATE/multi-disc.cfg" \
-	"$STATE/search.cfg" "$STATE/random-game.cfg" "$WORK/plugins/search.plugin" "$WORK/plugins/random-game.plugin"
+	"$STATE/search.cfg" "$STATE/random-game.cfg" "$WORK/plugins/search.plugin" "$WORK/plugins/random-game.plugin" \
+	"$WORK/plugins/favorites.plugin" "$WORK/plugins/tags.plugin"
 case_log=""
