@@ -15,7 +15,7 @@
 // achievements cached.
 //
 // The caption sits on the name's line, right-aligned, and never over the
-// name. When row-badges is loaded with its dots on, it leaves room for
+// name. When row-badges is loaded with its dots or icons on, it leaves room for
 // them after the name, and below them in a cell with no name. When the row
 // is too narrow it tries the compact format, then drops parts from the
 // end, and shows nothing when even one doesn't fit.
@@ -63,18 +63,23 @@ static int isOn(const char* key, const char* fallback) {
 	return !strcmp(host->cfg_get(key, fallback), "on");
 }
 
-// row-badges' dots go after the name: 4 units from it, up to 36 wide with
-// the unplayed dot and five tier dots, or 4 with just the unplayed dot,
-// or in the top right corner, 8 units deep, when there's no name or no
-// room after it. Its settings are only there while it's loaded.
+// row-badges' badges go after the name: 4 units from it, the unplayed dot,
+// the status icons and trophy, and five tier dots, or in the top right
+// corner when there's no name or no room after it. Room is kept for every
+// badge whose setting is on, not per row, since which games have a status
+// flag or a trophy isn't known here. Its settings are only there while it's
+// loaded.
+static int badgeOn(const char* key) {
+	return !strcmp(publicSetting("row-badges", key, "off"), "on");
+}
+
 static void readBadges(void) {
 	if (badges_known) return;
 	badges_known = 1;
-	int unplayed = !strcmp(publicSetting("row-badges", "unplayed", "off"), "on");
-	int tiers = !strcmp(publicSetting("row-badges", "tiers", "off"), "on");
-	int width = tiers ? 36 : unplayed ? 4 : 0;
-	badge_reserve = width ? 4 + width + 6 : 6;
-	badge_corner = width ? 10 : 0;
+	static const char* const icon_keys[] = { "completed", "beaten", "broken", "backlog", "perfect" };
+	int icons = 0;
+	for (size_t i = 0; i < sizeof(icon_keys) / sizeof(icon_keys[0]); i++) icons += badgeOn(icon_keys[i]);
+	PC_badgeRoom(badgeOn("unplayed"), icons, badgeOn("tiers"), &badge_reserve, &badge_corner);
 }
 
 static int measure(const char* text, void* ctx) {

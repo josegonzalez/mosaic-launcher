@@ -43,11 +43,13 @@ static void fakeLog(const char* id, const char* m) { (void)id; (void)m; }
 static char cfg[8][2][32];
 static int cfg_count = 0;
 static int badges_loaded = 0;
-static char badge_unplayed[8] = "off", badge_tiers[8] = "off";
+static char badge_unplayed[8] = "off", badge_tiers[8] = "off", badge_completed[8] = "off", badge_perfect[8] = "off";
 static const char* fakeCfgRead(const char* id, const char* key, const char* fallback) {
 	if (strcmp(id, "row-badges") || !badges_loaded) return fallback;
 	if (!strcmp(key, "unplayed")) return badge_unplayed;
 	if (!strcmp(key, "tiers")) return badge_tiers;
+	if (!strcmp(key, "completed")) return badge_completed;
+	if (!strcmp(key, "perfect")) return badge_perfect;
 	return fallback;
 }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
@@ -388,6 +390,28 @@ int main(void) {
 	CHECK(PC_room(NULL, &name, 50, 20, 8, 20, &room) == 0);
 	CHECK(PC_room(&rect, &name, 50, 20, 8, 0, &room) == 0);
 
+	// the room row-badges' badges take, in units
+	int reserve, corner;
+	PC_badgeRoom(0, 0, 0, &reserve, &corner);
+	CHECK(reserve == 6 && corner == 0);
+	PC_badgeRoom(1, 0, 0, &reserve, &corner);
+	CHECK(reserve == 14 && corner == 10);
+	PC_badgeRoom(0, 0, 1, &reserve, &corner);
+	CHECK(reserve == 38 && corner == 10);
+	PC_badgeRoom(1, 0, 1, &reserve, &corner);
+	CHECK(reserve == 46 && corner == 10);
+	PC_badgeRoom(0, 1, 0, &reserve, &corner);
+	CHECK(reserve == 17 && corner == 13);
+	// every icon: 35 + 8 apart
+	PC_badgeRoom(0, 5, 0, &reserve, &corner);
+	CHECK(reserve == 4 + 43 + 6 && corner == 13);
+	// all of them: 4 + 25 + 6 groups of 2
+	PC_badgeRoom(1, 5, 1, &reserve, &corner);
+	CHECK(reserve == 4 + (6 * 4 + 35 + 10 * 2 + 4) + 6 && corner == 13);
+	PC_badgeRoom(-1, 9, 3, &reserve, &corner);
+	CHECK(reserve == 4 + (5 * 4 + 35 + 9 * 2 + 2) + 6);
+	PC_badgeRoom(0, 0, 0, NULL, NULL);
+
 	// muting a colour toward the background
 	CHECK(PC_mute(0xFFFFFF, 0x000000, 40) == 0x999999);
 	CHECK(PC_mute(0x000000, 0xFFFFFF, 40) == 0x666666);
@@ -453,15 +477,15 @@ int main(void) {
 	CHECK_STR(drawn, "4x");
 
 	// with row-badges loaded and its tier dots on, room after the name for
-	// six dots: 4 + 36 + 6 units at scale 2
+	// five dots: 4 + 28 + 6 units at scale 2
 	cfg_count = 0;
 	badges_loaded = 1;
 	snprintf(badge_tiers, sizeof(badge_tiers), "on");
 	restart();
-	narrow.w = 150 + 92 + 8 + 120;
+	narrow.w = 150 + 76 + 8 + 120;
 	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
 	CHECK_STR(drawn, "2h 15m \xC2\xB7 3 days ago");
-	CHECK(drawn_x == 150 + 92 + 8);
+	CHECK(drawn_x == 150 + 76 + 8);
 	narrow.w--;
 	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
 	CHECK_STR(drawn, "2h \xC2\xB7 3d");
@@ -481,6 +505,29 @@ int main(void) {
 	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
 	CHECK(drawn_x == 150 + 28 + 8);
 	CHECK_STR(drawn, "2h 15m \xC2\xB7 3 days ago");
+
+	// status icons and the trophy: two 7 unit icons, a gap of 2, then the
+	// unplayed dot: 4 + (4 + 14 + 2 + 2 + 2) + 6 = 34 units at scale 2
+	snprintf(badge_completed, sizeof(badge_completed), "on");
+	snprintf(badge_perfect, sizeof(badge_perfect), "on");
+	restart();
+	narrow.w = 150 + 68 + 8 + 120;
+	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
+	CHECK(drawn_x == 150 + 68 + 8);
+	CHECK_STR(drawn, "2h 15m \xC2\xB7 3 days ago");
+	narrow.w--;
+	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
+	CHECK_STR(drawn, "2h \xC2\xB7 3d");
+	// icons alone, with no name: 4 + 7 + 2 = 13 units above the caption
+	snprintf(badge_unplayed, sizeof(badge_unplayed), "off");
+	restart();
+	MosaicRect icon_cell = { 100, 200, 300, 60 }, icon_none = { 100, 200, 0, 60 };
+	icon_cell.h = 8 + 20 + 26;
+	CHECK(drawRow(&tetris_rom, icon_cell, icon_none) == 1);
+	icon_cell.h--;
+	CHECK(drawRow(&tetris_rom, icon_cell, icon_none) == 0);
+	snprintf(badge_completed, sizeof(badge_completed), "off");
+	snprintf(badge_perfect, sizeof(badge_perfect), "off");
 
 	// captions.text: the caption in full, fitted to a width, or none
 	cfg_count = 0;

@@ -101,6 +101,18 @@ int PC_reply(const PCStats* stats, long long now, const PCOptions* options, int 
 int PC_room(const MosaicRect* rect, const MosaicRect* name, int reserve, int corner, int margin, int text_h,
 	MosaicRect* out);
 
+// The room row-badges' badges take after a name or at the top of a cell,
+// in units of the screen's scale, from what its public settings turn on:
+// dots (the unplayed dot, 0 or 1), icons (the status flags and the
+// trophy that are on, 0 to 5) and tiers (1 when its tier dots are on, which
+// can show 5). Each dot is 4 units, each icon 7, a gap 2, and twice the gap
+// between groups, as row-badges lays them out. The room is for the most
+// that can show in a row, since which games have which icons isn't known
+// here. *reserve is the width to keep after the name, with the margins
+// before and after, and *corner the depth to keep at the top of a cell
+// with no name; both 0 with nothing on.
+void PC_badgeRoom(int dots, int icons, int tiers, int* reserve, int* corner);
+
 // fg moved toward bg by percent, from 0 (fg) to 100 (bg), as 0xRRGGBB.
 int PC_mute(int fg, int bg, int percent);
 

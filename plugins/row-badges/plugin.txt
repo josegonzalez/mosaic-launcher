@@ -17,12 +17,12 @@ setting.tagged=toggle|Tag mark|off
 # a dot on games with a manual, from the manuals plugin
 setting.manual=toggle|Manual mark|off
 # a star on games tags marks Completed, from its Status menu
-setting.completed=toggle|Completed icon|off
+setting.completed=toggle|Completed icon|off||public
 # a tick on games tags marks Beaten
-setting.beaten=toggle|Beaten icon|off
+setting.beaten=toggle|Beaten icon|off||public
 # a cross on games tags marks Broken
-setting.broken=toggle|Broken icon|off
+setting.broken=toggle|Broken icon|off||public
 # an hourglass on games tags marks Backlog
-setting.backlog=toggle|Backlog icon|off
+setting.backlog=toggle|Backlog icon|off||public
 # a trophy on games with every RetroAchievement unlocked, from minarch's local progress
-setting.perfect=toggle|100% achievements trophy|off
+setting.perfect=toggle|100% achievements trophy|off||public

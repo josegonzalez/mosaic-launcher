@@ -246,6 +246,24 @@ int PC_room(const MosaicRect* rect, const MosaicRect* name, int reserve, int cor
 	return 1;
 }
 
+void PC_badgeRoom(int dots, int icons, int tiers, int* reserve, int* corner) {
+	if (dots < 0) dots = 0;
+	if (dots > 1) dots = 1;
+	if (icons < 0) icons = 0;
+	if (icons > 5) icons = 5;
+	tiers = tiers > 0 ? 5 : 0;
+	int count = dots + icons + tiers;
+	int groups = (dots > 0) + (icons > 0) + (tiers > 0);
+	int width = 0, height = 0;
+	if (count) {
+		width = (dots + tiers) * 4 + icons * 7 + (count - 1) * 2 + (groups - 1) * 2;
+		height = icons ? 7 : 4;
+	}
+	// 4 units from the name, 6 of slack after; 4 above, 2 of slack below
+	if (reserve) *reserve = count ? 4 + width + 6 : 6;
+	if (corner) *corner = count ? 4 + height + 2 : 0;
+}
+
 int PC_mute(int fg, int bg, int percent) {
 	if (percent < 0) percent = 0;
 	if (percent > 100) percent = 100;

@@ -59,7 +59,7 @@ expect "row Extras caption none"
 # with row-badges' dots after the names, both show, apart (row-badges
 # counts the play history too, so only Unplayed gets its unplayed dot)
 printf 'tier=3\n' >"$CAPTION_DIR/.media/Tetris.info"
-printf 'unplayed=on\ntiers=on\n' >"$STATE/row-badges.cfg"
+printf 'unplayed=on\ntiers=on\ncompleted=on\n' >"$STATE/row-badges.cfg"
 printf 'folder=Roms/Play Captions (PCT)\n' >"$STATE/dotter.cfg"
 printf 'folder=Roms/Play Captions (PCT)\nTetris=2h 15m \302\267 3 days ago\n' >"$STATE/subtitler.cfg"
 rm -f "$STATE/playtime-captions.cfg"
