@@ -266,7 +266,7 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (host->register_action(TOGGLE_ID, "Simple mode", 0, always, toggle, NULL) != 0
 			|| !MOSAIC_HOST_HAS(host, quick_tile)
-			|| host->quick_tile(TOGGLE_ID, MOSAIC_QUICK_BOTTOM, NULL, NULL, isOn) != 0) {
+			|| host->quick_tile(TOGGLE_ID, MOSAIC_QUICK_BOTTOM, "quick/simple-mode.png", "quick/simple-mode-off.png", isOn) != 0) {
 		host->log(ID, "couldn't add the Simple mode tile; turn simple mode off from the Launcher pak");
 	}
 	if (isOn(NULL)) hideTiles(1);

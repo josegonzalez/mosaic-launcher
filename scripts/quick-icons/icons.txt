@@ -1,0 +1,42 @@
+# The bundled plugins' quick menu tile icons, which scripts/quick-icons.sh
+# makes into plugins/<plugin>/res/quick/<file>@<scale>x.png from the
+# Phosphor icon in phosphor/<icon>-fill.svg. The row is the tile's quick
+# menu row, top or bottom, which sets the icon's size as stock's art has it.
+#
+# plugin file icon row
+activity-stats activity chart-bar top
+blue-light warm-tint moon top
+bug-report bug-report bug top
+clear-recents clear-recents broom top
+filter-presets filter funnel top
+first-run first-run hand-waving top
+first-run buttons game-controller top
+first-run help question top
+focus-mode focus target top
+focus-mode focus-on crosshair top
+guest-profile guest user-switch top
+guest-profile clear-guest user-minus top
+localization map translate top
+music music music-notes top
+quick-menu-plus toggle-save floppy-disk-back top
+quick-menu-plus toggle-load folder-open top
+quick-menu-plus toggle-screenshot camera top
+quick-menu-plus toggle-adjustments sliders-horizontal top
+quick-menu-plus toggle-clock clock top
+quick-menu-plus toggle-battery battery-high top
+quick-menu-plus toggle-haptics vibrate top
+quick-menu-plus awake coffee top
+quick-menu-plus stock arrow-u-up-left top
+quick-menu-plus restart arrow-clockwise top
+quick-menu-plus reset arrow-counter-clockwise top
+random-game random dice-five top
+random-game pick-from shuffle top
+save-state-manager save-states floppy-disk top
+screenshot-viewer screenshots images top
+simple-mode simple-mode lock-simple bottom
+simple-mode simple-mode-off lock-simple-open bottom
+sort-modes sort sort-ascending top
+sync sync arrows-clockwise top
+system-info system-info info top
+tags tag tag top
+theme-plus theme palette top

@@ -202,16 +202,17 @@ static char* tileText(const Entry* item) {
 	return label == item->name ? TR(item->name) : (char*)label;
 }
 
-// A plugin tile's PNG for its on/off state, or "" for none.
-static const char* tileIcon(const QuickTile* tile) {
-	const char* icon = QuickTile_isOff(tile) && tile->icon_off ? tile->icon_off : tile->icon;
-	return icon ? icon : "";
+// A plugin tile's PNG for its on/off state, the theme's first, into out, or
+// "" for none.
+static void tileIcon(const QuickTile* tile, char* out, size_t size) {
+	if (QuickTiles_icon(tile->action->id, out, size) != 0) out[0] = '\0';
 }
 
 // A plugin tile on the bottom row: its PNG centered on the pill, or its
 // label when it has none.
 static void blitTileIcon(const QuickTile* tile, Entry* item, SDL_Rect rect, uint32_t icon_color, SDL_Color text_color) {
-	const char* path = tileIcon(tile);
+	char path[MAX_PATH];
+	tileIcon(tile, path, sizeof(path));
 	SDL_Surface* bmp = path[0] ? PluginDraw_loadImage("quick menu", path) : NULL;
 	if (bmp) {
 		SDL_Surface* converted = SDL_ConvertSurfaceFormat(bmp, screen->format->format, 0);
@@ -291,7 +292,7 @@ void QuickMenu_render(void) {
 
 			char icon_path[MAX_PATH];
 			const QuickTile* tile = QuickTiles_forEntry(item);
-			if (tile) snprintf(icon_path, sizeof(icon_path), "%s", tileIcon(tile));
+			if (tile) tileIcon(tile, icon_path, sizeof(icon_path));
 			else resolveArt(ART_QUICK_ICON, item->name, icon_path, sizeof(icon_path));
 			SDL_Surface* bmp = icon_path[0] ? PluginDraw_loadImage("quick menu", icon_path) : NULL;
 			if(bmp) {

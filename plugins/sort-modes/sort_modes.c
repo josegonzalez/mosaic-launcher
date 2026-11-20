@@ -608,7 +608,7 @@ static int init(const MosaicHost* h) {
 	if (host->register_action(NEXT_ID, "SORT", MOSAIC_ACTION_EDITS, canStep, step, NULL) != 0) say("couldn't register " NEXT_ID);
 	if (host->register_action(PICK_ID, "Sort", MOSAIC_ACTION_EDITS, canPick, pick, NULL) != 0) say("couldn't register " PICK_ID);
 	else if (strcmp(host->cfg_get("tile", "on"), "off") != 0
-			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(PICK_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(PICK_ID, MOSAIC_QUICK_TOP, "quick/sort.png", NULL, NULL) != 0)) {
 		say("couldn't add the Sort tile");
 	}
 	return 0;

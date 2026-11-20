@@ -868,7 +868,7 @@ static void addTiles(void) {
 		char id[32];
 		snprintf(id, sizeof(id), "tags.tile.%i", count);
 		if (host->register_action(id, tiles[count], 0, tileAvailable, tileOpen, (void*)(intptr_t)count) != 0
-				|| host->quick_tile(id, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
+				|| host->quick_tile(id, MOSAIC_QUICK_TOP, "quick/tag.png", NULL, NULL) != 0) {
 			say("couldn't add a quick menu tile");
 			break;
 		}

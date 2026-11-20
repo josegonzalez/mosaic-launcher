@@ -1299,7 +1299,7 @@ static int init(const MosaicHost* h) {
 		say("couldn't provide its services");
 	}
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
-		&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(OPEN_ACTION, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+		&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(OPEN_ACTION, MOSAIC_QUICK_TOP, "quick/music.png", NULL, NULL) != 0)) {
 		say("couldn't add the Music tile");
 	}
 	static const struct {

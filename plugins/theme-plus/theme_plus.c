@@ -571,7 +571,7 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
-			&& host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
+			&& host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, "quick/theme.png", NULL, NULL) != 0) {
 		say("couldn't add the Theme tile");
 	}
 	static const struct {

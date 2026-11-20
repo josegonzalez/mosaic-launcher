@@ -756,7 +756,7 @@ static int init(const MosaicHost* h) {
 		return 0;
 	}
 	tile_on = strcmp(host->cfg_get("tile", "off"), "on") == 0;
-	if (tile_on && (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(MAP_ACTION, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+	if (tile_on && (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(MAP_ACTION, MOSAIC_QUICK_TOP, "quick/map.png", NULL, NULL) != 0)) {
 		say("couldn't add the map.txt tile");
 	}
 	static const struct {

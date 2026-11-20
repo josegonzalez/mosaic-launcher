@@ -173,7 +173,7 @@ static int init(const MosaicHost* h) {
 	host = h;
 	if (host->register_action("focus-mode.toggle", "Focus", MOSAIC_ACTION_EDITS, always, toggle, NULL) != 0
 			|| !MOSAIC_HOST_HAS(host, quick_tile)
-			|| host->quick_tile("focus-mode.toggle", MOSAIC_QUICK_TOP, NULL, NULL, isOn) != 0) {
+			|| host->quick_tile("focus-mode.toggle", MOSAIC_QUICK_TOP, "quick/focus.png", NULL, isOn) != 0) {
 		host->log(ID, "couldn't add the Focus tile; turn focus mode off from the Launcher pak");
 	}
 	if (!MOSAIC_HOST_HAS(host, set_names)) {
@@ -193,7 +193,7 @@ static int init(const MosaicHost* h) {
 		}
 	}
 	if (strcmp(host->cfg_get("pick_tile", "on"), "off") != 0
-			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(PICK_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(PICK_ID, MOSAIC_QUICK_TOP, "quick/focus-on.png", NULL, NULL) != 0)) {
 		host->log(ID, "couldn't add the Focus on tile");
 	}
 	return 0;

@@ -5,6 +5,7 @@
 #include "launcher.h"
 #include "quicktiles.h"
 #include "stubs.h"
+#include <sys/stat.h>
 
 // What nav.c reaches beyond the listing code; none of it runs here.
 int openRom(char* path, char* last) { (void)path; (void)last; return 0; }
@@ -121,8 +122,105 @@ static void testRows(void) {
 	CHECK(!QuickTiles_rowHidden(QUICK_ROW_TOP) && !QuickTiles_labelsHidden());
 }
 
+static void clearCard(void) {
+	CHECK(system("rm -rf " TEST_SDCARD_PATH) == 0);
+}
+
+// A theme's .media/quick_<action id>.png wins over the plugin's icon, and
+// its _off one while the tile is off, falling back file by file.
+static void testThemeFirst(void) {
+	char out[MAX_PATH];
+	clearCard();
+	mkdir(TEST_SDCARD_PATH, 0755);
+	mkdir(TEST_SDCARD_PATH "/.media", 0755);
+	on = 1;
+	CHECK(QuickTiles_add("test.icon", QUICK_ROW_TOP, "/icons/star.png", NULL, NULL) == 0);
+	CHECK(QuickTiles_add("test.plain", QUICK_ROW_TOP, NULL, NULL, NULL) == 0);
+	CHECK(QuickTiles_add("test.toggle", QUICK_ROW_BOTTOM, "/icons/on.png", "/icons/off.png", isOn) == 0);
+
+	// no theme files: the plugin's
+	CHECK(QuickTiles_icon("test.icon", out, sizeof(out)) == 0);
+	CHECK_STR(out, "/icons/star.png");
+
+	// the theme's, for a tile with an icon and one without
+	touch(TEST_SDCARD_PATH "/.media/quick_test.icon.png");
+	touch(TEST_SDCARD_PATH "/.media/quick_test.plain.png");
+	CHECK(QuickTiles_icon("test.icon", out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/.media/quick_test.icon.png");
+	CHECK(QuickTiles_icon("test.plain", out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/.media/quick_test.plain.png");
+
+	// a toggle with only the theme's on icon: on shows it, off the plugin's icon_off
+	touch(TEST_SDCARD_PATH "/.media/quick_test.toggle.png");
+	CHECK(QuickTiles_icon("test.toggle", out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/.media/quick_test.toggle.png");
+	on = 0;
+	CHECK(QuickTiles_icon("test.toggle", out, sizeof(out)) == 0);
+	CHECK_STR(out, "/icons/off.png");
+	// and the theme's off icon once it has one
+	touch(TEST_SDCARD_PATH "/.media/quick_test.toggle_off.png");
+	CHECK(QuickTiles_icon("test.toggle", out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/.media/quick_test.toggle_off.png");
+	on = 1;
+	CHECK(QuickTiles_icon("test.toggle", out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/.media/quick_test.toggle.png");
+
+	// a theme path too long for out
+	char small[16];
+	CHECK(QuickTiles_icon("test.icon", small, sizeof(small)) == -1);
+	CHECK_STR(small, "");
+
+	// an off toggle without an icon_off falls back to the on icons
+	unlink(TEST_SDCARD_PATH "/.media/quick_test.toggle_off.png");
+	unlink(TEST_SDCARD_PATH "/.media/quick_test.toggle.png");
+	CHECK(QuickTiles_add("test.toggle", QUICK_ROW_BOTTOM, "/icons/on.png", NULL, isOn) == 0);
+	on = 0;
+	CHECK(QuickTiles_icon("test.toggle", out, sizeof(out)) == 0);
+	CHECK_STR(out, "/icons/on.png");
+	on = 1;
+	QuickTiles_reset();
+	clearCard();
+}
+
+// A plugin's icon path: full paths as they are, relative ones in its res
+// folder with the scale's file first.
+static void testIconPath(void) {
+	char out[MAX_PATH];
+	const char* res = TEST_SDCARD_PATH "/res";
+	clearCard();
+	mkdir(TEST_SDCARD_PATH, 0755);
+	mkdir(TEST_SDCARD_PATH "/res", 0755);
+	mkdir(TEST_SDCARD_PATH "/res/quick", 0755);
+	touch(TEST_SDCARD_PATH "/res/quick/star@2x.png");
+
+	CHECK(QuickTiles_iconPath(res, "/icons/star.png", 2, out, sizeof(out)) == 0);
+	CHECK_STR(out, "/icons/star.png");
+	CHECK(QuickTiles_iconPath(res, "quick/star.png", 2, out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/res/quick/star@2x.png");
+	// no file for this scale: the name as given
+	CHECK(QuickTiles_iconPath(res, "quick/star.png", 3, out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/res/quick/star.png");
+	CHECK(QuickTiles_iconPath(res, "quick/star.jpg", 2, out, sizeof(out)) == 0);
+	CHECK_STR(out, TEST_SDCARD_PATH "/res/quick/star.jpg");
+	// no res folder, no icon, and too small an out
+	CHECK(QuickTiles_iconPath(NULL, "quick/star.png", 2, out, sizeof(out)) == 0);
+	CHECK_STR(out, "quick/star.png");
+	snprintf(out, sizeof(out), "%s", "junk");
+	CHECK(QuickTiles_iconPath(res, NULL, 2, out, sizeof(out)) == 0);
+	CHECK_STR(out, "");
+	CHECK(QuickTiles_iconPath(res, "", 2, out, sizeof(out)) == 0);
+	CHECK_STR(out, "");
+	char small[8];
+	CHECK(QuickTiles_iconPath(res, "quick/star.png", 2, small, sizeof(small)) == -1);
+	CHECK_STR(small, "");
+	CHECK(QuickTiles_iconPath(res, "quick/star.png", 2, NULL, 8) == -1);
+	clearCard();
+}
+
 int main(void) {
 	testIcon();
 	testRows();
+	testThemeFirst();
+	testIconPath();
 	CHECK_DONE();
 }

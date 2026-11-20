@@ -136,7 +136,7 @@ static int init(const MosaicHost* h) {
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0) {
 		if (host->register_action("clear-recents.tile", "Clear recents", MOSAIC_ACTION_EDITS, hasRecents, clearAll, NULL) != 0
 				|| !MOSAIC_HOST_HAS(host, quick_tile)
-				|| host->quick_tile("clear-recents.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
+				|| host->quick_tile("clear-recents.tile", MOSAIC_QUICK_TOP, "quick/clear-recents.png", NULL, NULL) != 0) {
 			say("couldn't add the Clear recents tile");
 		}
 	}

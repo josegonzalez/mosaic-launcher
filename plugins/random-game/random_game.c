@@ -416,7 +416,7 @@ static int init(const MosaicHost* h) {
 	if (isOn("tile", "off")) {
 		if (host->register_action("random-game.tile", "Random", 0, canPickAll, pickAll, NULL) != 0
 				|| !MOSAIC_HOST_HAS(host, quick_tile)
-				|| host->quick_tile("random-game.tile", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
+				|| host->quick_tile("random-game.tile", MOSAIC_QUICK_TOP, "quick/random.png", NULL, NULL) != 0) {
 			say("couldn't add the Random tile");
 		}
 	}
@@ -432,7 +432,7 @@ static int init(const MosaicHost* h) {
 			}
 		}
 		if (isOn("from_tile", "off") && (!MOSAIC_HOST_HAS(host, quick_tile)
-				|| host->quick_tile("random-game.from", MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+				|| host->quick_tile("random-game.from", MOSAIC_QUICK_TOP, "quick/pick-from.png", NULL, NULL) != 0)) {
 			say("couldn't add the Pick from tile");
 		}
 	}

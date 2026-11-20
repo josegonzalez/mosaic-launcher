@@ -895,7 +895,7 @@ static int init(const MosaicHost* h) {
 	}
 	if (MOSAIC_HOST_HAS(host, set_names)) host->subscribe("launcher.set_changed", setChanged, NULL);
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
-			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, "quick/activity.png", NULL, NULL) != 0)) {
 		say("couldn't add the Activity tile");
 	}
 	static const struct {

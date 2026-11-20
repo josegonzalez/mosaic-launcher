@@ -136,6 +136,12 @@ With Pin to top on, µCity, a favorite, comes first in Game Boy Color.
 ![Game Boy Color with µCity first](docs/pin.png)
 ```
 
+## Quick menu icons
+
+The bundled plugins' quick menu tile icons are [Phosphor](https://phosphoricons.com) icons, in its fill weight, from Phosphor's v2.0.8 release (https://github.com/phosphor-icons/core/releases/tag/v2.0.8, whose archive is https://github.com/phosphor-icons/core/archive/refs/tags/v2.0.8.tar.gz). Its licence (MIT) is `scripts/quick-icons/LICENSE`, and is in `THIRD_PARTY_NOTICES.txt` too, which the pak carries. The SVGs used are copied unchanged into `scripts/quick-icons/phosphor/`, and `scripts/quick-icons/icons.txt` lists each tile's plugin, file name, icon and row.
+
+`./scripts/quick-icons.sh` makes every icon again from them into `plugins/<id>/res/quick/<file>@<scale>x.png`, white on clear as grey and alpha PNGs, at stock's sizes for the row (48 units for the top row, 12 for the bottom), at scales 2 and 3, the scales of every device. It needs `rsvg-convert` and ImageMagick (`brew install librsvg imagemagick`). To add an icon, add its line to `icons.txt`, run `./scripts/quick-icons.sh fetch`, which downloads the release archive, checks its SHA-256 and copies the SVGs `phosphor/` lacks, pass `quick/<file>.png` to `quick_tile`, and commit the SVG and the PNGs. [plugin-api.md](plugin-api.md)'s "Quick menu tile icons" has how the launcher finds them and the names a theme replaces them by.
+
 ## Updating NextUI
 
 The launcher in `launcher/` started as upstream's `nextui.c`, split into modules:

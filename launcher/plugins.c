@@ -722,7 +722,19 @@ static int hostQuickTile(const char* action_id, int row, const char* icon, const
 	if (row == MOSAIC_QUICK_TOP) quick_row = QUICK_ROW_TOP;
 	else if (row == MOSAIC_QUICK_BOTTOM) quick_row = QUICK_ROW_BOTTOM;
 	else return -1;
-	if (QuickTiles_add(action_id, quick_row, icon, icon_off, is_on) != 0) {
+	// relative icons are in the calling plugin's res folder
+	const char* caller = Caller_current();
+	LoadedPlugin* p = caller ? loadedById(caller) : NULL;
+	char res[MAX_PATH] = "";
+	if (p && Manifest_res(p->manifest, res, sizeof(res)) != 0) res[0] = '\0';
+	char on_path[MAX_PATH];
+	char off_path[MAX_PATH];
+	if (QuickTiles_iconPath(res[0] ? res : NULL, icon, FIXED_SCALE, on_path, sizeof(on_path)) != 0
+			|| QuickTiles_iconPath(res[0] ? res : NULL, icon_off, FIXED_SCALE, off_path, sizeof(off_path)) != 0) {
+		LOG_warn("plugins: the icon for %s's quick menu tile is too long a path\n", action_id ? action_id : "(null)");
+		return -1;
+	}
+	if (QuickTiles_add(action_id, quick_row, on_path, off_path, is_on) != 0) {
 		LOG_warn("plugins: can't add a quick menu tile for %s\n", action_id ? action_id : "(null)");
 		return -1;
 	}

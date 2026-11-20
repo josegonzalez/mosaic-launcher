@@ -1023,7 +1023,7 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
-			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0)) {
+			&& (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(ACTION_ID, MOSAIC_QUICK_TOP, "quick/system-info.png", NULL, NULL) != 0)) {
 		say("couldn't add the System info tile");
 	}
 	static const struct {

@@ -969,8 +969,8 @@ static void bindSetting(const char* key, const char* action) {
 	}
 }
 
-static void addTile(const char* action) {
-	if (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(action, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
+static void addTile(const char* action, const char* icon) {
+	if (!MOSAIC_HOST_HAS(host, quick_tile) || host->quick_tile(action, MOSAIC_QUICK_TOP, icon, NULL, NULL) != 0) {
 		char line[128];
 		snprintf(line, sizeof(line), "couldn't add %s's tile", action);
 		say(line);
@@ -1013,9 +1013,9 @@ static int init(const MosaicHost* h) {
 		return 1;
 	}
 	if (host->register_action(HELP_ACTION_ID, "Help", 0, NULL, runHelp, NULL) != 0) say("couldn't register " HELP_ACTION_ID);
-	if (tile_on) addTile(ACTION_ID);
-	if (setting("buttons_tile", "on")) addTile(BUTTONS_ACTION_ID);
-	if (setting("help_tile", "on")) addTile(HELP_ACTION_ID);
+	if (tile_on) addTile(ACTION_ID, "quick/first-run.png");
+	if (setting("buttons_tile", "on")) addTile(BUTTONS_ACTION_ID, "quick/buttons.png");
+	if (setting("help_tile", "on")) addTile(HELP_ACTION_ID, "quick/help.png");
 	bindSetting("button", ACTION_ID);
 	bindSetting("buttons_button", BUTTONS_ACTION_ID);
 	bindSetting("help_button", HELP_ACTION_ID);

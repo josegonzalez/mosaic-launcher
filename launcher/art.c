@@ -46,6 +46,9 @@ void resolveArt(int kind, const char* subject, char* out, size_t size) {
 		case ART_QUICK_ICON:
 			snprintf(out, size, SDCARD_PATH "/.system/res/%s@%ix.png", subject, FIXED_SCALE);
 			break;
+		case ART_QUICK_TILE_ICON:
+			snprintf(out, size, SDCARD_PATH "/.media/quick_%s.png", subject);
+			break;
 		default:
 			if (size) out[0] = '\0';
 			break;

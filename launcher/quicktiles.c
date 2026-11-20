@@ -128,19 +128,56 @@ int QuickTile_isOff(const QuickTile* tile) {
 	return !on;
 }
 
+// The card's .media/quick_<id><suffix>.png into out when it's there.
+static int themeIcon(const char* id, const char* suffix, char* out, size_t size) {
+	char subject[256];
+	char path[MAX_PATH];
+	snprintf(subject, sizeof(subject), "%s%s", id, suffix);
+	resolveArt(ART_QUICK_TILE_ICON, subject, path, sizeof(path));
+	if (!exists(path)) return 0;
+	snprintf(out, size, "%s", path);
+	return 1;
+}
+
 int QuickTiles_icon(const char* action_id, char* out, size_t size) {
 	if (!out || !size) return -1;
 	out[0] = '\0';
 	if (!action_id) return -1;
 	for (int i = 0; i < tile_count; i++) {
 		if (strcmp(tiles[i].action->id, action_id) != 0) continue;
-		const char* icon = QuickTile_isOff(&tiles[i]) && tiles[i].icon_off ? tiles[i].icon_off : tiles[i].icon;
-		if (!icon) return 0;
+		char path[MAX_PATH];
+		int off = QuickTile_isOff(&tiles[i]);
+		const char* icon = "";
+		if (off && themeIcon(action_id, "_off", path, sizeof(path))) icon = path;
+		else if (off && tiles[i].icon_off) icon = tiles[i].icon_off;
+		else if (themeIcon(action_id, "", path, sizeof(path))) icon = path;
+		else if (tiles[i].icon) icon = tiles[i].icon;
 		if (strlen(icon) >= size) return -1;
 		snprintf(out, size, "%s", icon);
 		return 0;
 	}
 	return -1;
+}
+
+int QuickTiles_iconPath(const char* res, const char* icon, int scale, char* out, size_t size) {
+	if (!out || !size) return -1;
+	out[0] = '\0';
+	if (!icon || !icon[0]) return 0;
+	char path[MAX_PATH];
+	int n;
+	if (icon[0] == '/' || !res) n = snprintf(path, sizeof(path), "%s", icon);
+	else {
+		n = snprintf(path, sizeof(path), "%s/%s", res, icon);
+		size_t len = strlen(icon);
+		if (len > 4 && !strcmp(icon + len - 4, ".png")) {
+			char scaled[MAX_PATH];
+			int m = snprintf(scaled, sizeof(scaled), "%s/%.*s@%ix.png", res, (int)(len - 4), icon, scale);
+			if (m > 0 && (size_t)m < sizeof(scaled) && exists(scaled)) n = snprintf(path, sizeof(path), "%s", scaled);
+		}
+	}
+	if (n < 0 || (size_t)n >= sizeof(path) || (size_t)n >= size) return -1;
+	snprintf(out, size, "%s", path);
+	return 0;
 }
 
 void QuickTiles_apply(Array* entries, int row) {

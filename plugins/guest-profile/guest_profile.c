@@ -152,11 +152,11 @@ static int init(const MosaicHost* h) {
 	}
 	if (host->register_action(CLEAR_ID, "Clear guest", MOSAIC_ACTION_EDITS, always, clearData, NULL) != 0) say("couldn't register " CLEAR_ID);
 	if (strcmp(host->cfg_get("tile", "on"), "off") != 0
-			&& host->quick_tile(TOGGLE_ID, MOSAIC_QUICK_TOP, NULL, NULL, isOn) != 0) {
+			&& host->quick_tile(TOGGLE_ID, MOSAIC_QUICK_TOP, "quick/guest.png", NULL, isOn) != 0) {
 		say("couldn't add the Guest tile");
 	}
 	if (strcmp(host->cfg_get("clear_tile", "on"), "off") != 0
-			&& host->quick_tile(CLEAR_ID, MOSAIC_QUICK_TOP, NULL, NULL, NULL) != 0) {
+			&& host->quick_tile(CLEAR_ID, MOSAIC_QUICK_TOP, "quick/clear-guest.png", NULL, NULL) != 0) {
 		say("couldn't add the Clear guest tile");
 	}
 	int button = GP_button(host->cfg_get("button", "none"));

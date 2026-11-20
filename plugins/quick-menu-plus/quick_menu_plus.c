@@ -277,9 +277,9 @@ static void askReset(const char* path, void* data) {
 ///////////////////////////////////////
 // hooks
 
-static void addTile(const char* id, const char* label, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), int (*is_on)(void*), void* data) {
+static void addTile(const char* id, const char* label, const char* icon, int flags, int (*available)(const char*, void*), void (*run)(const char*, void*), int (*is_on)(void*), void* data) {
 	if (host->register_action(id, label, flags, available, run, data) != 0
-			|| host->quick_tile(id, MOSAIC_QUICK_TOP, NULL, NULL, is_on) != 0) {
+			|| host->quick_tile(id, MOSAIC_QUICK_TOP, icon, NULL, is_on) != 0) {
 		char message[200];
 		snprintf(message, sizeof(message), "couldn't add the %s tile", label);
 		say(message);
@@ -310,7 +310,9 @@ static void addStockToggles(void) {
 		}
 		char id[QMP_NAME_LEN + 32];
 		snprintf(id, sizeof(id), ID ".toggle.%s", toggles[i]->word);
-		addTile(id, toggles[i]->label, 0, always, flipStock, stockOn, (void*)toggles[i]);
+		char icon[QMP_NAME_LEN + 32];
+		snprintf(icon, sizeof(icon), "quick/toggle-%s.png", toggles[i]->word);
+		addTile(id, toggles[i]->label, icon, 0, always, flipStock, stockOn, (void*)toggles[i]);
 	}
 }
 
@@ -331,7 +333,7 @@ static int init(const MosaicHost* h) {
 	if (isOn("awake_tile", "on")) {
 		if (!MOSAIC_HOST_HAS(host, inhibit_sleep)) say("this launcher can't hold off sleep; no Stay awake tile");
 		else {
-			addTile(ID ".awake", TR_MARK("Stay awake"), 0, always, toggleAwake, awakeOn, NULL);
+			addTile(ID ".awake", TR_MARK("Stay awake"), "quick/awake.png", 0, always, toggleAwake, awakeOn, NULL);
 			if (access(QMP_AWAKE_FILE, F_OK) == 0) setAwake(1);
 		}
 	}
@@ -343,19 +345,19 @@ static int init(const MosaicHost* h) {
 		else {
 			findPak();
 			if (!pak[0]) say("manage.sh not found; no Reboot to stock tile");
-			addTile(ID ".stock", TR_MARK("Reboot to stock"), MOSAIC_ACTION_EDITS, canRebootToStock, askRebootToStock, NULL, NULL);
+			addTile(ID ".stock", TR_MARK("Reboot to stock"), "quick/stock.png", MOSAIC_ACTION_EDITS, canRebootToStock, askRebootToStock, NULL, NULL);
 		}
 	}
 
 	if (isOn("restart_tile", "off")) {
 		if (!MOSAIC_HOST_HAS(host, restart)) say("this launcher can't restart for plugins; no Restart launcher tile");
-		else addTile(ID ".restart", TR_MARK("Restart launcher"), 0, always, restartNow, NULL, NULL);
+		else addTile(ID ".restart", TR_MARK("Restart launcher"), "quick/restart.png", 0, always, restartNow, NULL, NULL);
 	}
 	if (isOn("reset_tile", "off")) {
 		if (!MOSAIC_HOST_HAS(host, reset_settings) || !MOSAIC_HOST_HAS(host, confirm)) {
 			say("this launcher can't reset its settings for plugins; no Reset launcher settings tile");
 		}
-		else addTile(ID ".reset", TR_MARK("Reset launcher settings"), MOSAIC_ACTION_EDITS, always, askReset, NULL, NULL);
+		else addTile(ID ".reset", TR_MARK("Reset launcher settings"), "quick/reset.png", MOSAIC_ACTION_EDITS, always, askReset, NULL, NULL);
 	}
 	return 0;
 }

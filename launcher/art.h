@@ -14,6 +14,7 @@ enum ArtKind {
 	ART_QUICK_BG,       // subject: tile name+state  -> <sd>/.media/quick_<subject>.png
 	ART_QUICK_FALLBACK, // subject: unused           -> <sd>/.media/quick.png
 	ART_QUICK_ICON,     // subject: tile name        -> <sd>/.system/res/<subject>@<scale>x.png
+	ART_QUICK_TILE_ICON, // subject: action id+state -> <sd>/.media/quick_<subject>.png, a theme's plugin tile icon
 	// only plugins' art_path supplies these, so they resolve to ""
 	ART_BOX,
 	ART_BOX_3D,
