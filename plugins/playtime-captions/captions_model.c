@@ -248,7 +248,7 @@ int PC_room(const MosaicRect* rect, const MosaicRect* name, int reserve, int cor
 
 void PC_badgeRoom(int dots, int icons, int tiers, int* reserve, int* corner) {
 	if (dots < 0) dots = 0;
-	if (dots > 1) dots = 1;
+	if (dots > 4) dots = 4;
 	if (icons < 0) icons = 0;
 	if (icons > 5) icons = 5;
 	tiers = tiers > 0 ? 5 : 0;

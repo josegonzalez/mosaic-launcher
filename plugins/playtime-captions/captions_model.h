@@ -103,10 +103,12 @@ int PC_room(const MosaicRect* rect, const MosaicRect* name, int reserve, int cor
 
 // The room row-badges' badges take after a name or at the top of a cell,
 // in units of the screen's scale, from what its public settings turn on:
-// dots (the unplayed dot, 0 or 1), icons (the status flags and the
-// trophy that are on, 0 to 5) and tiers (1 when its tier dots are on, which
-// can show 5). Each dot is 4 units, each icon 7, a gap 2, and twice the gap
-// between groups, as row-badges lays them out. The room is for the most
+// dots (the one-dot marks that are on, the unplayed dot and the favorite,
+// tag and manual marks, 0 to 4), icons (the status flags and the trophy
+// that are on, 0 to 5) and tiers (1 when its tier dots are on, which can
+// show 5). Each dot is 4 units, each icon 7, a gap 2, and twice the gap
+// between groups, as row-badges lays them out; the marks are one group,
+// the tier dots another. The room is for the most
 // that can show in a row, since which games have which icons isn't known
 // here. *reserve is the width to keep after the name, with the margins
 // before and after, and *corner the depth to keep at the top of a cell

@@ -63,11 +63,12 @@ static int isOn(const char* key, const char* fallback) {
 	return !strcmp(host->cfg_get(key, fallback), "on");
 }
 
-// row-badges' badges go after the name: 4 units from it, the unplayed dot,
-// the status icons and trophy, and five tier dots, or in the top right
-// corner when there's no name or no room after it. Room is kept for every
-// badge whose setting is on, not per row, since which games have a status
-// flag or a trophy isn't known here. Its settings are only there while it's
+// row-badges' badges go after the name: 4 units from it, the unplayed dot
+// and the favorite, tag and manual marks, the status icons and trophy, and
+// five tier dots, or in the top right corner when there's no name or no
+// room after it. Room is kept for every badge whose setting is on, not per
+// row, since which games have a mark, a status flag or a trophy isn't known
+// here. Its settings are only there while it's
 // loaded.
 static int badgeOn(const char* key) {
 	return !strcmp(publicSetting("row-badges", key, "off"), "on");
@@ -76,10 +77,12 @@ static int badgeOn(const char* key) {
 static void readBadges(void) {
 	if (badges_known) return;
 	badges_known = 1;
+	static const char* const mark_keys[] = { "unplayed", "favorites", "tagged", "manual" };
 	static const char* const icon_keys[] = { "completed", "beaten", "broken", "backlog", "perfect" };
-	int icons = 0;
+	int marks = 0, icons = 0;
+	for (size_t i = 0; i < sizeof(mark_keys) / sizeof(mark_keys[0]); i++) marks += badgeOn(mark_keys[i]);
 	for (size_t i = 0; i < sizeof(icon_keys) / sizeof(icon_keys[0]); i++) icons += badgeOn(icon_keys[i]);
-	PC_badgeRoom(badgeOn("unplayed"), icons, badgeOn("tiers"), &badge_reserve, &badge_corner);
+	PC_badgeRoom(marks, icons, badgeOn("tiers"), &badge_reserve, &badge_corner);
 }
 
 static int measure(const char* text, void* ctx) {

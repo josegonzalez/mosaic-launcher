@@ -11,11 +11,11 @@ setting.unplayed=toggle|Unplayed dot|off||public
 # dots for the tier= value, 1 to 5, in a game's or system's .info sidecar
 setting.tiers=toggle|Tier dots|off||public
 # a dot on your favorites, from the favorites plugin
-setting.favorites=toggle|Favorite mark|off
+setting.favorites=toggle|Favorite mark|off||public
 # a dot on games with any tag, from the tags plugin
-setting.tagged=toggle|Tag mark|off
+setting.tagged=toggle|Tag mark|off||public
 # a dot on games with a manual, from the manuals plugin
-setting.manual=toggle|Manual mark|off
+setting.manual=toggle|Manual mark|off||public
 # a star on games tags marks Completed, from its Status menu
 setting.completed=toggle|Completed icon|off||public
 # a tick on games tags marks Beaten

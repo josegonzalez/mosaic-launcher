@@ -44,12 +44,16 @@ static char cfg[8][2][32];
 static int cfg_count = 0;
 static int badges_loaded = 0;
 static char badge_unplayed[8] = "off", badge_tiers[8] = "off", badge_completed[8] = "off", badge_perfect[8] = "off";
+static char badge_favorites[8] = "off", badge_tagged[8] = "off", badge_manual[8] = "off";
 static const char* fakeCfgRead(const char* id, const char* key, const char* fallback) {
 	if (strcmp(id, "row-badges") || !badges_loaded) return fallback;
 	if (!strcmp(key, "unplayed")) return badge_unplayed;
 	if (!strcmp(key, "tiers")) return badge_tiers;
 	if (!strcmp(key, "completed")) return badge_completed;
 	if (!strcmp(key, "perfect")) return badge_perfect;
+	if (!strcmp(key, "favorites")) return badge_favorites;
+	if (!strcmp(key, "tagged")) return badge_tagged;
+	if (!strcmp(key, "manual")) return badge_manual;
 	return fallback;
 }
 static const char* fakeCfgGet(const char* key, const char* fallback) {
@@ -408,8 +412,16 @@ int main(void) {
 	// all of them: 4 + 25 + 6 groups of 2
 	PC_badgeRoom(1, 5, 1, &reserve, &corner);
 	CHECK(reserve == 4 + (6 * 4 + 35 + 10 * 2 + 4) + 6 && corner == 13);
+	// the four one-dot marks are one group: 16 + 3 gaps
+	PC_badgeRoom(4, 0, 0, &reserve, &corner);
+	CHECK(reserve == 4 + 22 + 6 && corner == 10);
+	// every badge: 9 dots, 5 icons, 13 gaps and 2 more between groups
+	PC_badgeRoom(4, 5, 1, &reserve, &corner);
+	CHECK(reserve == 4 + (9 * 4 + 35 + 13 * 2 + 4) + 6 && corner == 13);
 	PC_badgeRoom(-1, 9, 3, &reserve, &corner);
 	CHECK(reserve == 4 + (5 * 4 + 35 + 9 * 2 + 2) + 6);
+	PC_badgeRoom(7, 0, 0, &reserve, &corner);
+	CHECK(reserve == 4 + 22 + 6);
 	PC_badgeRoom(0, 0, 0, NULL, NULL);
 
 	// muting a colour toward the background
@@ -528,6 +540,35 @@ int main(void) {
 	CHECK(drawRow(&tetris_rom, icon_cell, icon_none) == 0);
 	snprintf(badge_completed, sizeof(badge_completed), "off");
 	snprintf(badge_perfect, sizeof(badge_perfect), "off");
+
+	// the favorite, tag and manual marks go with the unplayed dot: four
+	// dots three gaps apart, 4 + 22 + 6 = 32 units at scale 2
+	snprintf(badge_unplayed, sizeof(badge_unplayed), "on");
+	snprintf(badge_favorites, sizeof(badge_favorites), "on");
+	snprintf(badge_tagged, sizeof(badge_tagged), "on");
+	snprintf(badge_manual, sizeof(badge_manual), "on");
+	restart();
+	narrow.w = 150 + 64 + 8 + 120;
+	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
+	CHECK(drawn_x == 150 + 64 + 8);
+	CHECK_STR(drawn, "2h 15m \xC2\xB7 3 days ago");
+	narrow.w--;
+	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
+	CHECK_STR(drawn, "2h \xC2\xB7 3d");
+	// just the favorite mark: 4 + 4 + 6 units, as for the unplayed dot
+	snprintf(badge_unplayed, sizeof(badge_unplayed), "off");
+	snprintf(badge_tagged, sizeof(badge_tagged), "off");
+	snprintf(badge_manual, sizeof(badge_manual), "off");
+	restart();
+	narrow.w = 150 + 28 + 8 + 120;
+	CHECK(drawRow(&tetris_rom, narrow, row_name) == 1);
+	CHECK(drawn_x == 150 + 28 + 8);
+	// with no name, below the corner marks: 4 + 4 + 2 = 10 units
+	MosaicRect mark_cell = { 100, 200, 300, 8 + 20 + 20 }, mark_none = { 100, 200, 0, 60 };
+	CHECK(drawRow(&tetris_rom, mark_cell, mark_none) == 1);
+	mark_cell.h--;
+	CHECK(drawRow(&tetris_rom, mark_cell, mark_none) == 0);
+	snprintf(badge_favorites, sizeof(badge_favorites), "off");
 
 	// captions.text: the caption in full, fitted to a width, or none
 	cfg_count = 0;

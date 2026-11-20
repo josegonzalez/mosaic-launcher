@@ -87,7 +87,7 @@ Every status icon and the trophy on, with statuses set in tags: Libbet is Beaten
 | Backlog icon (`backlog`) | on, off | off | An hourglass on games tags marks Backlog |
 | 100% achievements trophy (`perfect`) | on, off | off | A trophy on games with every RetroAchievement unlocked, from minarch's local progress |
 
-The unplayed dot, tier dots, status icons and trophy settings are `public`, so other plugins can read them with `cfg_read`.
+The unplayed dot, favorite, tag and manual mark, tier dots, status icons and trophy settings are `public`, so other plugins can read them with `cfg_read`.
 
 ## For plugin authors
 
