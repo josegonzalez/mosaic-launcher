@@ -1102,6 +1102,7 @@ A theme can replace a plugin tile's icon by its action's id: the launcher draws 
 | `filter-presets` | `filter-presets.pick` | top |
 | `first-run` | `first-run.open`, `first-run.buttons`, `first-run.help` | top |
 | `focus-mode` | `focus-mode.toggle`, `focus-mode.pick` | top |
+| `gamification` | `gamification.open` | top |
 | `guest-profile` | `guest-profile.toggle`, `guest-profile.clear` | top |
 | `localization` | `localization.map` | top |
 | `music` | `music.open` | top |
