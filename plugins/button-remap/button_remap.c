@@ -10,6 +10,10 @@
 // plugins' bindings there, and with two or more actions available the
 // button opens a menu of them; with "repeat:" it overrides them instead.
 // Buttons without a setting are left alone.
+//
+// FN1, FN2 and HOME each run an action id or a Tools pak their setting
+// names, where the device has them and the user left them unassigned in
+// stock's Settings.
 
 #include <stdio.h>
 #include <string.h>
@@ -44,10 +48,39 @@ static void readTable(void) {
 	call_count = Remap_calls(&table, calls);
 }
 
+// FN1, FN2 and HOME, through the launcher's FN bindings: the user's own
+// choice in stock's Settings wins, and the first plugin to bind a button
+// keeps it, so the launcher may refuse one (and logs why). A press runs
+// the action as any FN button does, through plugins' action gates.
+static void bindFns(void) {
+	for (int index = 0; index < REMAP_FNS; index++) {
+		const char* key = Remap_fnKey(index);
+		const char* value = host->cfg_get(key, "");
+		char action[REMAP_FN_LEN];
+		int parsed = Remap_parseFn(value, host->platform, action);
+		if (parsed == REMAP_UNSET) continue;
+		if (parsed == REMAP_BAD) {
+			SAY("can't read %s=%s, leaving the button as it was", key, value);
+			continue;
+		}
+		if (!MOSAIC_HOST_HAS(host, fn_release)) {
+			SAY("this launcher can't bind FN buttons, so %s is left as it was", key);
+			continue;
+		}
+		int button = MOSAIC_BUTTON_FN1 + index;
+		if (!host->fn_name(button)[0]) {
+			SAY("this device has no %s button, so %s does nothing", key, key);
+			continue;
+		}
+		host->fn_bind(button, action);
+	}
+}
+
 static int init(const MosaicHost* h) {
 	host = h;
 	bound = 0;
 	readTable();
+	bindFns();
 	for (int i = 0; i < call_count; i++) {
 		const RemapCall* c = &calls[i];
 		if (c->bind) continue; // on the first tick, once every plugin has registered its actions

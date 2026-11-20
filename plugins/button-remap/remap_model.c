@@ -131,3 +131,68 @@ int Remap_calls(const RemapTable* table, RemapCall* out) {
 	}
 	return n;
 }
+
+static const char* const fn_keys[REMAP_FNS] = { "fn1", "fn2", "home" };
+
+const char* Remap_fnKey(int index) {
+	if (index < 0 || index >= REMAP_FNS) return NULL;
+	return fn_keys[index];
+}
+
+// Skips prefix at the start of *text, ignoring case, when it's there.
+static int skip(const char** text, const char* prefix) {
+	size_t len = strlen(prefix);
+	if (strncasecmp(*text, prefix, len)) return 0;
+	*text += len;
+	return 1;
+}
+
+// A pak's folder in Tools/<platform>: a name ending in .pak, with no
+// slashes, so nothing outside it.
+static int pakFolder(const char* name, size_t len) {
+	if (len <= 4 || strncasecmp(name + len - 4, ".pak", 4)) return 0;
+	if (memchr(name, '/', len) || memchr(name, '\\', len)) return 0;
+	if (len >= 2 && name[0] == '.' && name[1] == '.') return 0;
+	for (size_t i = 0; i < len; i++) {
+		if ((unsigned char)name[i] < 0x20) return 0;
+	}
+	return 1;
+}
+
+int Remap_parseFn(const char* value, const char* platform, char* out) {
+	out[0] = '\0';
+	if (!value) return REMAP_UNSET;
+	while (isspace((unsigned char)*value)) value++;
+	size_t len = strlen(value);
+	while (len > 0 && isspace((unsigned char)value[len - 1])) len--;
+	if (len == 0) return REMAP_UNSET;
+
+	char text[REMAP_FN_LEN];
+	if (len >= sizeof(text)) return REMAP_BAD;
+	memcpy(text, value, len);
+	text[len] = '\0';
+
+	const char* p = text;
+	if (skip(&p, "action:")) {
+		char id[REMAP_FN_LEN - sizeof("action:") + 1]; // so "action:<id>" fits
+		if (copyId(p, p + strlen(p), id, sizeof(id)) != 0) return REMAP_BAD;
+		snprintf(out, REMAP_FN_LEN, "action:%s", id);
+		return REMAP_SET;
+	}
+	int pak = skip(&p, "pak:") || (len >= 4 && !strncasecmp(text + len - 4, ".pak", 4));
+	if (pak) {
+		// Tools/ and Tools/<platform>/ are where every Tools pak is
+		if (skip(&p, "Tools/") && platform && platform[0]) {
+			const char* rest = p;
+			if (skip(&rest, platform) && *rest == '/') p = rest + 1;
+		}
+		size_t n = strlen(p);
+		if (!pakFolder(p, n) || n + strlen("pak:") >= REMAP_FN_LEN) return REMAP_BAD;
+		snprintf(out, REMAP_FN_LEN, "pak:%s", p);
+		return REMAP_SET;
+	}
+	char id[REMAP_FN_LEN - sizeof("action:") + 1]; // so "action:<id>" fits
+	if (copyId(text, text + len, id, sizeof(id)) != 0) return REMAP_BAD;
+	snprintf(out, REMAP_FN_LEN, "action:%s", id);
+	return REMAP_SET;
+}

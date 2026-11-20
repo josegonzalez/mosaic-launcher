@@ -65,6 +65,27 @@ static int fakeOverride(int screen, int button, int trigger, const char* id) {
 	return 0;
 }
 
+static const char* fn_names[REMAP_FNS] = { "L4", "R4", "HOME" };
+static char fn_bound[REMAP_FNS][REMAP_FN_LEN]; // what fn_bind got, "" for nothing
+static int fn_refuse = -1; // fn_bind refuses this index, as if the user had assigned it
+static const char* fakeFnName(int button) {
+	int index = button - MOSAIC_BUTTON_FN1;
+	return index >= 0 && index < REMAP_FNS ? fn_names[index] : "";
+}
+static int fakeFnBind(int button, const char* action) {
+	int index = button - MOSAIC_BUTTON_FN1;
+	CHECK(index >= 0 && index < REMAP_FNS && fn_names[index][0]);
+	CHECK(!fn_bound[index][0]); // once each
+	if (index == fn_refuse) return -1;
+	snprintf(fn_bound[index], sizeof(fn_bound[0]), "%s", action);
+	return 0;
+}
+static int fakeFnRelease(int button) {
+	(void)button;
+	CHECK(0); // the plugin never releases its buttons
+	return -1;
+}
+
 static MosaicHost fake = {
 	.size = sizeof(MosaicHost),
 	.api_version = MOSAIC_API_VERSION,
@@ -77,6 +98,9 @@ static MosaicHost fake = {
 	.bind_button = fakeBind,
 	.override_button = fakeOverride,
 	.override_repeat = 1,
+	.fn_name = fakeFnName,
+	.fn_bind = fakeFnBind,
+	.fn_release = fakeFnRelease,
 };
 
 static void reset(void) {
@@ -86,6 +110,11 @@ static void reset(void) {
 	logs = 0;
 	refuse_button = -1;
 	unknown_action = NULL;
+	memset(fn_bound, 0, sizeof(fn_bound));
+	fn_refuse = -1;
+	fn_names[0] = "L4";
+	fn_names[1] = "R4";
+	fn_names[2] = "HOME";
 }
 
 // Starts the plugin as the loader would, then runs its first two ticks.
@@ -341,6 +370,116 @@ static void testRefusals(void) {
 	CHECK(logs == 3);
 }
 
+///////////////////////////////////////
+// FN buttons
+
+static void testFnKeys(void) {
+	CHECK_STR(Remap_fnKey(0), "fn1");
+	CHECK_STR(Remap_fnKey(1), "fn2");
+	CHECK_STR(Remap_fnKey(2), "home");
+	CHECK(Remap_fnKey(-1) == NULL);
+	CHECK(Remap_fnKey(REMAP_FNS) == NULL);
+}
+
+static void testParseFn(void) {
+	char out[REMAP_FN_LEN];
+	CHECK(Remap_parseFn(NULL, "tg5040", out) == REMAP_UNSET && !out[0]);
+	CHECK(Remap_parseFn("", "tg5040", out) == REMAP_UNSET && !out[0]);
+	CHECK(Remap_parseFn("  ", "tg5040", out) == REMAP_UNSET && !out[0]);
+
+	// action ids
+	CHECK(Remap_parseFn("gamelist.switcher", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "action:gamelist.switcher");
+	CHECK(Remap_parseFn(" random-game.pick ", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "action:random-game.pick");
+	CHECK(Remap_parseFn("action:favorites.toggle", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "action:favorites.toggle");
+
+	// paks, in each spelling
+	CHECK(Remap_parseFn("Tools/Files.pak", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "pak:Files.pak");
+	CHECK(Remap_parseFn("Tools/tg5040/Files.pak", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "pak:Files.pak");
+	CHECK(Remap_parseFn("Files.pak", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "pak:Files.pak");
+	CHECK(Remap_parseFn("tools/Clock.PAK", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "pak:Clock.PAK");
+	CHECK(Remap_parseFn("pak:Clock.pak", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "pak:Clock.pak");
+	CHECK(Remap_parseFn("pak:Tools/Clock.pak", "tg5040", out) == REMAP_SET);
+	CHECK_STR(out, "pak:Clock.pak");
+	CHECK(Remap_parseFn("Tools/Game Tracker.pak", NULL, out) == REMAP_SET);
+	CHECK_STR(out, "pak:Game Tracker.pak");
+
+	// bad ones
+	CHECK(Remap_parseFn("Tools/tg5050/Files.pak", "tg5040", out) == REMAP_BAD); // another platform's
+	CHECK(Remap_parseFn("Roms/Files.pak", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn("Tools/../Files.pak", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn("..pak", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn(".pak", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn("pak:Clock", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn("pak:", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn("action:", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn("game list", "tg5040", out) == REMAP_BAD);
+	CHECK(Remap_parseFn("a,b", "tg5040", out) == REMAP_BAD);
+	char lng[400];
+	memset(lng, 'a', sizeof(lng) - 1);
+	lng[sizeof(lng) - 1] = '\0';
+	CHECK(Remap_parseFn(lng, "tg5040", out) == REMAP_BAD);
+	memcpy(lng + sizeof(lng) - 5, ".pak", 5);
+	CHECK(Remap_parseFn(lng, "tg5040", out) == REMAP_BAD);
+}
+
+static void testFnBinds(void) {
+	// nothing set binds nothing
+	reset();
+	start();
+	for (int i = 0; i < REMAP_FNS; i++) CHECK(!fn_bound[i][0]);
+	CHECK(logs == 0);
+
+	// each button set
+	reset();
+	setCfg("fn1", "Tools/Files.pak");
+	setCfg("fn2", "gamelist.switcher");
+	setCfg("home", "pak:Clock.pak");
+	start();
+	CHECK_STR(fn_bound[0], "pak:Files.pak");
+	CHECK_STR(fn_bound[1], "action:gamelist.switcher");
+	CHECK_STR(fn_bound[2], "pak:Clock.pak");
+	CHECK(logs == 0);
+
+	// a device with only HOME, as the tg5050: FN1 and FN2 do nothing
+	reset();
+	fn_names[0] = "";
+	fn_names[1] = "";
+	setCfg("fn1", "Files.pak");
+	setCfg("home", "Files.pak");
+	start();
+	CHECK(!fn_bound[0][0]);
+	CHECK_STR(fn_bound[2], "pak:Files.pak");
+	CHECK(logs == 1);
+
+	// a bad setting, and one the launcher refuses, as when the user
+	// assigned the button in Settings or another plugin bound it first
+	reset();
+	fn_refuse = 1;
+	setCfg("fn1", "Roms/Files.pak");
+	setCfg("fn2", "Files.pak");
+	start();
+	CHECK(!fn_bound[0][0]);
+	CHECK(!fn_bound[1][0]);
+	CHECK(logs == 1); // the launcher logs its own refusals
+
+	// a launcher without FN bindings
+	reset();
+	setCfg("home", "Files.pak");
+	fake.size = offsetof(MosaicHost, fn_name);
+	start();
+	fake.size = sizeof(MosaicHost);
+	CHECK(!fn_bound[2][0]);
+	CHECK(logs == 1);
+}
+
 int main(void) {
 	const MosaicPlugin* p = mosaic_plugin_get(&fake);
 	CHECK(p->size == sizeof(MosaicPlugin));
@@ -356,5 +495,8 @@ int main(void) {
 	testButtons();
 	testRepeat();
 	testRefusals();
+	testFnKeys();
+	testParseFn();
+	testFnBinds();
 	CHECK_DONE();
 }

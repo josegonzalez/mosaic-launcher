@@ -15,6 +15,15 @@ msgstr "Botón A"
 msgid "Button remap"
 msgstr "Reasignar botones"
 
+msgid "FN1 button"
+msgstr "Botón FN1"
+
+msgid "FN2 button"
+msgstr "Botón FN2"
+
+msgid "HOME button"
+msgstr "Botón HOME"
+
 msgid "L2 button"
 msgstr "Botón L2"
 

@@ -67,4 +67,22 @@ typedef struct RemapCall {
 // out holds REMAP_CALLS_MAX. Returns the count.
 int Remap_calls(const RemapTable* table, RemapCall* out);
 
+// The FN buttons host->fn_bind takes: FN1, FN2 and HOME (FN3, which is
+// HOME on every device that has it), with the setting keys "fn1", "fn2"
+// and "home".
+#define REMAP_FNS 3
+#define REMAP_FN_LEN 256 // a binding's bytes, its terminator included, as host->fn_bind keeps
+
+// The setting key for FN button index (0 for FN1 to 2 for HOME), or NULL.
+const char* Remap_fnKey(int index);
+
+// Parses an FN button's setting into what host->fn_bind takes: an action
+// id, such as gamelist.switcher, as "action:<id>"; a Tools pak, such as
+// Tools/Files.pak, Tools/<platform>/Files.pak or Files.pak, as
+// "pak:Files.pak"; or "action:..." and "pak:..." as they are. platform is
+// the device's, for the Tools/<platform>/ form. out holds REMAP_FN_LEN.
+// Returns REMAP_UNSET for empty or NULL, REMAP_SET, or REMAP_BAD for a
+// badly spelled id, a pak outside Tools or one too long to keep.
+int Remap_parseFn(const char* value, const char* platform, char* out);
+
 #endif

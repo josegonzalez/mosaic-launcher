@@ -15,3 +15,7 @@ setting.y=text|Y button|
 setting.l2=text|L2 button|
 setting.r2=text|R2 button|
 setting.start=text|START button|
+# FN1, FN2 and HOME, where the device has them: an action id, eg. gamelist.switcher, or a Tools pak, eg. Tools/Files.pak, run on a press from any launcher screen; empty leaves the button as stock's Settings has it, and the user's choice there wins
+setting.fn1=text|FN1 button|
+setting.fn2=text|FN2 button|
+setting.home=text|HOME button|

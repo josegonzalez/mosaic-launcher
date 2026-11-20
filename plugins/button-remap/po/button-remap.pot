@@ -23,6 +23,18 @@ msgid "Button remap"
 msgstr ""
 
 #: plugin.txt
+msgid "FN1 button"
+msgstr ""
+
+#: plugin.txt
+msgid "FN2 button"
+msgstr ""
+
+#: plugin.txt
+msgid "HOME button"
+msgstr ""
+
+#: plugin.txt
 msgid "L2 button"
 msgstr ""
 
