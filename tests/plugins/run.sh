@@ -141,6 +141,14 @@ clear_tmp() {
 	rm -f /tmp/mosaic-launcher-launched /tmp/mosaic-launcher-home /tmp/stay_awake /tmp/stay_alive
 }
 
+# clear_plugins: removes the plugins earlier cases built, before each case,
+# as a plugin plugins.txt doesn't name loads, so none inherits another's. A
+# case right after the one its "# after:" line names keeps what that one
+# built; one that isn't builds what it needs again.
+clear_plugins() {
+	rm -rf "$WORK/plugins"
+}
+
 # start_launcher <log> [line...]: starts the launcher, keeping the crash
 # guard's state. With lines, stops once the log has all of them and the
 # first frame is up (the loading marker is gone); without, runs until it
@@ -487,12 +495,15 @@ else
 	# the card from the skeleton when there isn't one, before the folders
 	# below make it look prepared to upstream's script, which then skips it
 	bash "$ROOT/vendor/NextUI/workspace/desktop/prepare_fake_sd_root.sh" >/dev/null || fail "preparing the fake card"
+	previous_case=""
 	for case_name in $run_cases; do
 		case_started=$(now_ms)
 		# where the cases write the shared settings and recents, which only a
 		# launch makes on a new card
 		mkdir -p "$(dirname "$RECENTS")"
 		clear_tmp
+		[ "$(after "$case_name")" = "$previous_case" ] || clear_plugins
+		previous_case=$case_name
 		# shellcheck source=/dev/null
 		. "$ROOT/tests/plugins/cases/$case_name.sh"
 		case_ms=$(($(now_ms) - case_started))

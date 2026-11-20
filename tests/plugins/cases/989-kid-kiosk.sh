@@ -36,16 +36,7 @@ mkdir -p "$KK_KIDS" "$KK_OTHER" "$STATE"
 [ -f /tmp/last.txt ] && cp /tmp/last.txt "$WORK/kid-last.saved"
 [ -f "$KK_PIN" ] && mv "$KK_PIN" "$WORK/kid-pin.saved"
 printf 'Kids\nKids\t/Roms/Kid Games (GB)/Alpha.gb\n' >"$STATE/tags.txt"
-# only tags and simple-mode: any other plugin an earlier case built into
-# $WORK/plugins, such as favorites with its own Y, is turned off
-{
-	printf 'tags=on\nsimple-mode=on\n'
-	for kk_built in "$WORK"/plugins/*.plugin; do
-		[ -e "$kk_built" ] || continue
-		kk_id=$(basename "$kk_built" .plugin)
-		case "$kk_id" in tags | simple-mode) ;; *) printf '%s=off\n' "$kk_id" ;; esac
-	done
-} >"$STATE/plugins.txt"
+printf 'tags=on\nsimple-mode=on\n' >"$STATE/plugins.txt"
 # typing 4826 from where the keyboard starts (q), then START
 TYPE_PIN="up right right right a right right right right a left left left left left left a right right right right a start"
 
