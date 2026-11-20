@@ -599,6 +599,24 @@ static int fakeDrawHints(MosaicSurface* screen, int group, const MosaicHint* hin
 	return 0;
 }
 
+// gate_edit: the edit it's asked about, answered when the test says
+static char gate_id[64];
+static void (*gate_done)(int, void*);
+static void* gate_data;
+static int gate_calls = 0;
+static int fakeGateEdit(const char* edit_id, void (*on_done)(int, void*), void* data) {
+	gate_calls++;
+	snprintf(gate_id, sizeof(gate_id), "%s", edit_id);
+	gate_done = on_done;
+	gate_data = data;
+	return 0;
+}
+static void gateAnswer(int answer) {
+	void (*done)(int, void*) = gate_done;
+	gate_done = NULL;
+	if (done) done(answer, gate_data);
+}
+
 static void setupHost(void) {
 	memset(&fake_host, 0, sizeof(fake_host));
 	fake_host.size = sizeof(MosaicHost);
@@ -1049,6 +1067,46 @@ static void testRomm(void) {
 	registered.exit(NULL);
 }
 
+// With gate_edit, Y asks the launcher's gate as save-state-manager.delete
+// before the confirm: refused, nothing is asked or deleted; a PIN waits
+// for the answer; one that comes after the screen closed asks nothing.
+static void testDeleteGate(void) {
+	makeCard();
+	start();
+	fake_host.gate_edit = fakeGateEdit;
+	gate_calls = 0;
+	selectGame(GB_ROMS "/Tetris.gb", "Tetris", MOSAIC_ENTRY_ROM);
+	actions[actionIndex(GAME_ID)].run(NULL, NULL);
+	draw();
+	CHECK(logStarts("slots 0 of 3: Tetris, Slot 1, "));
+	confirm_text[0] = '\0';
+	press(MOSAIC_BUTTON_Y);
+	CHECK(gate_calls == 1);
+	CHECK_STR(gate_id, "save-state-manager.delete");
+	CHECK_STR(confirm_text, ""); // not until the gate answers
+	gateAnswer(MOSAIC_GATE_REFUSE);
+	CHECK_STR(confirm_text, "");
+	CHECK_STR(last_log, "not deleting a state of Tetris.gb: refused");
+	CHECK(exists(SHARED "/GB-gambatte/Tetris.gb.st0"));
+
+	// let through, as after the right PIN: the confirm, then the delete
+	press(MOSAIC_BUTTON_Y);
+	CHECK(gate_calls == 2);
+	gateAnswer(MOSAIC_GATE_RUN);
+	CHECK(strstr(confirm_text, "Delete this save state?\nTetris \xc2\xb7 Slot 1 \xc2\xb7 ") != NULL);
+	confirm_yes(confirm_data);
+	CHECK(logStarts("deleted Slot 1 of Tetris.gb: "));
+	CHECK(!exists(SHARED "/GB-gambatte/Tetris.gb.st0"));
+
+	// the screen closed before the answer: no confirm
+	confirm_text[0] = '\0';
+	press(MOSAIC_BUTTON_Y);
+	registered.exit(registered.data);
+	gateAnswer(MOSAIC_GATE_RUN);
+	CHECK_STR(confirm_text, "");
+	fake_host.gate_edit = NULL;
+}
+
 int main(void) {
 	setenv("TZ", "UTC", 1);
 	tzset();
@@ -1065,6 +1123,7 @@ int main(void) {
 	testGameScreen();
 	testAllScreen();
 	testNoDelete();
+	testDeleteGate();
 	testBounded();
 	testRomm();
 	CHECK(system("rm -rf '" CARD "'") == 0);

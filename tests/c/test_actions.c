@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include "check.h"
 #include "actions.h"
+#include "caller.h"
 
 // The buttons, and stock's repeat pace.
 #include "defines.h"
@@ -606,6 +607,146 @@ static void test_gate(void) {
 	gate_answer = ACTION_GATE_RUN;
 }
 
+// gate_edit's flow: with no gate it runs at once, as stock; the gate's
+// run and refuse answer straight away; a PIN waits for the prompt; while
+// drawing it's refused on the next frame; each on_done exactly once, as
+// the code that asked, and refused before its plugin's quit.
+static int edit_answer = ACTION_GATE_RUN;
+static int edit_asked = 0;
+static char edit_asked_id[64];
+static void (*edit_typed)(int right) = NULL;
+static int pin_asks = 0;
+static int pin_right_now = -1; // -1 leaves the prompt open, else answers inside ask_pin
+static int editAnswerFor(const char* id) {
+	edit_asked++;
+	snprintf(edit_asked_id, sizeof(edit_asked_id), "%s", id);
+	return edit_answer;
+}
+static void editAskPin(void (*typed)(int right)) {
+	pin_asks++;
+	edit_typed = typed;
+	if (pin_right_now >= 0) typed(pin_right_now);
+}
+static int done_calls = 0;
+static int done_answer = -1;
+static void* done_data = NULL;
+static char done_caller[64];
+static void editDoneCb(int answer, void* data) {
+	done_calls++;
+	done_answer = answer;
+	done_data = data;
+	snprintf(done_caller, sizeof(done_caller), "%s", Caller_current() ? Caller_current() : "(none)");
+}
+static void editAgain(int answer, void* data) {
+	editDoneCb(answer, data);
+	// asking again from on_done works, and answers straight away
+	Edit_gate("p.again", 1, editDoneCb, NULL);
+}
+
+static void test_editGate(void) {
+	int token = 0;
+	// no gate: it runs at once, as the code that asked
+	Actions_setEditGate(NULL, NULL);
+	AS_CALLER("screenshot-viewer") CHECK(Edit_gate("screenshot-viewer.delete", 1, editDoneCb, &token) == 0);
+	CHECK(done_calls == 1 && done_answer == ACTION_GATE_RUN && done_data == &token);
+	CHECK_STR(done_caller, "screenshot-viewer");
+
+	// the gate's answers: run, then refuse, each asked with the edit's id
+	Actions_setEditGate(editAnswerFor, editAskPin);
+	done_calls = 0;
+	CHECK(Edit_gate("p.delete", 1, editDoneCb, NULL) == 0);
+	CHECK(done_calls == 1 && done_answer == ACTION_GATE_RUN && edit_asked == 1);
+	CHECK_STR(edit_asked_id, "p.delete");
+	edit_answer = ACTION_GATE_REFUSE;
+	CHECK(Edit_gate("p.delete", 1, editDoneCb, NULL) == 0);
+	CHECK(done_calls == 2 && done_answer == ACTION_GATE_REFUSE);
+	edit_answer = 7; // anything else counts as a run
+	CHECK(Edit_gate("p.delete", 1, editDoneCb, NULL) == 0);
+	CHECK(done_calls == 3 && done_answer == ACTION_GATE_RUN);
+
+	// the PIN: nothing until the prompt answers, then once, as the caller
+	edit_answer = ACTION_GATE_PIN;
+	done_calls = 0;
+	AS_CALLER("save-state-manager") CHECK(Edit_gate("save-state-manager.delete", 1, editDoneCb, &token) == 0);
+	CHECK(done_calls == 0 && pin_asks == 1 && edit_typed != NULL);
+	// a second PIN while the first waits is refused straight away
+	CHECK(Edit_gate("p.other", 1, editDoneCb, NULL) == -1);
+	CHECK(done_calls == 1 && done_answer == ACTION_GATE_REFUSE && pin_asks == 1);
+	// the prompt still open: a frame doesn't answer it
+	Edits_deliver(1);
+	CHECK(done_calls == 1);
+	edit_typed(1);
+	CHECK(done_calls == 2 && done_answer == ACTION_GATE_RUN && done_data == &token);
+	CHECK_STR(done_caller, "save-state-manager");
+	edit_typed(1); // a stale answer runs nothing
+	CHECK(done_calls == 2);
+	// a wrong PIN or a cancel refuses it
+	CHECK(Edit_gate("p.delete", 1, editDoneCb, NULL) == 0);
+	edit_typed(0);
+	CHECK(done_calls == 3 && done_answer == ACTION_GATE_REFUSE);
+	// with no PIN set, ask_pin answers from inside it
+	pin_right_now = 1;
+	CHECK(Edit_gate("p.delete", 1, editDoneCb, NULL) == 0);
+	CHECK(done_calls == 4 && done_answer == ACTION_GATE_RUN);
+	pin_right_now = -1;
+	// a prompt another dialog replaced is refused once it's gone
+	CHECK(Edit_gate("p.delete", 1, editDoneCb, NULL) == 0);
+	Edits_deliver(1);
+	CHECK(done_calls == 4);
+	Edits_deliver(0);
+	CHECK(done_calls == 5 && done_answer == ACTION_GATE_REFUSE);
+	// with no way to ask the PIN, refused
+	Actions_setEditGate(editAnswerFor, NULL);
+	CHECK(Edit_gate("p.delete", 1, editDoneCb, NULL) == -1);
+	CHECK(done_calls == 6 && done_answer == ACTION_GATE_REFUSE);
+	Actions_setEditGate(editAnswerFor, editAskPin);
+
+	// the plugin quits while its PIN prompt waits: refused before its quit,
+	// as it, and another plugin's edit is left waiting
+	AS_CALLER("save-state-manager") CHECK(Edit_gate("save-state-manager.delete", 1, editDoneCb, NULL) == 0);
+	Edits_drop("screenshot-viewer");
+	CHECK(done_calls == 6);
+	Edits_drop("save-state-manager");
+	CHECK(done_calls == 7 && done_answer == ACTION_GATE_REFUSE);
+	CHECK_STR(done_caller, "save-state-manager");
+	edit_typed(1); // its prompt closing later runs nothing
+	CHECK(done_calls == 7);
+
+	// while drawing: refused without asking, on the next frame, in order
+	edit_answer = ACTION_GATE_RUN;
+	int asked = edit_asked;
+	int first = 1, second = 2;
+	AS_CALLER("screenshot-viewer") CHECK(Edit_gate("screenshot-viewer.delete", 0, editDoneCb, &first) == -1);
+	CHECK(Edit_gate("p.delete", 0, editAgain, &second) == -1);
+	CHECK(done_calls == 7 && edit_asked == asked);
+	Edits_deliver(1);
+	// the first, then the second, whose on_done asked again and was answered
+	CHECK(done_calls == 10 && done_answer == ACTION_GATE_RUN);
+	Edits_deliver(1);
+	CHECK(done_calls == 10);
+
+	// bad ids are refused straight away, and no on_done is -1 with nothing run
+	CHECK(Edit_gate(NULL, 1, editDoneCb, NULL) == -1);
+	CHECK(done_calls == 11 && done_answer == ACTION_GATE_REFUSE);
+	CHECK(Edit_gate("", 1, editDoneCb, NULL) == -1);
+	char longer[200];
+	memset(longer, 'a', sizeof(longer) - 1);
+	longer[sizeof(longer) - 1] = '\0';
+	CHECK(Edit_gate(longer, 1, editDoneCb, NULL) == -1);
+	CHECK(done_calls == 13);
+	CHECK(Edit_gate("p.delete", 1, NULL, NULL) == -1);
+	CHECK(done_calls == 13);
+
+	// past EDITS_WAITING_MAX waiting, another is dropped and logged
+	for (int i = 0; i < EDITS_WAITING_MAX; i++) Edit_gate("p.delete", 0, editDoneCb, NULL);
+	logged[0] = '\0';
+	CHECK(Edit_gate("p.delete", 0, editDoneCb, NULL) == -1);
+	CHECK(strstr(logged, "dropping the edit p.delete") != NULL);
+	Edits_deliver(1);
+	CHECK(done_calls == 13 + EDITS_WAITING_MAX);
+	Actions_setEditGate(NULL, NULL);
+}
+
 int main(void) {
 	// dispatch: the fired, available binding runs
 	press(BTN_A);
@@ -710,6 +851,7 @@ int main(void) {
 	test_binding_list();
 	test_shared_overflow();
 	test_gate();
+	test_editGate();
 
 	CHECK_DONE();
 }

@@ -2038,6 +2038,30 @@ typedef struct MosaicHost {
 	// Desktop has no external audio and answers MOSAIC_AUDIO_SINK_NONE.
 	// Check for it with MOSAIC_HOST_HAS(host, audio_sink).
 	int (*audio_sink)(void);
+
+	// Asking before an edit a plugin makes on a screen of its own rather
+	// than through an action, such as a delete, so kiosk mode covers it.
+	// edit_id names it, such as "<plugin id>.delete". Every plugin's
+	// action_gate is asked about edit_id with MOSAIC_ACTION_EDITS, as for
+	// an action, and when one answers MOSAIC_GATE_PIN the launcher asks for
+	// its PIN, titled "PIN to make changes" (a wrong one says so). on_done
+	// gets MOSAIC_GATE_RUN, when the edit may go ahead, or
+	// MOSAIC_GATE_REFUSE, exactly once, as the calling plugin's code and
+	// never while drawing: from inside gate_edit when nothing asks for the
+	// PIN (with no action_gate, or every one saying MOSAIC_GATE_RUN, that's
+	// MOSAIC_GATE_RUN, as before), or once the PIN prompt closes, refused
+	// for a wrong PIN, a cancel or another dialog taking its place. One
+	// still waiting is refused before the plugin's quit, or as its init
+	// declines. A refusing action_gate says why itself.
+	// gate_edit returns -1 for a refusal of its own: a call while drawing
+	// or from init, refused on the next frame without asking, and one with
+	// a missing, empty or longer than 127 bytes edit_id, or while another
+	// edit waits for the PIN, refused straight away. It returns 0
+	// otherwise, and -1 without calling on_done for a NULL
+	// on_done, a call off the launcher's thread or, past 16 edits waiting
+	// at once, one that would wait; the launcher logs each refusal. Check
+	// for it with MOSAIC_HOST_HAS(host, gate_edit).
+	int (*gate_edit)(const char* edit_id, void (*on_done)(int answer, void* data), void* data);
 } MosaicHost;
 
 // What the play history calls return when the history can't be read.

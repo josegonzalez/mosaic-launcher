@@ -20,7 +20,7 @@ It starts on a grid of thumbnails with each game's name under it. The selected o
 | **A** | Shows the selected screenshot across the screen, where left and right step to the next and previous |
 | **B** | Goes back |
 | **X** | Shows the selected screenshot's game's media (see below) |
-| **Y** | Deletes the selected screenshot after a confirm (Delete with Y), removing only that file |
+| **Y** | Deletes the selected screenshot after a confirm (Delete with Y), removing only that file. In [simple mode's kiosk mode](../simple-mode/README.md#kiosk-mode) it asks for the launcher's PIN first, and is refused with no PIN set |
 
 Only regular files directly in the folder are listed or deleted, and links are never followed. Thumbnails and full views are scaled copies kept in two small pools, the least recently drawn going first, and freed when the screen closes.
 
@@ -75,6 +75,7 @@ The Screenshots tile on the quick menu (on by default).
 
 - Registers the actions `screenshot-viewer.open`, `screenshot-viewer.capture` and `screenshot-viewer.media`; `button` follows `screenshot-viewer.open`, and `media_button` follows `screenshot-viewer.media`, which takes the game's path and is bound to **Y** on the game list too. Registers a quick menu tile, and the screens `screenshot-viewer.main` and `screenshot-viewer.media-view`.
 - `screenshot-viewer.capture` uses the launcher's `save_screenshot`.
+- Asks `gate_edit` as `screenshot-viewer.delete` before the delete's confirm, so an `action_gate` such as simple mode's kiosk can ask for the PIN or refuse it.
 - Reads and deletes files in `Screenshots/`, and writes `Launcher.<date>.png` there. Reads the media files listed above beside a game.
 - Finds a game's name, and a screenshot's game, with the card index (`index_find`, `index_entry`), and tidies the file name as stock does without it.
 - Plays a game's clip with `video-previews`' `video.play` service (`path=<game>`, `clock=off`), on that plugin's own screen over the media screen, and closes it by calling `video.play` without a game. While it shows, its `input_filter` takes **left**, **right** and **B**, which that screen doesn't take. It doesn't list `video-previews` in `requires` or `optional`: without it, or without ffmpeg (`video.play` doesn't answer), clips are left out.

@@ -761,6 +761,24 @@ static int fakeIndexRefresh(void) {
 	return 0;
 }
 
+// gate_edit: the edit it's asked about, answered when the test says
+static char gate_id[64];
+static void (*gate_done)(int, void*);
+static void* gate_data;
+static int gate_calls = 0;
+static int fakeGateEdit(const char* edit_id, void (*on_done)(int, void*), void* data) {
+	gate_calls++;
+	snprintf(gate_id, sizeof(gate_id), "%s", edit_id);
+	gate_done = on_done;
+	gate_data = data;
+	return 0;
+}
+static void gateAnswer(int answer) {
+	void (*done)(int, void*) = gate_done;
+	gate_done = NULL;
+	if (done) done(answer, gate_data);
+}
+
 static void setupHost(void) {
 	memset(&fake_host, 0, sizeof(fake_host));
 	fake_host.size = sizeof(MosaicHost);
@@ -1197,6 +1215,46 @@ static void testBounded(void) {
 	CHECK(live == 0);
 }
 
+// With gate_edit, Y asks the launcher's gate as screenshot-viewer.delete
+// before the confirm: refused, nothing is asked or deleted; a PIN waits
+// for the answer; one that comes after the screen closed asks nothing.
+static void testDeleteGate(void) {
+	makeCard();
+	start();
+	fake_host.gate_edit = fakeGateEdit;
+	gate_calls = 0;
+	registered.enter(registered.data);
+	draw();
+	CHECK_STR(last_log, "grid 0 of 4: Dr. Mario, 2026-11-09 08:30, 4 columns");
+	confirm_text[0] = '\0';
+	press(MOSAIC_BUTTON_Y);
+	CHECK(gate_calls == 1);
+	CHECK_STR(gate_id, "screenshot-viewer.delete");
+	CHECK_STR(confirm_text, ""); // not until the gate answers
+	gateAnswer(MOSAIC_GATE_REFUSE);
+	CHECK_STR(confirm_text, "");
+	CHECK_STR(last_log, "not deleting Dr. Mario.2026-11-09-08-30-00.png: refused");
+	CHECK(exists(SHOTS "/Dr. Mario.2026-11-09-08-30-00.png"));
+
+	// let through, as after the right PIN: the confirm, then the delete
+	press(MOSAIC_BUTTON_Y);
+	CHECK(gate_calls == 2);
+	gateAnswer(MOSAIC_GATE_RUN);
+	CHECK(strstr(confirm_text, "Delete this screenshot?") != NULL);
+	CHECK(strstr(confirm_text, "Dr. Mario") != NULL);
+	confirm_yes(confirm_data);
+	CHECK(!exists(SHOTS "/Dr. Mario.2026-11-09-08-30-00.png"));
+	CHECK_STR(toast_text, "Screenshot deleted");
+
+	// the screen closed before the answer: no confirm
+	confirm_text[0] = '\0';
+	press(MOSAIC_BUTTON_Y);
+	registered.exit(registered.data);
+	gateAnswer(MOSAIC_GATE_RUN);
+	CHECK_STR(confirm_text, "");
+	fake_host.gate_edit = NULL;
+}
+
 int main(void) {
 	testNames();
 	testSort();
@@ -1209,6 +1267,7 @@ int main(void) {
 	testAction();
 	testScreen();
 	testEmptyAndNoDelete();
+	testDeleteGate();
 	testBounded();
 	testMediaNames();
 	testMediaFind();

@@ -135,6 +135,148 @@ int ActionGate_stricter(int a, int b) {
 	return a > b ? a : b;
 }
 
+///////////////////////////////////////
+// edits plugins make on their own screens
+
+#define EDIT_ID_MAX 128
+#define EDIT_CALLER_MAX 64
+
+typedef struct WaitingEdit {
+	char id[EDIT_ID_MAX];
+	char caller[EDIT_CALLER_MAX];
+	int has_caller;
+	void (*on_done)(int answer, void* data);
+	void* data;
+	int answer;
+	int pin; // 1 while it waits for the PIN prompt
+} WaitingEdit;
+
+static int (*editAnswer)(const char* edit_id) = NULL;
+static void (*editPin)(void (*typed)(int right)) = NULL;
+static WaitingEdit waiting[EDITS_WAITING_MAX];
+static int waiting_count = 0;
+
+void Actions_setEditGate(int (*answer)(const char* edit_id), void (*ask_pin)(void (*typed)(int right))) {
+	editAnswer = answer;
+	editPin = ask_pin;
+}
+
+static void editDone(const WaitingEdit* edit) {
+	WaitingEdit copy = *edit; // on_done may ask again, changing the list
+	AS_CALLER(copy.has_caller ? copy.caller : NULL) copy.on_done(copy.answer, copy.data);
+}
+
+static WaitingEdit* editWait(const char* id, void (*on_done)(int, void*), void* data, int answer, int pin) {
+	if (waiting_count >= EDITS_WAITING_MAX) {
+		LOG_warn("plugins: dropping the edit %s: %i are waiting already\n", id, waiting_count);
+		return NULL;
+	}
+	WaitingEdit* edit = &waiting[waiting_count++];
+	memset(edit, 0, sizeof(*edit));
+	snprintf(edit->id, sizeof(edit->id), "%s", id);
+	const char* caller = Caller_current();
+	edit->has_caller = caller != NULL;
+	snprintf(edit->caller, sizeof(edit->caller), "%s", caller ? caller : "");
+	edit->on_done = on_done;
+	edit->data = data;
+	edit->answer = answer;
+	edit->pin = pin;
+	return edit;
+}
+
+static void editTake(int index, WaitingEdit* out) {
+	*out = waiting[index];
+	memmove(&waiting[index], &waiting[index + 1], sizeof(waiting[0]) * (size_t)(waiting_count - index - 1));
+	waiting_count--;
+}
+
+static int pinWaiting(void) {
+	for (int i = 0; i < waiting_count; i++) {
+		if (waiting[i].pin) return i;
+	}
+	return -1;
+}
+
+static void editPinTyped(int right) {
+	int at = pinWaiting();
+	if (at < 0) return; // dropped meanwhile
+	WaitingEdit edit;
+	editTake(at, &edit);
+	edit.answer = right ? ACTION_GATE_RUN : ACTION_GATE_REFUSE;
+	edit.pin = 0;
+	if (!right) LOG_info("plugins: %s was refused: the PIN wasn't typed\n", edit.id);
+	editDone(&edit);
+}
+
+int Edit_gate(const char* edit_id, int now, void (*on_done)(int answer, void* data), void* data) {
+	if (!on_done) {
+		LOG_warn("plugins: gate_edit refused: it has no on_done\n");
+		return -1;
+	}
+	int ok = edit_id && edit_id[0] && strlen(edit_id) < EDIT_ID_MAX;
+	const char* id = ok ? edit_id : "(bad id)";
+	if (!ok) LOG_warn("plugins: refusing an edit: its id is missing, empty or too long\n");
+	else if (!now) {
+		LOG_info("plugins: refusing %s: not while drawing or from init\n", id);
+		ok = 0;
+	}
+	int answer = ok ? (editAnswer ? editAnswer(id) : ACTION_GATE_RUN) : ACTION_GATE_REFUSE;
+	if (answer == ACTION_GATE_PIN && (pinWaiting() >= 0 || !editPin)) {
+		LOG_info("plugins: refusing %s: the PIN can't be asked now\n", id);
+		answer = ACTION_GATE_REFUSE;
+		ok = 0;
+	}
+	if (answer == ACTION_GATE_PIN) {
+		if (!editWait(id, on_done, data, ACTION_GATE_REFUSE, 1)) return -1;
+		LOG_info("plugins: asking the PIN before %s\n", id);
+		editPin(editPinTyped); // with no PIN set, this answers straight away
+		return 0;
+	}
+	if (answer != ACTION_GATE_REFUSE) answer = ACTION_GATE_RUN;
+	if (now) {
+		WaitingEdit edit = { .has_caller = 0, .on_done = on_done, .data = data, .answer = answer };
+		const char* caller = Caller_current();
+		edit.has_caller = caller != NULL;
+		snprintf(edit.caller, sizeof(edit.caller), "%s", caller ? caller : "");
+		editDone(&edit);
+	} else {
+		editWait(id, on_done, data, answer, 0);
+	}
+	return ok ? 0 : -1;
+}
+
+void Edits_deliver(int prompt_open) {
+	// only those waiting now: one asked from an on_done waits for the next
+	int count = waiting_count;
+	for (int n = 0; n < count && waiting_count > 0; n++) {
+		int at = -1;
+		for (int i = 0; i < waiting_count && at < 0; i++) {
+			if (!waiting[i].pin || !prompt_open) at = i;
+		}
+		if (at < 0) return;
+		WaitingEdit edit;
+		editTake(at, &edit);
+		if (edit.pin) LOG_info("plugins: %s was refused: its PIN prompt closed without an answer\n", edit.id);
+		edit.pin = 0;
+		editDone(&edit);
+	}
+}
+
+void Edits_drop(const char* plugin_id) {
+	if (!plugin_id) return;
+	for (int i = 0; i < waiting_count;) {
+		if (!waiting[i].has_caller || strcmp(waiting[i].caller, plugin_id) != 0) {
+			i++;
+			continue;
+		}
+		WaitingEdit edit;
+		editTake(i, &edit);
+		edit.answer = ACTION_GATE_REFUSE;
+		edit.pin = 0;
+		editDone(&edit);
+	}
+}
+
 static int run(const Action* action, const char* path, int gated) {
 	if (!action) return -1;
 	path = pathFor(action, path);

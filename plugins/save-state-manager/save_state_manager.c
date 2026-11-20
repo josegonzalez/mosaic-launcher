@@ -15,7 +15,9 @@
 // each slot's preview, name and time; A shows the preview across the
 // screen, where left and right step through the slots, and B goes back.
 // Y, on a game's states or the full view, deletes the selected state after
-// the launcher's confirm (the "delete" setting turns it off): its state
+// the launcher's gate (gate_edit, as save-state-manager.delete, so kiosk
+// mode asks for the PIN) and its confirm (the "delete" setting turns it
+// off): its state
 // files, its preview and disc files, and the last-slot file only when it
 // names that slot. Only regular files in real folders under
 // .userdata/shared are ever deleted, looked at without following links.
@@ -54,6 +56,7 @@
 #define SCREEN_ID ID ".main"
 #define OPEN_ID ID ".open"
 #define GAME_ID ID ".game"
+#define DELETE_EDIT ID ".delete"
 #define THUMB_COPIES 40
 #define FULL_COPIES 3
 
@@ -70,6 +73,7 @@ static int game_sel = 0, game_row = 0;
 static int slot_sel = 0, slot_row = 0;
 static int cols = 1; // the grid's, for up and down
 static int deleted = 0;
+static int viewing = 0; // 1 while the screen is open
 static struct {
 	char tag[SM_NAME_MAX];
 	char name[SM_NAME_MAX];
@@ -440,6 +444,21 @@ static void deleteConfirmed(void* data) {
 	host->request_redraw();
 }
 
+static char question[SM_NAME_MAX + 256 + 256];
+
+// The gate's answer: the confirm once it may go ahead.
+static void deleteGated(int answer, void* data) {
+	(void)data;
+	if (answer != MOSAIC_GATE_RUN || !viewing) {
+		char message[SM_NAME_MAX + 64];
+		snprintf(message, sizeof(message), "not deleting a state of %s: refused", pending.name);
+		say(message);
+		return;
+	}
+	host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
+}
+
+// Asks the launcher's gate first (kiosk mode's PIN), then confirms.
 static void askDelete(void) {
 	SMGame* game = current();
 	if (!game || slot_sel < 0 || slot_sel >= game->count) return;
@@ -448,9 +467,9 @@ static void askDelete(void) {
 	pending.slot = game->slots[slot_sel].slot;
 	char text[SM_NAME_MAX + 256];
 	slotTitle(game, &game->slots[slot_sel], 1, text, sizeof(text));
-	char question[sizeof(text) + 256];
 	snprintf(question, sizeof(question), tr("Delete this save state?\n%s"), text);
-	host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
+	if (MOSAIC_HOST_HAS(host, gate_edit)) host->gate_edit(DELETE_EDIT, deleteGated, NULL);
+	else deleteGated(MOSAIC_GATE_RUN, NULL);
 }
 
 ///////////////////////////////////////
@@ -461,6 +480,7 @@ static int enter(void* data) {
 	slot_sel = slot_row = 0;
 	game_sel = game_row = 0;
 	deleted = 0;
+	viewing = 1;
 	rescan = 0;
 	if (all) restore = 0;
 	shown[0] = '\0';
@@ -485,6 +505,7 @@ static int enter(void* data) {
 
 static void leave(void* data) {
 	(void)data;
+	viewing = 0;
 	copiesClear();
 	SM_listFree(&list);
 	// so the list's resume and other plugins' badges see the change

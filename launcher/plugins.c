@@ -853,26 +853,27 @@ static void gatePinDone(int result, void* data) {
 
 // Every plugin's action_gate, the strictest answer winning (see
 // action_gate in mosaic_plugin.h).
-static int gateAction(const Action* action, const char* path) {
+static int gateAnswer(const char* id, int flags) {
 	int answer = ACTION_GATE_RUN;
-	int flags = actionFlags(action);
 	for (int i = 0; i < loaded_count; i++) {
 		const MosaicPlugin* p = loaded[i].plugin;
 		if (!Plugin_has(p, action_gate) || !p->action_gate) continue;
 		int rc = MOSAIC_GATE_RUN;
-		AS_PLUGIN(i) rc = p->action_gate(action->id, flags);
+		AS_PLUGIN(i) rc = p->action_gate(id, flags);
 		if (rc != MOSAIC_GATE_RUN && rc != MOSAIC_GATE_PIN && rc != MOSAIC_GATE_REFUSE) {
-			if (!loaded[i].gate_logged) LOG_warn("plugins: %s's action_gate returned %i for %s, counted as a run\n", loaded[i].id, rc, action->id);
+			if (!loaded[i].gate_logged) LOG_warn("plugins: %s's action_gate returned %i for %s, counted as a run\n", loaded[i].id, rc, id);
 			loaded[i].gate_logged = 1;
 			continue;
 		}
 		answer = ActionGate_stricter(answer, rc);
 	}
-	if (answer == ACTION_GATE_REFUSE) {
-		LOG_info("plugins: %s was refused by a plugin's action_gate\n", action->id);
-		return answer;
-	}
-	if (answer != ACTION_GATE_PIN) return ACTION_GATE_RUN;
+	if (answer == ACTION_GATE_REFUSE) LOG_info("plugins: %s was refused by a plugin's action_gate\n", id);
+	return answer == ACTION_GATE_REFUSE || answer == ACTION_GATE_PIN ? answer : ACTION_GATE_RUN;
+}
+
+static int gateAction(const Action* action, const char* path) {
+	int answer = gateAnswer(action->id, actionFlags(action));
+	if (answer != ACTION_GATE_PIN) return answer;
 	if (strlen(action->id) >= sizeof(gated_id) || (path && strlen(path) >= sizeof(gated_path))) {
 		LOG_warn("plugins: can't ask the PIN for %s: its id or path is too long\n", action->id);
 		return ACTION_GATE_REFUSE;
@@ -883,6 +884,34 @@ static int gateAction(const Action* action, const char* path) {
 	if (path) strcpy(gated_path, path);
 	hostAskPin(TR("PIN to make changes"), gatePinDone, NULL);
 	return ACTION_GATE_PIN;
+}
+
+// gate_edit: plugins' action_gate answers an edit as an action with
+// MOSAIC_ACTION_EDITS, and the PIN is asked as for one.
+static int gateEditAnswer(const char* edit_id) {
+	return gateAnswer(edit_id, MOSAIC_ACTION_EDITS);
+}
+
+static void (*edit_typed)(int right);
+
+static void editPinDone(int result, void* data) {
+	(void)data;
+	if (result == MOSAIC_PIN_WRONG) Toast_show(TR("Wrong PIN"));
+	void (*typed)(int) = edit_typed;
+	edit_typed = NULL;
+	if (typed) typed(result == MOSAIC_PIN_RIGHT);
+}
+
+static void gateEditPin(void (*typed)(int right)) {
+	edit_typed = typed;
+	hostAskPin(TR("PIN to make changes"), editPinDone, NULL);
+}
+
+static int hostGateEdit(const char* edit_id, void (*on_done)(int answer, void* data), void* data) {
+	if (!callingPlugin("gate_edit")) return -1;
+	int drawing = initializing >= 0 || layout_rendering || decorating || backgrounding || generating || screen_drawing
+		|| transition_owner >= 0;
+	return Edit_gate(edit_id, !drawing, on_done, data);
 }
 
 void Plugins_adoptPin(void) {
@@ -2473,6 +2502,7 @@ static const MosaicHost host = {
 	.restart = hostRestart,
 	.reset_settings = hostResetSettings,
 	.audio_sink = hostAudioSink,
+	.gate_edit = hostGateEdit,
 };
 
 ///////////////////////////////////////
@@ -2617,6 +2647,8 @@ static void load(const PluginManifest* m) {
 		providersReleaseAll(m->id);
 		freeSurfaces(m->id);
 		Audio_closeFor(m->id, "as it declined to start");
+		// a gate_edit its init asked is refused while its code is there
+		Edits_drop(m->id);
 		PluginCfg_free(&p->cfg);
 		dlclose(handle);
 		loaded_count--;
@@ -2960,6 +2992,7 @@ static void start(void) {
 
 void Plugins_init(void) {
 	Actions_setGate(gateAction);
+	Actions_setEditGate(gateEditAnswer, gateEditPin);
 	// before any plugin's init, and whether or not any loads
 	profileRead();
 	start();
@@ -3018,6 +3051,8 @@ void Plugins_quit(void) {
 	Audio_soundHostClose("at quit", 1);
 	for (int i = loaded_count - 1; i >= 0; i--) {
 		LoadedPlugin* p = &loaded[i];
+		// an edit it still waits on is refused while it can hear it
+		Edits_drop(p->id);
 		if (Plugin_has(p->plugin, quit) && p->plugin->quit) AS_PLUGIN(i) p->plugin->quit();
 		// turning a plugin off, or a launch, gives the user's colour back
 		hostLedClear(p->id);
@@ -3960,6 +3995,8 @@ void Plugins_tick(unsigned long now) {
 		state.reload = 1;
 	}
 	if (loaded_count) sinkRefresh(now);
+	// gate_edit's answers that waited for a frame, before plugins' ticks
+	Edits_deliver(currentScreen == SCREEN_MODAL);
 	EACH_PLUGIN_WITH(tick) p->tick(now);
 	Audio_soundTick(now);
 }

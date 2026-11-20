@@ -31,7 +31,7 @@ With **Kiosk mode** on, actions that change things ask for the launcher's PIN fi
 
 With no PIN set, those actions are refused, with a message saying to set one, since a confirm alone wouldn't keep anyone out.
 
-The bundled actions that ask: `tags.edit`, `tags.status`, `favorites.toggle`, `hidden.hide`, `hidden.unhide`, `game-actions.rename`, `game-actions.collect`, `game-actions.delete`, `sort-modes.next`, `sort-modes.pick`, `filter-presets.prev`, `filter-presets.next`, `filter-presets.pick`, `focus-mode.toggle`, `focus-mode.pick`, `clear-recents.remove`, `clear-recents.clear`, `clear-recents.tile`, `smart-collections.dismiss`, `smart-collections.restore`, `smart-collections.save_tag`, `multi-disc.combine`, `emulator-override.choose`, `localization.map`, `guest-profile.clear`, `first-run.open`, `theme-plus.pick`, `sync.open`, `quick-menu-plus.stock` (Reboot to stock) and each of `tasks`' game tasks.
+The bundled actions that ask: `tags.edit`, `tags.status`, `favorites.toggle`, `hidden.hide`, `hidden.unhide`, `game-actions.rename`, `game-actions.collect`, `game-actions.delete`, `sort-modes.next`, `sort-modes.pick`, `filter-presets.prev`, `filter-presets.next`, `filter-presets.pick`, `focus-mode.toggle`, `focus-mode.pick`, `clear-recents.remove`, `clear-recents.clear`, `clear-recents.tile`, `smart-collections.dismiss`, `smart-collections.restore`, `smart-collections.save_tag`, `multi-disc.combine`, `emulator-override.choose`, `localization.map`, `guest-profile.clear`, `first-run.open`, `theme-plus.pick`, `sync.open`, `quick-menu-plus.stock` (Reboot to stock) and each of `tasks`' game tasks. Deletes inside plugin screens ask too, before their confirm: `screenshot-viewer.delete` and `save-state-manager.delete`.
 
 ## Turn it on
 
@@ -75,7 +75,7 @@ With kiosk mode on and a PIN set: Y on a game asks for the PIN before its tags.
 - Hides quick menu tiles with `hide_quick_tile`, and asks the launcher to check the PIN with `ask_pin`; the plugin never sees the PIN.
 - Writes `on` to its own `simple-mode.cfg`.
 - Reads the kid tag's games from the `tags:<name>` entry set with `set_list`, again on `launcher.set_changed` for a tag and after a game, and reads the `.txt` files in `Collections/` and the recents to decide on Recently Played and collections.
-- Answers `action_gate` for every action: while simple mode and kiosk mode are on, `MOSAIC_GATE_PIN` for an action registered with `MOSAIC_ACTION_EDITS`, or `MOSAIC_GATE_REFUSE` with no PIN set. A plugin whose action changes things registers it with `MOSAIC_ACTION_EDITS` so kiosk mode covers it.
+- Answers `action_gate` for every action: while simple mode and kiosk mode are on, `MOSAIC_GATE_PIN` for an action registered with `MOSAIC_ACTION_EDITS`, or `MOSAIC_GATE_REFUSE` with no PIN set. A plugin whose action changes things registers it with `MOSAIC_ACTION_EDITS` so kiosk mode covers it, and one that changes things on a screen of its own asks `gate_edit` first, which the launcher answers through the same `action_gate`.
 
 ## Credits
 

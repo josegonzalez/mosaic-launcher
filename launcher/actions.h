@@ -45,6 +45,36 @@ int ActionGate_stricter(int a, int b);
 // as at the start, lets every action run.
 void Actions_setGate(int (*gate)(const Action* action, const char* path));
 
+// Edits a plugin makes on a screen of its own rather than through an
+// action, such as a delete, asked about as an action with
+// MOSAIC_ACTION_EDITS would be (see gate_edit in mosaic_plugin.h). answer
+// is what plugins' action_gate say about edit_id, as an ActionGate;
+// ask_pin opens the PIN prompt and calls typed, 1 for the right PIN and 0
+// for a wrong one or none, once it closes. NULL for answer, as at the
+// start, lets every edit run; NULL for ask_pin refuses one that needs it.
+void Actions_setEditGate(int (*answer)(const char* edit_id), void (*ask_pin)(void (*typed)(int right)));
+
+// Asks before the edit edit_id runs. on_done gets ACTION_GATE_RUN or
+// ACTION_GATE_REFUSE exactly once, as the code that asked: straight away
+// when now is 1, from Edits_deliver when it's 0 (while drawing or from
+// init, where it's refused without asking), or once the PIN prompt
+// answers. Returns 0, or -1, with on_done refused, for a missing, empty
+// or too long edit_id, a call with now 0, or a PIN asked while another
+// edit waits for one; with no on_done it's -1 and nothing runs. Past
+// EDITS_WAITING_MAX waiting at once, another with now 0 or a PIN is
+// dropped, logged, and on_done never runs.
+#define EDITS_WAITING_MAX 16
+int Edit_gate(const char* edit_id, int now, void (*on_done)(int answer, void* data), void* data);
+
+// Gives the edits Edit_gate refused with now 0 their answer, in the order
+// asked, and refuses one still waiting for its PIN when prompt_open is 0,
+// as its prompt went without an answer (another dialog took its place).
+// Called once a frame, outside drawing.
+void Edits_deliver(int prompt_open);
+
+// Refuses every edit plugin_id still waits on, before its quit.
+void Edits_drop(const char* plugin_id);
+
 // Runs the action as Action_run does, without asking the gate, such as
 // once the PIN a gate asked for is typed.
 int Action_runUngated(const Action* action, const char* path);

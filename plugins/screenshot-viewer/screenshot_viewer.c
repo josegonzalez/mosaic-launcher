@@ -18,7 +18,9 @@
 // the selected one across the screen and B closes it. In the full view
 // left and right step to the next and previous, wrapping on a press, and
 // B goes back to the grid. Y, in either, deletes the selected screenshot
-// after the launcher's confirm (the "delete" setting turns it off). Only
+// after the launcher's gate (gate_edit, as screenshot-viewer.delete, so
+// kiosk mode asks for the PIN) and its confirm (the "delete" setting turns
+// it off). Only
 // regular files directly in the folder are listed or deleted, looked at
 // without following links. It draws stock's hints with draw_hints.
 //
@@ -54,6 +56,7 @@
 #define CAPTURE_ID ID ".capture"
 #define MEDIA_ID ID ".media"
 #define MEDIA_SCREEN_ID ID ".media-view"
+#define DELETE_EDIT ID ".delete"
 #define CLIP_SCREEN_ID "video-previews.saver"
 #define THUMB_COPIES 40
 #define FULL_COPIES 3
@@ -320,13 +323,28 @@ static void deleteConfirmed(void* data) {
 	host->request_redraw();
 }
 
+static char question[SV_NAME_MAX + 32 + 256];
+
+// The gate's answer: the confirm once it may go ahead.
+static void deleteGated(int answer, void* data) {
+	(void)data;
+	char message[SV_NAME_MAX + 64];
+	if (answer != MOSAIC_GATE_RUN || !viewing) {
+		snprintf(message, sizeof(message), "not deleting %s: refused", pending);
+		say(message);
+		return;
+	}
+	host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
+}
+
+// Asks the launcher's gate first (kiosk mode's PIN), then confirms.
 static void askDelete(void) {
 	snprintf(pending, sizeof(pending), "%s", list.shots[selected].file);
 	char text[SV_NAME_MAX + 32];
 	SV_title(&list.shots[selected], text, sizeof(text));
-	char question[sizeof(text) + 256];
 	snprintf(question, sizeof(question), tr("Delete this screenshot?\n%s"), text);
-	host->confirm(question, tr("DELETE"), deleteConfirmed, NULL);
+	if (MOSAIC_HOST_HAS(host, gate_edit)) host->gate_edit(DELETE_EDIT, deleteGated, NULL);
+	else deleteGated(MOSAIC_GATE_RUN, NULL);
 }
 
 ///////////////////////////////////////

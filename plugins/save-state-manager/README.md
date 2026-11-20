@@ -17,7 +17,7 @@ A game's states are a grid in slot order, each with its preview, name and time. 
 |---|---|
 | **A** | Shows the preview across the screen, where left and right step through the slots |
 | **B** | Goes back |
-| **Y** | Deletes the selected state after a confirm (Delete with Y) |
+| **Y** | Deletes the selected state after a confirm (Delete with Y). In [simple mode's kiosk mode](../simple-mode/README.md#kiosk-mode) it asks for the launcher's PIN first, and is refused with no PIN set |
 
 ### With RomM
 
@@ -71,6 +71,7 @@ With romm set up, on a game from RomM: Slot 1, which romm synced, marked synced,
 - Provides the `states.last` service (`provides=states.last`): ask for a game or game folder's `path` and get a game's most recently saved state as the slot, its label, when it was saved and its preview (see [plugin-api.md](../../docs/plugin-api.md)).
 - Registers the actions `save-state-manager.game` and `save-state-manager.open`; `button` follows `save-state-manager.game`.
 - Asks `romm`'s `romm.synced` service about each slot's newest state file for the SYNCED mark, and about the game for the Restore from server cell, as a game's states are read, never while drawing. The cell runs `run_action("romm.flashback", <the game's path>)`.
+- Asks `gate_edit` as `save-state-manager.delete` before the delete's confirm, so an `action_gate` such as simple mode's kiosk can ask for the PIN or refuse it.
 - Reads and deletes files in `.userdata/shared/<tag>-<core>` and `.userdata/shared/.minui/<tag>`.
 
 ## Credits
